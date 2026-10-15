@@ -1,0 +1,1 @@
+-- Seed data goes here (runs on supabase db reset).
