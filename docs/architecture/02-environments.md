@@ -13,7 +13,7 @@ See [ADR-0001](decisions/ADR-0001-fly-fastapi-postgres-hosting.md).
 | Image source | local build | GHCR image built in CI | same image digest promoted from staging |
 | Datastore | `postgres:16` container | Fly Postgres (small) | Fly Postgres (small, daily snapshots) |
 | Cache/queue | `redis:7` container | Upstash (free tier) | Upstash |
-| Object storage | MinIO container (S3 API) | Tigris bucket `fnh-photos-staging` | Tigris `fnh-photos` + `fnh-photos-backup` |
+| Object storage | SeaweedFS container (S3 API) | Tigris bucket `fnh-photos-staging` | Tigris `fnh-photos` + `fnh-photos-backup` |
 | TMDB | fake server (`tmdb-fake` service) | real API key | real API key |
 | Email | MailHog | provider sandbox | provider |
 | Secrets source | `.env` (from `.env.example`) | `fly secrets` | `fly secrets` |
@@ -22,7 +22,7 @@ See [ADR-0001](decisions/ADR-0001-fly-fastapi-postgres-hosting.md).
 ## Per-environment detail
 
 **dev.** `docker compose up -d`, then `docker compose run --rm api alembic upgrade head` and the seed
-(one household, six people with emoji avatars, twenty owned movies, a past night with photos). MinIO
+(one household, six people with emoji avatars, twenty owned movies, a past night with photos). SeaweedFS
 stands in for Tigris because both are S3-compatible. Set `STORAGE_ENDPOINT` accordingly.
 
 **staging.** It gets the same deploy as prod on every merge to `main` and is used to test on a

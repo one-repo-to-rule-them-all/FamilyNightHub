@@ -10,8 +10,8 @@ QA/CI engineer, so the bar is **deterministic, trustworthy green**.
 flowchart TB
     PR["push / PR"] --> S["static: ruff, mypy, eslint, prettier, tsc"]
     PR --> U["unit: pytest unit + domain 100% + vitest"]
-    PR --> I["integration: pytest vs Postgres+Redis+MinIO services (incl. isolation + RLS coverage)"]
-    S & U & I --> E["e2e: docker compose (api, worker, web, tmdb-fake, minio) → Playwright multi-phone + axe"]
+    PR --> I["integration: pytest vs Postgres+Redis+SeaweedFS services (incl. isolation + RLS coverage)"]
+    S & U & I --> E["e2e: docker compose (api, worker, web, tmdb-fake, seaweedfs) → Playwright multi-phone + axe"]
     E -- "all green" --> M["merge to main"]
     M --> B["build images → GHCR"] --> ST["deploy staging (release_command migrates)"] --> SM["smoke: /api/health + scripted join/vote"] --> G["manual approval"] --> P["deploy prod (same digest)"]
 ```
@@ -22,7 +22,7 @@ flowchart TB
 |---|---|---|
 | `static` | ruff, mypy, eslint, prettier, `tsc --noEmit` | `.github/workflows/ci.yml` |
 | `unit` | pytest `tests/unit` (+ Hypothesis tally properties), vitest (photo pipeline incl. GPS-strip fixture) | `backend/tests/unit`, `frontend/src/**/*.test.ts` |
-| `integration` | pytest against real Postgres/Redis/MinIO service containers | `backend/tests/integration` |
+| `integration` | pytest against real Postgres/Redis/SeaweedFS (S3) service containers | `backend/tests/integration` |
 | `isolation` | two-household seed; every endpoint and table returns nothing cross-household; `test_rls_coverage` | `backend/tests/integration/test_isolation.py` |
 | `contract` | `openapi.json` and `api.gen.ts` drift check; Alembic `check` (models match migrations) | ci.yml |
 | `e2e` | compose stack, Playwright: 4 phone contexts (iPhone + Pixel descriptors) + TV context; unauthenticated context must get 0 photo URLs; axe | `frontend/e2e/` |

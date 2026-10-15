@@ -1,34 +1,35 @@
 # Family Night Hub
 
-Next.js (App Router) + Supabase (Postgres, Auth, RLS) deployed on Vercel.
-
-## Local development
-
-1. `npm install`
-2. `cp .env.example .env.local`
-3. `npm run db:start` (needs Docker) and paste the printed API URL and publishable key into `.env.local`
-4. `npm run dev` then open http://localhost:3000
-
-Useful: `npm run db:reset` re-applies migrations and `supabase/seed.sql`; `npm run db:types` regenerates TypeScript types.
-
-## Supabase (hosted)
-
-1. Create a project at supabase.com.
-2. `npx supabase login && npx supabase link --project-ref <ref>`
-3. `npx supabase db push` to apply `supabase/migrations`.
-4. In Auth settings, add your Vercel URL(s) to Site URL / Redirect URLs.
-
-## Vercel
-
-1. Import this repo at vercel.com/new (framework is detected from `vercel.json`).
-2. Add env vars for Production and Preview:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
-3. Deploy. Every push to `main` deploys to production; PRs get preview URLs.
+Private, phone-first movie-night app for one family: shortlist, ranked voting, TV reveal, private
+photo album. Three Fly.io apps (Next.js web, FastAPI API, ARQ worker) on Postgres, Redis and
+Tigris. Architecture: [`docs/architecture/`](docs/architecture/README.md).
 
 ## Layout
 
-- `src/lib/supabase/` - browser, server and proxy (session refresh) clients
-- `src/proxy.ts` - Next 16 proxy (formerly middleware) that refreshes auth cookies
-- `supabase/migrations/` - schema and RLS policies
+- `backend/` - FastAPI API + ARQ worker (one image), Alembic migrations, pytest suites
+- `frontend/` - Next.js 16 app (proxies `/api/*` to the API)
+- `docker-compose.yml` - local stack (Postgres, Redis, SeaweedFS for S3, MailHog, API)
+- `infra/` - local-only service config
+
+## Local development
+
+Needs Docker, [uv](https://docs.astral.sh/uv/) and Node 22.
+
+```bash
+cp .env.example .env
+docker compose -p fnh up -d --build --wait
+curl localhost:8000/api/health
+```
+
+Backend checks (from `backend/`):
+
+```bash
+uv sync
+uv run ruff check . && uv run mypy app
+uv run pytest tests/unit
+uv run pytest tests/integration   # needs the compose stack up
+```
+
+Frontend (from `frontend/`): `npm install`, then `npm run dev` and open http://localhost:3000.
+
+Local ports: Postgres 55432, Redis 56379, S3 58333, MailHog UI 58025, API 8000.
