@@ -35,6 +35,7 @@ The numbered docs go **broad → narrow**.
 | Top-3 ranked voting rules and deterministic tie-break | [`ADR-0006`](decisions/ADR-0006-voting-rules-and-tie-break.md) |
 | Candidate generator draws owned → streaming → TMDB | [`ADR-0007`](decisions/ADR-0007-candidate-generator-order.md) |
 | Inherit Ctrl+Alt+Defeat design tokens | [`ADR-0008`](decisions/ADR-0008-ctrl-alt-defeat-design-tokens.md) |
+| Pre-auth lookups (device, magic link, slug) via narrow definer functions | [`ADR-0009`](decisions/ADR-0009-pre-auth-lookups-via-definer-functions.md) |
 
 ## The 30-second mental model
 
@@ -104,7 +105,8 @@ If anything in these docs disagrees with the code below, the code wins. (Paths a
 
 ## When this folder goes stale
 
-These docs describe the **intended** system as of **2026-10-15** (no code yet). They will rot:
+These docs describe the **intended** system as of **2026-10-15**; code exists for the backend
+skeleton and the Phase 1 schema (migration `0001`). They will rot:
 
 - **Adding a service / environment / background task / CI job** → update the relevant chapter in the same PR.
 - **Renaming a file or moving a route** → keep the Source-of-truth table current first.

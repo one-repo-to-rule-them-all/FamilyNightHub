@@ -39,7 +39,8 @@ backend/app/
 A ballot submit goes through these steps:
 
 1. Pydantic validates `{person_id, ranks: [{option_id, rank}]}`.
-2. `CurrentDevice` hashes the cookie token, loads the device and rejects it if revoked.
+2. `CurrentDevice` hashes the cookie token and resolves it with `auth_resolve_device()`
+   ([ADR-0009](decisions/ADR-0009-pre-auth-lookups-via-definer-functions.md)); unknown or revoked → 401.
 3. `CurrentHousehold` opens a transaction and runs `SET LOCAL app.household_id`.
 4. `BallotService` checks the session is `voting`, that the person is bound to the device (or the caller is a host), and that the ranks are valid for `k`. It then replaces the ballot rows.
 5. It publishes `ballot_count` to `session:{id}`.
@@ -60,6 +61,9 @@ per transaction, and queries also filter explicitly. Cross-household requests ge
 | Device | `fnh_device` httpOnly cookie (hashed with pepper in `devices.token_hash`) | `CurrentDevice` |
 | Admin/host | `fnh_session` httpOnly cookie after magic link (15-min single-use link) | `CurrentAccount` |
 
+Both credentials are resolved to `(id, household_id)` by the ADR-0009 definer functions before
+any household transaction opens; everything after runs under RLS.
+
 The permission map (`core/permissions.py`) is the single source of truth. Hosts get `sessions:run`
 and `ballots:proxy`; admins get everything. Join flow rules are in
 [ADR-0002](decisions/ADR-0002-device-identity-and-join-flow.md). Cookie-authenticated mutations
@@ -71,8 +75,8 @@ The session state machine (`domain/session_state.py`):
 `draft → voting → revealed → tonight → closed`. Every transition goes through one service method
 that writes an audit row. `close_voting` runs the tally module, then the tie-break, then stores
 `ranking jsonb`, `tie_seed` and `winner_option_id` in one transaction
-([ADR-0006](decisions/ADR-0006-voting-rules-and-tie-break.md)). `revealed → tonight` is automatic
-after the TV finishes the reveal animation (or 30s).
+([ADR-0006](decisions/ADR-0006-voting-rules-and-tie-break.md)). `revealed → tonight` is lazy: the
+snapshot reports `tonight` once `revealed_at` is 30s old, and the next write persists it (no timer).
 
 ## Live updates
 

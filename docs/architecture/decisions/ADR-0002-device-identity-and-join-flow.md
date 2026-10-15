@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-15)
+Accepted (2026-10-15)
 
 ## Context
 
@@ -15,10 +15,14 @@ vote as anyone, forever. Safari can also wipe script-writable storage after 7 da
 
 ## Decision
 
-- **Admins and hosts** sign in by magic link (email via SMTP/Resend). Sign-up is invite-only.
+- **Admins and hosts** sign in by magic link (email via SMTP/Resend). Sign-up is invite-only;
+  the first admin is created by a CLI bootstrap command (`python -m app.cli bootstrap`).
+- **TV**: a host signs in on the TV browser and chooses "Use as TV", which mints a device
+  with `is_tv = true` and signs the host session out of that browser.
 - **Devices**: the fridge QR opens `/j/{household_slug}`, which is a door, not a key. Joining
   requires either a signed-in host/admin on that device, or the **night code** (6 chars, shown on
-  the TV, valid only while a session is `voting`/`tonight`, rotates per session). A successful
+  the TV, valid while a session is `draft`/`voting`/`revealed`/`tonight` so people can join
+  while the TV shows the lobby, dead once it is `closed`, rotates per session). A successful
   join mints a device token (256-bit random, stored hashed in `devices`) in an **httpOnly, Secure,
   SameSite=Lax cookie** (365-day sliding expiry) — not `localStorage`.
 - **People** are rows in `people` (name, emoji avatar, colour). After joining, the phone shows an

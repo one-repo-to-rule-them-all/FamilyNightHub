@@ -52,6 +52,9 @@ under 5 GB comes to roughly $10–30/mo. Not $0 by design (ADR-0001).
 
 ## Migrations & health
 
+- **Roles:** provisioning runs `backend/db/init/00-init-app-role.sql` once per database as a role
+  with `CREATEROLE`. It creates `fnh_app` (runtime) and `fnh_resolver` (ADR-0009). Migration
+  `0001` refuses to run if either is missing. Compose runs the script automatically.
 - **When migrations run:** Fly `release_command = "alembic upgrade head"` on `fnh-api`, using the owner role, before new machines start. Migrations must be backward-compatible with the previous release (expand/contract).
 - **Health checks:** `GET /api/health` (DB `select 1` with GUC set for a sentinel household, plus a Redis ping) gates the deploy, and the uptime monitor pings it every 5 minutes.
 - **Postgres backups:** Fly's daily volume snapshots plus a weekly `pg_dump` from the worker into the backup bucket. Restore runbook: `docs/runbooks/restore.md` (Phase 1 deliverable).

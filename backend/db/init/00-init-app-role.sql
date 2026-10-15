@@ -15,7 +15,20 @@ BEGIN
 END
 $$;
 
+-- ADR-0009: NOLOGIN owner of the pre-auth SECURITY DEFINER functions. Its table access is
+-- column-level grants plus SELECT-only policies, both created by the migration. Granted to
+-- the owner so migrations can ALTER FUNCTION ... OWNER TO fnh_resolver without superuser.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fnh_resolver') THEN
+        CREATE ROLE fnh_resolver NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+    END IF;
+END
+$$;
+GRANT fnh_resolver TO fnh;
+
 GRANT USAGE ON SCHEMA public TO fnh_app;
+GRANT USAGE ON SCHEMA public TO fnh_resolver;
 
 -- Tables created later by the owner auto-grant DML to the app role, so each migration
 -- only needs to carry its RLS policy (enforced by tests/integration/test_rls_coverage.py).

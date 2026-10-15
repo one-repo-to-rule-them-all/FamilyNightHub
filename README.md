@@ -18,6 +18,7 @@ Needs Docker, [uv](https://docs.astral.sh/uv/) and Node 22.
 ```bash
 cp .env.example .env
 docker compose -p fnh up -d --build --wait
+docker compose -p fnh exec api alembic upgrade head
 curl localhost:8000/api/health
 ```
 

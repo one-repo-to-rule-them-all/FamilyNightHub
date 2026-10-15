@@ -1,10 +1,38 @@
-"""ORM models. Import every model module here so Alembic sees the full metadata."""
+"""ORM models. Every model module is imported here so Alembic sees the full metadata."""
 
-from sqlalchemy.orm import DeclarativeBase
+from app.models.base import Base
+from app.models.household import (
+    Account,
+    Device,
+    DevicePerson,
+    Household,
+    HouseholdSettings,
+    MagicLink,
+    Person,
+)
+from app.models.movie_night import BallotRank, Movie, Option, Rating, Session
+from app.models.ops import AuditEvent, BackupRun, FailedJob, TmdbCache
+from app.models.photos import Photo, PhotoDeletion, PhotoReaction
 
-
-class Base(DeclarativeBase):
-    pass
-
-
-__all__ = ["Base"]
+__all__ = [
+    "Account",
+    "AuditEvent",
+    "BackupRun",
+    "BallotRank",
+    "Base",
+    "Device",
+    "DevicePerson",
+    "FailedJob",
+    "Household",
+    "HouseholdSettings",
+    "MagicLink",
+    "Movie",
+    "Option",
+    "Person",
+    "Photo",
+    "PhotoDeletion",
+    "PhotoReaction",
+    "Rating",
+    "Session",
+    "TmdbCache",
+]

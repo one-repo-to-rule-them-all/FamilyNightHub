@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-15). Follows OrderUp ADR-0003 and ADR-0006.
+Accepted (2026-10-15). Follows OrderUp ADR-0003 and ADR-0006.
 
 ## Context
 
