@@ -3,13 +3,15 @@
 #   CI green on a push to main
 #     -> build the backend image (fnh-api + fnh-worker) and the web image, push to GHCR
 #        tagged sha-<commit>
-#     -> staging: fnh-api-staging (release_command migrates), fnh-worker-staging,
+#     -> staging: photos bucket CORS (deploy/bucket-cors.sh), fnh-api-staging (release_command migrates), fnh-worker-staging,
 #        fnh-web-staging, then smoke GET https://fnh-web-staging.fly.dev/api/health
 #     -> production (GitHub environment `production`, owner approval): the SAME digests
 #
 # Inert until provisioned: each deploy job reads FLY_API_TOKEN from its GitHub environment
 # and, when it is empty, emits a notice and skips its steps instead of failing main. Builds
-# still run and push to GHCR (GITHUB_TOKEN only), so images exist from day one.
+# still run and push to GHCR (GITHUB_TOKEN only), so images exist from day one. The photos
+# bucket's CORS step is gated the same way on its own vars.PHOTOS_BUCKET + BUCKET_ADMIN_* (all
+# or none), so it can be provisioned before or after Fly.
 #
 # BEFORE adding the production token: give the `production` environment a required
 # reviewer. GitHub creates a referenced environment on first use WITHOUT protection rules,
@@ -113,9 +115,14 @@ jobs:
       deployed: ${{ steps.gate.outputs.enabled }}
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      PHOTOS_BUCKET: ${{ vars.PHOTOS_BUCKET }}
     steps:
-      - name: Gate on FLY_API_TOKEN
+      - name: Gate on FLY_API_TOKEN and the bucket-admin key
         id: gate
+        env:
+          # Presence only; the key itself reaches the CORS step alone.
+          BUCKET_ADMIN_ACCESS_KEY_ID: ${{ secrets.BUCKET_ADMIN_ACCESS_KEY_ID }}
+          BUCKET_ADMIN_SECRET_ACCESS_KEY: ${{ secrets.BUCKET_ADMIN_SECRET_ACCESS_KEY }}
         run: |
           if [ -z "$FLY_API_TOKEN" ]; then
             echo "::notice title=Staging deploy skipped::FLY_API_TOKEN is not set on the 'staging' environment. Provision Fly (docs/runbooks/restore.md) to enable deploys."
@@ -123,10 +130,28 @@ jobs:
           else
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
+          set="$(printf '%s' "${PHOTOS_BUCKET:+1}${BUCKET_ADMIN_ACCESS_KEY_ID:+1}${BUCKET_ADMIN_SECRET_ACCESS_KEY:+1}")"
+          if [ -z "$set" ]; then
+            echo "::notice title=Bucket CORS skipped::PHOTOS_BUCKET / BUCKET_ADMIN_* are not set on the 'staging' environment (docs/runbooks/restore.md §1.4)."
+            echo "cors=false" >> "$GITHUB_OUTPUT"
+          elif [ "$set" != "111" ]; then
+            echo "::error title=Bucket CORS half-configured::'staging' needs all of vars.PHOTOS_BUCKET, secrets.BUCKET_ADMIN_ACCESS_KEY_ID and secrets.BUCKET_ADMIN_SECRET_ACCESS_KEY, or none."
+            exit 1
+          else
+            echo "cors=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v7
-        if: steps.gate.outputs.enabled == 'true'
+        if: steps.gate.outputs.enabled == 'true' || steps.gate.outputs.cors == 'true'
         with:
           ref: ${{ env.DEPLOY_SHA }}
+      - name: Photos bucket CORS for the web origin (before the web deploy needs it)
+        if: steps.gate.outputs.cors == 'true'
+        env:
+          # A bucket-admin key that lives only in this GitHub environment, never on a Fly app:
+          # the API's STORAGE_* key stays object read/write and can't change bucket config.
+          AWS_ACCESS_KEY_ID: ${{ secrets.BUCKET_ADMIN_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BUCKET_ADMIN_SECRET_ACCESS_KEY }}
+        run: bash deploy/bucket-cors.sh deploy/staging/api.fly.toml
       - uses: actions/download-artifact@v4
         if: steps.gate.outputs.enabled == 'true'
         with:
@@ -190,9 +215,14 @@ jobs:
       packages: read
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      PHOTOS_BUCKET: ${{ vars.PHOTOS_BUCKET }}
     steps:
-      - name: Gate on FLY_API_TOKEN
+      - name: Gate on FLY_API_TOKEN and the bucket-admin key
         id: gate
+        env:
+          # Presence only; the key itself reaches the CORS step alone.
+          BUCKET_ADMIN_ACCESS_KEY_ID: ${{ secrets.BUCKET_ADMIN_ACCESS_KEY_ID }}
+          BUCKET_ADMIN_SECRET_ACCESS_KEY: ${{ secrets.BUCKET_ADMIN_SECRET_ACCESS_KEY }}
         run: |
           if [ -z "$FLY_API_TOKEN" ]; then
             echo "::notice title=Production deploy skipped::FLY_API_TOKEN is not set on the 'production' environment."
@@ -200,10 +230,28 @@ jobs:
           else
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           fi
+          set="$(printf '%s' "${PHOTOS_BUCKET:+1}${BUCKET_ADMIN_ACCESS_KEY_ID:+1}${BUCKET_ADMIN_SECRET_ACCESS_KEY:+1}")"
+          if [ -z "$set" ]; then
+            echo "::notice title=Bucket CORS skipped::PHOTOS_BUCKET / BUCKET_ADMIN_* are not set on the 'production' environment (docs/runbooks/restore.md §1.4)."
+            echo "cors=false" >> "$GITHUB_OUTPUT"
+          elif [ "$set" != "111" ]; then
+            echo "::error title=Bucket CORS half-configured::'production' needs all of vars.PHOTOS_BUCKET, secrets.BUCKET_ADMIN_ACCESS_KEY_ID and secrets.BUCKET_ADMIN_SECRET_ACCESS_KEY, or none."
+            exit 1
+          else
+            echo "cors=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v7
-        if: steps.gate.outputs.enabled == 'true'
+        if: steps.gate.outputs.enabled == 'true' || steps.gate.outputs.cors == 'true'
         with:
           ref: ${{ env.DEPLOY_SHA }}
+      - name: Photos bucket CORS for the web origin (before the web deploy needs it)
+        if: steps.gate.outputs.cors == 'true'
+        env:
+          # A bucket-admin key that lives only in this GitHub environment, never on a Fly app:
+          # the API's STORAGE_* key stays object read/write and can't change bucket config.
+          AWS_ACCESS_KEY_ID: ${{ secrets.BUCKET_ADMIN_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BUCKET_ADMIN_SECRET_ACCESS_KEY }}
+        run: bash deploy/bucket-cors.sh deploy/prod/api.fly.toml
       - uses: actions/download-artifact@v4
         if: steps.gate.outputs.enabled == 'true'
         with:
