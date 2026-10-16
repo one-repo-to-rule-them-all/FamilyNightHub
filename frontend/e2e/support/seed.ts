@@ -28,6 +28,10 @@ export type SeedOptions = {
   openVoting?: boolean;
   /** Close voting and settle the reveal: the night is `tonight`, so photos are open. */
   tonight?: boolean;
+  /** Owned titles in the library for the candidate generator (0-2, see seed_night.py OWNED). */
+  owned?: number;
+  /** The household's streaming services (TMDB provider ids, e.g. 337 = Disney Plus). */
+  providers?: number[];
 };
 
 const BACKEND = path.resolve(__dirname, "../../../backend");
@@ -38,6 +42,8 @@ export function seedNight(options: SeedOptions = {}): SeededNight {
   if (options.movies) args.push("--movies", String(options.movies));
   if (options.openVoting) args.push("--open-voting");
   if (options.tonight) args.push("--tonight");
+  if (options.owned) args.push("--owned", String(options.owned));
+  if (options.providers?.length) args.push("--providers", options.providers.join(","));
   return runSeed(args) as SeededNight;
 }
 
