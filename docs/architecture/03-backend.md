@@ -33,7 +33,10 @@ backend/app/
 | Photos | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}` | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below |
 | Ratings | `/api/v1/sessions/{id}/ratings` | 1–5 per person, once the night is `tonight`/`closed` |
 | Movies | `/api/v1/movies`, `GET /api/v1/tmdb/search?q=` | Library, owned flag (later); TMDB search proxy for hosts (503 when TMDB is off or down) |
-| Admin | `/api/v1/admin/*` | People merge/rename, device revoke, history edit, settings |
+| Admin people | `GET/POST /api/v1/admin/people`, `PATCH /admin/people/{id}`, `POST /admin/people/{id}/convert-to-member`, `POST /admin/people/merge` | Add, rename/re-avatar/recolour, guest → member, merge (`admin:people`; hosts may add guests). See "People and devices admin" |
+| Admin devices | `GET /api/v1/admin/devices`, `PATCH /admin/devices/{id}`, `POST /admin/devices/{id}/revoke` | The "Devices" list with each device's people, label, revoke (`admin:devices`) |
+| Admin settings | `GET/PATCH /api/v1/admin/settings`, `POST /admin/join-slug/rotate` | Household defaults and the fridge-QR slug (`admin:settings`) |
+| Admin (later) | `/api/v1/admin/*` | History edit, winner correction, photo hard delete |
 | Health | `/api/health` | DB + Redis |
 
 ## Request lifecycle
@@ -83,7 +86,7 @@ rotate `SESSION_SECRET` (which signs everyone out). Revisit with a sessions tabl
 matters. The first admin is created by `python -m app.cli bootstrap` (`app/cli.py`).
 
 The permission map (`core/permissions.py`) is the single source of truth. Hosts get
-`sessions:run`, `ballots:proxy`, `devices:enroll` and `devices:approve`; admins get everything;
+`sessions:run` (which also lets them add a guest), `ballots:proxy`, `devices:enroll` and `devices:approve`; admins get everything;
 unknown roles get nothing. Routes declare `Depends(require_permission("..."))`. Join flow rules are in
 [ADR-0002](decisions/ADR-0002-device-identity-and-join-flow.md). Cookie-authenticated mutations,
 and the join itself, require `SameSite=Lax` plus a CSRF header: `X-FNH-CSRF` must equal the
@@ -140,6 +143,60 @@ Audit actions (`audit_events`, `target_type = 'session'`): `session.created`,
 `session.voting_closed` (from/to, ballot count, winner, which tie-break decided),
 `session.settled`, `session.closed`, and `ballot.proxy_cast` (`data` is the person only, never
 the ranks).
+
+## People and devices admin
+
+All under `/api/v1/admin/*` (`app/api/v1/admin/`), account-only: a device cookie alone gets
+401, a role without the permission 403, another household's id 404, and every mutation needs
+the CSRF header and writes an audit row.
+
+- **People** (`services/people_admin_service.py`, `admin:people`). Create takes `{name,
+  avatar_emoji, color, is_guest}`. Names are whitespace-collapsed, 1–60 chars; the emoji is
+  1–16 code points with no whitespace and at least one non-ASCII character (ZWJ families and
+  keycaps pass, words don't); colour is `#rrggbb`, stored lowercase. **Names are unique per
+  household among unmerged people, case-insensitively** (guests included), checked under a
+  per-household advisory lock; a clash is 409 naming the existing person. A merged-away name
+  is free again. Hosts (`sessions:run`) may create **guests only**; everything else here is
+  admin-only. `PATCH` changes only the fields sent; `convert-to-member` clears `is_guest`
+  (idempotent). A merged person is 404 to every admin route and drops out of every list.
+- **Merge** (`POST /admin/people/merge {from_person_id, into_person_id}`). People are never
+  deleted ([05-data.md](05-data.md) "Conventions"): in the request's one transaction both rows
+  are locked in id order, every row naming the source is repointed to the target, and the
+  source gets `merged_into_id`. Collisions with the target's own rows go the target's way, so
+  the result never depends on row order:
+
+  | Table | Unique key | Rule |
+  |---|---|---|
+  | `ballot_ranks` | (session, person, rank), (session, person, option) | In a night where the target has a ballot, the source's **whole** ballot is dropped (two partial ballots can't be mixed into a valid one); otherwise it moves |
+  | `ratings` | (session, person) | Target's rating wins |
+  | `photo_reactions` | (photo, person, emoji) | Duplicates collapse into the target's |
+  | `device_people` | (device, person) | Target's row is kept, upgraded to `active` if either was |
+  | `photos` | — | All move |
+
+  The target keeps its own name, avatar, colour and guest flag. People previously merged into
+  the source are repointed to the target, so `merged_into_id` is always one hop. Self-merge is
+  409. The response and the `person.merged` audit row carry moved/dropped counts per table.
+- **Devices** (`services/device_admin_service.py`, `admin:devices`). The list returns every
+  device (live first, most recently seen first, then revoked) with label, `is_tv`,
+  `last_seen_at`, `revoked_at` and its people with binding status. `PATCH` sets or clears the
+  label. **Revoke** stamps `revoked_at`: the ADR-0009 resolver ignores revoked devices, so the
+  cookie is 401 on its next request, its bindings stop counting as "taken" (the people are free
+  to claim without approval) and its pending claims leave the review list. Bindings are kept for
+  the record. Revoking twice changes nothing. **Revocation is final — there is no un-revoke**: a
+  revoked phone rejoins with a night code (or a host enrollment) and becomes a new device, so a
+  stolen token can never be brought back to life.
+- **Settings** (`services/household_settings_service.py`, `admin:settings`). `GET` returns the
+  join slug plus `default_voting_method`, `default_age_cap` and `region`; `PATCH` changes only
+  the fields sent (`default_age_cap: null` clears the cap). Phase 1 accepts only `top3` as the
+  voting method; age caps are `G`/`PG`/`PG-13`/`R`/`NC-17`; region is ISO 3166-1 alpha-2,
+  stored uppercase. **Rotate join slug** issues a new `xxxx-xxxx-xxxx` slug from the night-code
+  alphabet, lowercased (`domain/join_slug.py`, ~2^59 values; a unique-constraint clash retries
+  in a savepoint). `/j/{old}` stops resolving immediately; devices already in keep working.
+
+Audit actions: `person.created`, `person.updated` (`data.fields`), `person.converted_to_member`,
+`person.merged` (`target_id` = the target), `device.relabeled`, `device.revoked`,
+`settings.updated` (`data` = from/to of the fields sent), `household.join_slug_rotated` (no
+slug values).
 
 ## Voting
 

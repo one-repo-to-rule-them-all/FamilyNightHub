@@ -104,7 +104,9 @@ Restores are rehearsed once before launch (runbook).
 
 UUID primary keys (so sessions and albums are never enumerable), `timestamptz` everywhere, and
 soft-hide for photos (`status = hidden`) with hard delete reserved for admins. People are merged by
-repointing FKs and setting `merged_into_id`, never by deleting.
+repointing FKs and setting `merged_into_id`, never by deleting (collision rules in
+[03-backend.md](03-backend.md) "People and devices admin"). Unmerged names are unique per household,
+case-insensitively, enforced by the service rather than an index. Revoked devices are kept, never deleted.
 
 ## What's intentionally **not** here / **not** built yet
 
