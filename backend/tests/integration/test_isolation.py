@@ -189,11 +189,13 @@ async def test_ballot_constraints_reject_bad_ranks(two_households: Pair) -> None
         "INSERT INTO ballot_ranks (household_id, session_id, person_id, option_id, rank, "
         "cast_by_device_id) VALUES (:h, :s, :p, :o, :r, :d)"
     )
-    # rank 1 is already taken by the seeded ballot; same option twice; rank out of range.
+    # rank 1 is already taken by the seeded ballot; same option twice; rank out of range
+    # (1..8 since ADR-0010: an approval ballot may hold the whole shortlist).
     for params in (
         {**base, "o": a.ids["option2"], "r": 1},
         {**base, "o": a.ids["option"], "r": 2},
-        {**base, "o": a.ids["option2"], "r": 4},
+        {**base, "o": a.ids["option2"], "r": 9},
+        {**base, "o": a.ids["option2"], "r": 0},
     ):
         with pytest.raises(IntegrityError):
             async with household_session(a.household_id) as s:

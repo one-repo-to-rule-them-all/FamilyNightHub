@@ -8,6 +8,7 @@ and lets tests reproduce a tie-break. Production draws it with `secrets.randbits
 
 from __future__ import annotations
 
+import random
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
@@ -15,7 +16,9 @@ from typing import Any, Literal, Protocol
 MAX_SEED = 2**64 - 1  # sessions.tie_seed is numeric(20)
 
 Ballot = Mapping[str, int]
-"""One person's ballot: option id -> rank (1 = favourite). Partial ballots are fine."""
+"""One person's ballot: option id -> rank (1 = favourite). Partial ballots are fine.
+pick_one holds one entry at rank 1; approval numbers its approvals 1..m, an ordinal that
+carries no preference (ADR-0010)."""
 
 TieBreak = Literal["none", "first_places", "head_to_head", "random"]
 """Which step separated the winner from the options tied with it on score."""
@@ -76,3 +79,25 @@ class TallyMethod(Protocol):
     def __call__(
         self, options: Sequence[str], ballots: Sequence[Ballot], *, seed: int
     ) -> Ranking: ...
+
+
+class BallotCheck(Protocol):
+    """Validate one ballot against the shortlist and k; return it as option -> rank."""
+
+    def __call__(
+        self, options: Sequence[str], k: int, ranks: Sequence[tuple[str, int]]
+    ) -> dict[str, int]: ...
+
+
+def check_tally_input(options: Sequence[str], seed: int) -> None:
+    if len(set(options)) != len(options):
+        raise ValueError("duplicate option ids")
+    if not 0 <= seed <= MAX_SEED:
+        raise ValueError("seed must fit in 64 bits")
+
+
+def seeded_lottery(options: Sequence[str], seed: int) -> dict[str, float]:
+    """One draw per option in sorted-id order, so the result depends only on the option
+    set and the seed, never on ballot or shortlist order (ADR-0006 step 3)."""
+    rng = random.Random(seed)
+    return {option: rng.random() for option in sorted(options)}

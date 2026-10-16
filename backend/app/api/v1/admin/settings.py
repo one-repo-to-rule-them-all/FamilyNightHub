@@ -35,8 +35,8 @@ async def get_settings(account: CanManageSettings, db: AccountDb) -> SettingsOut
 async def update_settings(
     body: SettingsUpdateIn, account: CanManageSettings, db: AccountDb
 ) -> SettingsOut:
-    """Only the fields sent change. `default_voting_method` is `top3` until Phase 2;
-    `default_age_cap: null` means no cap."""
+    """Only the fields sent change. `default_voting_method` is what new nights start
+    with; `default_age_cap: null` means no cap."""
     changes = body.model_dump(include=body.model_fields_set)
     # null is meaningful only for the age cap; elsewhere it means "unchanged".
     changes = {k: v for k, v in changes.items() if v is not None or k == "default_age_cap"}

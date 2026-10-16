@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import session_state
 from app.domain.session_state import SessionRuleError
-from app.domain.voting import top3
+from app.domain.voting import BALLOT_CHECKS
 from app.domain.voting.base import BallotError
 from app.realtime import events
 from app.realtime.publisher import publish_after_commit
@@ -41,12 +41,13 @@ class OwnBallot:
 
 async def _open_for_votes(
     db: AsyncSession, household_id: uuid.UUID, session_id: uuid.UUID
-) -> tuple[list[uuid.UUID], int]:
-    """Option ids and k for a night that is taking votes; NotFound / Conflict otherwise."""
+) -> tuple[list[uuid.UUID], int, str]:
+    """Option ids, k and the voting method for a night that is taking votes; NotFound /
+    Conflict otherwise."""
     row = (
         await db.execute(
             text(
-                "SELECT status, ballot_size FROM sessions "
+                "SELECT status, ballot_size, voting_method FROM sessions "
                 "WHERE id = :s AND household_id = :h FOR SHARE"
             ),
             {"s": session_id, "h": household_id},
@@ -61,7 +62,7 @@ async def _open_for_votes(
     options = await db.execute(
         text("SELECT id FROM options WHERE session_id = :s"), {"s": session_id}
     )
-    return [o.id for o in options], int(row.ballot_size)
+    return [o.id for o in options], int(row.ballot_size), row.voting_method
 
 
 async def cast(
@@ -75,9 +76,10 @@ async def cast(
     proxy_account_id: uuid.UUID | None = None,
 ) -> None:
     """Replace `person_id`'s ballot. Exactly one of device_id (a phone voting as a person
-    actively bound to it) or proxy_account_id (a host with `ballots:proxy`) is given."""
+    actively bound to it) or proxy_account_id (a host with `ballots:proxy`) is given.
+    For approval the ranks are 1..m ordinals of the approvals (ADR-0010)."""
     assert (device_id is None) != (proxy_account_id is None)
-    options, k = await _open_for_votes(db, household_id, session_id)
+    options, k, method = await _open_for_votes(db, household_id, session_id)
     if device_id is not None:
         await people_service.require_can_act_as(db, device_id, person_id)
     else:
@@ -88,7 +90,9 @@ async def cast(
         if person is None:
             raise NotFound("Person not found")
     try:
-        top3.check_ballot([str(o) for o in options], k, [(str(o), r) for o, r in ranks])
+        # The night's method decides what a valid ballot is (ADR-0006, ADR-0010).
+        check = BALLOT_CHECKS[method]
+        check([str(o) for o in options], k, [(str(o), r) for o, r in ranks])
     except BallotError as err:
         raise Invalid(err.reason) from None
 

@@ -19,6 +19,7 @@ import { STATUS_LABEL } from "../status";
 import { CandidateRoller } from "./candidate-roller";
 import { MovieSearch } from "./movie-search";
 import { ShortlistEditor } from "./shortlist-editor";
+import { VotingMethodPicker } from "./voting-method-picker";
 import { VotingPanel } from "./voting-panel";
 
 /** /host/[session]: shortlist → open voting → who has voted / proxy votes → close → winner. */
@@ -79,6 +80,7 @@ function DraftStage({ night }: { night: Night }) {
       <ShortlistEditor night={night} />
       <CandidateRoller night={night} />
       <MovieSearch night={night} />
+      <VotingMethodPicker night={night} />
       <div className="flex flex-col gap-2">
         <ApiErrorNotice error={open.error} />
         <Button

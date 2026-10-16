@@ -84,13 +84,22 @@ async def test_admin_sets_the_streaming_services(two_households: Pair) -> None:
     }
 
 
+@pytest.mark.parametrize("method", ["approval", "pick_one", "top3"])
+async def test_every_voting_method_can_be_the_default(two_households: Pair, method: str) -> None:
+    a, _ = two_households
+    async with phone() as p:
+        _as_admin(p, a)
+        resp = await p.patch(SETTINGS, {"default_voting_method": method})
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["default_voting_method"] == method
+
+
 @pytest.mark.parametrize(
     "body",
     [
         {"streaming_providers": [0]},
         {"streaming_providers": list(range(1, 22))},
-        {"default_voting_method": "approval"},  # Phase 2
-        {"default_voting_method": "pick_one"},
+        {"default_voting_method": "borda"},
         {"default_age_cap": "PG13"},
         {"region": "USA"},
         {"region": "1A"},

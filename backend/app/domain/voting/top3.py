@@ -12,17 +12,17 @@ only on the option set and the seed, never on ballot or shortlist order.
 
 from __future__ import annotations
 
-import random
 from collections.abc import Sequence
 
 from app.domain.session_state import ballot_size
 from app.domain.voting.base import (
-    MAX_SEED,
     Ballot,
     BallotError,
     Placement,
     Ranking,
     TieBreak,
+    check_tally_input,
+    seeded_lottery,
 )
 
 METHOD = "top3"
@@ -45,10 +45,7 @@ def check_ballot(
 
 
 def tally(options: Sequence[str], ballots: Sequence[Ballot], *, seed: int) -> Ranking:
-    if len(set(options)) != len(options):
-        raise ValueError("duplicate option ids")
-    if not 0 <= seed <= MAX_SEED:
-        raise ValueError("seed must fit in 64 bits")
+    check_tally_input(options, seed)
     k = ballot_size(len(options))
     cast = [check_ballot(options, k, list(b.items())) for b in ballots]
 
@@ -59,8 +56,7 @@ def tally(options: Sequence[str], ballots: Sequence[Ballot], *, seed: int) -> Ra
             score[option] += k - rank + 1
             firsts[option] += rank == 1
 
-    rng = random.Random(seed)
-    lottery = {option: rng.random() for option in sorted(options)}
+    lottery = seeded_lottery(options, seed)
 
     def prefers(a: str, b: str) -> int:
         """Ballots ranking a above b."""

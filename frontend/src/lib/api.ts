@@ -22,6 +22,7 @@ export type Account = Schemas["AccountOut"];
 export type Night = Schemas["SessionOut"];
 export type NightOption = Schemas["OptionOut"];
 export type NightStatus = Night["status"];
+export type VotingMethod = Night["voting_method"];
 export type NightSummary = Schemas["NightSummaryOut"];
 export type OwnBallot = Schemas["OwnBallotOut"];
 export type OwnRating = Schemas["OwnRatingOut"];
@@ -218,6 +219,11 @@ export const api = {
   reorderOptions: (sessionId: string, optionIds: string[]) =>
     request<Night>("PUT", `/sessions/${encodeURIComponent(sessionId)}/options/order`, {
       option_ids: optionIds,
+    }),
+  /** Change a draft night's voting method (ADR-0010); 409 once voting has opened. */
+  setVotingMethod: (sessionId: string, votingMethod: VotingMethod) =>
+    request<Night>("PATCH", `/sessions/${encodeURIComponent(sessionId)}`, {
+      voting_method: votingMethod,
     }),
   openVoting: (sessionId: string) =>
     request<Night>("POST", `/sessions/${encodeURIComponent(sessionId)}/open-voting`),

@@ -52,6 +52,29 @@ def test_ballot_size_needs_two_options(n: int) -> None:
 
 
 @given(st.integers(min_value=2, max_value=8))
+def test_pick_one_holds_one_and_approval_holds_the_whole_shortlist(n: int) -> None:
+    assert ss.ballot_size(n, "pick_one") == 1
+    assert ss.ballot_size(n, "approval") == n
+    assert ss.open_voting("draft", n, "approval").ballot_size == n
+    assert ss.open_voting("draft", n, "pick_one").ballot_size == 1
+
+
+def test_ballot_size_refuses_an_unknown_method() -> None:
+    with pytest.raises(ValueError, match="unknown voting method"):
+        ss.ballot_size(3, "borda")
+    with pytest.raises(SessionRuleError):
+        ss.ballot_size(1, "approval")
+
+
+def test_the_voting_method_changes_only_in_draft() -> None:
+    ss.check_can_change_method("draft")
+    for status in STATUSES[1:]:
+        with pytest.raises(SessionRuleError, match="locked"):
+            ss.check_can_change_method(status)
+    assert ss.VOTING_METHODS == ("top3", "approval", "pick_one")
+
+
+@given(st.integers(min_value=2, max_value=8))
 def test_open_voting_with_a_valid_shortlist(n: int) -> None:
     opened = ss.open_voting("draft", n)
     assert opened.status == "voting"

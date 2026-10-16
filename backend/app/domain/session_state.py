@@ -2,9 +2,11 @@
 
     draft -> voting -> revealed -> tonight -> closed
 
-Only `draft` may edit the shortlist. Opening voting freezes it at 2..8 options and fixes
-the ballot size k = min(3, n - 1). `revealed -> tonight` is lazy: `effective_status`
-reports `tonight` once `revealed_at` is REVEAL_SETTLE old, and the next write persists it.
+Only `draft` may edit the shortlist or change the voting method. Opening voting freezes
+the shortlist at 2..8 options and fixes the ballot size k for the night's method: top3
+min(3, n - 1), pick_one 1, approval n (ADR-0006, ADR-0010). `revealed -> tonight` is
+lazy: `effective_status` reports `tonight` once `revealed_at` is REVEAL_SETTLE old, and
+the next write persists it.
 Services call these functions and persist the result; nothing here touches I/O.
 """
 
@@ -16,6 +18,8 @@ from typing import Literal
 
 Status = Literal["draft", "voting", "revealed", "tonight", "closed"]
 Action = Literal["open_voting", "close_voting", "settle", "close"]
+VotingMethod = Literal["top3", "approval", "pick_one"]
+VOTING_METHODS: tuple[VotingMethod, ...] = ("top3", "approval", "pick_one")
 
 MIN_OPTIONS = 2
 MAX_OPTIONS = 8
@@ -52,18 +56,31 @@ def transition(status: str, action: Action) -> Status:
         raise SessionRuleError(f"Cannot {action.replace('_', ' ')} while {status}") from None
 
 
-def ballot_size(option_count: int) -> int:
-    """ADR-0006: k = min(3, n - 1). A shortlist of 2 is effectively pick-one."""
+def ballot_size(option_count: int, method: str = "top3") -> int:
+    """The most entries one ballot may hold. top3 (ADR-0006): k = min(3, n - 1), so a
+    shortlist of 2 is effectively pick-one. pick_one: 1. approval: n (ADR-0010)."""
     if option_count < MIN_OPTIONS:
         raise SessionRuleError(f"A shortlist needs at least {MIN_OPTIONS} options")
-    return min(MAX_BALLOT_SIZE, option_count - 1)
+    if method == "top3":
+        return min(MAX_BALLOT_SIZE, option_count - 1)
+    if method == "pick_one":
+        return 1
+    if method == "approval":
+        return option_count
+    raise ValueError(f"unknown voting method {method!r}")
 
 
-def open_voting(status: str, option_count: int) -> OpenedVoting:
+def open_voting(status: str, option_count: int, method: str = "top3") -> OpenedVoting:
     new_status = transition(status, "open_voting")
     if option_count > MAX_OPTIONS:
         raise SessionRuleError(f"A shortlist holds at most {MAX_OPTIONS} options")
-    return OpenedVoting(new_status, ballot_size(option_count))
+    return OpenedVoting(new_status, ballot_size(option_count, method))
+
+
+def check_can_change_method(status: str) -> None:
+    """The voting method is part of the draft: it locks with the shortlist (ADR-0010)."""
+    if status != "draft":
+        raise SessionRuleError("The voting method is locked once voting opens")
 
 
 def check_shortlist_editable(status: str) -> None:
