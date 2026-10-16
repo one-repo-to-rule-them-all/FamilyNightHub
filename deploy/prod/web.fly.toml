@@ -1,0 +1,41 @@
+# fnh-web: Next.js standalone (ADR-0001). Image: frontend/Dockerfile. The only
+# PRODUCTION: promoted by manual approval with the same image digest staging ran.
+# public app: it serves the UI and proxies /api/* to fnh-api over Flycast.
+# Layout from FieldPro deploy/ @ 0670961; settings from OrderUp frontend/fly.*.toml @ 2f86cd8.
+
+app = "fnh-web"
+primary_region = "dfw"
+
+[env]
+  # Server-only, read at boot by frontend/docker-entrypoint.sh (Next freezes rewrite
+  # destinations at build time; the image carries a placeholder so one digest serves both
+  # environments). Never NEXT_PUBLIC_*.
+  API_INTERNAL_URL = "http://fnh-api.flycast"
+  NODE_ENV = "production"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  # Proxied SSE streams are long-lived connections here too.
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 150
+    hard_limit = 200
+
+  # The page itself, not /api/health: that would fail web deploys whenever the API is down.
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "15s"
+    timeout = "5s"
+    method = "GET"
+    path = "/"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
