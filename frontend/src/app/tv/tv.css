@@ -1,0 +1,46 @@
+/*
+ * The TV's own type scale (ADR-0008: "the TV uses its own type scale"). Everything on the TV is
+ * sized in `em` off one root that follows the viewport, so a 1080p and a 4K TV read the same from
+ * the sofa, and a laptop preview still fits.
+ */
+.tv-screen {
+  font-size: clamp(14px, 1.45vw, 48px);
+  line-height: 1.25;
+}
+
+.tv-display {
+  font-size: 4.5em;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.tv-title {
+  font-size: 2.6em;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.tv-body {
+  font-size: 1.5em;
+}
+
+.tv-code {
+  font-size: 4.4em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.tv-tile[data-voted="true"] {
+  transform: scale(1.04);
+}
+
+.tv-tile {
+  transition:
+    transform 400ms ease,
+    opacity 400ms ease,
+    box-shadow 400ms ease;
+}

@@ -17,7 +17,8 @@ Deployed as `fnh-web` on Fly. Read the repo's `AGENTS.md` note: Next 16 uses `pr
 
 `src/proxy.ts` redirects pages based on cookie presence only. That is a UX convenience; the API is
 the security boundary. Today: `/who` without `fnh_device` → `/`; `/host/*` without `fnh_session` →
-`/login`; `/login` with `fnh_session` → `/host`.
+`/login`; `/login` with `fnh_session` → `/host`. `/tv/*` is not redirected: an unpaired browser gets a
+pairing explanation from the 401.
 
 **Built so far** (the rest of the table is still the plan):
 
@@ -30,7 +31,10 @@ the security boundary. Today: `/who` without `fnh_device` → `/`; `/host/*` wit
 | `/history` | `src/app/(public)/history/` | Past nights from `GET /api/v1/sessions` (server default: revealed, tonight, closed): winner poster, date, turnout; each links to its `/s/[session]` |
 | `/login` | `src/app/(auth)/login/` | Email → `POST /api/v1/auth/magic-link`; shows the server's one answer, which is the same whether or not the address exists |
 | `/auth/callback?token=` | `src/app/(auth)/auth/callback/` | `POST /api/v1/auth/verify` once (guarded against StrictMode's double effect), then `router.replace("/host")` so the spent token leaves history. `referrer: no-referrer` |
-| `/host` | `src/app/host/` | Placeholder: who is signed in, and sign out |
+| `/host` | `src/app/host/` | Start a night (the code is shown once, see below), nights in progress, pending person claims with approve/reject (polled every 10s), **Use this browser as the TV** (`POST /devices/enroll {as_tv:true}`, then `/tv/{night}`), sign out |
+| `/host/[session]` | `src/app/host/[session]/` | Draft: shortlist (up/down/remove, reducer in `src/lib/shortlist.ts`, whole order PUT, server order synced back), poster search (debounced, through `/api/v1/tmdb/search`, TMDB attribution line; a 503 says "type the title" and the typed-title form is always there), **Open voting** at 2–8 titles. Voting: who has voted (avatars only), proxy ballot, **Close voting**. Then the winner and **End the night**. Rotate code at any stage before `closed` |
+| `/tv` | `src/app/tv/` | Follows the newest draft/voting/revealed/tonight night; an unpaired browser gets "sign in as host, then Use this browser as the TV" |
+| `/tv/[session]` | `src/app/tv/[session]/` | Lobby (night code, join instructions, people tiles) → turnout tiles light up as ballots arrive (`GET …/voters`, never ranks) → reveal spinner (`src/lib/reveal.ts`) landing on `result.winner_option_id`. Screen Wake Lock where supported; follows the next night once this one is `tonight`/`closed` |
 
 ## Design system
 
@@ -48,6 +52,45 @@ fetch Google Fonts).
   `outline` / `secondary` / `ghost`.
 - **Tap targets ≥ 56px.** `Button size="tap"` (`h-14`) and `h-14`+ inputs on phone screens.
   Avatar tiles are 160px tall.
+
+## Host and TV screens
+
+**Night code on the TV.** The API returns the plaintext code once (create / rotate) and stores only
+a hash, so no screen can fetch it again. The browser that received it keeps it in
+`sessionStorage` under `fnh.nightCode.{session}` (`src/lib/night-code-handoff.ts`): tab-scoped,
+gone when the tab closes, never sent back to the server, dropped once the night is `closed`.
+- The ADR-0002 flow (host signs in on the TV's browser, starts the night, **Use this browser as the
+  TV**) stays in one tab, so `/tv/[session]` reads the code the host page just stored.
+- A TV paired on an earlier night never saw tonight's code: it shows a "Host: type tonight's code"
+  field (typed from the host's phone, which shows the code on create), kept the same way.
+- Another host browser sees "Rotate code" instead of a code.
+
+**QR.** `src/lib/join-link.ts` builds `/j/{slug}` and the QR as one SVG path (`qrcode`, no
+innerHTML). No endpoint exposes the household's join slug to a device or a host yet
+(`/admin/settings` in the people/devices admin work is admin-only), so the TV says "Scan the
+fridge QR" and leaves the QR off until one does.
+
+**Proxy votes** need the household's people. The only people list a host can read today is the
+device-scoped `GET /people`, so the host's browser is offered "Add this browser as a device"
+(`POST /devices/enroll {as_tv:false}`) before it can list them.
+
+**Enroll, then wait.** Both enroll paths go through `enrollDevice()` in `src/lib/api.ts`, which
+waits until `GET /devices/me` answers before the screen moves on. The API commits the enroll in a
+request-scoped dependency, and that commit can finish after the response has reached the
+browser, so the next device request could otherwise get a 401 (seen in CI).
+
+**Live data.** `src/hooks/use-night-poll.ts` polls the snapshot (and `…/voters` while voting) every
+5s, including in background tabs, and exposes the same `data-live` values as the planned SSE hook
+(`ready` / `reconnecting`, plus `connecting` before the first answer), so the swap to
+`useLiveSession` doesn't change tests.
+
+**Reveal.** Cosmetic, deterministic: two laps over the shortlist with a quadratic slow-down,
+stopping on the stored winner. `prefers-reduced-motion` (or opening on an already-`tonight` night)
+shows the winner straight away.
+
+**TV type scale.** `src/app/tv/tv.css`: one root size that follows the viewport
+(`clamp(14px, 1.45vw, 48px)`) and `em`-based `tv-display` / `tv-title` / `tv-body` / `tv-code`, so
+a 1080p and a 4K TV read the same from the sofa.
 
 ## Phone state machine
 
@@ -134,7 +177,7 @@ mutations never retry.
 | `npm run typecheck` | `tsc --noEmit` (TypeScript 7) |
 | `npm run lint:install`, then `npm run lint` | ESLint with `eslint-config-next`. ESLint, the Next config and the TypeScript 5 that typescript-eslint needs live in `tools/eslint/` (TypeScript 7 has no JS API for it), and `eslint.config.mjs` resolves its plugins from there. It also bans `waitForTimeout` / `setTimeout` in tests |
 | `npm run format:check` | Prettier + `prettier-plugin-tailwindcss` (class order) |
-| `npm test` | Vitest with v8 coverage, `src/**/*.test.ts`: API client CSRF and error handling, night-code input, the ballot reducer (100% gate on `src/lib/ballot.ts`) |
+| `npm test` | Vitest with v8 coverage, `src/**/*.test.ts`: API client CSRF and error handling, night-code input, the ballot reducer (100% gate on `src/lib/ballot.ts`), shortlist reducer and bounds, proxy-ballot ranking, reveal sequencing, QR/join link, night-code hand-off |
 | `npm run test:e2e` | Playwright + axe against the real API; see [`07-cicd.md`](07-cicd.md#running-e2e-locally) |
 
 ## Where to add new code
