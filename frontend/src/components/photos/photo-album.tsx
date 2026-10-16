@@ -92,7 +92,12 @@ export function PhotoAlbum({ sessionId, canAdd = true }: { sessionId: string; ca
       {album.isError ? (
         <ApiErrorNotice error={album.error} />
       ) : album.isPending ? (
-        <div aria-busy="true" aria-label="Loading photos" className="grid grid-cols-3 gap-2">
+        <div
+          role="status"
+          aria-busy="true"
+          aria-label="Loading photos"
+          className="grid grid-cols-3 gap-2"
+        >
           {[0, 1, 2].map((i) => (
             <div key={i} className="aspect-square animate-pulse rounded-lg bg-muted" />
           ))}

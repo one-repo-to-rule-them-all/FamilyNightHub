@@ -99,6 +99,22 @@ def check_photos_open(effective: str) -> None:
         raise SessionRuleError("Photos open once tonight's movie is picked")
 
 
+RATING_STATUSES: frozenset[str] = frozenset({"tonight", "closed"})
+
+
+def check_can_rate(effective: str) -> None:
+    """Ratings open with the movie (`tonight`) and stay open once the night closes; the
+    phone asks after the movie, but a rating given early is kept. Pass the *effective*
+    status, so a settled reveal counts as tonight."""
+    if effective not in RATING_STATUSES:
+        raise SessionRuleError("Ratings open once tonight's movie is picked")
+
+
+def shows_rating(effective: str) -> bool:
+    """The family average is shown only once ratings are open (never mid-vote)."""
+    return effective in RATING_STATUSES
+
+
 def effective_status(status: str, revealed_at: datetime | None, now: datetime) -> str:
     """What a reader should see: `revealed` turns into `tonight` after REVEAL_SETTLE."""
     if status == "revealed" and revealed_at is not None and now - revealed_at >= REVEAL_SETTLE:

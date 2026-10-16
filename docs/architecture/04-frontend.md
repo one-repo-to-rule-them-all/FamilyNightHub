@@ -102,11 +102,32 @@ nobody rates during the movie.
 
 **Built:** `draft`, `voting`, `revealed` (winner card from `result.winner_option_id`, plus the
 other placements and "N people voted"), `tonight` (winner + photo drop + album) and `closed`
-(winner, results, album, link to `/history`). Not built yet: rating prompt. The accent (`marquee-glow`,
+(winner, rating panel, results, album, link to `/history`), plus the ratings below. The accent (`marquee-glow`,
 `text-cinema`) is used only on the winner card; ranked posters on the ballot use a plain
 foreground ring and number badge. Server error messages are shown as-is (`ApiErrorNotice`), e.g.
 "This phone can't vote as them" or "Voting is not open"; a refused ballot also refetches the
 snapshot and the people list, so a stale screen catches up.
+
+**Ratings** (Phase 2). Nobody rates during the movie, so the stars stay out of the way until it's over:
+
+- `tonight` shows a "Rate later" card with a **Rate it now** button that unfolds the panel (the
+  server accepts ratings from `tonight` on, so nobody is refused).
+- `closed` shows the panel directly, under the winner.
+- The panel (`src/components/night/rating-panel.tsx`) has one row per person this phone holds
+  (`binding: "mine"`), each a radiogroup of five 56px star buttons. A tap saves at once
+  (`PUT …/ratings`), and another tap replaces the score. Below the rows, "Family average: 4.5 from
+  2 ratings" comes from the snapshot's `rating`.
+- Own scores come from `GET …/ratings/mine` under the key `["night", id, "ratings"]`, so every
+  live event (`rating_count` included) refreshes them along with the snapshot.
+- The landing card (`src/components/night/rate-prompt-card.tsx`, on `/who` and `/`) asks
+  "How was *Movie*?" about the most recent `tonight`/`closed` night for as long as someone this
+  phone holds hasn't rated it. **Rate it** links to `/s/{id}#rate` (the hash unfolds a `tonight`
+  panel). **Not now** (✕) hides the card for that night on this phone (`localStorage`). Without a
+  device it renders nothing.
+- `/history` shows each night's family average.
+- The pure parts (who still owes a rating, the average line, and the guarded storage) are in
+  `src/lib/rating.ts`, gated at 100%.
+- The selected stars use the foreground colour, not the cinema accent, which stays on the winner card.
 
 **Who-are-you:** a grid of big avatar tiles (emoji + colour + name), not a dropdown. After a ballot
 is submitted, the phone shows "Pass to next person", which goes back to the grid.
@@ -245,7 +266,7 @@ mutations never retry.
 | `npm run typecheck` | `tsc --noEmit` (TypeScript 7) |
 | `npm run lint:install`, then `npm run lint` | ESLint with `eslint-config-next`. ESLint, the Next config and the TypeScript 5 that typescript-eslint needs live in `tools/eslint/` (TypeScript 7 has no JS API for it), and `eslint.config.mjs` resolves its plugins from there. It also bans `waitForTimeout` / `setTimeout` in tests |
 | `npm run format:check` | Prettier + `prettier-plugin-tailwindcss` (class order) |
-| `npm test` | Vitest with v8 coverage, `src/**/*.test.ts`: API client CSRF and error handling, night-code input, the ballot reducer (100% gate on `src/lib/ballot.ts`), the photo pipeline (GPS strip on `e2e/fixtures/gps.jpg` through a real JPEG encoder, `@napi-rs/canvas`), the upload queue with fake timers (lines gated at 100%), the IndexedDB job store (`fake-indexeddb`), upload error sorting, and album URL reuse (100% gate), plus (from host/TV) shortlist reducer and bounds, proxy-ballot ranking, reveal sequencing, QR/join link, night-code hand-off |
+| `npm test` | Vitest with v8 coverage, `src/**/*.test.ts`: API client CSRF and error handling, night-code input, the ballot reducer (100% gate on `src/lib/ballot.ts`), the photo pipeline (GPS strip on `e2e/fixtures/gps.jpg` through a real JPEG encoder, `@napi-rs/canvas`), the upload queue with fake timers (lines gated at 100%), the IndexedDB job store (`fake-indexeddb`), upload error sorting, album URL reuse (100% gate) and the rating helpers (100% gate on `src/lib/rating.ts`), plus (from host/TV) shortlist reducer and bounds, proxy-ballot ranking, reveal sequencing, QR/join link, night-code hand-off |
 | `npm run test:e2e` | Playwright + axe against the real API; see [`07-cicd.md`](07-cicd.md#running-e2e-locally) |
 
 ## Where to add new code

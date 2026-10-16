@@ -920,6 +920,16 @@
             "title": "Id",
             "type": "string"
           },
+          "rating": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RatingSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "revealed_at": {
             "anyOf": [
               {
@@ -977,7 +987,8 @@
           "revealed_at",
           "closed_at",
           "winner",
-          "turnout"
+          "turnout",
+          "rating"
         ],
         "title": "NightSummaryOut",
         "type": "object"
@@ -1139,6 +1150,32 @@
           "ranks"
         ],
         "title": "OwnBallotOut",
+        "type": "object"
+      },
+      "OwnRatingOut": {
+        "properties": {
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "person_id",
+          "score"
+        ],
+        "title": "OwnRatingOut",
         "type": "object"
       },
       "PersonCreateIn": {
@@ -1526,6 +1563,54 @@
         "title": "RankOut",
         "type": "object"
       },
+      "RatingIn": {
+        "description": "One person's score for the night's movie, replacing any earlier one.",
+        "properties": {
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "score": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Score",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "person_id",
+          "score"
+        ],
+        "title": "RatingIn",
+        "type": "object"
+      },
+      "RatingSummaryOut": {
+        "description": "The family's average only: never anyone's own score.",
+        "properties": {
+          "average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "average",
+          "count"
+        ],
+        "title": "RatingSummaryOut",
+        "type": "object"
+      },
       "ReactionCountOut": {
         "properties": {
           "count": {
@@ -1641,6 +1726,16 @@
             "title": "Options",
             "type": "array"
           },
+          "rating": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RatingSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "result": {
             "anyOf": [
               {
@@ -1718,7 +1813,8 @@
           "voting_opened_at",
           "revealed_at",
           "closed_at",
-          "result"
+          "result",
+          "rating"
         ],
         "title": "SessionOut",
         "type": "object"
@@ -4328,6 +4424,169 @@
         "summary": "Unhide Photo",
         "tags": [
           "photos"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/ratings": {
+      "put": {
+        "description": "Set or replace the score of a person bound to this phone.",
+        "operationId": "rate_api_v1_sessions__session_id__ratings_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RatingIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't (actively) bound to that person"
+          },
+          "404": {
+            "description": "No such night (or person) in this household"
+          },
+          "409": {
+            "description": "Ratings are not open yet"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rate",
+        "tags": [
+          "ratings"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/ratings/mine": {
+      "get": {
+        "description": "Scores of the people actively bound to this phone (null until each has rated).",
+        "operationId": "my_ratings_api_v1_sessions__session_id__ratings_mine_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OwnRatingOut"
+                  },
+                  "title": "Response My Ratings Api V1 Sessions  Session Id  Ratings Mine Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Ratings",
+        "tags": [
+          "ratings"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/ratings/proxy": {
+      "put": {
+        "description": "Host rates on someone's behalf (audited as `rating.proxy_rated`).",
+        "operationId": "rate_proxy_api_v1_sessions__session_id__ratings_proxy_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RatingIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't (actively) bound to that person"
+          },
+          "404": {
+            "description": "No such night (or person) in this household"
+          },
+          "409": {
+            "description": "Ratings are not open yet"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rate Proxy",
+        "tags": [
+          "ratings"
         ]
       }
     },

@@ -2,11 +2,13 @@
 
 import { Clock } from "lucide-react";
 import Link from "next/link";
+import { useState, useSyncExternalStore } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { PhoneScreen } from "@/components/phone-screen";
+import { RatingPanel } from "@/components/night/rating-panel";
 import { PhotoAlbum } from "@/components/photos/photo-album";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useLiveSession } from "@/hooks/use-live-session";
 import type { Night } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -31,7 +33,12 @@ export function NightScreen({ sessionId }: { sessionId: string }) {
     >
       {night.isPending ? (
         <PhoneScreen title="Movie night">
-          <div aria-busy="true" aria-label="Loading the night" className="grid grid-cols-2 gap-3">
+          <div
+            role="status"
+            aria-busy="true"
+            aria-label="Loading the night"
+            className="grid grid-cols-2 gap-3"
+          >
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="aspect-[2/3] animate-pulse rounded-xl bg-muted" />
             ))}
@@ -82,12 +89,14 @@ function NightState({ night }: { night: Night }) {
         <PhoneScreen title="Tonight">
           <WinnerCard night={night} compact />
           <PhotoAlbum sessionId={night.id} />
+          <RateLater night={night} />
         </PhoneScreen>
       );
     case "closed":
       return (
         <PhoneScreen title="That's a wrap" lede="Thanks for movie night.">
           <WinnerCard night={night} compact />
+          <RatingPanel night={night} />
           <Results night={night} />
           <PhotoAlbum sessionId={night.id} />
           <Link
@@ -99,4 +108,32 @@ function NightState({ night }: { night: Night }) {
         </PhoneScreen>
       );
   }
+}
+
+function subscribeHash(onChange: () => void) {
+  window.addEventListener("hashchange", onChange);
+  return () => window.removeEventListener("hashchange", onChange);
+}
+
+/**
+ * Nobody rates during the movie: `tonight` keeps the stars folded away behind "Rate now", and
+ * the home card asks "How was it?" next time the phone opens the app (04-frontend.md).
+ */
+function RateLater({ night }: { night: Night }) {
+  const [opened, setOpened] = useState(false);
+  // The home card's "Rate it" links here with #rate: open straight away.
+  const asked = useSyncExternalStore(
+    subscribeHash,
+    () => window.location.hash === "#rate",
+    () => false,
+  );
+  if (opened || asked) return <RatingPanel night={night} />;
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl bg-card p-4 ring-1 ring-foreground/10">
+      <p className="text-lg">Rate later: we&apos;ll ask how it was after the movie.</p>
+      <Button variant="outline" size="tap" className="w-full" onClick={() => setOpened(true)}>
+        Rate it now
+      </Button>
+    </div>
+  );
 }

@@ -31,7 +31,7 @@ backend/app/
 | Ballots | `PUT /api/v1/sessions/{id}/ballots`, `PUT …/ballots/proxy`, `GET …/ballots/mine`, `GET …/voters` | Phone casts/replaces a bound person's ballot; host proxy ballot (`ballots:proxy`); a phone reads back its own people's ballots; who has voted (avatars only) |
 | Live | `/api/v1/sse-tickets`, `/api/v1/sessions/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md) |
 | Photos | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}` | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below |
-| Ratings | `/api/v1/sessions/{id}/ratings` | 1–5 per person, once the night is `tonight`/`closed` |
+| Ratings | `PUT /api/v1/sessions/{id}/ratings`, `PUT …/ratings/proxy`, `GET …/ratings/mine` | 1–5 per person, once the night is `tonight`/`closed`: a phone rates as its bound people, a host proxy-rates (`ballots:proxy`), a phone reads back its own people's scores. See "Ratings" |
 | Movies | `/api/v1/movies`, `GET /api/v1/tmdb/search?q=` | Library, owned flag (later); TMDB search proxy for hosts (503 when TMDB is off or down) |
 | Admin people | `GET/POST /api/v1/admin/people`, `PATCH /admin/people/{id}`, `POST /admin/people/{id}/convert-to-member`, `POST /admin/people/merge` | Add, rename/re-avatar/recolour, guest → member, merge (`admin:people`; hosts may add guests). See "People and devices admin" |
 | Admin devices | `GET /api/v1/admin/devices`, `PATCH /admin/devices/{id}`, `POST /admin/devices/{id}/revoke` | The "Devices" list with each device's people, label, revoke (`admin:devices`) |
@@ -140,8 +140,8 @@ Audit actions (`audit_events`, `target_type = 'session'`): `session.created`,
 `session.code_rotated`, `session.option_added`, `session.option_removed`, `session.reordered`,
 `session.voting_opened` (`data` records from/to, option count, ballot size),
 `session.voting_closed` (from/to, ballot count, winner, which tie-break decided),
-`session.settled`, `session.closed`, and `ballot.proxy_cast` (`data` is the person only, never
-the ranks).
+`session.settled`, `session.closed`, `ballot.proxy_cast` (`data` is the person only, never
+the ranks), and `rating.proxy_rated` (`data` is the person only, never the score).
 
 ## People and devices admin
 
@@ -248,6 +248,37 @@ with the winner's title/year/poster, dates and turnout (people with a ballot). T
 filter is `revealed`, `tonight`, `closed`; filtering uses the status readers see, so a settled
 reveal counts as `tonight`. A winner appears only once a night's status is revealed or later.
 
+## Ratings
+
+`services/rating_service.py`, `api/v1/ratings.py`. After the movie, each person scores it 1–5.
+The table (`ratings`, unique (session, person), `check(score between 1 and 5)`) shipped in Phase 1.
+
+- **Rate** (`PUT …/ratings {person_id, score}`, device, CSRF) needs an **active** binding to the
+  person (`people_service.require_can_act_as`; a pending claim or another phone's person is 403
+  "This phone can't rate as them"). **Proxy** (`PUT …/ratings/proxy`, `ballots:proxy`, CSRF) lets
+  a host rate for anyone in the household (an unknown or merged person is 404). Each proxy rating
+  writes a `rating.proxy_rated` audit row whose `data` holds the person only, never the score.
+  Both are an upsert (`ON CONFLICT (session_id, person_id) DO UPDATE`): rating again replaces the
+  score, and repeating it changes nothing.
+- **When.** Ratings are accepted once the night's *effective* status is `tonight` or `closed`
+  (`domain/session_state.check_can_rate`), so a reveal counts once it has settled (the lazy
+  `revealed → tonight` rule). Earlier statuses are 409 "Ratings open once tonight's movie is picked".
+  The session row is read `FOR SHARE`. The phone only *asks* after the movie (04-frontend.md), but
+  the server doesn't refuse a rating given during it.
+- **Reads.** `GET …/ratings/mine` returns `{person_id, score|null}` for each person actively bound
+  to the calling phone. The snapshot and each history row carry `rating: {average, count}` (the
+  family average, `average` null while `count` is 0), and only once the night is
+  `tonight`/`closed` (`session_state.shows_rating`); before that `rating` is null. No endpoint
+  returns another person's score.
+- **Live.** Every rating publishes `rating_count` after commit, and screens refetch the snapshot.
+- **For the generator.** `rating_service.average_rating(db, movie_id, since)` returns the family's
+  `RatingAverage(average, count)` for a library movie over the nights it won whose reveal (or
+  creation) is at or after `since`, or None if it wasn't rated in that window (ADR-0007's "skip
+  titles watched in the last 12 months unless the average is 4 or higher"). It is household-scoped
+  by the caller's RLS transaction.
+- Other household's night → 404; a device on the proxy route → 401; an account without
+  `ballots:proxy` → 403; a score outside 1–5 → 422.
+
 ## Photos
 
 `services/photo_service.py` over `integrations/storage.py` ([ADR-0005](decisions/ADR-0005-photo-pipeline-and-storage.md)).
@@ -318,6 +349,7 @@ snapshot version. Every event is a hint: clients refetch `GET /sessions/{id}` (o
 | `ballot_count` | any ballot cast or replaced (phone or proxy) |
 | `revealed` | close-voting when it actually tallies (not the idempotent repeat) |
 | `photo_added` | a photo upload completes (`pending → ready`) |
+| `rating_count` | a rating set or replaced (phone or proxy) |
 | `degraded` | the stream itself, never published |
 
 The lazy `revealed → tonight` settle publishes nothing: readers already see `tonight`. The

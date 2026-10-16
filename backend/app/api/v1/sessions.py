@@ -36,6 +36,7 @@ from app.schemas.sessions import (
     OptionIn,
     OptionOut,
     PlacementOut,
+    RatingSummaryOut,
     ReorderIn,
     SessionCreatedOut,
     SessionCreateIn,
@@ -46,6 +47,7 @@ from app.schemas.sessions import (
 )
 from app.services import generator_service, session_service
 from app.services.errors import Conflict, Forbidden, Invalid, NotFound, ServiceError, Unavailable
+from app.services.rating_service import RatingAverage
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -102,7 +104,14 @@ async def _out(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.UUID)
         revealed_at=snap.revealed_at,
         closed_at=snap.closed_at,
         result=_result(snap.result),
+        rating=rating_out(snap.rating),
     )
+
+
+def rating_out(rating: RatingAverage | None) -> RatingSummaryOut | None:
+    if rating is None:
+        return None
+    return RatingSummaryOut(average=rating.average, count=rating.count)
 
 
 def _result(result: session_service.VotingResult | None) -> VotingResultOut | None:
@@ -185,6 +194,7 @@ async def list_sessions(
                 poster_path=n.winner.poster_path,
             ),
             turnout=n.turnout,
+            rating=rating_out(n.rating),
         )
         for n in nights
     ]

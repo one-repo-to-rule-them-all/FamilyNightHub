@@ -24,6 +24,8 @@ export type NightOption = Schemas["OptionOut"];
 export type NightStatus = Night["status"];
 export type NightSummary = Schemas["NightSummaryOut"];
 export type OwnBallot = Schemas["OwnBallotOut"];
+export type OwnRating = Schemas["OwnRatingOut"];
+export type RatingSummary = Schemas["RatingSummaryOut"];
 export type Voter = Schemas["VoterOut"];
 export type TmdbResult = Schemas["TmdbResultOut"];
 export type Claim = Schemas["ClaimOut"];
@@ -181,6 +183,12 @@ export const api = {
     request<OwnBallot[]>("GET", `/sessions/${encodeURIComponent(sessionId)}/ballots/mine`),
   castBallot: (sessionId: string, body: Schemas["BallotIn"]) =>
     request<void>("PUT", `/sessions/${encodeURIComponent(sessionId)}/ballots`, body),
+  /** Scores of the people this phone holds (null until each has rated). */
+  myRatings: (sessionId: string) =>
+    request<OwnRating[]>("GET", `/sessions/${encodeURIComponent(sessionId)}/ratings/mine`),
+  /** Rate (or re-rate) the night 1–5 as a person this phone holds; open from `tonight` on. */
+  rate: (sessionId: string, body: Schemas["RatingIn"]) =>
+    request<void>("PUT", `/sessions/${encodeURIComponent(sessionId)}/ratings`, body),
 
   /** A 60s single-use ticket for this night's live stream (ADR-0004). */
   sseTicket: (sessionId: string) =>

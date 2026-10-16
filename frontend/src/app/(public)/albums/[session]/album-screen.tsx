@@ -20,7 +20,12 @@ export function AlbumScreen({ sessionId }: { sessionId: string }) {
   if (night.isPending) {
     return (
       <PhoneScreen title="Photos">
-        <div aria-busy="true" aria-label="Loading the album" className="grid grid-cols-3 gap-2">
+        <div
+          role="status"
+          aria-busy="true"
+          aria-label="Loading the album"
+          className="grid grid-cols-3 gap-2"
+        >
           {[0, 1, 2].map((i) => (
             <div key={i} className="aspect-square animate-pulse rounded-lg bg-muted" />
           ))}

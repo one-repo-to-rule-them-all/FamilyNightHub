@@ -1,11 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Star } from "lucide-react";
 import Link from "next/link";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Poster } from "@/components/poster";
 import { api, type ApiError, type NightSummary } from "@/lib/api";
+import { describeAverage } from "@/lib/rating";
 
 const dateFormat = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -23,7 +25,12 @@ export function HistoryList() {
 
   if (nights.isPending) {
     return (
-      <div aria-busy="true" aria-label="Loading past nights" className="flex flex-col gap-3">
+      <div
+        role="status"
+        aria-busy="true"
+        aria-label="Loading past nights"
+        className="flex flex-col gap-3"
+      >
         {[0, 1, 2].map((i) => (
           <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />
         ))}
@@ -52,6 +59,7 @@ export function HistoryList() {
     <ul className="flex flex-col gap-3" data-testid="history-list">
       {nights.data.map((night) => {
         const when = new Date(night.revealed_at ?? night.created_at);
+        const average = describeAverage(night.rating);
         return (
           <li key={night.id}>
             <Link
@@ -73,6 +81,12 @@ export function HistoryList() {
                 <span className="text-sm text-muted-foreground" data-testid="history-turnout">
                   {night.turnout} {night.turnout === 1 ? "person" : "people"} voted
                 </span>
+                {average ? (
+                  <span className="flex items-center gap-1 text-sm" data-testid="history-rating">
+                    <Star aria-hidden className="size-4 fill-current" />
+                    <span className="sr-only">Family rating:</span> {average}
+                  </span>
+                ) : null}
               </span>
             </Link>
           </li>

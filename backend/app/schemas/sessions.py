@@ -88,6 +88,8 @@ class SessionOut(BaseModel):
     closed_at: datetime | None
     # Null until the night is revealed: tallies are hidden while voting (ADR-0006).
     result: VotingResultOut | None
+    # The family's average score; null until ratings open (`tonight`/`closed`).
+    rating: RatingSummaryOut | None
 
 
 class TmdbResultOut(BaseModel):
@@ -249,6 +251,34 @@ class NightSummaryOut(BaseModel):
     winner: WinnerOut | None
     # How many people voted.
     turnout: int
+    # The family's average score; null until ratings open (`tonight`/`closed`).
+    rating: RatingSummaryOut | None
 
 
-SessionOut.model_rebuild()  # `result` refers to VotingResultOut, defined below it
+# --- Ratings ---------------------------------------------------------------------------
+
+
+class RatingIn(BaseModel):
+    """One person's score for the night's movie, replacing any earlier one."""
+
+    person_id: uuid.UUID
+    score: int = Field(ge=1, le=5)
+
+
+class OwnRatingOut(BaseModel):
+    person_id: uuid.UUID
+    # Null until this person has rated.
+    score: int | None
+
+
+class RatingSummaryOut(BaseModel):
+    """The family's average only: never anyone's own score."""
+
+    # Null while nobody has rated.
+    average: float | None
+    count: int
+
+
+# `result` and `rating` refer to models defined below SessionOut / NightSummaryOut.
+SessionOut.model_rebuild()
+NightSummaryOut.model_rebuild()
