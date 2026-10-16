@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -58,6 +59,26 @@ class AccountOut(BaseModel):
     display_name: str
     role: Literal["admin", "host"]
     household_name: str
+
+
+class EnrollIn(BaseModel):
+    device_label: str | None = Field(default=None, max_length=80)
+    # "Use as TV": marks the device as the TV and signs the host out of this browser.
+    as_tv: bool = False
+
+
+class EnrollOut(BaseModel):
+    device_id: uuid.UUID
+    is_tv: bool
+
+
+class ClaimOut(BaseModel):
+    device_id: uuid.UUID
+    device_label: str | None
+    person_id: uuid.UUID
+    person_name: str
+    avatar_emoji: str
+    requested_at: datetime
 
 
 class BindingOut(BaseModel):
