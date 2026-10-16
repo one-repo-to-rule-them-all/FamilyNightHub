@@ -10,6 +10,8 @@ export type SeededNight = {
   householdName: string;
   adminEmail: string;
   people: string[];
+  /** Signed `fnh_session` cookie value for the seeded admin (see seed_night.py). */
+  hostSession: string;
 };
 
 const BACKEND = path.resolve(__dirname, "../../../backend");

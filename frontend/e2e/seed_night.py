@@ -4,7 +4,9 @@ Run from backend/ (so `app` and its settings resolve), with the same env as the 
 
     uv run python ../frontend/e2e/seed_night.py --slug e2e-abc123
 
-Prints one JSON line: {"slug", "nightCode", "householdName", "adminEmail", "people": [...]}.
+Prints one JSON line: {"slug", "nightCode", "householdName", "adminEmail", "people": [...],
+"hostSession"}. `hostSession` is a signed `fnh_session` cookie value for the admin (the same
+signer the magic-link verify uses), so host/TV tests can start signed in without MailHog.
 Every test seeds its own household, so tests never share state and reruns need no cleanup.
 It goes through app.cli.bootstrap (the real first-admin path) and household_session (RLS, GUC
 set per transaction), and hashes the night code with the real pepper, exactly like the API.
@@ -17,6 +19,7 @@ import asyncio
 import json
 import os
 import sys
+import time
 
 sys.path.insert(0, os.getcwd())
 
@@ -24,7 +27,7 @@ from sqlalchemy import text  # noqa: E402
 
 from app.cli import bootstrap  # noqa: E402
 from app.core.database import household_session  # noqa: E402
-from app.core.security import hash_night_code  # noqa: E402
+from app.core.security import hash_night_code, sign_account_session  # noqa: E402
 from app.domain import night_code  # noqa: E402
 
 PEOPLE = [
@@ -65,6 +68,9 @@ async def seed(slug: str) -> dict[str, object]:
         "householdName": household,
         "adminEmail": email,
         "people": [name for name, _, _ in PEOPLE],
+        "hostSession": sign_account_session(
+            created.account_id, created.household_id, int(time.time())
+        ),
     }
 
 

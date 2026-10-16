@@ -26,7 +26,7 @@ flowchart TB
 | `unit` | pytest `tests/unit` (+ Hypothesis tally properties), vitest (API client CSRF + error envelope, night-code input; later the photo pipeline incl. GPS-strip fixture) | `backend/tests/unit`, `frontend/src/**/*.test.ts` | Built (photo-pipeline vitest lands with the pipeline) |
 | `integration` | Whole pytest suite against Postgres + Redis service containers as `fnh_app`, after the role bootstrap. **Includes the isolation suite** (two seeded households, every table) and `test_rls_coverage`. Coverage gates run here | `backend/tests/integration` | Built. SeaweedFS service joins with the photo endpoints; endpoint-level isolation joins with the endpoints |
 | `contract` | `alembic upgrade` → `downgrade base` → `upgrade` round trip, `alembic check` (models match migrations), `openapi.json` + `api.gen.ts` drift | ci.yml | Built |
-| `e2e` | Postgres + Redis + MailHog service containers, role bootstrap + migrations, `next build`, then Playwright starts uvicorn and `next start`. Phone viewports (Pixel 7, and iPhone 13 on Chromium) with axe (WCAG 2.1 AA): join with the night code → pick an avatar, wrong code, lookalike characters, cookie redirects, magic-link request → emailed link → `/host` → sign out, bad and replayed tokens. Each test seeds its own household (`frontend/e2e/seed_night.py`). Later: 4 phone contexts + TV context, SSE, tmdb-fake, "unauthenticated context gets 0 photo URLs" | `frontend/e2e/` | Built (join + sign-in); multi-phone/TV lands with voting |
+| `e2e` | Postgres + Redis + MailHog service containers, role bootstrap + migrations, `next build`, then Playwright starts uvicorn and `next start`. Phone viewports (Pixel 7, and iPhone 13 on Chromium) with axe (WCAG 2.1 AA): join with the night code → pick an avatar, wrong code, lookalike characters, cookie redirects, magic-link request → emailed link → `/host` → sign out, bad and replayed tokens. Host + TV (`host-tv.spec.ts`): a TV context (1280×720) where the host starts a night and pairs it as the TV (code handed off in-tab), the host's phone builds a shortlist (forced TMDB 503 → typed titles; add, reorder, remove, reload) and opens voting, a phone joins and votes, a proxy vote, close with `X-FNH-Test-Seed`, TV turnout tiles light and the reveal lands on the stored winner; a paired TV asking for the code; `/tv` unpaired. Each test seeds its own household (`frontend/e2e/seed_night.py`, which also prints a signed `fnh_session` cookie so host tests start signed in without MailHog). Later: 4 phone contexts, SSE, tmdb-fake, "unauthenticated context gets 0 photo URLs" | `frontend/e2e/` | Built (join, sign-in, host + TV); multi-phone ballots land with `/s/[session]` |
 | `bundle-secrets` | `next build` with sentinel values for every server secret, then grep `.next/static` for each. Verified by a deliberate leak (`next.config` `env` + client component) that the grep catches | ci.yml | Built |
 
 `ENVIRONMENT=test` in CI. TypeScript types come from `openapi-typescript`, installed in its own
@@ -40,7 +40,9 @@ green.
 
 **E2E determinism rules:** wait for `data-live="ready"` before acting; assert on server-derived
 text with `expect.poll`/`toHaveText`; tie-break seeds are injected through a test-only header that
-is accepted only when `ENVIRONMENT=test`; TMDB is always `tmdb-fake`.
+is accepted only when `ENVIRONMENT=test`; TMDB is always `tmdb-fake` (the CI `e2e` job doesn't run it
+yet, so `host-tv.spec.ts` forces the search's 503 with `page.route` and uses typed titles). Host
+and TV screens poll every 5s until SSE lands, so their assertions wait up to 15s.
 
 ## Running E2E locally
 

@@ -6,7 +6,7 @@ import { HostHome } from "./host-home";
 
 export const metadata: Metadata = { title: "Host" };
 
-/** Placeholder until the shortlist builder lands (04-frontend.md route table). */
+/** Start a night, approve phones, pair the TV (04-frontend.md route table). */
 export default function HostPage() {
   return (
     <PhoneScreen title="Host">

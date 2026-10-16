@@ -19,6 +19,13 @@ export type Binding = Schemas["BindingOut"];
 export type Device = Schemas["DeviceOut"];
 export type JoinResult = Schemas["JoinOut"];
 export type Account = Schemas["AccountOut"];
+export type Night = Schemas["SessionOut"];
+export type NightStatus = Night["status"];
+export type NightOption = Schemas["OptionOut"];
+export type NightSummary = Schemas["NightSummaryOut"];
+export type Voter = Schemas["VoterOut"];
+export type TmdbResult = Schemas["TmdbResultOut"];
+export type Claim = Schemas["ClaimOut"];
 
 export const CSRF_HEADER = "X-FNH-CSRF";
 const BASE = "/api/v1";
@@ -154,6 +161,59 @@ export const api = {
   verifyMagicLink: (body: Schemas["VerifyIn"]) => request<Account>("POST", "/auth/verify", body),
   me: () => request<Account>("GET", "/auth/me"),
   logout: () => request<void>("POST", "/auth/logout"),
+
+  // Nights (host + TV screens). Mutations are host-only; reads work for any household viewer.
+  nights: (statuses: NightStatus[], limit = 20) => {
+    const query = new URLSearchParams(statuses.map((s) => ["status", s]));
+    query.set("limit", String(limit));
+    return request<NightSummary[]>("GET", `/sessions?${query.toString()}`);
+  },
+  night: (sessionId: string) => request<Night>("GET", `/sessions/${encodeURIComponent(sessionId)}`),
+  createNight: (body: Schemas["SessionCreateIn"]) =>
+    request<Schemas["SessionCreatedOut"]>("POST", "/sessions", body),
+  rotateNightCode: (sessionId: string) =>
+    request<Schemas["NightCodeOut"]>(
+      "POST",
+      `/sessions/${encodeURIComponent(sessionId)}/night-code`,
+    ),
+  addOption: (sessionId: string, body: Schemas["OptionIn"]) =>
+    request<Night>("POST", `/sessions/${encodeURIComponent(sessionId)}/options`, body),
+  removeOption: (sessionId: string, optionId: string) =>
+    request<Night>(
+      "DELETE",
+      `/sessions/${encodeURIComponent(sessionId)}/options/${encodeURIComponent(optionId)}`,
+    ),
+  reorderOptions: (sessionId: string, optionIds: string[]) =>
+    request<Night>("PUT", `/sessions/${encodeURIComponent(sessionId)}/options/order`, {
+      option_ids: optionIds,
+    }),
+  openVoting: (sessionId: string) =>
+    request<Night>("POST", `/sessions/${encodeURIComponent(sessionId)}/open-voting`),
+  closeVoting: (sessionId: string) =>
+    request<Night>("POST", `/sessions/${encodeURIComponent(sessionId)}/close-voting`),
+  closeNight: (sessionId: string) =>
+    request<Night>("POST", `/sessions/${encodeURIComponent(sessionId)}/close`),
+  voters: (sessionId: string) =>
+    request<Schemas["VotersOut"]>("GET", `/sessions/${encodeURIComponent(sessionId)}/voters`),
+  proxyBallot: (sessionId: string, body: Schemas["BallotIn"]) =>
+    request<void>("PUT", `/sessions/${encodeURIComponent(sessionId)}/ballots/proxy`, body),
+  searchTmdb: (q: string) =>
+    request<TmdbResult[]>("GET", `/tmdb/search?${new URLSearchParams({ q }).toString()}`),
+
+  // Host device actions (ADR-0002).
+  claims: () => request<Claim[]>("GET", "/devices/claims"),
+  approveClaim: (deviceId: string, personId: string) =>
+    request<void>(
+      "POST",
+      `/devices/${encodeURIComponent(deviceId)}/people/${encodeURIComponent(personId)}/approve`,
+    ),
+  rejectClaim: (deviceId: string, personId: string) =>
+    request<void>(
+      "POST",
+      `/devices/${encodeURIComponent(deviceId)}/people/${encodeURIComponent(personId)}/reject`,
+    ),
+  enroll: (body: Schemas["EnrollIn"]) =>
+    request<Schemas["EnrollOut"]>("POST", "/devices/enroll", body),
 };
 
 /** "Try again in 2 minutes." for a 429, or null when the server gave no Retry-After. */
