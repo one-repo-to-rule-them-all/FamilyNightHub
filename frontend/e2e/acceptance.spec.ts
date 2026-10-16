@@ -162,11 +162,11 @@ test.describe("Phase 1 acceptance", () => {
     await expectNoAxeViolations(host);
     await host.getByRole("button", { name: "Approve Leo" }).click();
     await expect(host.getByText("No phones are waiting.")).toBeVisible();
-    // /who doesn't poll, so phone C sees the approval once it reloads (as its owner would).
-    await phoneC.reload();
+    // /who polls while a claim is pending, so the tile flips with no reload.
     await expect(phoneC.getByRole("button", { name: /^Leo/ })).toHaveAttribute(
       "data-binding",
       "mine",
+      POLL,
     );
     await expect(phoneC.getByTestId("who-status")).toHaveText(
       "You're in as Leo & Noah. Voting opens on the TV.",

@@ -32,6 +32,17 @@ export function nightPollInterval(state: LiveState, status: string | undefined):
   return status === "revealed" ? POLL_MS : pollWhileDown(state);
 }
 
+/**
+ * `/who`'s people `refetchInterval`. A host approving a pending claim publishes nothing to the
+ * phone (/who has no night stream), so while any tile is `pending` the list polls on the
+ * snapshot cadence and the tile flips to `mine` without a reload. Otherwise it doesn't poll.
+ */
+export function pendingPollInterval(
+  people: readonly { binding: string }[] | undefined,
+): number | false {
+  return people?.some((p) => p.binding === "pending") ? POLL_MS : false;
+}
+
 /** The slice of `EventSource` the connection uses (so tests can hand it a fake). */
 export type StreamLike = {
   onopen: ((event: Event) => void) | null;
