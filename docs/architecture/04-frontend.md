@@ -150,7 +150,9 @@ an SSE ticket, opens `EventSource`, invalidates the snapshot on each event, refe
   re-tickets after a backoff of 1s, 2s, 5s, 10s, then every 30s. The browser's own auto-retry is never
   used: it would replay a single-use ticket. A failed ticket mint backs off the same way.
 - **Polling only while down:** `refetchInterval` is 5s while `live` is `reconnecting` (also in a
-  background tab, so a phone left on the ballot still sees the reveal) and off while `ready`.
+  background tab, so a phone left on the ballot still sees the reveal) and off while `ready`,
+  except while the night is `revealed`: the lazy settle into `tonight` publishes nothing
+  (03-backend.md), so a screen on the reveal polls until it flips (`nightPollInterval`).
 - **Wake-ups:** `visibilitychange` → visible refetches the snapshot; it and `online` also re-ticket
   at once if the stream is waiting out a backoff (and reset the backoff if an attempt is in flight).
 - No `EventSource` at all (very old browser): stays `reconnecting` and polls.

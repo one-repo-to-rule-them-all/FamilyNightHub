@@ -22,6 +22,16 @@ export function pollWhileDown(state: LiveState): number | false {
   return state === "ready" ? false : POLL_MS;
 }
 
+/**
+ * The night snapshot's `refetchInterval`. `revealed -> tonight` settles lazily on the server
+ * (REVEAL_SETTLE, 30s) and publishes nothing (03-backend.md), so a screen left on the reveal with
+ * the stream up would never learn the night is `tonight` (no photo drop until a reload). While
+ * the night is `revealed` it polls; otherwise only while the stream is down.
+ */
+export function nightPollInterval(state: LiveState, status: string | undefined): number | false {
+  return status === "revealed" ? POLL_MS : pollWhileDown(state);
+}
+
 /** The slice of `EventSource` the connection uses (so tests can hand it a fake). */
 export type StreamLike = {
   onopen: ((event: Event) => void) | null;

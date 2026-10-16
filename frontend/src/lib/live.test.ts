@@ -5,6 +5,7 @@ import {
   LiveConnection,
   type LiveState,
   POLL_MS,
+  nightPollInterval,
   pollWhileDown,
   type StreamLike,
 } from "./live";
@@ -67,6 +68,20 @@ describe("pollWhileDown", () => {
   it("polls the snapshot only while the stream is down", () => {
     expect(pollWhileDown("reconnecting")).toBe(POLL_MS);
     expect(pollWhileDown("ready")).toBe(false);
+  });
+});
+
+describe("nightPollInterval", () => {
+  it("polls a revealed night even with the stream up: its settle into tonight sends no event", () => {
+    expect(nightPollInterval("ready", "revealed")).toBe(POLL_MS);
+    expect(nightPollInterval("reconnecting", "revealed")).toBe(POLL_MS);
+  });
+
+  it("otherwise polls only while the stream is down", () => {
+    for (const status of ["draft", "voting", "tonight", "closed", undefined]) {
+      expect(nightPollInterval("ready", status)).toBe(false);
+      expect(nightPollInterval("reconnecting", status)).toBe(POLL_MS);
+    }
   });
 });
 

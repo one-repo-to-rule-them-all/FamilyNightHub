@@ -13,8 +13,12 @@ function decode(body: string): string {
   return body.replace(/=\r?\n/g, "").replace(/=3D/gi, "=");
 }
 
-/** The token from the newest sign-in email to `email` (addresses are unique per test). */
-export async function magicLinkToken(email: string): Promise<string> {
+/**
+ * The token from the newest sign-in email to `email` (addresses are unique per test). `except`
+ * skips links already used, so a second sign-in waits for its own email instead of finding the
+ * first one.
+ */
+export async function magicLinkToken(email: string, except: string[] = []): Promise<string> {
   if (!MAILHOG_URL) throw new Error("MAILHOG_URL is not set");
   let token: string | null = null;
   // The API sends from a background task after answering 202: poll until the mail lands.
@@ -27,7 +31,7 @@ export async function magicLinkToken(email: string): Promise<string> {
           const match = /\/auth\/callback\?token=([A-Za-z0-9_-]+)/.exec(
             decode(message.Content.Body),
           );
-          if (match) token = match[1];
+          if (match && !except.includes(match[1])) token = match[1];
           if (token) break;
         }
         return token;

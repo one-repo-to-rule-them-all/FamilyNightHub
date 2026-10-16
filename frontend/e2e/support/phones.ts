@@ -1,5 +1,12 @@
 import AxeBuilder from "@axe-core/playwright";
-import { type APIRequestContext, type Browser, type Page, test } from "@playwright/test";
+import {
+  type APIRequestContext,
+  type Browser,
+  type BrowserContext,
+  devices,
+  type Page,
+  test,
+} from "@playwright/test";
 
 import { expect, type SeededNight } from "./seed";
 
@@ -25,8 +32,25 @@ export async function newPhone(browser: Browser): Promise<Page> {
   return context.newPage();
 }
 
+/**
+ * A phone with an explicit device profile (Chromium either way: the API's cookies are Secure),
+ * for specs that mix iPhones and Pixels in one run.
+ */
+export async function newPhoneLike(
+  browser: Browser,
+  device: "iPhone 13" | "Pixel 7",
+  baseURL: string,
+): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext({ ...devices[device], baseURL });
+  return { context, page: await context.newPage() };
+}
+
 /** Join with the night code, then claim each person on /who (server-confirmed). */
-export async function joinAs(page: Page, night: SeededNight, names: string[]) {
+export async function joinAs(
+  page: Page,
+  night: Pick<SeededNight, "slug" | "nightCode">,
+  names: string[],
+) {
   await page.goto(`/j/${night.slug}`);
   await page.getByLabel("Night code").fill(night.nightCode);
   await page.getByRole("button", { name: "Join" }).click();
@@ -44,7 +68,7 @@ export async function joinAs(page: Page, night: SeededNight, names: string[]) {
  */
 export async function apiFromPhone(
   page: Page,
-  method: "GET" | "PUT" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   body?: unknown,
 ): Promise<{ status: number; body: unknown }> {
@@ -69,6 +93,20 @@ export async function apiFromPhone(
     },
     { method, path, body },
   );
+}
+
+/** A poster on the phone ballot, ranked or not. */
+export const poster = (page: Page, title: string) =>
+  page.getByRole("button", { name: new RegExp(`^(Pick \\d )?${title}`) });
+
+/** Tap posters in order, then Done; the confirmation lists what the server saved. */
+export async function vote(page: Page, name: string, titles: readonly string[]) {
+  await expect(page.getByTestId("voting-as")).toHaveText(name);
+  for (const title of titles) await poster(page, title).click();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByRole("heading", { name: `Thanks, ${name}!` })).toBeVisible();
+  const saved = page.getByTestId("saved-picks").getByRole("listitem");
+  await expect(saved).toHaveText(titles.map((title, i) => `Pick ${i + 1}${title}`));
 }
 
 const API_URL = `http://localhost:${process.env.E2E_API_PORT ?? 8201}`;
