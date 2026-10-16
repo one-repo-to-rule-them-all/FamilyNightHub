@@ -17,12 +17,10 @@
 name: CI
 
 on:
-  # Every PR, whatever its base. The repo's default branch is currently
-  # `feat/initial-scaffold` (`main` is an unrelated empty commit); drop it from `push` once
-  # the default branch is renamed to `main`.
+  # Every PR, whatever its base (stacked branches get the gate too).
   pull_request:
   push:
-    branches: [main, feat/initial-scaffold]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
