@@ -137,6 +137,13 @@ def shows_result(status: str) -> bool:
     return status in RESULT_STATUSES
 
 
+def check_can_correct_winner(status: str) -> None:
+    """An admin may correct the winner only once there is one (ADR-0006: a re-close with
+    an audit row). A draft or a night still voting has no winner to correct."""
+    if status not in RESULT_STATUSES:
+        raise SessionRuleError("Only a night that has picked its movie can be corrected")
+
+
 def check_can_vote(status: str) -> None:
     """Ballots are cast and replaced only while voting is open."""
     if status != "voting":
