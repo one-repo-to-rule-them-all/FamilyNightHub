@@ -37,7 +37,8 @@ class Unavailable(ServiceError):
 
 
 class Invalid(ServiceError):
-    """Well-formed input that breaks a domain rule (e.g. a ballot ranking 4 options). 422."""
+    """Well-formed input that breaks a domain rule (e.g. a ballot ranking 4 options), or
+    an upload that fails its check (a photo of the wrong type or size). 422."""
 
     def __init__(self, reason: str) -> None:
         super().__init__(reason)

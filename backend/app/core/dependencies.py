@@ -148,6 +148,8 @@ class ViewerContext:
     household_id: uuid.UUID
     device: DeviceContext | None
     account_id: uuid.UUID | None
+    # The account's role when the viewer is an account (e.g. moderators see hidden photos).
+    role: str | None = None
 
 
 async def current_viewer(request: Request) -> ViewerContext:
@@ -159,7 +161,7 @@ async def current_viewer(request: Request) -> ViewerContext:
         except HTTPException:
             pass
         else:
-            return ViewerContext(account.household_id, None, account.account_id)
+            return ViewerContext(account.household_id, None, account.account_id, account.role)
     device = await current_device(request)
     return ViewerContext(device.household_id, device, None)
 

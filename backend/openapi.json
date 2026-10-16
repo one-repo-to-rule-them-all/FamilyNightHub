@@ -614,6 +614,25 @@
         "title": "MergeOut",
         "type": "object"
       },
+      "MyReactionOut": {
+        "properties": {
+          "emoji": {
+            "title": "Emoji",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "emoji"
+        ],
+        "title": "MyReactionOut",
+        "type": "object"
+      },
       "NightCodeOut": {
         "properties": {
           "night_code": {
@@ -970,6 +989,158 @@
         "title": "PersonUpdateIn",
         "type": "object"
       },
+      "PhotoCreateIn": {
+        "properties": {
+          "person_id": {
+            "description": "Who is sharing it: a person bound to this device",
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "taken_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "EXIF DateTimeOriginal, date only (read on the phone)",
+            "title": "Taken On"
+          }
+        },
+        "required": [
+          "person_id"
+        ],
+        "title": "PhotoCreateIn",
+        "type": "object"
+      },
+      "PhotoCreatedOut": {
+        "properties": {
+          "expires_in": {
+            "description": "Seconds the upload URLs stay valid",
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "photo_id": {
+            "format": "uuid",
+            "title": "Photo Id",
+            "type": "string"
+          },
+          "thumb_upload_url": {
+            "description": "PUT the thumbnail JPEG here, same content type",
+            "title": "Thumb Upload Url",
+            "type": "string"
+          },
+          "upload_url": {
+            "description": "PUT the full JPEG here with Content-Type: image/jpeg",
+            "title": "Upload Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "photo_id",
+          "upload_url",
+          "thumb_upload_url",
+          "expires_in"
+        ],
+        "title": "PhotoCreatedOut",
+        "type": "object"
+      },
+      "PhotoOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "my_reactions": {
+            "description": "Reactions by people bound to the calling device (empty for accounts)",
+            "items": {
+              "$ref": "#/components/schemas/MyReactionOut"
+            },
+            "title": "My Reactions",
+            "type": "array"
+          },
+          "person_avatar_emoji": {
+            "title": "Person Avatar Emoji",
+            "type": "string"
+          },
+          "person_color": {
+            "title": "Person Color",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "person_name": {
+            "title": "Person Name",
+            "type": "string"
+          },
+          "reactions": {
+            "items": {
+              "$ref": "#/components/schemas/ReactionCountOut"
+            },
+            "title": "Reactions",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "hidden"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "taken_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taken On"
+          },
+          "thumb_url": {
+            "description": "Presigned GET for the thumbnail (10 min)",
+            "title": "Thumb Url",
+            "type": "string"
+          },
+          "url": {
+            "description": "Presigned GET for the full image (10 min)",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "person_id",
+          "person_name",
+          "person_avatar_emoji",
+          "person_color",
+          "status",
+          "taken_on",
+          "created_at",
+          "url",
+          "thumb_url",
+          "reactions",
+          "my_reactions"
+        ],
+        "title": "PhotoOut",
+        "type": "object"
+      },
       "PlacementOut": {
         "properties": {
           "first_places": {
@@ -1037,6 +1208,24 @@
           "rank"
         ],
         "title": "RankOut",
+        "type": "object"
+      },
+      "ReactionCountOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "emoji": {
+            "title": "Emoji",
+            "type": "string"
+          }
+        },
+        "required": [
+          "emoji",
+          "count"
+        ],
+        "title": "ReactionCountOut",
         "type": "object"
       },
       "ReorderIn": {
@@ -3255,6 +3444,490 @@
         "summary": "Remove Option",
         "tags": [
           "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/photos": {
+      "get": {
+        "description": "The album, newest first. URLs are minted per request and expire in 10 minutes.\nHidden photos appear only for accounts that may unhide them.",
+        "operationId": "list_photos_api_v1_sessions__session_id__photos_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PhotoOut"
+                  },
+                  "title": "Response List Photos Api V1 Sessions  Session Id  Photos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "List Photos",
+        "tags": [
+          "photos"
+        ]
+      },
+      "post": {
+        "description": "Start an upload: a `pending` photo plus presigned PUTs for the JPEG and its thumbnail.\nPUT both, then call `complete`.",
+        "operationId": "create_photo_api_v1_sessions__session_id__photos_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "The person is not bound to this device"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "409": {
+            "description": "The album isn't open (before the pick) or is full"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Create Photo",
+        "tags": [
+          "photos"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/photos/{photo_id}": {
+      "delete": {
+        "description": "Hard delete (admins): both objects, the row and its reactions. A tombstone tells the\nworker to purge the backup copies within 24h.",
+        "operationId": "delete_photo_api_v1_sessions__session_id__photos__photo_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Delete Photo",
+        "tags": [
+          "photos"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/photos/{photo_id}/complete": {
+      "post": {
+        "description": "Check both uploads (HEAD: image/jpeg, 1 byte..10 MB) and publish the photo.",
+        "operationId": "complete_photo_api_v1_sessions__session_id__photos__photo_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "description": "Upload missing, not a JPEG, or over 10 MB"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Complete Photo",
+        "tags": [
+          "photos"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/photos/{photo_id}/hide": {
+      "post": {
+        "description": "Soft hide: gone from every phone and the TV, kept for an unhide. Idempotent.",
+        "operationId": "hide_photo_api_v1_sessions__session_id__photos__photo_id__hide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such photo in this household"
+          },
+          "409": {
+            "description": "The photo hasn't finished uploading"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hide Photo",
+        "tags": [
+          "photos"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/photos/{photo_id}/reactions/{emoji}": {
+      "delete": {
+        "description": "Idempotent.",
+        "operationId": "remove_reaction_api_v1_sessions__session_id__photos__photo_id__reactions__emoji__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "emoji",
+            "required": true,
+            "schema": {
+              "enum": [
+                "\u2764\ufe0f",
+                "\ud83d\ude02",
+                "\ud83d\ude2e",
+                "\ud83d\udc4d",
+                "\ud83c\udf89",
+                "\ud83c\udf7f"
+              ],
+              "title": "Emoji",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Whose reaction to remove",
+            "in": "query",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "description": "Whose reaction to remove",
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "The person is not bound to this device"
+          },
+          "404": {
+            "description": "No such visible photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Reaction",
+        "tags": [
+          "photos"
+        ]
+      },
+      "put": {
+        "description": "Idempotent.",
+        "operationId": "add_reaction_api_v1_sessions__session_id__photos__photo_id__reactions__emoji__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "emoji",
+            "required": true,
+            "schema": {
+              "enum": [
+                "\u2764\ufe0f",
+                "\ud83d\ude02",
+                "\ud83d\ude2e",
+                "\ud83d\udc4d",
+                "\ud83c\udf89",
+                "\ud83c\udf7f"
+              ],
+              "title": "Emoji",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Who is reacting",
+            "in": "query",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "description": "Who is reacting",
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "The person is not bound to this device"
+          },
+          "404": {
+            "description": "No such visible photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Reaction",
+        "tags": [
+          "photos"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/photos/{photo_id}/unhide": {
+      "post": {
+        "operationId": "unhide_photo_api_v1_sessions__session_id__photos__photo_id__unhide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such photo in this household"
+          },
+          "409": {
+            "description": "The photo hasn't finished uploading"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unhide Photo",
+        "tags": [
+          "photos"
         ]
       }
     },

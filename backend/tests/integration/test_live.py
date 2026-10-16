@@ -24,6 +24,8 @@ from app.realtime import publisher, tickets
 from tests.integration.live_stream import LiveStream, subscribers
 from tests.integration.phones import Phone, phone
 from tests.integration.seed import SeededHousehold
+from tests.integration.storage_doubles import FakeStorage, storage
+from tests.integration.test_photos import _member, _ready_photo
 from tests.integration.test_voting import _host, _night, _person, _phone_for, _vote
 
 pytestmark = pytest.mark.integration
@@ -280,6 +282,25 @@ async def test_the_stream_closes_itself_after_its_lifetime(
         live = await _open(sid, await _ticket(host, sid))
     assert await live.body() == ": connected\n\n"
     assert await subscribers(publisher.session_channel(uuid.UUID(sid))) == 0
+
+
+async def test_a_completed_photo_reaches_the_stream(two_households: Pair) -> None:
+    a, _ = two_households
+    sid = a.ids["session"]
+    bucket = FakeStorage()
+    async with phone() as kid:
+        person = await _member(kid, a)
+        live = await _open(sid, await _ticket(kid, sid))
+        try:
+            assert await live.frame() == ": connected\n\n"
+            with storage(bucket):
+                photo_id = await _ready_photo(kid, a, bucket, person)
+            event = await live.event()
+            assert event["type"] == "photo_added"
+            assert set(event) == {"type", "session_id", "version"}
+            assert photo_id not in json.dumps(event)
+        finally:
+            await live.hang_up()
 
 
 # --- Publishing ------------------------------------------------------------------------

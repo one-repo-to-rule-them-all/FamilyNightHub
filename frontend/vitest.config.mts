@@ -8,5 +8,15 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    coverage: {
+      provider: "v8",
+      include: ["src/lib/**/*.ts"],
+      exclude: ["src/**/*.test.ts"],
+      reporter: ["text-summary", "text"],
+      // Pure logic is gated at 100% (as the backend's domain package is): the ballot reducer.
+      thresholds: {
+        "src/lib/ballot.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
+      },
+    },
   },
 });
