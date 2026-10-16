@@ -33,7 +33,12 @@ export function NightScreen({ sessionId }: { sessionId: string }) {
     >
       {night.isPending ? (
         <PhoneScreen title="Movie night">
-          <div aria-busy="true" aria-label="Loading the night" className="grid grid-cols-2 gap-3">
+          <div
+            role="status"
+            aria-busy="true"
+            aria-label="Loading the night"
+            className="grid grid-cols-2 gap-3"
+          >
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="aspect-[2/3] animate-pulse rounded-xl bg-muted" />
             ))}

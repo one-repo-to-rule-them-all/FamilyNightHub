@@ -25,7 +25,12 @@ export function HistoryList() {
 
   if (nights.isPending) {
     return (
-      <div aria-busy="true" aria-label="Loading past nights" className="flex flex-col gap-3">
+      <div
+        role="status"
+        aria-busy="true"
+        aria-label="Loading past nights"
+        className="flex flex-col gap-3"
+      >
         {[0, 1, 2].map((i) => (
           <div key={i} className="h-36 animate-pulse rounded-2xl bg-muted" />
         ))}
