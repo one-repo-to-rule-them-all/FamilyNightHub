@@ -19,6 +19,7 @@ Needs Docker, [uv](https://docs.astral.sh/uv/) and Node 22.
 cp .env.example .env
 docker compose -p fnh up -d --build --wait
 docker compose -p fnh exec api alembic upgrade head
+docker compose -p fnh exec api python -m app.cli bootstrap --household "Our Family" --slug our-family --email you@example.com --name You
 curl localhost:8000/api/health
 ```
 
@@ -43,4 +44,5 @@ After changing an API schema, regenerate the contract (CI fails on drift):
 CI (`.github/workflows/ci.yml`) runs static, unit, integration (incl. isolation and RLS
 coverage), contract and bundle-secrets jobs; see `docs/architecture/07-cicd.md`.
 
-Local ports: Postgres 55432, Redis 56379, S3 58333, MailHog UI 58025, API 8000.
+Local ports: Postgres 55432, Redis 56379, S3 58333, MailHog UI 58025 (sign-in links land here),
+API 8000.

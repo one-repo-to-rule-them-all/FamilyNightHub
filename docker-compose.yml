@@ -66,6 +66,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://fnh_app:fnh_app@db:5432/fnh_dev
       MIGRATION_DATABASE_URL: postgresql+psycopg2://fnh:fnh@db:5432/fnh_dev
       REDIS_URL: redis://redis:6379/0
+      # Magic links land in MailHog: http://localhost:58025
+      EMAIL_MODE: smtp
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
     volumes:
       - ./backend/app:/app/app
       - ./backend/migrations:/app/migrations

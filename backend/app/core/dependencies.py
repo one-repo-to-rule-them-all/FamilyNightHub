@@ -8,8 +8,9 @@ before the response is sent.
 
 from __future__ import annotations
 
+import time
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
@@ -20,13 +21,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, household_session
+from app.core.permissions import Permission, has_permission
 from app.core.security import (
+    ACCOUNT_COOKIE,
     CSRF_COOKIE,
     CSRF_HEADER,
     DEVICE_COOKIE,
     csrf_matches,
     hash_device_token,
     set_device_cookie,
+    verify_account_session,
 )
 
 
@@ -80,6 +84,57 @@ async def device_db(device: CurrentDevice, response: Response) -> AsyncIterator[
 
 
 DeviceDb = Annotated[AsyncSession, Depends(device_db)]
+
+
+@dataclass(frozen=True)
+class AccountContext:
+    account_id: uuid.UUID
+    household_id: uuid.UUID
+    role: str
+
+
+async def current_account(request: Request) -> AccountContext:
+    """Signed `fnh_session` cookie, then a fresh read of the account row (role, disabled),
+    so a disabled account or changed role takes effect on the next request."""
+    raw = request.cookies.get(ACCOUNT_COOKIE)
+    claims = verify_account_session(raw, int(time.time())) if raw else None
+    if claims is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in required")
+    async with household_session(claims.household_id) as session:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT role FROM accounts WHERE id = :a AND household_id = :h "
+                    "AND disabled_at IS NULL"
+                ),
+                {"a": claims.account_id, "h": claims.household_id},
+            )
+        ).first()
+    if row is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in required")
+    return AccountContext(claims.account_id, claims.household_id, row.role)
+
+
+CurrentAccount = Annotated[AccountContext, Depends(current_account)]
+
+
+async def account_db(account: CurrentAccount) -> AsyncIterator[AsyncSession]:
+    async with household_session(account.household_id) as session:
+        yield session
+
+
+AccountDb = Annotated[AsyncSession, Depends(account_db)]
+
+
+def require_permission(permission: Permission) -> Callable[..., Awaitable[AccountContext]]:
+    """Dependency factory: 403 unless the signed-in account's role grants `permission`."""
+
+    async def check(account: CurrentAccount) -> AccountContext:
+        if not has_permission(account.role, permission):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Not allowed for your role")
+        return account
+
+    return check
 
 
 async def require_csrf(request: Request) -> None:

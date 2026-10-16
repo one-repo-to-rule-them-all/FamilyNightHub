@@ -1,7 +1,8 @@
-"""Failure-budget limiter on Redis (fixed window). Used for join; magic links next.
+"""Attempt-budget limiter on Redis (fixed window).
 
-Only *failures* are counted, keyed on an identity the request carries (the join slug),
-never on the client address: a household shares one NAT address, and forwarded headers
+Join spends the budget on failures only, keyed on the join slug; magic-link requests spend
+it on every request, keyed on the email. Keys are always an identity the request carries,
+never the client address: a household shares one NAT address, and forwarded headers
 are spoofable behind a proxy (OrderUp ADR-0018 reasoning). A limited key is rejected
 before any credential is checked, so a correct guess cannot slip through once the budget
 is spent.
@@ -47,7 +48,8 @@ async def retry_after(budget: Budget, identity: str) -> int | None:
         return None
 
 
-async def record_failure(budget: Budget, identity: str) -> None:
+async def spend(budget: Budget, identity: str) -> None:
+    """Count one attempt against the budget (join: failures only; magic link: every request)."""
     try:
         redis = get_redis()
         key = budget.key(identity)

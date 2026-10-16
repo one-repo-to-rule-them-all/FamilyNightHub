@@ -24,7 +24,7 @@ backend/app/
 | Area | Path prefix | Notes |
 |---|---|---|
 | Join | `GET /api/v1/csrf`, `POST /api/v1/join` | Issue the CSRF cookie; validate slug + night code, mint the device cookie (failure-budgeted) |
-| Auth | `/api/v1/auth` | Magic-link request/verify for admins and hosts; logout |
+| Auth | `/api/v1/auth/{magic-link,verify,me,logout}` | Magic-link request/verify for admins and hosts, current account, logout |
 | People/devices | `/api/v1/people`, `/api/v1/devices/me`, `PUT/DELETE /api/v1/devices/me/people/{id}` | Avatar grid with each tile's binding state, bind or unbind a person to this device |
 | Sessions | `/api/v1/sessions` | Create, shortlist, open/close voting, snapshot |
 | Ballots | `/api/v1/sessions/{id}/ballots` | Upsert own ballot; host proxy ballot |
@@ -67,8 +67,22 @@ per transaction, and queries also filter explicitly. Cross-household requests ge
 Both credentials are resolved to `(id, household_id)` by the ADR-0009 definer functions before
 any household transaction opens; everything after runs under RLS.
 
-The permission map (`core/permissions.py`) is the single source of truth. Hosts get `sessions:run`
-and `ballots:proxy`; admins get everything. Join flow rules are in
+**Account sessions.** `POST /auth/magic-link` always answers 202 with the same body; the email
+(a 256-bit, hash-stored, 15-minute, single-use link to `FRONTEND_BASE_URL/auth/callback`) goes out
+in a background task after the response, so known and unknown addresses look alike. Requests
+are budgeted per address (`MAGIC_LINK_REQUEST_LIMIT`, default 5 per 15 min), counting every
+request. `POST /auth/verify` consumes the link with `UPDATE ... WHERE used_at IS NULL
+RETURNING`, so two tabs racing one link sign in once. The session is a **signed, stateless**
+`fnh_session` cookie (`{account}.{household}.{issued_at}` + HMAC-SHA256 under
+`SESSION_SECRET`, 30 days, `HttpOnly; Secure; SameSite=Lax`). `CurrentAccount` re-reads the
+account on every request, so disabling an account or changing its role takes effect
+immediately. Trade-off: one stolen session can't be revoked on its own; disable the account or
+rotate `SESSION_SECRET` (which signs everyone out). Revisit with a sessions table if that ever
+matters. The first admin is created by `python -m app.cli bootstrap` (`app/cli.py`).
+
+The permission map (`core/permissions.py`) is the single source of truth. Hosts get
+`sessions:run`, `ballots:proxy`, `devices:enroll` and `devices:approve`; admins get everything;
+unknown roles get nothing. Routes declare `Depends(require_permission("..."))`. Join flow rules are in
 [ADR-0002](decisions/ADR-0002-device-identity-and-join-flow.md). Cookie-authenticated mutations,
 and the join itself, require `SameSite=Lax` plus a CSRF header: `X-FNH-CSRF` must equal the
 readable `fnh_csrf` cookie that `GET /api/v1/csrf` issues (double-submit, constant-time compare).

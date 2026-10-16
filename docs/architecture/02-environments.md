@@ -46,7 +46,7 @@ under 5 GB comes to roughly $10–30/mo. Not $0 by design (ADR-0001).
 | `BACKUP_STORAGE_*` (backup bucket, write-only) | fly secrets | **worker only** |
 | `TMDB_READ_TOKEN` | fly secrets | api only (never `NEXT_PUBLIC_*`) |
 | `SESSION_SECRET`, `DEVICE_TOKEN_PEPPER` | fly secrets | api |
-| `EMAIL_API_KEY` | fly secrets | api, worker |
+| `EMAIL_API_KEY` (SMTP password; with `SMTP_HOST`/`SMTP_PORT`/`SMTP_USERNAME`/`SMTP_STARTTLS`, `EMAIL_MODE=smtp`, `EMAIL_FROM`) | fly secrets (+ plain env for the non-secret ones) | api, worker |
 | `SENTRY_DSN` | fly secrets | all |
 | `FLY_API_TOKEN` | GitHub environment secret | deploy workflow |
 
@@ -55,6 +55,10 @@ under 5 GB comes to roughly $10–30/mo. Not $0 by design (ADR-0001).
 - **Roles:** provisioning runs `backend/db/init/00-init-app-role.sql` once per database as a role
   with `CREATEROLE`. It creates `fnh_app` (runtime) and `fnh_resolver` (ADR-0009). Migration
   `0001` refuses to run if either is missing. Compose runs the script automatically.
+- **First admin:** after the first deploy, `fly ssh console -a fnh-api -C "python -m app.cli
+  bootstrap --household ... --slug ... --email ... --name ..."` creates the household, its
+  settings and the admin account, and prints the fridge-QR URL. Locally: `docker compose -p fnh
+  exec api python -m app.cli bootstrap ...`; magic links land in MailHog (`:58025`).
 - **When migrations run:** Fly `release_command = "alembic upgrade head"` on `fnh-api`, using the owner role, before new machines start. Migrations must be backward-compatible with the previous release (expand/contract).
 - **Health checks:** `GET /api/health` (DB `select 1` with GUC set for a sentinel household, plus a Redis ping) gates the deploy, and the uptime monitor pings it every 5 minutes.
 - **Postgres backups:** Fly's daily volume snapshots plus a weekly `pg_dump` from the worker into the backup bucket. Restore runbook: `docs/runbooks/restore.md` (Phase 1 deliverable).
