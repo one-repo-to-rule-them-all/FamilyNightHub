@@ -27,7 +27,7 @@ backend/app/
 | Auth | `/api/v1/auth/{magic-link,verify,me,logout}` | Magic-link request/verify for admins and hosts, current account, logout |
 | People/devices | `/api/v1/people`, `/api/v1/devices/me`, `PUT/DELETE /api/v1/devices/me/people/{id}` | Avatar grid with each tile's binding state, bind or unbind a person to this device |
 | Host devices | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}` | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it); review pending person claims (`devices:enroll` / `devices:approve`) |
-| Sessions | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}` | Host (`sessions:run`): create (code shown once), rotate code, shortlist, open/close voting, close the night. Snapshot and history: any device or account of the household |
+| Sessions | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET/PATCH /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}` | Host (`sessions:run`): create (code shown once; `voting_method` defaults to the household's), change the voting method while `draft`, rotate code, shortlist, open/close voting, close the night. Snapshot and history: any device or account of the household |
 | Ballots | `PUT /api/v1/sessions/{id}/ballots`, `PUT …/ballots/proxy`, `GET …/ballots/mine`, `GET …/voters` | Phone casts/replaces a bound person's ballot; host proxy ballot (`ballots:proxy`); a phone reads back its own people's ballots; who has voted (avatars only) |
 | Live | `/api/v1/sse-tickets`, `/api/v1/sessions/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md) |
 | Photos | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}` | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below |
@@ -120,7 +120,12 @@ hosts serialize) and persists; the rules are pure functions in `domain/session_s
 - **Create** (`POST /sessions`) starts a `draft` night owned by the signed-in host. The night code
   (`domain/night_code.generate`) is in the response **once**; only
   `HMAC(pepper, "night:{household}:{code}")` is stored. A collision with another live night of
-  the household (unique index) is retried in a savepoint.
+  the household (unique index) is retried in a savepoint. `voting_method` (`top3`, `approval`,
+  `pick_one`) defaults to `settings.default_voting_method`.
+- **Voting method** (`PATCH /sessions/{id}` with `voting_method`): `draft` only, else 409; it
+  locks with the shortlist when voting opens
+  ([ADR-0010](decisions/ADR-0010-approval-and-pick-one-voting.md)). A real change audits
+  `session.voting_method_changed` (from/to) and publishes `shortlist_changed`.
 - **Rotate** (`POST /sessions/{id}/night-code`) issues a new code, shown once; the old one stops
   joining immediately, phones already in keep their device cookie. Allowed until `closed`.
 - **Shortlist** (`draft` only, else 409): add by library `movie_id`, by `tmdb_id` (upserts the
@@ -138,7 +143,7 @@ hosts serialize) and persists; the rules are pure functions in `domain/session_s
   reason; device-only caller on a host route → 401, an account without `sessions:run` → 403.
 
 Audit actions (`audit_events`, `target_type = 'session'`): `session.created`,
-`session.code_rotated`, `session.option_added`, `session.option_removed`, `session.reordered`,
+`session.voting_method_changed`, `session.code_rotated`, `session.option_added`, `session.option_removed`, `session.reordered`,
 `session.voting_opened` (`data` records from/to, option count, ballot size),
 `session.voting_closed` (from/to, ballot count, winner, which tie-break decided),
 `session.settled`, `session.closed`, `ballot.proxy_cast` (`data` is the person only, never
@@ -187,8 +192,8 @@ the CSRF header and writes an audit row.
   stolen token can never be brought back to life.
 - **Settings** (`services/household_settings_service.py`, `admin:settings`). `GET` returns the
   join slug plus `default_voting_method`, `default_age_cap` and `region`; `PATCH` changes only
-  the fields sent (`default_age_cap: null` clears the cap). Phase 1 accepts only `top3` as the
-  voting method; age caps are `G`/`PG`/`PG-13`/`R`/`NC-17`; region is ISO 3166-1 alpha-2,
+  the fields sent (`default_age_cap: null` clears the cap). `default_voting_method` is any of
+  `top3`, `approval`, `pick_one` (new nights start with it); age caps are `G`/`PG`/`PG-13`/`R`/`NC-17`; region is ISO 3166-1 alpha-2,
   stored uppercase. **Rotate join slug** issues a new `xxxx-xxxx-xxxx` slug from the night-code
   alphabet, lowercased (`domain/join_slug.py`, ~2^59 values; a unique-constraint clash retries
   in a savepoint). `/j/{old}` stops resolving immediately; devices already in keep working.
@@ -248,7 +253,8 @@ permission 403, other household 404, CSRF on every mutation, an audit row per wr
 The session state machine (`domain/session_state.py`):
 `draft → voting → revealed → tonight → closed`, as a transition table (`transition(status,
 action)` refuses anything else; `closed` is terminal). `open_voting` needs 2–8 options and fixes
-`ballot_size = min(3, n − 1)` with `voting_opened_at`. Every transition goes through one service method
+`ballot_size` with `voting_opened_at`: the most entries one ballot may hold, per method: `top3`
+`min(3, n − 1)`, `pick_one` 1, `approval` n. Every transition goes through one service method
 that writes an audit row. `close_voting` runs the tally module, then the tie-break, then stores
 `ranking jsonb`, `tie_seed` and `winner_option_id` in one transaction
 ([ADR-0006](decisions/ADR-0006-voting-rules-and-tie-break.md)). `revealed → tonight` is lazy: the
@@ -268,11 +274,22 @@ and which step decided the winner (`none`, `first_places`, `head_to_head`, `rand
 is a full tie decided by the seed. Hypothesis properties cover winner-is-shortlisted, ballot and
 shortlist order independence, seed reproducibility, partial ballots and zero ballots.
 
+`pick_one.py` and `approval.py` implement the same interface
+([ADR-0010](decisions/ADR-0010-approval-and-pick-one-voting.md)); `METHODS` and `BALLOT_CHECKS` in
+`domain/voting/__init__.py` map `sessions.voting_method` to the tally and ballot check.
+**pick_one**: exactly one option at rank 1, one point per ballot; first places and head-to-head both
+reduce to the vote count, so a tie goes straight to the seeded lottery (`none`/`random`).
+**approval**: 1..n options (all is fine, none is 422), one point per approval, numbered 1..m on the
+wire as an ordinal that means nothing. Ties go to (1) **sole approvals** (ballots approving that
+option alone, stored as `first_places`), then the lottery; head-to-head is skipped because it is
+always level for options tied on approvals. Each module has Hypothesis properties for the same
+invariants plus the head-to-head identity.
+
 **Ballots** (`services/ballot_service.py`, `api/v1/ballots.py`). `PUT …/ballots` from a phone
 needs an **active** binding to the person (`people_service.require_can_act_as`; a pending
 claim or another phone's person is 403). `PUT …/ballots/proxy` is for hosts with `ballots:proxy`
 and stores `cast_by_account_id`, `is_proxy = true`. Both need status `voting` (else 409),
-validate against k (else 422) and replace the person's rows in the request's transaction. The
+validate against the night's method and k (else 422) and replace the person's rows in the request's transaction. The
 session row is read `FOR SHARE`, so a ballot and `close_voting` (`FOR UPDATE`) serialize: a ballot
 either lands before the tally or sees `revealed` and gets 409. `GET …/voters` (any device or
 account) lists who has voted as person id, avatar emoji and colour; `GET …/ballots/mine` returns
@@ -496,4 +513,3 @@ record, and events. `domain/` is pure: no I/O, 100% coverage. Integrations wrap 
 - No WebSockets and no GraphQL.
 - No server-side image processing in v1 ([ADR-0005](decisions/ADR-0005-photo-pipeline-and-storage.md)).
 - No account system for members. No OAuth providers.
-- Approval and pick-one voting modules ship in Phase 2.

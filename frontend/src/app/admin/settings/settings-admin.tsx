@@ -17,8 +17,15 @@ import {
   sameIds,
   toggleProvider,
 } from "@/lib/admin";
-import { type ApiError, type HouseholdSettings, type Schemas, api } from "@/lib/api";
+import {
+  type ApiError,
+  type HouseholdSettings,
+  type Schemas,
+  type VotingMethod,
+  api,
+} from "@/lib/api";
 import { joinUrl } from "@/lib/join-link";
+import { VOTING_METHODS } from "@/lib/voting-method";
 
 import { AdminQueryError } from "../admin-error";
 
@@ -164,6 +171,7 @@ const SELECT_CLASS =
 function Defaults({ settings }: { settings: HouseholdSettings }) {
   const id = useId();
   const queryClient = useQueryClient();
+  const [method, setMethod] = useState<VotingMethod>(settings.default_voting_method);
   const [ageCap, setAgeCap] = useState<string>(settings.default_age_cap ?? NO_AGE_CAP);
   const [region, setRegion] = useState(settings.region);
   const [regionError, setRegionError] = useState<string | null>(null);
@@ -191,10 +199,33 @@ function Defaults({ settings }: { settings: HouseholdSettings }) {
           setRegionError(code ? null : "Use a two-letter country code, like US or GB.");
           setSaved(false);
           if (!code || save.isPending) return;
-          save.mutate({ default_age_cap: ageCapFromSelect(ageCap), region: code });
+          save.mutate({
+            default_voting_method: method,
+            default_age_cap: ageCapFromSelect(ageCap),
+            region: code,
+          });
         }}
       >
         <div className="flex flex-wrap gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`${id}-method`}>How we vote</Label>
+            <select
+              id={`${id}-method`}
+              value={method}
+              aria-describedby={`${id}-method-help`}
+              onChange={(event) => setMethod(event.target.value as VotingMethod)}
+              className={SELECT_CLASS}
+            >
+              {VOTING_METHODS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <p id={`${id}-method-help`} className="max-w-xs text-sm text-muted-foreground">
+              {VOTING_METHODS.find((m) => m.value === method)?.explanation}
+            </p>
+          </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={`${id}-age`}>Age cap</Label>
             <select

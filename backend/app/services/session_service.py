@@ -214,16 +214,32 @@ async def create(
     account_id: uuid.UUID,
     *,
     title: str | None,
+    voting_method: str | None = None,
     generate: Any = night_code.generate,
 ) -> CreatedNight:
+    """A draft night. Without `voting_method` it takes the household default (ADR-0010)."""
+    if voting_method is None:
+        default = await db.scalar(
+            text("SELECT default_voting_method FROM settings WHERE household_id = :h"),
+            {"h": household_id},
+        )
+        voting_method = default or "top3"
+
     async def write(code_hash: str) -> uuid.UUID:
         new_id: uuid.UUID = (
             await db.execute(
                 text(
                     "INSERT INTO sessions (household_id, title, night_code_hash, "
-                    "host_account_id) VALUES (:h, :t, :c, :a) RETURNING id"
+                    "host_account_id, voting_method) "
+                    "VALUES (:h, :t, :c, :a, :m) RETURNING id"
                 ),
-                {"h": household_id, "t": title, "c": code_hash, "a": account_id},
+                {
+                    "h": household_id,
+                    "t": title,
+                    "c": code_hash,
+                    "a": account_id,
+                    "m": voting_method,
+                },
             )
         ).scalar_one()
         return new_id
@@ -231,6 +247,36 @@ async def create(
     code, session_id = await _set_code(db, household_id, write, generate)
     await _audit(db, household_id, account_id, "session.created", session_id)
     return CreatedNight(session_id, code)
+
+
+async def set_voting_method(
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    account_id: uuid.UUID,
+    session_id: uuid.UUID,
+    voting_method: str,
+) -> None:
+    """Change the method of a draft night; Conflict once voting has opened (ADR-0010)."""
+    status = await _lock(db, household_id, account_id, session_id)
+    _rule(session_state.check_can_change_method, status)
+    before: str = await db.scalar(
+        text("SELECT voting_method FROM sessions WHERE id = :s"), {"s": session_id}
+    )
+    if before == voting_method:
+        return
+    await db.execute(
+        text("UPDATE sessions SET voting_method = :m WHERE id = :s"),
+        {"m": voting_method, "s": session_id},
+    )
+    await _audit(
+        db,
+        household_id,
+        account_id,
+        "session.voting_method_changed",
+        session_id,
+        {"from": before, "to": voting_method},
+    )
+    publish_after_commit(db, session_id, events.SHORTLIST_CHANGED)
 
 
 async def rotate_code(
@@ -376,8 +422,11 @@ async def open_voting(
 ) -> None:
     status = await _lock(db, household_id, account_id, session_id)
     count = len(await _option_ids(db, session_id))
+    method: str = await db.scalar(
+        text("SELECT voting_method FROM sessions WHERE id = :s"), {"s": session_id}
+    )
     try:
-        opened = session_state.open_voting(status, count)
+        opened = session_state.open_voting(status, count, method)
     except SessionRuleError as err:
         raise Conflict(err.reason) from None
     await db.execute(

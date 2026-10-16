@@ -17,7 +17,7 @@ from __future__ import annotations
 SESSION = "session"
 
 STATUS_CHANGED = "status_changed"  # open-voting, close (tonight -> closed)
-SHORTLIST_CHANGED = "shortlist_changed"  # option added, removed, reordered
+SHORTLIST_CHANGED = "shortlist_changed"  # option added/removed/reordered; method changed
 BALLOT_COUNT = "ballot_count"  # someone's ballot landed; refetch who has voted
 REVEALED = "revealed"  # close-voting tallied the night
 PHOTO_ADDED = "photo_added"  # photos PR (#10) publishes this once an upload completes

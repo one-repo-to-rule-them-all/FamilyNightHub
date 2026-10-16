@@ -8,11 +8,13 @@ import { usePrefersReducedMotion } from "@/hooks/use-media";
 import type { Night } from "@/lib/api";
 import { revealSequence } from "@/lib/reveal";
 import { cn } from "@/lib/utils";
+import { scoreLabel, tiebreakNote } from "@/lib/voting-method";
 
 /**
  * The reveal (ADR-0006): a cosmetic spin over the shortlist that always lands on the stored
  * winner. Under prefers-reduced-motion (or when the night was already revealed before this screen
- * opened it, `animate` false) it shows the winner straight away.
+ * opened it, `animate` false) it shows the winner straight away. Once landed it lists every
+ * title's score in the night's own unit (points, approvals or votes; ADR-0010).
  */
 export function Reveal({ night, animate }: { night: Night; animate: boolean }) {
   const reducedMotion = usePrefersReducedMotion();
@@ -90,7 +92,32 @@ export function Reveal({ night, animate }: { night: Night; animate: boolean }) {
           {night.result?.ballot_count ?? 0} {night.result?.ballot_count === 1 ? "vote" : "votes"}{" "}
           counted
         </p>
+        {night.result ? <Scores night={night} result={night.result} /> : null}
       </div>
     </section>
+  );
+}
+
+function Scores({ night, result }: { night: Night; result: NonNullable<Night["result"]> }) {
+  const titles = new Map(night.options.map((o) => [o.id, o.title]));
+  const note = tiebreakNote(night.voting_method, result.tiebreak);
+  return (
+    <>
+      {note ? (
+        <p className="tv-body text-muted-foreground" data-testid="tv-tiebreak">
+          {note}
+        </p>
+      ) : null}
+      <ol className="tv-body flex flex-col gap-[0.2em]" data-testid="tv-scores">
+        {result.placements.map((p) => (
+          <li key={p.option_id} className="flex justify-between gap-[1em]">
+            <span className={cn(p.place !== 1 && "text-muted-foreground")}>
+              {p.place}. {titles.get(p.option_id)}
+            </span>
+            <span className="tabular-nums">{scoreLabel(night.voting_method, p.score)}</span>
+          </li>
+        ))}
+      </ol>
+    </>
   );
 }

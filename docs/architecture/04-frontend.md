@@ -33,14 +33,14 @@ pairing explanation from the 401.
 | `/login` | `src/app/(auth)/login/` | Email → `POST /api/v1/auth/magic-link`; shows the server's one answer, which is the same whether or not the address exists |
 | `/auth/callback?token=` | `src/app/(auth)/auth/callback/` | `POST /api/v1/auth/verify` once (guarded against StrictMode's double effect), then `router.replace("/host")` so the spent token leaves history. `referrer: no-referrer` |
 | `/host` | `src/app/host/` | Start a night (the code is shown once, see below), nights in progress, pending person claims with approve/reject (polled every 10s), **Use this browser as the TV** (`POST /devices/enroll {as_tv:true}`, then `/tv/{night}`), sign out |
-| `/host/[session]` | `src/app/host/[session]/` | Draft: shortlist (up/down/remove, reducer in `src/lib/shortlist.ts`, whole order PUT, server order synced back), **Roll candidates** (see "Candidate generator" below), poster search (debounced, through `/api/v1/tmdb/search`, TMDB attribution line; a 503 says "type the title" and the typed-title form is always there), **Open voting** at 2–8 titles. Voting: who has voted (avatars only), proxy ballot, **Close voting**. Then the winner and **End the night**. Rotate code at any stage before `closed` |
+| `/host/[session]` | `src/app/host/[session]/` | Draft: shortlist (up/down/remove, reducer in `src/lib/shortlist.ts`, whole order PUT, server order synced back), **Roll candidates** (see "Candidate generator" below), poster search (debounced, through `/api/v1/tmdb/search`, TMDB attribution line; a 503 says "type the title" and the typed-title form is always there), a **How we vote** picker (Top 3 / Approval / Pick one with a one-line explanation each; `PATCH /sessions/{id}`, draft only), **Open voting** at 2–8 titles. Voting: who has voted (avatars only), proxy ballot, **Close voting**. Then the winner and **End the night**. Rotate code at any stage before `closed` |
 | `/admin/people` | `src/app/admin/people/` | People table (avatar, Family/Guest, added). **Add a person** (name, emoji avatar with one-tap suggestions, colour from the avatar palette, guest flag), **Edit** (rename / re-avatar / recolour in a dialog; only changed fields are PATCHed), **Make family member** for guests, **Merge duplicates** (pick the duplicate and the person to keep; a confirm dialog says ballots, ratings, photos, reactions and phone bindings move to the target, the source is hidden and never deleted, and collisions go the target's way), then the moved/dropped counts as one sentence. A 409 name clash is shown as-is |
 | `/admin/devices` | `src/app/admin/devices/` | Every device (live first, then revoked): label or "Unnamed phone", TV badge, bound people (pending marked), last seen, status. **Rename** (empty clears the label) and **Revoke** with a confirm that says it is final and the phone must rejoin with a night code as a new device |
-| `/admin/settings` | `src/app/admin/settings/` | **Join link**: the current `/j/{slug}` and **Rotate join link** behind a confirm warning that the printed fridge QR stops working at once; the new URL is shown after. **Defaults**: age cap (none, G…NC-17) and region (two letters). **Streaming services**: checkboxes from `GET /api/v1/tmdb/providers` for the household's region, at most 20, saved with `PATCH /admin/settings {streaming_providers}`; JustWatch attribution (the response's `attribution`) and the TMDB notice under the list; a 503 says the list can't load and keeps the saved ones |
+| `/admin/settings` | `src/app/admin/settings/` | **Join link**: the current `/j/{slug}` and **Rotate join link** behind a confirm warning that the printed fridge QR stops working at once; the new URL is shown after. **Defaults**: how we vote (Top 3 / Approval / Pick one, with the method's one-line explanation; new nights start with it, ADR-0010), age cap (none, G…NC-17) and region (two letters). **Streaming services**: checkboxes from `GET /api/v1/tmdb/providers` for the household's region, at most 20, saved with `PATCH /admin/settings {streaming_providers}`; JustWatch attribution (the response's `attribution`) and the TMDB notice under the list; a 503 says the list can't load and keeps the saved ones |
 | `/tv` | `src/app/tv/` | Follows the newest draft/voting/revealed/tonight night; an unpaired browser gets "sign in as host, then Use this browser as the TV" |
 | `/admin/movies` | `src/app/admin/movies/` | Bulk add ("One title per line, optional (year)", parsed by `src/lib/bulk-titles.ts`, 100 lines max, duplicates dropped) → per-line results: matched / already owned / added as typed; **ambiguous** and **not found** lines become radio groups (TMDB candidates, "Add as typed", "Skip") sent together with **Confirm choices**. A TMDB-down notice when titles were added as typed. Below it the library `DataTable`: title search, a Show filter (all / owned / not owned / watchlist / blocked), Owned/Watchlist/Blocked checkboxes (`PATCH` each), 50 per page. TMDB attribution line |
 | `/admin/history` | `src/app/admin/history/` | Past nights (`GET /api/v1/sessions`) in a `DataTable` with **Correct winner**: an inline form loads the snapshot, offers the night's other options as radios, requires a reason, and posts `…/correct-winner`; the table and `/history` then show the new winner |
-| `/tv/[session]` | `src/app/tv/[session]/` | Lobby (night code, join instructions, people tiles) → turnout tiles light up as ballots arrive (`GET …/voters`, never ranks) → reveal spinner (`src/lib/reveal.ts`) landing on `result.winner_option_id`. Screen Wake Lock where supported (released while the tab is hidden); once the night is `tonight`/`closed`, the photo slideshow (see "TV slideshow" below), and it follows the next night |
+| `/tv/[session]` | `src/app/tv/[session]/` | Lobby (night code, join instructions, people tiles) → turnout tiles light up as ballots arrive (`GET …/voters`, never ranks) → reveal spinner (`src/lib/reveal.ts`) landing on `result.winner_option_id`, then every title's score in the method's unit (points, approvals or votes) and which tie-break step decided it. Screen Wake Lock where supported (released while the tab is hidden); once the night is `tonight`/`closed`, the photo slideshow (see "TV slideshow" below), and it follows the next night |
 
 ## Design system
 
@@ -183,13 +183,22 @@ confirmation offers "Pass to next person" back to that grid. Nobody → "Pick wh
 The confirmation lists the ranks as the server saved them; "Change my picks" reopens the ballot
 pre-filled (ballots are replaceable until close).
 
-**Ballot:** tap a poster to make it 1, the next tap makes 2, then 3. Tap again to clear. "Done" is
-enabled after the first tap (partial ballots are allowed).
+**Ballot:** the screen follows the night's `voting_method`
+([ADR-0010](decisions/ADR-0010-approval-and-pick-one-voting.md)).
+- `top3`: tap a poster to make it 1, the next tap makes 2, then 3. Tap again to clear. "Done" is
+  enabled after the first tap (partial ballots are allowed).
+- `pick_one`: tap one poster; tapping another replaces it, tapping it again clears it.
+- `approval`: tap to tick or untick as many posters as you like, then "Done" (at least one).
+Picked posters show a check instead of a rank number outside `top3`.
 
 The tap-to-rank logic is a pure reducer, `src/lib/ballot.ts` (unit-tested to 100%, gated in
 `vitest.config.mts`): picks are kept in rank order, the cap is the snapshot's `ballot_size`
 (k = min(3, options − 1), ADR-0006), a tap once full is ignored, and clearing a pick moves the ones
-below it up, so the `PUT /sessions/{id}/ballots` ranks always run 1..m with no gaps. Posters come
+below it up, so the `PUT /sessions/{id}/ballots` ranks always run 1..m with no gaps. The state
+carries the method: `pick_one` (k = 1) replaces the pick when full, `approval` (k = options) sends
+its picks numbered 1..m, an order the server ignores. The host's proxy ballot dispatches the same
+reducer. Per-method copy (prompt, pick count) lives there too; picker explanations, score units
+and tie-break notes are in `src/lib/voting-method.ts` (also gated at 100%). Posters come
 from TMDB's image CDN (`w342`); typed titles without a poster get a title card
 (`src/components/poster.tsx`).
 
@@ -343,7 +352,7 @@ mutations never retry.
 | `npm run typecheck` | `tsc --noEmit` (TypeScript 7) |
 | `npm run lint:install`, then `npm run lint` | ESLint with `eslint-config-next`. ESLint, the Next config and the TypeScript 5 that typescript-eslint needs live in `tools/eslint/` (TypeScript 7 has no JS API for it), and `eslint.config.mjs` resolves its plugins from there. It also bans `waitForTimeout` / `setTimeout` in tests |
 | `npm run format:check` | Prettier + `prettier-plugin-tailwindcss` (class order) |
-| `npm test` | Vitest with v8 coverage, `src/**/*.test.ts`: API client CSRF and error handling, night-code input, the ballot reducer (100% gate on `src/lib/ballot.ts`), the photo pipeline (GPS strip on `e2e/fixtures/gps.jpg` through a real JPEG encoder, `@napi-rs/canvas`), the upload queue with fake timers (lines gated at 100%), the IndexedDB job store (`fake-indexeddb`), upload error sorting, album URL reuse (100% gate) and the rating helpers (100% gate on `src/lib/rating.ts`), the admin helpers (100% gate on `src/lib/admin.ts`), the candidate mapping (100% gate on `src/lib/candidates.ts`: request body incl. omitted vs `null` cap, option source per candidate, badge text, shortlist limit), plus (from host/TV) shortlist reducer and bounds, proxy-ballot ranking, reveal sequencing, QR/join link, night-code hand-off |
+| `npm test` | Vitest with v8 coverage, `src/**/*.test.ts`: API client CSRF and error handling, night-code input, the ballot reducer for all three methods (100% gate on `src/lib/ballot.ts`), voting-method labels (100% gate on `src/lib/voting-method.ts`), the photo pipeline (GPS strip on `e2e/fixtures/gps.jpg` through a real JPEG encoder, `@napi-rs/canvas`), the upload queue with fake timers (lines gated at 100%), the IndexedDB job store (`fake-indexeddb`), upload error sorting, album URL reuse (100% gate) and the rating helpers (100% gate on `src/lib/rating.ts`), the admin helpers (100% gate on `src/lib/admin.ts`), the candidate mapping (100% gate on `src/lib/candidates.ts`: request body incl. omitted vs `null` cap, option source per candidate, badge text, shortlist limit), plus (from host/TV) shortlist reducer and bounds, proxy-ballot ranking, reveal sequencing, QR/join link, night-code hand-off |
 | `npm run test:e2e` | Playwright + axe against the real API; see [`07-cicd.md`](07-cicd.md#running-e2e-locally) |
 
 ## Where to add new code
@@ -355,5 +364,3 @@ New phone screen → `app/(public)/…` plus a hook in `src/hooks/`. New admin t
 
 - No service-worker offline mode beyond the upload queue. No push notifications.
 - No zip download. No light theme toggle (dark only in v1).
-- Approval/pick-one ballots come later in Phase 2 (the generator UI and the library/history
-  admin are built).

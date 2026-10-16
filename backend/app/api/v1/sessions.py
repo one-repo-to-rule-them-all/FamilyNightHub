@@ -42,6 +42,7 @@ from app.schemas.sessions import (
     SessionCreateIn,
     SessionOut,
     SessionStatus,
+    SessionUpdateIn,
     VotingResultOut,
     WinnerOut,
 )
@@ -154,9 +155,14 @@ def tie_seed(test_seed: str | None) -> int:
 async def create_session(
     body: SessionCreateIn, account: CanRun, db: AccountDb
 ) -> SessionCreatedOut:
-    """Start a night in `draft`. The night code is in this response and nowhere else."""
+    """Start a night in `draft`. The night code is in this response and nowhere else.
+    `voting_method` defaults to the household's `default_voting_method`."""
     created = await session_service.create(
-        db, account.household_id, account.account_id, title=body.title
+        db,
+        account.household_id,
+        account.account_id,
+        title=body.title,
+        voting_method=body.voting_method,
     )
     return SessionCreatedOut(session_id=created.session_id, night_code=created.night_code)
 
@@ -204,6 +210,25 @@ async def list_sessions(
 async def get_session(session_id: uuid.UUID, viewer: CurrentViewer, db: ViewerDb) -> SessionOut:
     """The night as every screen sees it. Never ballots; `result` only from reveal on."""
     return await _out(db, viewer.household_id, session_id)
+
+
+@router.patch(
+    "/{session_id}",
+    response_model=SessionOut,
+    dependencies=[CsrfProtected],
+    responses=EDIT,
+)
+async def update_session(
+    session_id: uuid.UUID, body: SessionUpdateIn, account: CanRun, db: AccountDb
+) -> SessionOut:
+    """Change a draft night's voting method (ADR-0010). 409 once voting has opened."""
+    try:
+        await session_service.set_voting_method(
+            db, account.household_id, account.account_id, session_id, body.voting_method
+        )
+    except ServiceError as err:
+        raise_http(err)
+    return await _out(db, account.household_id, session_id)
 
 
 @router.post(

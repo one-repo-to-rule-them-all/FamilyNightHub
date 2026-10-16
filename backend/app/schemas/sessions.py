@@ -13,15 +13,24 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from app.domain.generator import MAX_COUNT as MAX_CANDIDATES
-from app.domain.session_state import MAX_BALLOT_SIZE, MAX_OPTIONS
+from app.domain.session_state import MAX_OPTIONS
 from app.schemas.admin import AgeCap
 
 SessionStatus = Literal["draft", "voting", "revealed", "tonight", "closed"]
 OptionSource = Literal["manual", "owned", "streaming", "tmdb"]
+VotingMethod = Literal["top3", "approval", "pick_one"]
 
 
 class SessionCreateIn(BaseModel):
     title: str | None = Field(default=None, max_length=120)
+    # Omit to use the household's default_voting_method (ADR-0010).
+    voting_method: VotingMethod | None = None
+
+
+class SessionUpdateIn(BaseModel):
+    """Draft-only changes (ADR-0010): the method locks with the shortlist."""
+
+    voting_method: VotingMethod
 
 
 class SessionCreatedOut(BaseModel):
@@ -78,8 +87,9 @@ class SessionOut(BaseModel):
     id: uuid.UUID
     title: str | None
     status: SessionStatus
-    voting_method: Literal["top3", "approval", "pick_one"]
-    # k = min(3, options - 1), fixed when voting opens; null while in draft (ADR-0006).
+    voting_method: VotingMethod
+    # The most entries one ballot may hold, fixed when voting opens; null while in draft.
+    # top3 min(3, options - 1) (ADR-0006), pick_one 1, approval = options (ADR-0010).
     ballot_size: int | None
     options: list[OptionOut]
     created_at: datetime
@@ -180,15 +190,17 @@ class GenerateOut(BaseModel):
 
 class RankIn(BaseModel):
     option_id: uuid.UUID
-    rank: int = Field(ge=1, le=MAX_BALLOT_SIZE)
+    rank: int = Field(ge=1, le=MAX_OPTIONS)
 
 
 class BallotIn(BaseModel):
     """One person's ballot, replacing any earlier one. Ranks run 1..m with no gaps,
-    m <= the night's ballot_size; rank 1 alone is fine."""
+    m <= the night's ballot_size. top3: rank 1 alone is fine. pick_one: one option at
+    rank 1. approval: the approved options numbered 1..m; that order means nothing
+    (ADR-0010). An empty ballot is never valid."""
 
     person_id: uuid.UUID
-    ranks: list[RankIn] = Field(min_length=1, max_length=MAX_BALLOT_SIZE)
+    ranks: list[RankIn] = Field(min_length=1, max_length=MAX_OPTIONS)
 
 
 class RankOut(BaseModel):

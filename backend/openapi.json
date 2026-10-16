@@ -252,7 +252,7 @@
         "type": "object"
       },
       "BallotIn": {
-        "description": "One person's ballot, replacing any earlier one. Ranks run 1..m with no gaps,\nm <= the night's ballot_size; rank 1 alone is fine.",
+        "description": "One person's ballot, replacing any earlier one. Ranks run 1..m with no gaps,\nm <= the night's ballot_size. top3: rank 1 alone is fine. pick_one: one option at\nrank 1. approval: the approved options numbered 1..m; that order means nothing\n(ADR-0010). An empty ballot is never valid.",
         "properties": {
           "person_id": {
             "format": "uuid",
@@ -263,7 +263,7 @@
             "items": {
               "$ref": "#/components/schemas/RankIn"
             },
-            "maxItems": 3,
+            "maxItems": 8,
             "minItems": 1,
             "title": "Ranks",
             "type": "array"
@@ -1861,7 +1861,7 @@
             "type": "string"
           },
           "rank": {
-            "maximum": 3.0,
+            "maximum": 8.0,
             "minimum": 1.0,
             "title": "Rank",
             "type": "integer"
@@ -1990,6 +1990,22 @@
               }
             ],
             "title": "Title"
+          },
+          "voting_method": {
+            "anyOf": [
+              {
+                "enum": [
+                  "top3",
+                  "approval",
+                  "pick_one"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voting Method"
           }
         },
         "title": "SessionCreateIn",
@@ -2149,6 +2165,25 @@
         "title": "SessionOut",
         "type": "object"
       },
+      "SessionUpdateIn": {
+        "description": "Draft-only changes (ADR-0010): the method locks with the shortlist.",
+        "properties": {
+          "voting_method": {
+            "enum": [
+              "top3",
+              "approval",
+              "pick_one"
+            ],
+            "title": "Voting Method",
+            "type": "string"
+          }
+        },
+        "required": [
+          "voting_method"
+        ],
+        "title": "SessionUpdateIn",
+        "type": "object"
+      },
       "SettingsOut": {
         "properties": {
           "default_age_cap": {
@@ -2234,7 +2269,11 @@
           "default_voting_method": {
             "anyOf": [
               {
-                "const": "top3",
+                "enum": [
+                  "top3",
+                  "approval",
+                  "pick_one"
+                ],
                 "type": "string"
               },
               {
@@ -3346,7 +3385,7 @@
         ]
       },
       "patch": {
-        "description": "Only the fields sent change. `default_voting_method` is `top3` until Phase 2;\n`default_age_cap: null` means no cap.",
+        "description": "Only the fields sent change. `default_voting_method` is what new nights start\nwith; `default_age_cap: null` means no cap.",
         "operationId": "update_settings_api_v1_admin_settings_patch",
         "requestBody": {
           "content": {
@@ -3946,7 +3985,7 @@
         ]
       },
       "post": {
-        "description": "Start a night in `draft`. The night code is in this response and nowhere else.",
+        "description": "Start a night in `draft`. The night code is in this response and nowhere else.\n`voting_method` defaults to the household's `default_voting_method`.",
         "operationId": "create_session_api_v1_sessions_post",
         "requestBody": {
           "content": {
@@ -4028,6 +4067,64 @@
           }
         },
         "summary": "Get Session",
+        "tags": [
+          "sessions"
+        ]
+      },
+      "patch": {
+        "description": "Change a draft night's voting method (ADR-0010). 409 once voting has opened.",
+        "operationId": "update_session_api_v1_sessions__session_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "Not allowed in the night's current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Session",
         "tags": [
           "sessions"
         ]
