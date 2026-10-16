@@ -7,13 +7,15 @@ Ratings open once the night's *effective* status is `tonight` (a settled reveal 
 stay open after `closed`. Readers only ever see their own people's scores and the family
 average; never another person's score.
 
-`average_rating` is the read the candidate generator uses (ADR-0007: a title watched in the
-last 12 months is skipped unless its average family rating is 4 or higher).
+`average_ratings` is the read the candidate generator uses (ADR-0007: a title watched in the
+last 12 months is skipped unless its average family rating is 4 or higher); `average_rating`
+is the same read for one movie.
 """
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -153,26 +155,35 @@ async def average_rating(
     db: AsyncSession, movie_id: uuid.UUID, since: datetime
 ) -> RatingAverage | None:
     """The family's average score for `movie_id` over the nights it won since `since`
-    (a night counts from its reveal), or None if it hasn't been rated in that window.
+    (a night counts from its reveal), or None if it hasn't been rated in that window."""
+    return (await average_ratings(db, [movie_id], since)).get(movie_id)
 
-    For the candidate generator (ADR-0007). `movie_id` is a household's library row, and the
+
+async def average_ratings(
+    db: AsyncSession, movie_ids: Collection[uuid.UUID], since: datetime | None = None
+) -> dict[uuid.UUID, RatingAverage]:
+    """The family's average score for each of `movie_ids` over the nights it won since
+    `since` (a night counts from its reveal; None means every night it won), in one query.
+    A movie with no rating in that window has no entry.
+
+    For the candidate generator (ADR-0007). The ids are a household's library rows, and the
     caller's transaction carries that household's GUC, so RLS scopes the read."""
-    row = (
-        await db.execute(
-            text(
-                """
-                SELECT avg(r.score) AS average, count(*) AS n
-                FROM ratings r
-                JOIN sessions s ON s.id = r.session_id AND s.household_id = r.household_id
-                JOIN options o ON o.id = s.winner_option_id AND o.session_id = s.id
-                WHERE o.movie_id = :m
-                  AND s.status IN ('revealed', 'tonight', 'closed')
-                  AND coalesce(s.revealed_at, s.created_at) >= :since
-                """
-            ),
-            {"m": movie_id, "since": since},
-        )
-    ).one()
-    if row.n == 0:
-        return None
-    return RatingAverage(float(row.average), int(row.n))
+    if not movie_ids:
+        return {}
+    rows = await db.execute(
+        text(
+            """
+            SELECT o.movie_id, avg(r.score) AS average, count(*) AS n
+            FROM ratings r
+            JOIN sessions s ON s.id = r.session_id AND s.household_id = r.household_id
+            JOIN options o ON o.id = s.winner_option_id AND o.session_id = s.id
+            WHERE o.movie_id = ANY(:m)
+              AND s.status IN ('revealed', 'tonight', 'closed')
+              AND (CAST(:since AS timestamptz) IS NULL
+                   OR coalesce(s.revealed_at, s.created_at) >= :since)
+            GROUP BY o.movie_id
+            """
+        ),
+        {"m": list(movie_ids), "since": since},
+    )
+    return {r.movie_id: RatingAverage(float(r.average), int(r.n)) for r in rows}

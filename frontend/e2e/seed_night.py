@@ -11,6 +11,9 @@ shortlist. `--movies N` adds N typed titles through session_service (the host's 
 `--open-voting` opens voting, so ballot_size = min(3, N - 1) exactly as the API would fix it.
 `--tonight` goes on through the host's close (no ballots, pinned seed) and backdates the reveal
 past REVEAL_SETTLE, so the night is `tonight` and its photo album is open (ADR-0005).
+`--owned N` puts N owned titles in the library (OWNED: a TMDB one and a home copy, both rated G)
+and `--providers 337,8` sets the household's streaming services, so the candidate generator
+(ADR-0007) rolls owned titles first, then streaming, against tmdb-fake.
 `--no-night` seeds the household and its people only (`sessionId`/`nightCode` are null): the
 acceptance spec starts its night from the host's phone, as a family would.
 `hostCookie` is a signed `fnh_session` value for the household's admin, so a test can act as
@@ -49,6 +52,12 @@ PEOPLE = [
     ("Mia", "🐼", "#3b82f6"),
 ]
 
+# (title, tmdb_id, year, poster_path, genres): ids and posters as in backend/tmdb_fake.
+OWNED: list[tuple[str, int | None, int, str | None, list[str]]] = [
+    ("Toy Story", 862, 1995, "/fake-toy-story.jpg", ["Animation", "Family"]),
+    ("Grandma's Camcorder Classics", None, 2004, None, ["Family"]),
+]
+
 MOVIES = [
     "Paddington 2",
     "Spirited Away",
@@ -68,6 +77,8 @@ async def seed(
     tonight: bool,
     night: bool = True,
     host_account: bool = False,
+    owned: int = 0,
+    providers: list[int] | None = None,
 ) -> dict[str, object]:
     household = f"E2E {slug}"
     email = f"host-{slug}@e2e.test"
@@ -95,6 +106,26 @@ async def seed(
                     {"h": created.household_id, "e": f"helper-{slug}@e2e.test"},
                 )
             ).scalar_one()
+        for title, tmdb_id, year, poster, genres in OWNED[:owned]:
+            await db.execute(
+                text(
+                    "INSERT INTO movies (household_id, title, tmdb_id, year, poster_path, "
+                    "genres, us_cert, owned) VALUES (:h, :t, :tmdb, :y, :p, :g, 'G', true)"
+                ),
+                {
+                    "h": created.household_id,
+                    "t": title,
+                    "tmdb": tmdb_id,
+                    "y": year,
+                    "p": poster,
+                    "g": genres,
+                },
+            )
+        if providers:
+            await db.execute(
+                text("UPDATE settings SET streaming_providers = :p WHERE household_id = :h"),
+                {"h": created.household_id, "p": providers},
+            )
     if code is not None:
         session_id = await _seed_night(created, code, titles, open_voting, tonight)
     return {
@@ -166,11 +197,14 @@ def main() -> int:
     parser.add_argument("--tonight", action="store_true", help="needs --movies >= 2")
     parser.add_argument("--no-night", action="store_true", help="household and people only")
     parser.add_argument("--host-account", action="store_true", help="add a host-role account")
+    parser.add_argument("--owned", type=int, default=0, choices=range(len(OWNED) + 1))
+    parser.add_argument("--providers", default="", help="TMDB provider ids, e.g. 337,8")
     args = parser.parse_args()
     if args.tonight and args.movies < 2:
         parser.error("--tonight needs --movies 2 or more")
     if args.no_night and (args.movies or args.open_voting or args.tonight):
         parser.error("--no-night takes no --movies, --open-voting or --tonight")
+    providers = [int(p) for p in args.providers.split(",") if p.strip()]
     seeded = seed(
         args.slug,
         args.movies,
@@ -178,6 +212,8 @@ def main() -> int:
         args.tonight,
         not args.no_night,
         args.host_account,
+        args.owned,
+        providers,
     )
     print(json.dumps(asyncio.run(seeded)))
     return 0

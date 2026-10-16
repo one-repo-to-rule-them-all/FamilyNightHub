@@ -32,6 +32,10 @@ export type SeedOptions = {
   tonight?: boolean;
   /** Also add a host-role account (no admin permissions): `hostOnlyCookie`. */
   hostAccount?: boolean;
+  /** Owned titles in the library for the candidate generator (0-2, see seed_night.py OWNED). */
+  owned?: number;
+  /** The household's streaming services (TMDB provider ids, e.g. 337 = Disney Plus). */
+  providers?: number[];
 };
 
 const BACKEND = path.resolve(__dirname, "../../../backend");
@@ -43,6 +47,8 @@ export function seedNight(options: SeedOptions = {}): SeededNight {
   if (options.openVoting) args.push("--open-voting");
   if (options.tonight) args.push("--tonight");
   if (options.hostAccount) args.push("--host-account");
+  if (options.owned) args.push("--owned", String(options.owned));
+  if (options.providers?.length) args.push("--providers", options.providers.join(","));
   return runSeed(args) as SeededNight;
 }
 

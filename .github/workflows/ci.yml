@@ -7,10 +7,9 @@
 #                   isolation suite and the RLS coverage test; coverage gates
 #   contract        alembic upgrade + check (models == migrations), OpenAPI + api.gen.ts drift
 #   bundle-secrets  next build with sentinel server secrets, then grep .next/static
-#   e2e             Playwright (phone viewports + axe) against the real API and Next, on
-#                   Postgres + Redis + MailHog service containers
+#   e2e             Playwright (phone viewports + axe) against the real API, Next and
+#                   tmdb-fake, on Postgres + Redis + MailHog service containers
 #
-# Not here yet: multi-phone/TV E2E with SSE and tmdb-fake (lands with voting).
 # Deploys live in deploy.yml.
 #
 # Shape from OrderUp .github/workflows/ci.yml @ 2f86cd8 (service containers, role
@@ -279,6 +278,8 @@ jobs:
       CORS_ALLOWED_ORIGINS: http://localhost:3000
       E2E_API_PORT: "8000"
       E2E_WEB_PORT: "3000"
+      # TMDB is backend/tmdb_fake, started by Playwright; the API it starts points at it.
+      E2E_TMDB_PORT: "8002"
       # Rewrites are baked into the build, so `next build` needs it too.
       API_INTERNAL_URL: http://localhost:8000
       # Photos (ADR-0005): SeaweedFS stands in for Tigris, started below with the dev-only keys
