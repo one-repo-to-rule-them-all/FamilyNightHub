@@ -37,12 +37,15 @@ moment. The worker runs **continuously** (one machine). It was planned to auto-s
 windows, but Fly's auto-start is triggered by fly-proxy traffic, and nothing ever sends the worker
 a request: a stopped worker would never wake, and its crons would silently stop.
 
-**Cost (estimate, verify at setup):** two or three small machines plus small Fly Postgres plus storage
-under 5 GB comes to roughly $10–30/mo. Not $0 by design (ADR-0001). **Open, for the owner:** this
-figure predates Fly's Managed Postgres. Re-check it against current pricing for Managed Postgres
-versus legacy self-operated Fly Postgres before provisioning. If the choice moves the total out of
-range, record it in a new ADR superseding ADR-0001's cost line
-([runbook §0](../runbooks/restore.md#0-decide-before-provisioning)).
+**Cost:** ADR-0001 estimated roughly $10–30/mo. Checked against 2026-10-15 prices in
+[ADR-0013](decisions/ADR-0013-hosting-cost-correction.md) (Proposed): this topology on Managed
+Postgres with both environments always on is about **$125/mo**. Its recommendation is
+self-operated Postgres, Upstash Fixed for production, and staging scaled to zero when idle,
+which comes to about **$30/mo**. Not $0 by design (ADR-0001). **Owner decision before
+provisioning.**
+
+**First deploy:** one ordered checklist, from an empty Fly org to the fridge QR, is
+[`runbooks/first-deploy.md`](../runbooks/first-deploy.md).
 
 ## Fly topology and the `/api` proxy
 
@@ -82,11 +85,11 @@ All three apps run `shared-cpu-1x`/512 MB in `dfw`.
 | `DATABASE_URL` (app role `fnh_app`) | fly secrets | api, worker |
 | `MIGRATION_DATABASE_URL` (owner role) | fly secrets (release command only) | api release_command |
 | `REDIS_URL` | fly secrets | api, worker |
-| `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` (photos bucket, read/write; with plain-env `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_REGION`, optional `STORAGE_PUBLIC_ENDPOINT`; unset endpoint or keys = photo routes answer 503) | fly secrets (+ plain env for the non-secret ones) | api, worker |
+| `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` (photos bucket, read/write; unset endpoint or keys = photo routes answer 503) | fly secrets; the non-secret `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_REGION` sit in `api.fly.toml`/`worker.fly.toml` `[env]` (unset, the bucket would default to production's `fnh-photos`); `STORAGE_PUBLIC_ENDPOINT` is local-only | api, worker |
 | `BACKUP_STORAGE_*` (backup bucket, write-only) | fly secrets | **worker only** |
 | `TMDB_READ_TOKEN` (with plain-env `TMDB_BASE_URL`; unset token = search off, typed titles only) | fly secrets | api only (never `NEXT_PUBLIC_*`) |
-| `SESSION_SECRET`, `DEVICE_TOKEN_PEPPER` | fly secrets | api |
-| `EMAIL_API_KEY` (SMTP password; with `SMTP_HOST`/`SMTP_PORT`/`SMTP_USERNAME`/`SMTP_STARTTLS`, `EMAIL_MODE=smtp`, `EMAIL_FROM`) | fly secrets (+ plain env for the non-secret ones) | api, worker |
+| `SESSION_SECRET`, `DEVICE_TOKEN_PEPPER` | fly secrets | api; the **worker** also needs its **own random** values (unused, but Settings refuses to load in staging/production without non-placeholder ones, so the worker would crash-loop) |
+| `EMAIL_API_KEY` (SMTP password; STARTTLS on 587, no implicit TLS) with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `EMAIL_FROM` | fly secrets (provider-specific, set at provisioning); `EMAIL_MODE=smtp` and `SMTP_STARTTLS=true` in `api.fly.toml` | api only (the worker sends no email) |
 | `SENTRY_DSN` | fly secrets | all |
 | `API_INTERNAL_URL` (not secret) | `web.fly.toml` `[env]` | web (server only, read at boot) |
 | `FLY_API_TOKEN` | GitHub environment secret (`staging`, `production`) | deploy workflow |
@@ -95,7 +98,9 @@ All three apps run `shared-cpu-1x`/512 MB in `dfw`.
 ## Migrations & health
 
 - **Roles:** provisioning runs `backend/db/init/00-init-app-role.sql` once per database as a role
-  with `CREATEROLE`. It creates `fnh_app` (runtime) and `fnh_resolver` (ADR-0009). Migration
+  with `CREATEROLE` (on Fly, the `postgres` superuser; the owner `fnh` is CREATEROLE but **not**
+  superuser, and the script's `GRANT CREATE ON SCHEMA public TO fnh_resolver` is what lets a
+  non-superuser owner run migration 0001; [first-deploy step 3](../runbooks/first-deploy.md#3-postgres-and-the-role-bootstrap)). It creates `fnh_app` (runtime) and `fnh_resolver` (ADR-0009). Migration
   `0001` refuses to run if either is missing. Compose runs the script automatically. On Fly, follow
   [runbook §1.2](../runbooks/restore.md#12-postgres-legacy-fly-postgres): never `fly postgres
   attach`, and replace the script's dev password for `fnh_app` straight away.

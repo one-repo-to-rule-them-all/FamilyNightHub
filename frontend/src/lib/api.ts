@@ -30,6 +30,12 @@ export type RatingSummary = Schemas["RatingSummaryOut"];
 export type Voter = Schemas["VoterOut"];
 export type TmdbResult = Schemas["TmdbResultOut"];
 export type Claim = Schemas["ClaimOut"];
+export type AdminPerson = Schemas["AdminPersonOut"];
+export type AdminDevice = Schemas["AdminDeviceOut"];
+export type MergeResult = Schemas["MergeOut"];
+export type HouseholdSettings = Schemas["SettingsOut"];
+export type AgeCap = NonNullable<HouseholdSettings["default_age_cap"]>;
+export type StreamingProvider = Schemas["ProviderOut"];
 export type Photo = Schemas["PhotoOut"];
 export type PhotoCreated = Schemas["PhotoCreatedOut"];
 /** The album's fixed reaction set (the path parameter's enum). */
@@ -267,6 +273,33 @@ export const api = {
     request<void>("PUT", reactionPath(sessionId, photoId, emoji, personId)),
   unreact: (sessionId: string, photoId: string, emoji: ReactionEmoji, personId: string) =>
     request<void>("DELETE", reactionPath(sessionId, photoId, emoji, personId)),
+
+  // Admin (`/admin/*`, 03-backend.md "People and devices admin"). Account-only; the API answers
+  // 403 to a host without the permission, which the admin screens show as "admins only".
+  adminPeople: () => request<AdminPerson[]>("GET", "/admin/people"),
+  createPerson: (body: Schemas["PersonCreateIn"]) =>
+    request<AdminPerson>("POST", "/admin/people", body),
+  updatePerson: (personId: string, body: Schemas["PersonUpdateIn"]) =>
+    request<AdminPerson>("PATCH", `/admin/people/${encodeURIComponent(personId)}`, body),
+  convertToMember: (personId: string) =>
+    request<AdminPerson>("POST", `/admin/people/${encodeURIComponent(personId)}/convert-to-member`),
+  /** Folds `from` into `into`; the source is hidden (merged_into_id), never deleted. */
+  mergePeople: (body: Schemas["MergeIn"]) =>
+    request<MergeResult>("POST", "/admin/people/merge", body),
+  adminDevices: () => request<AdminDevice[]>("GET", "/admin/devices"),
+  /** `label: null` clears it. */
+  updateDevice: (deviceId: string, label: string | null) =>
+    request<AdminDevice>("PATCH", `/admin/devices/${encodeURIComponent(deviceId)}`, { label }),
+  /** Final: there is no un-revoke; the phone rejoins with a night code as a new device. */
+  revokeDevice: (deviceId: string) =>
+    request<AdminDevice>("POST", `/admin/devices/${encodeURIComponent(deviceId)}/revoke`),
+  settings: () => request<HouseholdSettings>("GET", "/admin/settings"),
+  updateSettings: (body: Schemas["SettingsUpdateIn"]) =>
+    request<HouseholdSettings>("PATCH", "/admin/settings", body),
+  /** `/j/{old}` stops resolving at once; the printed fridge QR needs reprinting. */
+  rotateJoinSlug: () => request<Schemas["JoinSlugOut"]>("POST", "/admin/join-slug/rotate"),
+  /** Streaming services in the household's region (JustWatch data: show `attribution`). */
+  streamingProviders: () => request<Schemas["ProvidersOut"]>("GET", "/tmdb/providers"),
 };
 
 /** The live stream URL for `EventSource`: the ticket is the credential (no cookie, no CSRF). */

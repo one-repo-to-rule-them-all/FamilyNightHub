@@ -29,6 +29,13 @@ GRANT fnh_resolver TO fnh;
 
 GRANT USAGE ON SCHEMA public TO fnh_app;
 GRANT USAGE ON SCHEMA public TO fnh_resolver;
+-- ALTER FUNCTION ... OWNER TO fnh_resolver also requires the NEW owner to hold CREATE on the
+-- function's schema (superusers skip that check). Locally and in CI the owner `fnh` is the
+-- superuser, so only a deployed database, where `fnh` is an ordinary CREATEROLE role, hits
+-- it: migration 0001 fails with "permission denied for schema public". fnh_resolver is
+-- NOLOGIN and only runs the fixed bodies of its definer functions, so this widens nothing a
+-- client can reach.
+GRANT CREATE ON SCHEMA public TO fnh_resolver;
 
 -- Tables created later by the owner auto-grant DML to the app role, so each migration
 -- only needs to carry its RLS policy (enforced by tests/integration/test_rls_coverage.py).

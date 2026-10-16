@@ -77,6 +77,16 @@ export function HostHome() {
       <PendingClaims />
       <UseAsTv sessionId={created?.session_id ?? null} />
 
+      {me.data.role === "admin" ? (
+        <Link
+          href="/admin"
+          className="flex min-h-14 items-center justify-between gap-3 rounded-xl bg-card px-4 py-3 text-lg ring-1 ring-foreground/10 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          Admin: people, devices, settings
+          <ChevronRight aria-hidden className="size-5 text-muted-foreground" />
+        </Link>
+      ) : null}
+
       <ApiErrorNotice error={logout.error} />
       <Button
         variant="outline"

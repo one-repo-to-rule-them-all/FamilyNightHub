@@ -12,6 +12,8 @@ export type SeededHousehold = {
   people: string[];
   /** A signed `fnh_session` value for the household's admin (see seed_night.py). */
   hostCookie: string;
+  /** A signed `fnh_session` for a second, host-role account (only with `hostAccount`). */
+  hostOnlyCookie: string | null;
 };
 
 export type SeededNight = SeededHousehold & {
@@ -28,6 +30,8 @@ export type SeedOptions = {
   openVoting?: boolean;
   /** Close voting and settle the reveal: the night is `tonight`, so photos are open. */
   tonight?: boolean;
+  /** Also add a host-role account (no admin permissions): `hostOnlyCookie`. */
+  hostAccount?: boolean;
   /** Owned titles in the library for the candidate generator (0-2, see seed_night.py OWNED). */
   owned?: number;
   /** The household's streaming services (TMDB provider ids, e.g. 337 = Disney Plus). */
@@ -42,6 +46,7 @@ export function seedNight(options: SeedOptions = {}): SeededNight {
   if (options.movies) args.push("--movies", String(options.movies));
   if (options.openVoting) args.push("--open-voting");
   if (options.tonight) args.push("--tonight");
+  if (options.hostAccount) args.push("--host-account");
   if (options.owned) args.push("--owned", String(options.owned));
   if (options.providers?.length) args.push("--providers", options.providers.join(","));
   return runSeed(args) as SeededNight;
