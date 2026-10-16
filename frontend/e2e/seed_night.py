@@ -3,11 +3,14 @@
 Run from backend/ (so `app` and its settings resolve), with the same env as the API under test:
 
     uv run python ../frontend/e2e/seed_night.py --slug e2e-abc123 [--movies 4 --open-voting]
+    uv run python ../frontend/e2e/seed_night.py --slug e2e-abc123 --movies 2 --tonight
 
 Prints one JSON line: {"slug", "nightCode", "householdName", "adminEmail", "people": [...],
 "sessionId", "movies": [...], "hostCookie"}. Without flags the night is a `draft` with no
 shortlist. `--movies N` adds N typed titles through session_service (the host's real path) and
 `--open-voting` opens voting, so ballot_size = min(3, N - 1) exactly as the API would fix it.
+`--tonight` goes on through the host's close (no ballots, pinned seed) and backdates the reveal
+past REVEAL_SETTLE, so the night is `tonight` and its photo album is open (ADR-0005).
 `hostCookie` is a signed `fnh_session` value for the household's admin, so a test can act as
 the host through the API (close voting with X-FNH-Test-Seed) without a magic-link round trip.
 
@@ -53,7 +56,7 @@ MOVIES = [
 ]
 
 
-async def seed(slug: str, movies: int, open_voting: bool) -> dict[str, object]:
+async def seed(slug: str, movies: int, open_voting: bool, tonight: bool) -> dict[str, object]:
     household = f"E2E {slug}"
     email = f"host-{slug}@e2e.test"
     created = await bootstrap(household, slug, email, "E2E Host")
@@ -90,9 +93,20 @@ async def seed(slug: str, movies: int, open_voting: bool) -> dict[str, object]:
                 session_service.OptionInput(title=title),
                 None,
             )
-        if open_voting:
+        if open_voting or tonight:
             await session_service.open_voting(
                 db, created.household_id, created.account_id, session_id
+            )
+        if tonight:
+            await session_service.close_voting(
+                db, created.household_id, created.account_id, session_id, seed=42
+            )
+            await db.execute(
+                text(
+                    "UPDATE sessions SET status = 'tonight', "
+                    "revealed_at = now() - interval '5 minutes' WHERE id = :s"
+                ),
+                {"s": session_id},
             )
     return {
         "slug": slug,
@@ -113,8 +127,11 @@ def main() -> int:
     parser.add_argument("--slug", required=True)
     parser.add_argument("--movies", type=int, default=0, choices=range(len(MOVIES) + 1))
     parser.add_argument("--open-voting", action="store_true")
+    parser.add_argument("--tonight", action="store_true", help="needs --movies >= 2")
     args = parser.parse_args()
-    print(json.dumps(asyncio.run(seed(args.slug, args.movies, args.open_voting))))
+    if args.tonight and args.movies < 2:
+        parser.error("--tonight needs --movies 2 or more")
+    print(json.dumps(asyncio.run(seed(args.slug, args.movies, args.open_voting, args.tonight))))
     return 0
 
 

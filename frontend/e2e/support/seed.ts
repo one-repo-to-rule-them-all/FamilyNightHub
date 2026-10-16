@@ -22,6 +22,8 @@ export type SeedOptions = {
   movies?: number;
   /** Open voting after adding the shortlist (needs at least 2 movies). */
   openVoting?: boolean;
+  /** Close voting and settle the reveal: the night is `tonight`, so photos are open. */
+  tonight?: boolean;
 };
 
 const BACKEND = path.resolve(__dirname, "../../../backend");
@@ -32,6 +34,7 @@ export function seedNight(options: SeedOptions = {}): SeededNight {
   const args = ["run", "python", "../frontend/e2e/seed_night.py", "--slug", slug];
   if (options.movies) args.push("--movies", String(options.movies));
   if (options.openVoting) args.push("--open-voting");
+  if (options.tonight) args.push("--tonight");
   const result = spawnSync("uv", args, {
     cwd: BACKEND,
     encoding: "utf8",

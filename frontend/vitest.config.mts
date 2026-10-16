@@ -14,10 +14,13 @@ export default defineConfig({
       exclude: ["src/**/*.test.ts"],
       reporter: ["text-summary", "text"],
       // Pure logic is gated at 100% (as the backend's domain package is): the ballot reducer and
-      // the live-stream state machine (ADR-0004).
+      // the album's URL reuse, and the live-stream state machine (ADR-0004). The upload queue
+      // is gated on lines (its retry/backoff paths).
       thresholds: {
         "src/lib/ballot.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/live.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
+        "src/lib/photos/album.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
+        "src/lib/photos/queue.ts": { lines: 100 },
       },
     },
   },

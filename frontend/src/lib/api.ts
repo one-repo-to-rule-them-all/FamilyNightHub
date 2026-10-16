@@ -11,7 +11,7 @@
  *
  * Types come from src/types/api.gen.ts (generated from backend/openapi.json; never hand-edited).
  */
-import type { components } from "@/types/api.gen";
+import type { components, operations } from "@/types/api.gen";
 
 export type Schemas = components["schemas"];
 export type Person = Schemas["PersonOut"];
@@ -27,6 +27,11 @@ export type OwnBallot = Schemas["OwnBallotOut"];
 export type Voter = Schemas["VoterOut"];
 export type TmdbResult = Schemas["TmdbResultOut"];
 export type Claim = Schemas["ClaimOut"];
+export type Photo = Schemas["PhotoOut"];
+export type PhotoCreated = Schemas["PhotoCreatedOut"];
+/** The album's fixed reaction set (the path parameter's enum). */
+export type ReactionEmoji =
+  operations["add_reaction_api_v1_sessions__session_id__photos__photo_id__reactions__emoji__put"]["parameters"]["path"]["emoji"];
 
 export const CSRF_HEADER = "X-FNH-CSRF";
 const BASE = "/api/v1";
@@ -227,6 +232,20 @@ export const api = {
     ),
   enroll: (body: Schemas["EnrollIn"]) =>
     request<Schemas["EnrollOut"]>("POST", "/devices/enroll", body),
+
+  // The night's photo album (ADR-0005).
+  /** The album, newest first. Every URL is a presigned GET that expires in 10 minutes. */
+  photos: (sessionId: string) =>
+    request<Photo[]>("GET", `/sessions/${encodeURIComponent(sessionId)}/photos`),
+  /** A pending photo plus presigned PUTs (5 min) for the JPEG and its thumbnail. */
+  createPhoto: (sessionId: string, body: Schemas["PhotoCreateIn"]) =>
+    request<PhotoCreated>("POST", `/sessions/${encodeURIComponent(sessionId)}/photos`, body),
+  completePhoto: (sessionId: string, photoId: string) =>
+    request<void>("POST", `${photoPath(sessionId, photoId)}/complete`),
+  react: (sessionId: string, photoId: string, emoji: ReactionEmoji, personId: string) =>
+    request<void>("PUT", reactionPath(sessionId, photoId, emoji, personId)),
+  unreact: (sessionId: string, photoId: string, emoji: ReactionEmoji, personId: string) =>
+    request<void>("DELETE", reactionPath(sessionId, photoId, emoji, personId)),
 };
 
 /** The live stream URL for `EventSource`: the ticket is the credential (no cookie, no CSRF). */
@@ -257,6 +276,15 @@ export async function enrollDevice(
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
+}
+
+function photoPath(sessionId: string, photoId: string): string {
+  return `/sessions/${encodeURIComponent(sessionId)}/photos/${encodeURIComponent(photoId)}`;
+}
+
+function reactionPath(sessionId: string, photoId: string, emoji: string, personId: string) {
+  const query = new URLSearchParams({ person_id: personId });
+  return `${photoPath(sessionId, photoId)}/reactions/${encodeURIComponent(emoji)}?${query}`;
 }
 
 /** "Try again in 2 minutes." for a 429, or null when the server gave no Retry-After. */
