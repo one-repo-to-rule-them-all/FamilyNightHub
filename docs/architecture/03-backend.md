@@ -26,6 +26,7 @@ backend/app/
 | Join | `GET /api/v1/csrf`, `POST /api/v1/join` | Issue the CSRF cookie; validate slug + night code, mint the device cookie (failure-budgeted) |
 | Auth | `/api/v1/auth/{magic-link,verify,me,logout}` | Magic-link request/verify for admins and hosts, current account, logout |
 | People/devices | `/api/v1/people`, `/api/v1/devices/me`, `PUT/DELETE /api/v1/devices/me/people/{id}` | Avatar grid with each tile's binding state, bind or unbind a person to this device |
+| Host devices | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}` | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it); review pending person claims (`devices:enroll` / `devices:approve`) |
 | Sessions | `/api/v1/sessions` | Create, shortlist, open/close voting, snapshot |
 | Ballots | `/api/v1/sessions/{id}/ballots` | Upsert own ballot; host proxy ballot |
 | Live | `/api/v1/sse-tickets`, `/api/v1/sessions/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md) |
@@ -93,6 +94,10 @@ looks for a non-closed session whose `night_code_hash` matches
 without 0/O/1/I/L (`domain/night_code.py`), case- and separator-insensitive. Every failure
 (unknown slug, malformed, wrong, closed) returns the same 400, so the endpoint does not reveal
 which slugs exist. A phone that already holds a live token for the household reuses its device.
+The other way in is a signed-in host: `POST /devices/enroll` mints a device for that browser
+(reusing one it already holds for the household). With `as_tv: true` the device is marked
+`is_tv` and the host's `fnh_session` is cleared, so the living-room TV never carries host rights.
+Approving a pending claim leaves the person bound to their other phone as well.
 The device cookie is `fnh_device`: 256-bit token, `HttpOnly; Secure; SameSite=Lax`, 365-day
 sliding `Max-Age`.
 

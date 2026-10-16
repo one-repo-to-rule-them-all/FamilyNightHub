@@ -62,6 +62,54 @@
         "title": "BindingOut",
         "type": "object"
       },
+      "ClaimOut": {
+        "properties": {
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "device_id": {
+            "format": "uuid",
+            "title": "Device Id",
+            "type": "string"
+          },
+          "device_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Label"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "person_name": {
+            "title": "Person Name",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_id",
+          "device_label",
+          "person_id",
+          "person_name",
+          "avatar_emoji",
+          "requested_at"
+        ],
+        "title": "ClaimOut",
+        "type": "object"
+      },
       "CsrfOut": {
         "properties": {
           "csrf_token": {
@@ -95,6 +143,48 @@
           "people"
         ],
         "title": "DeviceOut",
+        "type": "object"
+      },
+      "EnrollIn": {
+        "properties": {
+          "as_tv": {
+            "default": false,
+            "title": "As Tv",
+            "type": "boolean"
+          },
+          "device_label": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Label"
+          }
+        },
+        "title": "EnrollIn",
+        "type": "object"
+      },
+      "EnrollOut": {
+        "properties": {
+          "device_id": {
+            "format": "uuid",
+            "title": "Device Id",
+            "type": "string"
+          },
+          "is_tv": {
+            "title": "Is Tv",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "device_id",
+          "is_tv"
+        ],
+        "title": "EnrollOut",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -512,6 +602,73 @@
         ]
       }
     },
+    "/api/v1/devices/claims": {
+      "get": {
+        "operationId": "list_claims_api_v1_devices_claims_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClaimOut"
+                  },
+                  "title": "Response List Claims Api V1 Devices Claims Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Claims",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
+    "/api/v1/devices/enroll": {
+      "post": {
+        "description": "Let this browser in on the signed-in host's authority. With `as_tv`, the device is\nmarked as the TV and the host session is cleared from this browser, so a TV left in the\nliving room never holds host rights.",
+        "operationId": "enroll_api_v1_devices_enroll_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrollIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrollOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enroll",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
     "/api/v1/devices/me": {
       "get": {
         "operationId": "my_device_api_v1_devices_me_get",
@@ -610,6 +767,104 @@
         "summary": "Bind Person",
         "tags": [
           "people"
+        ]
+      }
+    },
+    "/api/v1/devices/{device_id}/people/{person_id}/approve": {
+      "post": {
+        "operationId": "approve_claim_api_v1_devices__device_id__people__person_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No pending claim"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Claim",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
+    "/api/v1/devices/{device_id}/people/{person_id}/reject": {
+      "post": {
+        "operationId": "reject_claim_api_v1_devices__device_id__people__person_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No pending claim"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Claim",
+        "tags": [
+          "devices"
         ]
       }
     },

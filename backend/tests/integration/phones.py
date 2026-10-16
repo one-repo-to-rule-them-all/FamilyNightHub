@@ -6,6 +6,7 @@ would silently drop them and every test would see a logged-out phone.
 
 from __future__ import annotations
 
+import time
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -15,7 +16,7 @@ from httpx import ASGITransport, AsyncClient, Response
 from sqlalchemy import text
 
 from app.core.database import household_session
-from app.core.security import CSRF_HEADER, hash_night_code
+from app.core.security import ACCOUNT_COOKIE, CSRF_HEADER, hash_night_code, sign_account_session
 from app.main import app
 
 
@@ -43,6 +44,14 @@ class Phone:
             f"/api/v1/devices/me/people/{person_id}", headers={CSRF_HEADER: await self.csrf()}
         )
 
+    async def post(self, path: str, body: dict[str, Any] | None = None) -> Response:
+        return await self.client.post(path, json=body, headers={CSRF_HEADER: await self.csrf()})
+
+    def sign_in_as(self, account_id: uuid.UUID, household_id: uuid.UUID) -> None:
+        """Skip the magic link (covered in test_auth.py): set a validly signed session."""
+        value = sign_account_session(account_id, household_id, int(time.time()))
+        self.client.cookies.set(ACCOUNT_COOKIE, value, domain="fnh.test")
+
     async def unbind(self, person_id: uuid.UUID) -> Response:
         return await self.client.delete(
             f"/api/v1/devices/me/people/{person_id}", headers={CSRF_HEADER: await self.csrf()}
@@ -65,3 +74,17 @@ async def open_night(
             text("UPDATE sessions SET night_code_hash = :c, status = :s WHERE id = :id"),
             {"c": hash_night_code(code, household_id), "s": status, "id": session_id},
         )
+
+
+async def add_account(household_id: uuid.UUID, role: str, email: str) -> uuid.UUID:
+    async with household_session(household_id) as db:
+        account_id: uuid.UUID = (
+            await db.execute(
+                text(
+                    "INSERT INTO accounts (household_id, email, display_name, role) "
+                    "VALUES (:h, :e, 'Test', :r) RETURNING id"
+                ),
+                {"h": household_id, "e": email, "r": role},
+            )
+        ).scalar_one()
+    return account_id
