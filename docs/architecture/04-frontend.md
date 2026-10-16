@@ -35,7 +35,7 @@ pairing explanation from the 401.
 | `/host` | `src/app/host/` | Start a night (the code is shown once, see below), nights in progress, pending person claims with approve/reject (polled every 10s), **Use this browser as the TV** (`POST /devices/enroll {as_tv:true}`, then `/tv/{night}`), sign out |
 | `/host/[session]` | `src/app/host/[session]/` | Draft: shortlist (up/down/remove, reducer in `src/lib/shortlist.ts`, whole order PUT, server order synced back), poster search (debounced, through `/api/v1/tmdb/search`, TMDB attribution line; a 503 says "type the title" and the typed-title form is always there), **Open voting** at 2–8 titles. Voting: who has voted (avatars only), proxy ballot, **Close voting**. Then the winner and **End the night**. Rotate code at any stage before `closed` |
 | `/tv` | `src/app/tv/` | Follows the newest draft/voting/revealed/tonight night; an unpaired browser gets "sign in as host, then Use this browser as the TV" |
-| `/tv/[session]` | `src/app/tv/[session]/` | Lobby (night code, join instructions, people tiles) → turnout tiles light up as ballots arrive (`GET …/voters`, never ranks) → reveal spinner (`src/lib/reveal.ts`) landing on `result.winner_option_id`. Screen Wake Lock where supported; follows the next night once this one is `tonight`/`closed` |
+| `/tv/[session]` | `src/app/tv/[session]/` | Lobby (night code, join instructions, people tiles) → turnout tiles light up as ballots arrive (`GET …/voters`, never ranks) → reveal spinner (`src/lib/reveal.ts`) landing on `result.winner_option_id`. Screen Wake Lock where supported (released while the tab is hidden); once the night is `tonight`/`closed`, the photo slideshow (see "TV slideshow" below), and it follows the next night |
 
 ## Design system
 
@@ -200,7 +200,7 @@ attribute and never `image/heic`. See [ADR-0005](decisions/ADR-0005-photo-pipeli
 The album is a thumbnail grid with a full-screen viewer, the uploader's avatar, and emoji reactions.
 The TV slideshow uses the Screen Wake Lock API where supported.
 
-**Built** (phone side; the TV slideshow is not):
+**Built** (phone side, and the TV slideshow below):
 
 - **Processing** (`process.ts`), one file at a time: `exifr` reads `DateTimeOriginal` only (sent
   as `taken_on`, date only). `createImageBitmap(file, {imageOrientation: "from-image"})` decodes and
@@ -238,6 +238,39 @@ The TV slideshow uses the Screen Wake Lock API where supported.
   the album is left. A thumbnail that fails to load triggers a refetch, which covers a phone that
   slept past the TTL. Images are plain `<img>` with `referrerPolicy="no-referrer"`, never
   `next/image`, whose optimizer would proxy the bytes through the server.
+
+### TV slideshow
+
+**Built.** `/tv/[session]` on a `tonight` or `closed` night (`src/app/tv/[session]/slideshow.tsx`;
+the scheduling is `src/lib/slideshow.ts`, pure and gated at 100% in vitest with fake timers):
+
+- **Album.** Query key `["night", id, "slideshow"]`: under the night key, so every live hint
+  (`photo_added`, `status_changed`, a reconnect, a return to visible) refetches it with the
+  snapshot. It also refetches every 10 s while the stream is up (hiding publishes no event, so this
+  sweep is what drops a hidden photo) and every 5 s while it is down. Only `ready` photos play:
+  a photo the API stops listing (or lists as `hidden`) leaves the screen on that refetch, even
+  mid-slide.
+- **Order.** The loop starts on the newest photo and then walks the album chronologically, 8 s
+  per photo. A photo that wasn't there before jumps the queue once (several at once: newest first),
+  then the loop resumes where it was.
+- **Presigned URLs (ADR-0005).** URLs are reused through `keepFreshUrls` (album.ts) for at most
+  8 minutes, except a photo whose image failed. No load starts on a URL within 60 s of its
+  10-minute expiry; once any URL is past the reuse window the TV refetches. A broken or expired
+  image is skipped and triggers a refetch, and is retried only once it has a new URL. URLs exist
+  only in each `<img src>` (`referrerPolicy="no-referrer"`, never `next/image`), never in data
+  attributes or logs; the scheduler's state holds ids and mint times only.
+- **Rendering.** At most two images load at once: the photo on screen and the next one,
+  preloaded. The outgoing photo crossfades into the new one once it has loaded (1.2 s), and each
+  photo slowly pans and zooms (14 s); both exist only under `prefers-reduced-motion:
+  no-preference`. Caption: the uploader's avatar and name, non-zero reaction counts, and the photo
+  count. Alt text is "Photo from {name}, {date}" (`taken_on`, else the upload date), never a
+  filename; the preloaded and outgoing images are `aria-hidden`.
+- **Remote.** ← → step (← walks back through the loop), space / OK / play-pause pauses and resumes
+  with a visible "Paused" badge; stepping while paused stays paused, resuming gives the photo a
+  full slide.
+- **Idle.** Until a photo can be shown: "Drop your photos from your phone", the night code when
+  this tab knows it and the night is still `tonight`, and a count once photos arrive. The join QR
+  joins it once an endpoint exposes the household's join slug to the TV (see "TV" above).
 - **Bucket CORS**: phones PUT and GET the bucket cross-origin, so it needs a CORS rule for the web
   origin (PUT/GET, `content-type`). `frontend/e2e/setup_bucket.py` sets it on SeaweedFS for local
   runs and CI. The Tigris buckets for staging and prod need the same rule (a deploy step).
