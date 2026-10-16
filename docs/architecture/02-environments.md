@@ -13,7 +13,7 @@ See [ADR-0001](decisions/ADR-0001-fly-fastapi-postgres-hosting.md).
 | Image source | local build | GHCR image built in CI | same image digest promoted from staging |
 | Datastore | `postgres:16` container | Fly Postgres (small) | Fly Postgres (small, daily snapshots) |
 | Cache/queue | `redis:7` container | Upstash (free tier) | Upstash |
-| Object storage | SeaweedFS container (S3 API) | Tigris bucket `fnh-photos-staging` | Tigris `fnh-photos` + `fnh-photos-backup` |
+| Object storage | SeaweedFS container (S3 API) | Tigris bucket `fnh-rbj-photos-staging` | Tigris `fnh-rbj-photos` + `fnh-rbj-photos-backup` |
 | TMDB | fake server (`tmdb-fake` service) | real API key | real API key |
 | Email | MailHog | provider sandbox | provider |
 | Secrets source | `.env` (from `.env.example`) | `fly secrets` | `fly secrets` |
@@ -84,7 +84,7 @@ All three apps run `shared-cpu-1x`/512 MB in `dfw`.
 | `DATABASE_URL` (app role `fnh_app`) | fly secrets | api, worker |
 | `MIGRATION_DATABASE_URL` (owner role) | fly secrets (release command only) | api release_command |
 | `REDIS_URL` | fly secrets | api, worker |
-| `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` (photos bucket, read/write; unset endpoint or keys = photo routes answer 503) | fly secrets; the non-secret `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_REGION` sit in `api.fly.toml`/`worker.fly.toml` `[env]` (unset, the bucket would default to production's `fnh-photos`); `STORAGE_PUBLIC_ENDPOINT` is local-only | api, worker |
+| `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` (photos bucket, read/write; unset endpoint or keys = photo routes answer 503) | fly secrets; the non-secret `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_REGION` sit in `api.fly.toml`/`worker.fly.toml` `[env]` (unset, the bucket would default to production's `fnh-rbj-photos`); `STORAGE_PUBLIC_ENDPOINT` is local-only | api, worker |
 | `BACKUP_STORAGE_*` (backup bucket, write-only) | fly secrets | **worker only** |
 | `TMDB_READ_TOKEN` (with plain-env `TMDB_BASE_URL`; unset token = search off, typed titles only) | fly secrets | api only (never `NEXT_PUBLIC_*`) |
 | `SESSION_SECRET`, `DEVICE_TOKEN_PEPPER` | fly secrets | api; the **worker** also needs its **own random** values (unused, but Settings refuses to load in staging/production without non-placeholder ones, so the worker would crash-loop) |

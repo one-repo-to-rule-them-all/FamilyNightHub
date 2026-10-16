@@ -131,18 +131,18 @@ The database is created empty here. Migrations run later, in the API's `release_
 Bucket names are global. If one is taken, choose another **and** change `STORAGE_BUCKET` in
 `deploy/<env>/{api,worker}.fly.toml` and `PHOTOS_BUCKET` in step 9 to match.
 
-- [ ] ⌨️ `fly storage create --name fnh-photos-staging --org <org>` (private by default; don't
+- [ ] ⌨️ `fly storage create --name fnh-rbj-photos-staging --org <org>` (private by default; don't
       pass `-a`, so nothing is auto-set on an app). It prints an access key pair. That pair
       is the **API's read/write key**: `STORAGE_ACCESS_KEY_ID` / `STORAGE_SECRET_ACCESS_KEY`.
-- [ ] 🌐 `fly storage dashboard fnh-photos-staging`. In the Tigris console:
+- [ ] 🌐 `fly storage dashboard fnh-rbj-photos-staging`. In the Tigris console:
   - confirm the printed key is limited to **this bucket** with Editor (read/write), not Admin;
   - create a second key, **Admin on this bucket only**. This is the **bucket-admin key** for
     the CORS rule. It goes into GitHub only (step 9), never onto a Fly app.
-- [ ] Production only: also `fly storage create --name fnh-photos-backup --org <org>`. Then
+- [ ] Production only: also `fly storage create --name fnh-rbj-photos-backup --org <org>`. Then
       create a key limited to the backup bucket for the worker (`BACKUP_STORAGE_*`; inert
       until `backup_new_photos` lands), and an offline **restore key** (read the backup
       bucket, write the photos bucket) that you keep in your password manager
-      ([restore.md §2.2](restore.md#22-photos-from-fnh-photos-backup)).
+      ([restore.md §2.2](restore.md#22-photos-from-fnh-rbj-photos-backup)).
 - [ ] The CORS rule is **not** set by hand: the Deploy workflow sets it and reads it back
       before every deploy (`deploy/bucket-cors.sh`, step 10).
 
@@ -235,7 +235,7 @@ secret just turns that feature off. Leaving out a required one stops the app boo
       gh secret set FLY_API_TOKEN --env staging -R $R
       gh secret set BUCKET_ADMIN_ACCESS_KEY_ID --env staging -R $R       # step 5 admin key
       gh secret set BUCKET_ADMIN_SECRET_ACCESS_KEY --env staging -R $R
-      gh variable set PHOTOS_BUCKET --env staging --body fnh-photos-staging -R $R
+      gh variable set PHOTOS_BUCKET --env staging --body fnh-rbj-photos-staging -R $R
       ```
 
       **Do not add `production`'s `FLY_API_TOKEN` yet.** Without it the production job skips
@@ -303,10 +303,10 @@ secret just turns that feature off. Leaving out a required one stops the app boo
 ## 14. Production
 
 - [ ] Repeat steps 2–8 with production names: `fnh-api`, `fnh-worker`, `fnh-web`,
-      `fnh-db`, `fnh-redis` (Fixed plan), buckets `fnh-photos` + `fnh-photos-backup`, and a
+      `fnh-db`, `fnh-redis` (Fixed plan), buckets `fnh-rbj-photos` + `fnh-rbj-photos-backup`, and a
       verified email domain. Use **new** passwords and secrets: nothing is shared with staging.
 - [ ] ⌨️ Production secrets in GitHub (`--env production`): `BUCKET_ADMIN_*`, plus
-      `PHOTOS_BUCKET=fnh-photos`, **then** `FLY_API_TOKEN` last (a separate token,
+      `PHOTOS_BUCKET=fnh-rbj-photos`, **then** `FLY_API_TOKEN` last (a separate token,
       `--name fnh-deploy-production`).
 - [ ] ⌨️ `gh workflow run deploy.yml --ref main -R $R`. Staging redeploys, then the
       production job waits. 🌐 **Approve** it in the run page. It deploys the **same image

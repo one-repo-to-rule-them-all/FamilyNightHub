@@ -29,8 +29,8 @@ drop the `-staging` suffix and use `deploy/prod/`.
    2026-10-15 are in [ADR-0013](../architecture/decisions/ADR-0013-hosting-cost-correction.md)
    (Accepted 2026-10-16), which chose this legacy flavour: MPG is $38/mo per environment and
    has no superuser or CREATEROLE to create our roles.
-2. **Bucket names.** Tigris bucket names are global. If `fnh-photos`, `fnh-photos-staging` or
-   `fnh-photos-backup` are taken, pick new names and update 02 and 05.
+2. **Bucket names.** Tigris bucket names are global. If `fnh-rbj-photos`, `fnh-rbj-photos-staging` or
+   `fnh-rbj-photos-backup` are taken, pick new names and update 02 and 05.
 3. **Deploy-token scope.** `FLY_API_TOKEN` must deploy three apps. A per-app deploy token
    (`fly tokens create deploy -a <app>`) covers one app, so the simple option is an org token
    with an expiry. If staging and production share one Fly org, the staging token can also
@@ -101,8 +101,8 @@ ADR-0013 (an idle ARQ worker polls about 5M commands/month).
 
 ### 1.4 Tigris buckets
 
-- Staging: `fnh-photos-staging` (private). No backup bucket.
-- Production: `fnh-photos` (private) and `fnh-photos-backup` (private), each with **its own
+- Staging: `fnh-rbj-photos-staging` (private). No backup bucket.
+- Production: `fnh-rbj-photos` (private) and `fnh-rbj-photos-backup` (private), each with **its own
   access key**. The backup key goes on `fnh-worker` only. If the API is ever compromised, its
   keys cannot touch the backups (06 "Gotchas").
 
@@ -115,7 +115,7 @@ api and worker fly.toml `[env]`. `BACKUP_STORAGE_*` stays inert until `backup_ne
 **CORS for phone uploads.** Create one more key per photos bucket that can change its config
 (Tigris dashboard, scoped to that bucket only) and put it **only** in the GitHub environment,
 never on a Fly app: secrets `BUCKET_ADMIN_ACCESS_KEY_ID` / `BUCKET_ADMIN_SECRET_ACCESS_KEY`, plus
-variable `PHOTOS_BUCKET` (`fnh-photos-staging` on `staging`, `fnh-photos` on `production`). The
+variable `PHOTOS_BUCKET` (`fnh-rbj-photos-staging` on `staging`, `fnh-rbj-photos` on `production`). The
 next Deploy run sets the rule (07-cicd "Photos bucket CORS"); re-run it by hand to apply now.
 
 ### 1.5 Secrets (02 "Secrets map")
@@ -204,7 +204,7 @@ Data written after the snapshot is lost (RPO up to 24h). The weekly `pg_dump` th
 narrow this is **not built**: it needs a read-only dump role that can read FORCE-RLS tables,
 and its own ADR (06).
 
-### 2.2 Photos from `fnh-photos-backup`
+### 2.2 Photos from `fnh-rbj-photos-backup`
 
 **Prerequisite:** `backup_new_photos` exists. Until the photo pipeline ships it, there is no
 backup to restore from.
@@ -228,13 +228,13 @@ of photos the database still has:
 
    ```bash
    while read -r key; do
-     aws s3 cp "s3://fnh-photos-backup/$key" "s3://fnh-photos/$key" \
+     aws s3 cp "s3://fnh-rbj-photos-backup/$key" "s3://fnh-rbj-photos/$key" \
        --endpoint-url https://fly.storage.tigris.dev --profile fnh-restore
    done < keys.txt
    ```
 
    The profile needs read on the backup bucket and write on the photos bucket. For a whole-
-   bucket loss, `aws s3 sync s3://fnh-photos-backup s3://fnh-photos` is simpler. It may also
+   bucket loss, `aws s3 sync s3://fnh-rbj-photos-backup s3://fnh-rbj-photos` is simpler. It may also
    bring back a photo deleted within the last day whose backup purge hadn't run yet, so
    re-run step 2's list and delete any object without a row.
 4. Spot-check a few album pages. Presigned GETs are minted per request, so nothing is cached.

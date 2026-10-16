@@ -21,7 +21,7 @@ primary_region = "dfw"
   WORKER_HEALTH_PORT = "8081"
   # Same bucket as the API: sweep_orphan_uploads deletes abandoned uploads from it.
   STORAGE_ENDPOINT = "https://fly.storage.tigris.dev"
-  STORAGE_BUCKET = "fnh-photos-staging"
+  STORAGE_BUCKET = "fnh-rbj-photos-staging"
   STORAGE_REGION = "auto"
 
 # No [http_service], on purpose. Fly auto-start is driven by fly-proxy traffic, and nothing

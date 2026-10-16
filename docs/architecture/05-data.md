@@ -87,11 +87,15 @@ Migrations run as the owner role in the Fly release command and must be expand/c
 
 ## Object storage
 
-Bucket `fnh-photos` (private, no public ACL, no listing for app credentials beyond its prefix).
+Tigris bucket names are global across all its users, and `fnh-photos*` were taken, so
+the deployed buckets are `fnh-rbj-photos-staging`, `fnh-rbj-photos` and
+`fnh-rbj-photos-backup`; diagrams and ADR-0005 keep the short conceptual names.
+
+Bucket `fnh-rbj-photos` (private, no public ACL, no listing for app credentials beyond its prefix).
 Key layout: `households/{hid}/sessions/{sid}/{photo_id}.jpg` and `…_thumb.jpg`. Presigned PUTs last
 5 minutes and sign `Content-Type: image/jpeg`; presigned GETs last 10. `photos.bytes` is the full
 image's size as HEAD reported it on `complete`; `photos.taken_at` holds the EXIF date at midnight
-UTC (the phone sends a date only). Reactions are limited to a six-emoji allowlist in the service. Bucket `fnh-photos-backup` is written only by the worker using
+UTC (the phone sends a date only). Reactions are limited to a six-emoji allowlist in the service. Bucket `fnh-rbj-photos-backup` is written only by the worker using
 separate credentials. Deletes remove both copies within 24h. See
 [ADR-0005](decisions/ADR-0005-photo-pipeline-and-storage.md).
 
@@ -100,7 +104,7 @@ separate credentials. Deletes remove both copies within 24h. See
 | What | How | Retention |
 |---|---|---|
 | Postgres | Fly daily snapshots + weekly worker `pg_dump` → backup bucket | 7 snapshots / 8 weekly dumps |
-| Photos | Nightly worker copy → `fnh-photos-backup` | Mirror (deletes propagate in 24h or less) |
+| Photos | Nightly worker copy → `fnh-rbj-photos-backup` | Mirror (deletes propagate in 24h or less) |
 
 Restores are rehearsed once before launch (runbook).
 
