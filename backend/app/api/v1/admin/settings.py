@@ -21,6 +21,7 @@ def _out(s: household_settings_service.HouseholdSettings) -> SettingsOut:
         default_voting_method=s.default_voting_method,
         default_age_cap=s.default_age_cap,
         region=s.region,
+        streaming_providers=s.streaming_providers,
         updated_at=s.updated_at,
     )
 

@@ -12,7 +12,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.domain.generator import MAX_COUNT as MAX_CANDIDATES
 from app.domain.session_state import MAX_BALLOT_SIZE, MAX_OPTIONS
+from app.schemas.admin import AgeCap
 
 SessionStatus = Literal["draft", "voting", "revealed", "tonight", "closed"]
 OptionSource = Literal["manual", "owned", "streaming", "tmdb"]
@@ -40,6 +42,9 @@ class OptionIn(BaseModel):
     tmdb_id: int | None = Field(default=None, gt=0)
     title: str | None = Field(default=None, min_length=1, max_length=300)
     year: int | None = Field(default=None, ge=1870, le=2100)
+    # With tmdb_id only: where the candidate came from (POST .../generate). A library
+    # movie_id derives `owned` itself; a typed title is `manual`.
+    source: Literal["streaming", "tmdb"] | None = None
 
     @model_validator(mode="after")
     def _exactly_one(self) -> OptionIn:
@@ -50,6 +55,8 @@ class OptionIn(BaseModel):
             raise ValueError("title must not be blank")
         if self.year is not None and self.title is None:
             raise ValueError("year goes with a typed title only")
+        if self.source is not None and self.tmdb_id is None:
+            raise ValueError("source goes with a tmdb_id only")
         return self
 
 
@@ -88,6 +95,82 @@ class TmdbResultOut(BaseModel):
     title: str
     year: int | None
     poster_path: str | None
+
+
+class ProviderOut(BaseModel):
+    provider_id: int
+    name: str
+    logo_path: str | None
+
+
+class ProvidersOut(BaseModel):
+    providers: list[ProviderOut]
+    # JustWatch attribution, required wherever this list is shown.
+    attribution: str
+
+
+# --- Candidate generator (ADR-0007) ------------------------------------------------------
+
+Genre = Literal[
+    "Action",
+    "Adventure",
+    "Animation",
+    "Comedy",
+    "Crime",
+    "Documentary",
+    "Drama",
+    "Family",
+    "Fantasy",
+    "History",
+    "Horror",
+    "Music",
+    "Mystery",
+    "Romance",
+    "Science Fiction",
+    "TV Movie",
+    "Thriller",
+    "War",
+    "Western",
+]
+
+
+class GenerateIn(BaseModel):
+    """Roll candidates without adding them. Omit `age_cap` to use the night's cap (else the
+    household default); send `age_cap: null` for no cap tonight."""
+
+    count: int = Field(default=12, ge=1, le=MAX_CANDIDATES)
+    genre: Genre | None = None
+    max_runtime: int | None = Field(default=None, ge=30, le=400)
+    age_cap: AgeCap | None = None
+
+
+class CandidateOut(BaseModel):
+    # Set for owned titles (add with movie_id); TMDB titles are added with tmdb_id + source.
+    movie_id: uuid.UUID | None
+    tmdb_id: int | None
+    title: str
+    year: int | None
+    poster_path: str | None
+    source: Literal["owned", "streaming", "tmdb"]
+    us_cert: str | None
+    runtime: int | None
+    # The household's services this title streams on (JustWatch data); streaming only.
+    providers: list[str]
+
+
+class AttributionOut(BaseModel):
+    tmdb: str
+    # Set whenever any candidate shows streaming data; the UI must show it with them.
+    justwatch: str | None
+
+
+class GenerateOut(BaseModel):
+    candidates: list[CandidateOut]
+    # The cap applied tonight (null = none).
+    age_cap: AgeCap | None
+    # TMDB was off or down: only owned titles were rolled.
+    tmdb_unavailable: bool
+    attribution: AttributionOut
 
 
 # --- Voting (ADR-0006) -----------------------------------------------------------------

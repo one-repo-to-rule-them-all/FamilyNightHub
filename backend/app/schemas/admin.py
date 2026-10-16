@@ -12,6 +12,7 @@ from pydantic import AfterValidator, BaseModel, Field, field_validator
 _COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 _REGION = re.compile(r"^[A-Za-z]{2}$")
 _EMOJI_MAX_CODEPOINTS = 16  # people.avatar_emoji is varchar(16); ZWJ families fit
+MAX_STREAMING_PROVIDERS = 20
 
 
 def clean_name(value: str) -> str:
@@ -138,6 +139,8 @@ class SettingsOut(BaseModel):
     default_voting_method: Literal["top3", "approval", "pick_one"]
     default_age_cap: AgeCap | None
     region: str
+    # TMDB watch-provider ids of the household's subscriptions (GET /tmdb/providers).
+    streaming_providers: list[int]
     updated_at: datetime
 
 
@@ -148,6 +151,15 @@ class SettingsUpdateIn(BaseModel):
     default_voting_method: Literal["top3"] | None = None
     default_age_cap: AgeCap | None = None
     region: str | None = None
+    # Replaces the whole list; [] means no streaming services.
+    streaming_providers: list[Annotated[int, Field(gt=0)]] | None = Field(
+        default=None, max_length=MAX_STREAMING_PROVIDERS
+    )
+
+    @field_validator("streaming_providers")
+    @classmethod
+    def _providers(cls, v: list[int] | None) -> list[int] | None:
+        return None if v is None else sorted(set(v))
 
     @field_validator("region")
     @classmethod

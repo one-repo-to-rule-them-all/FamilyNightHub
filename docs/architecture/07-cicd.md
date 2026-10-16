@@ -128,5 +128,5 @@ so it runs only when that job does (staging deployed, reviewer approved).
 Worth knowing so you don't assume green means safe:
 - Real iOS Safari HEIC behaviour. WebKit in Playwright is not iOS, so there is a manual iPhone checklist before each release that touches photos: [`runbooks/photo-drop-iphone-checklist.md`](../runbooks/photo-drop-iphone-checklist.md).
 - That the deployed (Tigris) buckets' CORS rule actually lets a browser in. The deploy sets it and reads it back, but no browser preflight runs against Tigris; the iPhone checklist is where a phone PUT first crosses it.
-- Live TMDB terms and parameter behaviour, because CI uses the fake. Re-verify against the live docs before building the generator.
+- Live TMDB terms and parameter behaviour, because CI uses the fake. Last verified against developer.themoviedb.org on 2026-10-15 when the generator was built (summary in the generator PR); re-check before relying on a new parameter.
 - Load, backup restore (rehearsed manually), and keeping the docs in sync with the code.

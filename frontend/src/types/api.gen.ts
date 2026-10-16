@@ -589,6 +589,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Candidates
+         * @description Roll candidates for a draft night (ADR-0007): owned titles first, then the
+         *     household's streaming services, then anywhere on TMDB. Nothing is added: the host adds
+         *     picks through POST .../options (`movie_id` for owned, else `tmdb_id` + `source`).
+         *     With TMDB off or down, owned titles still roll and `tmdb_unavailable` is true.
+         */
+        post: operations["generate_candidates_api_v1_sessions__session_id__generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/night-code": {
         parameters: {
             query?: never;
@@ -869,6 +892,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tmdb/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Providers
+         * @description Streaming services in the household's region, for picking `streaming_providers`
+         *     in settings. The data comes from JustWatch: show `attribution` with it.
+         */
+        get: operations["providers_api_v1_tmdb_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tmdb/search": {
         parameters: {
             query?: never;
@@ -953,6 +997,13 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** AttributionOut */
+        AttributionOut: {
+            /** Justwatch */
+            justwatch: string | null;
+            /** Tmdb */
+            tmdb: string;
+        };
         /**
          * BallotIn
          * @description One person's ballot, replacing any earlier one. Ranks run 1..m with no gaps,
@@ -979,6 +1030,30 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "pending";
+        };
+        /** CandidateOut */
+        CandidateOut: {
+            /** Movie Id */
+            movie_id: string | null;
+            /** Poster Path */
+            poster_path: string | null;
+            /** Providers */
+            providers: string[];
+            /** Runtime */
+            runtime: number | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "owned" | "streaming" | "tmdb";
+            /** Title */
+            title: string;
+            /** Tmdb Id */
+            tmdb_id: number | null;
+            /** Us Cert */
+            us_cert: string | null;
+            /** Year */
+            year: number | null;
         };
         /** ClaimOut */
         ClaimOut: {
@@ -1060,6 +1135,34 @@ export interface components {
             device_id: string;
             /** Is Tv */
             is_tv: boolean;
+        };
+        /**
+         * GenerateIn
+         * @description Roll candidates without adding them. Omit `age_cap` to use the night's cap (else the
+         *     household default); send `age_cap: null` for no cap tonight.
+         */
+        GenerateIn: {
+            /** Age Cap */
+            age_cap?: ("G" | "PG" | "PG-13" | "R" | "NC-17") | null;
+            /**
+             * Count
+             * @default 12
+             */
+            count: number;
+            /** Genre */
+            genre?: ("Action" | "Adventure" | "Animation" | "Comedy" | "Crime" | "Documentary" | "Drama" | "Family" | "Fantasy" | "History" | "Horror" | "Music" | "Mystery" | "Romance" | "Science Fiction" | "TV Movie" | "Thriller" | "War" | "Western") | null;
+            /** Max Runtime */
+            max_runtime?: number | null;
+        };
+        /** GenerateOut */
+        GenerateOut: {
+            /** Age Cap */
+            age_cap: ("G" | "PG" | "PG-13" | "R" | "NC-17") | null;
+            attribution: components["schemas"]["AttributionOut"];
+            /** Candidates */
+            candidates: components["schemas"]["CandidateOut"][];
+            /** Tmdb Unavailable */
+            tmdb_unavailable: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1218,6 +1321,8 @@ export interface components {
         OptionIn: {
             /** Movie Id */
             movie_id?: string | null;
+            /** Source */
+            source?: ("streaming" | "tmdb") | null;
             /** Title */
             title?: string | null;
             /** Tmdb Id */
@@ -1407,6 +1512,22 @@ export interface components {
             /** Score */
             score: number;
         };
+        /** ProviderOut */
+        ProviderOut: {
+            /** Logo Path */
+            logo_path: string | null;
+            /** Name */
+            name: string;
+            /** Provider Id */
+            provider_id: number;
+        };
+        /** ProvidersOut */
+        ProvidersOut: {
+            /** Attribution */
+            attribution: string;
+            /** Providers */
+            providers: components["schemas"]["ProviderOut"][];
+        };
         /** RankIn */
         RankIn: {
             /**
@@ -1503,6 +1624,8 @@ export interface components {
             join_slug: string;
             /** Region */
             region: string;
+            /** Streaming Providers */
+            streaming_providers: number[];
             /**
              * Updated At
              * Format: date-time
@@ -1520,6 +1643,8 @@ export interface components {
             default_voting_method?: "top3" | null;
             /** Region */
             region?: string | null;
+            /** Streaming Providers */
+            streaming_providers?: number[] | null;
         };
         /** SseTicketIn */
         SseTicketIn: {
@@ -2793,6 +2918,55 @@ export interface operations {
             };
         };
     };
+    generate_candidates_api_v1_sessions__session_id__generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GenerateOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not allowed in the night's current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     rotate_night_code_api_v1_sessions__session_id__night_code_post: {
         parameters: {
             query?: never;
@@ -3527,6 +3701,33 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    providers_api_v1_tmdb_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvidersOut"];
+                };
+            };
+            /** @description TMDB not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

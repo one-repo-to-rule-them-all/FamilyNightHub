@@ -344,6 +344,47 @@ Phase 1: the host types a title, `tmdb/search` proxies TMDB (cached), and pickin
 a `movies` row. Phase 2: `domain/generator.py` per
 [ADR-0007](decisions/ADR-0007-candidate-generator-order.md), with an injected RNG.
 
+**Generator.** `POST /sessions/{id}/generate` (`sessions:run`, CSRF, draft only, else 409; another
+household's night is 404) takes `{count 1–20, genre?, max_runtime?, age_cap?}` and returns
+candidates **without adding them**. The host adds picks through `POST .../options`: `movie_id`
+for owned titles (source `owned` is derived), `tmdb_id` + `source: "streaming"` or `"tmdb"`
+otherwise. `services/generator_service.py` loads the inputs and calls the pure
+`domain/generator.py`, which owns every rule:
+
+- **Pools, in order, fetched lazily** (a later pool is only fetched while the roll is short):
+  owned (`movies.owned`); streaming (`/discover/movie` with
+  `with_watch_providers=<settings.streaming_providers, pipe = OR>`, `watch_region=<settings.region>`,
+  `with_watch_monetization_types=flatrate`); anywhere (`/discover/movie` with `vote_count.gte=200`).
+  Both discover pools read page 1, then one page drawn with the RNG within
+  `min(total_pages, 50)` (TMDB rejects pages over 500). Each pool is shuffled with the RNG.
+- **Filters:** genre (TMDB's 19 genre names; `with_genres` id in the query), max runtime
+  (`with_runtime.lte`; list results carry no runtime, so an unknown runtime passes locally), and
+  the **age cap**: the request's (explicit `null` = no cap tonight), else `sessions.age_cap`, else
+  `settings.default_age_cap`. It goes in the query (`certification_country=US&certification.lte=`)
+  **and** is re-checked locally against the US certification from
+  `/movie/{id}/release_dates` (theatrical first; blank entries ignored). Local enforcement is
+  load-bearing: TMDB orders `NR` at 0, so `certification.lte` returns NR titles. Unrated titles
+  (no cert, `NR`, anything else unknown) never roll on a capped night.
+- **History:** winners revealed in the last 12 months are skipped unless the family's average
+  rating of that title (over every night it won) is 4 or higher; unrated means no rescue.
+  Blocked titles and titles already on the shortlist are always skipped; no duplicates across
+  pools (a title is the same by TMDB id or library id).
+- **Caching:** every TMDB response goes through `tmdb_cache` (30 days, stale-on-outage). A learned
+  certification is also written to `movies.us_cert` on the household's row for that TMDB id
+  (owned titles get theirs on their first capped roll; `upsert_from_tmdb` fetches it on add).
+  Keys longer than the 300-character column are truncated plus a SHA-256 suffix.
+- **Output:** title, year, poster, `source` (`owned`/`streaming`/`tmdb`), `us_cert`, runtime and,
+  for streaming, the household's services it is on (`/movie/{id}/watch/providers`, flatrate).
+  `attribution.tmdb` is always set and `attribution.justwatch` whenever streaming data is shown;
+  the UI must display them. With TMDB off or down, owned titles still roll and
+  `tmdb_unavailable` is true.
+- **Determinism:** the RNG is `random.Random(seed)` with `secrets.randbits(64)`; tests pin it with
+  `X-FNH-Test-Seed` (ENVIRONMENT=test only), so a roll is reproducible for a seed and cache state.
+
+`GET /tmdb/providers` lists the streaming services TMDB knows in the household's region (for the
+settings picker; JustWatch attribution included), and `PATCH /admin/settings` takes
+`streaming_providers` (≤ 20 TMDB provider ids, replaces the list).
+
 `integrations/tmdb.py` is HTTP and parsing only (httpx, `Authorization: Bearer
 TMDB_READ_TOKEN`, `TMDB_TIMEOUT_SECONDS`); it reads `TMDB_BASE_URL` so dev and CI point it at
 the fake. `services/movie_service.py` owns the cache: responses go into the global `tmdb_cache`
@@ -353,8 +394,12 @@ TMDB down and nothing cached, search and add-by-`tmdb_id` answer **503** with a 
 the host to type the title, and typed titles keep working.
 
 **tmdb-fake** (`backend/tmdb_fake/`, compose service `tmdb-fake` on `localhost:58100`) serves
-`/search/movie` and `/movie/{id}` from `fixtures/movies.json` in TMDB v3 response shapes (fake
-poster paths), wants a Bearer token and 404s unknown ids like TMDB. Tests mount it in-process
+`/search/movie`, `/movie/{id}`, `/discover/movie`, `/movie/{id}/release_dates`,
+`/movie/{id}/watch/providers` and `/watch/providers/movie` from `fixtures/*.json` in TMDB v3
+response shapes (real genre and provider ids; poster paths and streaming availability are
+illustrative). Discover applies the filters the way TMDB does, including the NR-is-0 cap order,
+and pages over 500 fail with TMDB's error. It wants a Bearer token and 404s unknown ids like
+TMDB. Tests mount it in-process
 via `httpx.ASGITransport` (`tests/integration/tmdb_doubles.py`, which also has "down" and
 "unconfigured" doubles). CI never calls the real API.
 
