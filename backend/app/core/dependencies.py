@@ -70,17 +70,21 @@ async def device_db(device: CurrentDevice, response: Response) -> AsyncIterator[
     """The request's household transaction. Also keeps the cookie sliding: at most once per
     DEVICE_TOUCH_INTERVAL_SECONDS it stamps last_seen_at and re-issues the cookie."""
     async with household_session(device.household_id) as session:
-        stale_before = datetime.now(UTC) - timedelta(seconds=settings.DEVICE_TOUCH_INTERVAL_SECONDS)
-        touched = await session.execute(
-            text(
-                "UPDATE devices SET last_seen_at = now() WHERE id = :d "
-                "AND (last_seen_at IS NULL OR last_seen_at < :stale)"
-            ),
-            {"d": device.device_id, "stale": stale_before},
-        )
-        if touched.rowcount:  # type: ignore[attr-defined]
-            set_device_cookie(response, device.token)
+        await _touch_device(session, device, response)
         yield session
+
+
+async def _touch_device(session: AsyncSession, device: DeviceContext, response: Response) -> None:
+    stale_before = datetime.now(UTC) - timedelta(seconds=settings.DEVICE_TOUCH_INTERVAL_SECONDS)
+    touched = await session.execute(
+        text(
+            "UPDATE devices SET last_seen_at = now() WHERE id = :d "
+            "AND (last_seen_at IS NULL OR last_seen_at < :stale)"
+        ),
+        {"d": device.device_id, "stale": stale_before},
+    )
+    if touched.rowcount:  # type: ignore[attr-defined]
+        set_device_cookie(response, device.token)
 
 
 DeviceDb = Annotated[AsyncSession, Depends(device_db)]
@@ -135,6 +139,43 @@ def require_permission(permission: Permission) -> Callable[..., Awaitable[Accoun
         return account
 
     return check
+
+
+@dataclass(frozen=True)
+class ViewerContext:
+    """Anyone in the household who may *read* a night: a device or a signed-in account."""
+
+    household_id: uuid.UUID
+    device: DeviceContext | None
+    account_id: uuid.UUID | None
+
+
+async def current_viewer(request: Request) -> ViewerContext:
+    """A signed-in account if the session cookie is valid, else a live device; else 401.
+    Read-only routes (the night snapshot) use this so the TV, phones and hosts share them."""
+    if request.cookies.get(ACCOUNT_COOKIE):
+        try:
+            account = await current_account(request)
+        except HTTPException:
+            pass
+        else:
+            return ViewerContext(account.household_id, None, account.account_id)
+    device = await current_device(request)
+    return ViewerContext(device.household_id, device, None)
+
+
+CurrentViewer = Annotated[ViewerContext, Depends(current_viewer)]
+
+
+async def viewer_db(viewer: CurrentViewer, response: Response) -> AsyncIterator[AsyncSession]:
+    """Same transaction as DeviceDb/AccountDb; a device viewer's cookie slides as usual."""
+    async with household_session(viewer.household_id) as session:
+        if viewer.device is not None:
+            await _touch_device(session, viewer.device, response)
+        yield session
+
+
+ViewerDb = Annotated[AsyncSession, Depends(viewer_db)]
 
 
 async def require_csrf(request: Request) -> None:

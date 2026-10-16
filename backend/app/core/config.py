@@ -67,8 +67,26 @@ class Settings(BaseSettings):
     JOIN_FAILURE_LIMIT: int = 30
     JOIN_FAILURE_WINDOW_SECONDS: int = 900
 
+    # --- TMDB (03-backend.md "Candidates") ---
+    # Server-only. Unset token = TMDB off: search answers 503 and the shortlist takes typed
+    # titles. Locally and in CI the base URL points at the tmdb-fake service.
+    TMDB_BASE_URL: str = "https://api.themoviedb.org/3"
+    TMDB_READ_TOKEN: str | None = None
+    TMDB_TIMEOUT_SECONDS: float = 5.0
+
     # --- HTTP ---
     CORS_ALLOWED_ORIGINS: str = "http://localhost:3000"
+
+    # --- Worker (06-background-worker.md) ---
+    # Liveness only: the tiny /health listener Fly and compose probe with curl.
+    WORKER_HEALTH_PORT: int = 8081
+    WORKER_JOB_TIMEOUT_SECONDS: int = 300
+    # Long enough for after_job_end to read a failed job's result back from Redis.
+    WORKER_KEEP_RESULT_SECONDS: int = 3600
+    # Nights left in `tonight` longer than this are closed; pending uploads older than this
+    # are swept.
+    STALE_SESSION_HOURS: int = 24
+    ORPHAN_UPLOAD_HOURS: int = 24
 
     # --- Observability ---
     SENTRY_DSN: str | None = None

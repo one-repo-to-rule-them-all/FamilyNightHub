@@ -27,12 +27,12 @@ backend/app/
 | Auth | `/api/v1/auth/{magic-link,verify,me,logout}` | Magic-link request/verify for admins and hosts, current account, logout |
 | People/devices | `/api/v1/people`, `/api/v1/devices/me`, `PUT/DELETE /api/v1/devices/me/people/{id}` | Avatar grid with each tile's binding state, bind or unbind a person to this device |
 | Host devices | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}` | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it); review pending person claims (`devices:enroll` / `devices:approve`) |
-| Sessions | `/api/v1/sessions` | Create, shortlist, open/close voting, snapshot |
+| Sessions | `POST /api/v1/sessions`, `GET /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/open-voting` | Host (`sessions:run`): create (code shown once), rotate code, shortlist, open voting. Snapshot: any device or account of the household. Close/reveal land with ballots |
 | Ballots | `/api/v1/sessions/{id}/ballots` | Upsert own ballot; host proxy ballot |
 | Live | `/api/v1/sse-tickets`, `/api/v1/sessions/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md) |
 | Photos | `/api/v1/sessions/{id}/photos` | Presign, complete, list (presigned GETs), react, hide/delete |
 | Ratings | `/api/v1/sessions/{id}/ratings` | 1–5 per person, once the night is `tonight`/`closed` |
-| Movies | `/api/v1/movies`, `/api/v1/tmdb/search` | Library, owned flag, TMDB search proxy |
+| Movies | `/api/v1/movies`, `GET /api/v1/tmdb/search?q=` | Library, owned flag (later); TMDB search proxy for hosts (503 when TMDB is off or down) |
 | Admin | `/api/v1/admin/*` | People merge/rename, device revoke, history edit, settings |
 | Health | `/api/health` | DB + Redis |
 
@@ -108,10 +108,40 @@ budget is spent, joins get 429 with `Retry-After`, even with the right code, unt
 ends; successful joins cost nothing. A host-approved join is the fallback if someone burns the
 budget on purpose. If Redis is down the limiter fails open and logs.
 
+## Nights and the shortlist
+
+`services/session_service.py` loads, locks (`SELECT … FOR UPDATE` on the session row, so racing
+hosts serialize) and persists; the rules are pure functions in `domain/session_state.py`.
+
+- **Create** (`POST /sessions`) starts a `draft` night owned by the signed-in host. The night code
+  (`domain/night_code.generate`) is in the response **once**; only
+  `HMAC(pepper, "night:{household}:{code}")` is stored. A collision with another live night of
+  the household (unique index) is retried in a savepoint.
+- **Rotate** (`POST /sessions/{id}/night-code`) issues a new code, shown once; the old one stops
+  joining immediately, phones already in keep their device cookie. Allowed until `closed`.
+- **Shortlist** (`draft` only, else 409): add by library `movie_id`, by `tmdb_id` (upserts the
+  household's `movies` row from `/movie/{id}`; an id already in the library needs no TMDB call),
+  or by typed `title` (+ optional `year`; a `movies` row without `tmdb_id`, reused for the same
+  title/year). `source` is `owned` for owned titles, `tmdb` for TMDB-backed ones, else `manual`.
+  At most 8 options; the same movie twice is 409. Remove renumbers positions; reorder
+  (`PUT …/options/order`) must list every option exactly once. Each edit returns the snapshot.
+- **Snapshot** (`GET /sessions/{id}`) is readable by any device of the household (`ViewerDb`
+  slides the device cookie as usual) or account: status, voting method, `ballot_size` (null in
+  `draft`), options with title/year/poster, timestamps. Never ballots, tallies, ranking, seed or
+  winner ([ADR-0004](decisions/ADR-0004-sse-live-updates.md), [ADR-0006](decisions/ADR-0006-voting-rules-and-tie-break.md)).
+- Errors: other household or unknown id → 404; wrong state or limits → 409 with a host-readable
+  reason; device-only caller on a host route → 401, an account without `sessions:run` → 403.
+
+Audit actions (`audit_events`, `target_type = 'session'`): `session.created`,
+`session.code_rotated`, `session.option_added`, `session.option_removed`, `session.reordered`,
+`session.voting_opened` (`data` records from/to, option count, ballot size).
+
 ## Voting
 
 The session state machine (`domain/session_state.py`):
-`draft → voting → revealed → tonight → closed`. Every transition goes through one service method
+`draft → voting → revealed → tonight → closed`, as a transition table (`transition(status,
+action)` refuses anything else; `closed` is terminal). `open_voting` needs 2–8 options and fixes
+`ballot_size = min(3, n − 1)` with `voting_opened_at`. Every transition goes through one service method
 that writes an audit row. `close_voting` runs the tally module, then the tie-break, then stores
 `ranking jsonb`, `tie_seed` and `winner_option_id` in one transaction
 ([ADR-0006](decisions/ADR-0006-voting-rules-and-tie-break.md)). `revealed → tonight` is lazy: the
@@ -128,7 +158,20 @@ Events never carry ballots or tallies before reveal.
 Phase 1: the host types a title, `tmdb/search` proxies TMDB (cached), and picking a result upserts
 a `movies` row. Phase 2: `domain/generator.py` per
 [ADR-0007](decisions/ADR-0007-candidate-generator-order.md), with an injected RNG.
-`integrations/tmdb.py` reads `TMDB_BASE_URL` so CI points it at the fake.
+
+`integrations/tmdb.py` is HTTP and parsing only (httpx, `Authorization: Bearer
+TMDB_READ_TOKEN`, `TMDB_TIMEOUT_SECONDS`); it reads `TMDB_BASE_URL` so dev and CI point it at
+the fake. `services/movie_service.py` owns the cache: responses go into the global `tmdb_cache`
+keyed by path + sorted params (search queries are whitespace-collapsed and case-folded), served
+for 30 days, then refetched; if the refetch fails, the stale entry is served. With no token, or
+TMDB down and nothing cached, search and add-by-`tmdb_id` answer **503** with a message telling
+the host to type the title, and typed titles keep working.
+
+**tmdb-fake** (`backend/tmdb_fake/`, compose service `tmdb-fake` on `localhost:58100`) serves
+`/search/movie` and `/movie/{id}` from `fixtures/movies.json` in TMDB v3 response shapes (fake
+poster paths), wants a Bearer token and 404s unknown ids like TMDB. Tests mount it in-process
+via `httpx.ASGITransport` (`tests/integration/tmdb_doubles.py`, which also has "down" and
+"unconfigured" doubles). CI never calls the real API.
 
 ## Where business logic belongs
 
