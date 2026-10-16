@@ -37,6 +37,7 @@ SNAPSHOT_KEYS = {
     "revealed_at",
     "closed_at",
     "result",
+    "rating",  # the family average only, from tonight on
 }
 OPTION_KEYS = {"id", "movie_id", "title", "year", "poster_path", "source", "position"}
 

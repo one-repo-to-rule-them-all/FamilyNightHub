@@ -28,8 +28,9 @@ from app.domain.voting import METHODS
 from app.integrations.tmdb import TmdbClient
 from app.realtime import events
 from app.realtime.publisher import publish_after_commit
-from app.services import movie_service
+from app.services import movie_service, rating_service
 from app.services.errors import Conflict, NotFound
+from app.services.rating_service import RatingAverage
 
 # A fresh code colliding with another live night of the same household is ~1 in 887M;
 # retry a couple of times rather than fail the host.
@@ -88,6 +89,8 @@ class Snapshot:
     closed_at: datetime | None
     # None until the night is revealed (ADR-0006: tallies are hidden while voting).
     result: VotingResult | None
+    # The family average; None until ratings open (`tonight`/`closed`).
+    rating: RatingAverage | None
 
 
 @dataclass(frozen=True)
@@ -109,6 +112,7 @@ class NightSummary:
     closed_at: datetime | None
     winner: Winner | None
     turnout: int
+    rating: RatingAverage | None
 
 
 @dataclass(frozen=True)
@@ -529,10 +533,14 @@ async def snapshot(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.U
         {"s": session_id},
     )
     status: str = row.status
+    effective = session_state.effective_status(status, row.revealed_at, datetime.now(UTC))
+    rating = None
+    if session_state.shows_rating(effective):
+        rating = await rating_service.session_average(db, session_id)
     return Snapshot(
         id=row.id,
         title=row.title,
-        status=session_state.effective_status(status, row.revealed_at, datetime.now(UTC)),
+        status=effective,
         voting_method=row.voting_method,
         ballot_size=None if status == "draft" else row.ballot_size,
         options=[
@@ -544,6 +552,7 @@ async def snapshot(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.U
         revealed_at=row.revealed_at,
         closed_at=row.closed_at,
         result=_result(row),
+        rating=rating,
     )
 
 
@@ -564,7 +573,10 @@ async def history(
                    s.winner_option_id, o.movie_id, m.title AS movie_title, m.year,
                    m.poster_path,
                    (SELECT count(DISTINCT br.person_id) FROM ballot_ranks br
-                     WHERE br.session_id = s.id) AS turnout
+                     WHERE br.session_id = s.id) AS turnout,
+                   (SELECT avg(r.score) FROM ratings r WHERE r.session_id = s.id)
+                     AS rating_average,
+                   (SELECT count(*) FROM ratings r WHERE r.session_id = s.id) AS rating_count
             FROM sessions s
             LEFT JOIN options o ON o.id = s.winner_option_id AND o.session_id = s.id
             LEFT JOIN movies m ON m.id = o.movie_id AND m.household_id = o.household_id
@@ -583,9 +595,21 @@ async def history(
         winner = None
         if r.winner_option_id is not None and session_state.shows_result(r.status):
             winner = Winner(r.winner_option_id, r.movie_id, r.movie_title, r.year, r.poster_path)
+        rating = None
+        if session_state.shows_rating(status):
+            average = None if r.rating_average is None else float(r.rating_average)
+            rating = RatingAverage(average, int(r.rating_count))
         nights.append(
             NightSummary(
-                r.id, r.title, status, r.created_at, r.revealed_at, r.closed_at, winner, r.turnout
+                r.id,
+                r.title,
+                status,
+                r.created_at,
+                r.revealed_at,
+                r.closed_at,
+                winner,
+                r.turnout,
+                rating,
             )
         )
         if len(nights) == limit:

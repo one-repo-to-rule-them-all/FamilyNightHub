@@ -175,3 +175,16 @@ def test_photos_open_from_tonight(status: str) -> None:
 def test_photos_closed_before_the_pick(status: str) -> None:
     with pytest.raises(SessionRuleError, match="Photos open"):
         ss.check_photos_open(status)
+
+
+@pytest.mark.parametrize("status", ["tonight", "closed"])
+def test_ratings_open_from_tonight(status: str) -> None:
+    ss.check_can_rate(status)
+    assert ss.shows_rating(status)
+
+
+@pytest.mark.parametrize("status", ["draft", "voting", "revealed", "nonsense"])
+def test_ratings_closed_before_the_pick(status: str) -> None:
+    with pytest.raises(SessionRuleError, match="Ratings open"):
+        ss.check_can_rate(status)
+    assert not ss.shows_rating(status)

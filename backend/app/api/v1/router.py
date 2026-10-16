@@ -10,6 +10,7 @@ from app.api.v1 import (
     join,
     people,
     photos,
+    ratings,
     sessions,
     stream,
     tmdb,
@@ -23,6 +24,7 @@ api_router.include_router(device_admin.router)
 api_router.include_router(join.router)
 api_router.include_router(people.router)
 api_router.include_router(photos.router)
+api_router.include_router(ratings.router)
 api_router.include_router(sessions.router)
 api_router.include_router(stream.router)
 api_router.include_router(tmdb.router)
