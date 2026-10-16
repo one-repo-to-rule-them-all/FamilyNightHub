@@ -20,6 +20,7 @@ export default defineConfig({
         "src/lib/ballot.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/live.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/rating.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
+        "src/lib/bulk-titles.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/photos/album.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/photos/queue.ts": { lines: 100 },
       },

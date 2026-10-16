@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * E2E against the real API (shape from Ctrl+Alt+Defeat playwright.config.ts @ dcbda7d).
  *
- * Playwright starts both servers: uvicorn from ../backend and Next (built + `next start` in CI,
+ * Playwright starts the servers: tmdb-fake and uvicorn from ../backend, and Next (built + `next start` in CI,
  * `next dev` locally). The caller provides the API's env (DATABASE_URL as fnh_app, REDIS_URL,
  * SESSION_SECRET, DEVICE_TOKEN_PEPPER, ...) after the role bootstrap and `alembic upgrade head`;
  * each test seeds its own household through e2e/seed_night.py, so there is no shared fixture data.
@@ -14,6 +14,8 @@ import { defineConfig, devices } from "@playwright/test";
  */
 const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 3201);
 const API_PORT = Number(process.env.E2E_API_PORT ?? 8201);
+// tmdb-fake (backend/tmdb_fake): the API under test always talks to it, never to real TMDB.
+const TMDB_PORT = Number(process.env.E2E_TMDB_PORT ?? 8202);
 const baseURL = `http://localhost:${WEB_PORT}`;
 const CI = !!process.env.CI;
 
@@ -36,11 +38,22 @@ export default defineConfig({
   ],
   webServer: [
     {
+      command: `uv run uvicorn tmdb_fake.app:app --port ${TMDB_PORT}`,
+      cwd: "../backend",
+      url: `http://localhost:${TMDB_PORT}/health`,
+      reuseExistingServer: !CI,
+      timeout: 120_000,
+    },
+    {
       command: `uv run uvicorn app.main:app --port ${API_PORT}`,
       cwd: "../backend",
       url: `http://localhost:${API_PORT}/api/health`,
       reuseExistingServer: !CI,
       timeout: 120_000,
+      env: {
+        TMDB_BASE_URL: `http://localhost:${TMDB_PORT}`,
+        TMDB_READ_TOKEN: "e2e-fake-tmdb-token",
+      },
     },
     {
       command: CI ? `npm run start -- --port ${WEB_PORT}` : `npm run dev -- --port ${WEB_PORT}`,

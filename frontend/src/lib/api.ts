@@ -30,6 +30,13 @@ export type Voter = Schemas["VoterOut"];
 export type TmdbResult = Schemas["TmdbResultOut"];
 export type Claim = Schemas["ClaimOut"];
 export type Photo = Schemas["PhotoOut"];
+export type AdminMovie = Schemas["AdminMovieOut"];
+export type MoviePage = Schemas["MoviePageOut"];
+export type MovieFlags = Schemas["MovieFlagsIn"];
+export type BulkResult = Schemas["BulkResultOut"];
+export type BulkLine = Schemas["BulkLineOut"];
+export type BulkPick = Schemas["BulkPickIn"];
+export type TypedTitle = Schemas["TypedTitleIn"];
 export type PhotoCreated = Schemas["PhotoCreatedOut"];
 /** The album's fixed reaction set (the path parameter's enum). */
 export type ReactionEmoji =
@@ -62,7 +69,7 @@ export class ApiError extends Error {
   }
 }
 
-type Method = "GET" | "POST" | "PUT" | "DELETE";
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 let fetchImpl: FetchLike = (input, init) => fetch(input, init);
@@ -254,6 +261,31 @@ export const api = {
     request<void>("PUT", reactionPath(sessionId, photoId, emoji, personId)),
   unreact: (sessionId: string, photoId: string, emoji: ReactionEmoji, personId: string) =>
     request<void>("DELETE", reactionPath(sessionId, photoId, emoji, personId)),
+  /** Admin library (`admin:movies`): search + flag filters (undefined = either), paginated. */
+  adminMovies: (filters: {
+    q?: string;
+    owned?: boolean;
+    watchlist?: boolean;
+    blocked?: boolean;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== "") query.set(key, String(value));
+    }
+    const suffix = query.size > 0 ? `?${query.toString()}` : "";
+    return request<MoviePage>("GET", `/admin/movies${suffix}`);
+  },
+  updateMovie: (movieId: string, flags: MovieFlags) =>
+    request<AdminMovie>("PATCH", `/admin/movies/${encodeURIComponent(movieId)}`, flags),
+  bulkAddMovies: (titles: TypedTitle[]) =>
+    request<BulkResult>("POST", "/admin/movies/bulk", { titles }),
+  confirmBulkMovies: (picks: BulkPick[]) =>
+    request<BulkResult>("POST", "/admin/movies/bulk/confirm", { picks }),
+  /** History edit (`admin:history`): re-point the winner; the ranking stays as voted. */
+  correctWinner: (sessionId: string, body: Schemas["CorrectWinnerIn"]) =>
+    request<Night>("POST", `/admin/sessions/${encodeURIComponent(sessionId)}/correct-winner`, body),
 };
 
 /** The live stream URL for `EventSource`: the ticket is the credential (no cookie, no CSRF). */

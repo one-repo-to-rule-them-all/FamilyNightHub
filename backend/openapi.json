@@ -110,6 +110,82 @@
         "title": "AdminDeviceOut",
         "type": "object"
       },
+      "AdminMovieOut": {
+        "properties": {
+          "blocked": {
+            "title": "Blocked",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "owned": {
+            "title": "Owned",
+            "type": "boolean"
+          },
+          "poster_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Poster Path"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tmdb_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tmdb Id"
+          },
+          "watchlist": {
+            "title": "Watchlist",
+            "type": "boolean"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "id",
+          "tmdb_id",
+          "title",
+          "year",
+          "poster_path",
+          "owned",
+          "watchlist",
+          "blocked",
+          "created_at"
+        ],
+        "title": "AdminMovieOut",
+        "type": "object"
+      },
       "AdminPersonOut": {
         "properties": {
           "avatar_emoji": {
@@ -221,6 +297,169 @@
           "status"
         ],
         "title": "BindingOut",
+        "type": "object"
+      },
+      "BulkAddIn": {
+        "description": "Typed titles, one per line in the UI (\"Title (year)\" parsed client-side).",
+        "properties": {
+          "titles": {
+            "items": {
+              "$ref": "#/components/schemas/TypedTitleIn"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Titles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "titles"
+        ],
+        "title": "BulkAddIn",
+        "type": "object"
+      },
+      "BulkConfirmIn": {
+        "properties": {
+          "picks": {
+            "items": {
+              "$ref": "#/components/schemas/BulkPickIn"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Picks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "picks"
+        ],
+        "title": "BulkConfirmIn",
+        "type": "object"
+      },
+      "BulkLineOut": {
+        "properties": {
+          "already_owned": {
+            "title": "Already Owned",
+            "type": "boolean"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/TmdbResultOut"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "movie": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AdminMovieOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "matched",
+              "ambiguous",
+              "not_found",
+              "added_manual"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "title",
+          "year",
+          "status",
+          "movie",
+          "already_owned",
+          "candidates"
+        ],
+        "title": "BulkLineOut",
+        "type": "object"
+      },
+      "BulkPickIn": {
+        "description": "An answer for an ambiguous or not-found line: `tmdb_id` to use that TMDB title, or\nleave it out to add the title as typed (no TMDB id).",
+        "properties": {
+          "title": {
+            "maxLength": 300,
+            "title": "Title",
+            "type": "string"
+          },
+          "tmdb_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tmdb Id"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "maximum": 2100.0,
+                "minimum": 1870.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "BulkPickIn",
+        "type": "object"
+      },
+      "BulkResultOut": {
+        "properties": {
+          "attribution": {
+            "title": "Attribution",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/BulkLineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "tmdb_unavailable": {
+            "title": "Tmdb Unavailable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "lines",
+          "tmdb_unavailable",
+          "attribution"
+        ],
+        "title": "BulkResultOut",
         "type": "object"
       },
       "CandidateOut": {
@@ -373,6 +612,26 @@
           "requested_at"
         ],
         "title": "ClaimOut",
+        "type": "object"
+      },
+      "CorrectWinnerIn": {
+        "properties": {
+          "option_id": {
+            "format": "uuid",
+            "title": "Option Id",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 500,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "option_id",
+          "reason"
+        ],
+        "title": "CorrectWinnerIn",
         "type": "object"
       },
       "CsrfOut": {
@@ -862,6 +1121,77 @@
           "bindings_dropped"
         ],
         "title": "MergeOut",
+        "type": "object"
+      },
+      "MovieFlagsIn": {
+        "description": "Only the flags sent are changed.",
+        "properties": {
+          "blocked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked"
+          },
+          "owned": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owned"
+          },
+          "watchlist": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Watchlist"
+          }
+        },
+        "title": "MovieFlagsIn",
+        "type": "object"
+      },
+      "MoviePageOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminMovieOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "MoviePageOut",
         "type": "object"
       },
       "MyReactionOut": {
@@ -2018,6 +2348,33 @@
         "title": "TmdbResultOut",
         "type": "object"
       },
+      "TypedTitleIn": {
+        "properties": {
+          "title": {
+            "maxLength": 300,
+            "title": "Title",
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "maximum": 2100.0,
+                "minimum": 1870.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "TypedTitleIn",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -2396,6 +2753,269 @@
         ]
       }
     },
+    "/api/v1/admin/movies": {
+      "get": {
+        "description": "The household's library, alphabetical. `q` searches titles; each flag filter is\noptional (left out = either).",
+        "operationId": "list_movies_api_v1_admin_movies_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "owned",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Owned"
+            }
+          },
+          {
+            "in": "query",
+            "name": "watchlist",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Watchlist"
+            }
+          },
+          {
+            "in": "query",
+            "name": "blocked",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Blocked"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoviePageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Movies",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/movies/bulk": {
+      "post": {
+        "description": "Resolve typed titles through TMDB search and mark the matches owned. Ambiguous lines\ncome back with candidates for `/bulk/confirm`. If TMDB is off or down, the remaining\nlines are added as typed titles (`added_manual`) and `tmdb_unavailable` is true.",
+        "operationId": "bulk_add_api_v1_admin_movies_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAddIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Add",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/movies/bulk/confirm": {
+      "post": {
+        "description": "The admin's picks for ambiguous lines (a `tmdb_id`) or \"add as typed\" (none).",
+        "operationId": "bulk_confirm_api_v1_admin_movies_bulk_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Confirm",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/movies/{movie_id}": {
+      "patch": {
+        "description": "Set owned / watchlist / blocked; flags left out are unchanged.",
+        "operationId": "update_movie_api_v1_admin_movies__movie_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "movie_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Movie Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MovieFlagsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMovieOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such movie in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Movie",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/people": {
       "get": {
         "description": "Everyone not merged away; `guests_only` for the \"convert a guest\" list.",
@@ -2640,6 +3260,66 @@
           }
         },
         "summary": "Convert To Member",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/sessions/{session_id}/correct-winner": {
+      "post": {
+        "description": "Make another option of the same night its winner, with a reason. Only for nights\nthat are revealed, tonight or closed. Audited as `session.winner_corrected` with\nold/new and the reason. Returns the night's snapshot.",
+        "operationId": "correct_winner_api_v1_admin_sessions__session_id__correct_winner_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectWinnerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night in this household"
+          },
+          "409": {
+            "description": "The night has no winner yet, the option is not on its shortlist, or it is already the winner"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Correct Winner",
         "tags": [
           "admin"
         ]

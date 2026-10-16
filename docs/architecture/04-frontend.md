@@ -12,7 +12,7 @@ Deployed as `fnh-web` on Fly. Read the repo's `AGENTS.md` note: Next 16 uses `pr
 | `(public)` | `/j/[slug]`, `/who`, `/s/[session]`, `/history`, `/albums/[session]` | devices | Phone-first, 56px+ tap targets, poster-led |
 | host | `/host`, `/host/[session]` | host/admin | Shortlist builder, open/close, proxy vote, approve claims |
 | tv | `/tv`, `/tv/[session]` | paired TV device | Large type, QR + night code, turnout tiles, reveal, slideshow |
-| admin | `/admin/*` | admin | People, devices, history, movies, photos, settings. Denser tables |
+| admin | `/admin/*` | admin | People, devices, history, movies, photos, settings. Denser tables. `src/app/admin/layout.tsx` is a wider column with the admin nav and a guard (signed out → `/login`; a host sees "only a family admin…"; the API's `admin:*` checks are the real boundary). Tables use `src/components/ui/data-table.tsx` |
 | auth | `/login`, `/auth/callback` | admins/hosts | Magic link |
 
 `src/proxy.ts` redirects pages based on cookie presence only. That is a UX convenience; the API is
@@ -35,6 +35,8 @@ pairing explanation from the 401.
 | `/host` | `src/app/host/` | Start a night (the code is shown once, see below), nights in progress, pending person claims with approve/reject (polled every 10s), **Use this browser as the TV** (`POST /devices/enroll {as_tv:true}`, then `/tv/{night}`), sign out |
 | `/host/[session]` | `src/app/host/[session]/` | Draft: shortlist (up/down/remove, reducer in `src/lib/shortlist.ts`, whole order PUT, server order synced back), poster search (debounced, through `/api/v1/tmdb/search`, TMDB attribution line; a 503 says "type the title" and the typed-title form is always there), **Open voting** at 2–8 titles. Voting: who has voted (avatars only), proxy ballot, **Close voting**. Then the winner and **End the night**. Rotate code at any stage before `closed` |
 | `/tv` | `src/app/tv/` | Follows the newest draft/voting/revealed/tonight night; an unpaired browser gets "sign in as host, then Use this browser as the TV" |
+| `/admin/movies` | `src/app/admin/movies/` | Bulk add ("One title per line, optional (year)", parsed by `src/lib/bulk-titles.ts`, 100 lines max, duplicates dropped) → per-line results: matched / already owned / added as typed; **ambiguous** and **not found** lines become radio groups (TMDB candidates, "Add as typed", "Skip") sent together with **Confirm choices**. A TMDB-down notice when titles were added as typed. Below it the library `DataTable`: title search, a Show filter (all / owned / not owned / watchlist / blocked), Owned/Watchlist/Blocked checkboxes (`PATCH` each), 50 per page. TMDB attribution line |
+| `/admin/history` | `src/app/admin/history/` | Past nights (`GET /api/v1/sessions`) in a `DataTable` with **Correct winner**: an inline form loads the snapshot, offers the night's other options as radios, requires a reason, and posts `…/correct-winner`; the table and `/history` then show the new winner |
 | `/tv/[session]` | `src/app/tv/[session]/` | Lobby (night code, join instructions, people tiles) → turnout tiles light up as ballots arrive (`GET …/voters`, never ranks) → reveal spinner (`src/lib/reveal.ts`) landing on `result.winner_option_id`. Screen Wake Lock where supported; follows the next night once this one is `tonight`/`closed` |
 
 ## Design system
@@ -278,4 +280,4 @@ New phone screen → `app/(public)/…` plus a hook in `src/hooks/`. New admin t
 
 - No service-worker offline mode beyond the upload queue. No push notifications.
 - No zip download. No light theme toggle (dark only in v1).
-- Generator UI, approval/pick-one ballots, and the bulk add for owned titles come in Phase 2.
+- Generator UI and approval/pick-one ballots come in Phase 2.
