@@ -19,6 +19,8 @@ from app.domain import session_state
 from app.domain.session_state import SessionRuleError
 from app.domain.voting import top3
 from app.domain.voting.base import BallotError
+from app.realtime import events
+from app.realtime.publisher import publish_after_commit
 from app.services import people_service
 from app.services.errors import Conflict, Invalid, NotFound
 
@@ -122,6 +124,8 @@ async def cast(
             ),
             {"h": household_id, "a": proxy_account_id, "s": session_id, "p": str(person_id)},
         )
+    # The hint says only "the turnout changed": phones and the TV refetch `voters`.
+    publish_after_commit(db, session_id, events.BALLOT_COUNT)
 
 
 async def _exists(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.UUID) -> None:

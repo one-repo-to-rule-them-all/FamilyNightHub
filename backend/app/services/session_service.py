@@ -26,6 +26,8 @@ from app.domain import night_code, session_state
 from app.domain.session_state import SessionRuleError
 from app.domain.voting import METHODS
 from app.integrations.tmdb import TmdbClient
+from app.realtime import events
+from app.realtime.publisher import publish_after_commit
 from app.services import movie_service
 from app.services.errors import Conflict, NotFound
 
@@ -307,6 +309,7 @@ async def add_option(
         session_id,
         {"option_id": str(option_id), "movie_id": str(movie_id), "source": source},
     )
+    publish_after_commit(db, session_id, events.SHORTLIST_CHANGED)
     return option_id
 
 
@@ -336,6 +339,7 @@ async def remove_option(
         session_id,
         {"option_id": str(option_id)},
     )
+    publish_after_commit(db, session_id, events.SHORTLIST_CHANGED)
 
 
 async def _renumber(db: AsyncSession, ordered: list[uuid.UUID]) -> None:
@@ -358,6 +362,7 @@ async def reorder(
     _rule(session_state.check_reorder, [str(o) for o in current], [str(o) for o in ordered])
     await _renumber(db, ordered)
     await _audit(db, household_id, account_id, "session.reordered", session_id)
+    publish_after_commit(db, session_id, events.SHORTLIST_CHANGED)
 
 
 async def open_voting(
@@ -384,6 +389,7 @@ async def open_voting(
         session_id,
         {"from": status, "to": opened.status, "options": count, "ballot_size": opened.ballot_size},
     )
+    publish_after_commit(db, session_id, events.STATUS_CHANGED)
 
 
 async def _ballots(db: AsyncSession, session_id: uuid.UUID) -> list[dict[str, int]]:
@@ -450,6 +456,7 @@ async def close_voting(
             "tiebreak": ranking.tiebreak,
         },
     )
+    publish_after_commit(db, session_id, events.REVEALED)
 
 
 async def close(
@@ -475,6 +482,7 @@ async def close(
         session_id,
         {"from": status, "to": new_status},
     )
+    publish_after_commit(db, session_id, events.STATUS_CHANGED)
 
 
 def _result(row: Any) -> VotingResult | None:
