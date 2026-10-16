@@ -1,0 +1,12 @@
+{
+  "name": "fnh-openapi-codegen",
+  "private": true,
+  "description": "Isolated so its TypeScript 5 peer does not collide with the app on TypeScript 7 (native compiler, different JS API).",
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "family-night-hub": "file:../.."
+  }
+}

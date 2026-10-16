@@ -1,0 +1,235 @@
+# PR gate for Family Night Hub (docs/architecture/07-cicd.md).
+#
+# Jobs run in parallel; branch protection should require all five:
+#   static          ruff, ruff format, mypy, repo rules, tsc
+#   unit            pytest tests/unit (no data plane)
+#   integration     pytest everything against real Postgres + Redis as fnh_app, incl. the
+#                   isolation suite and the RLS coverage test; coverage gates
+#   contract        alembic upgrade + check (models == migrations), OpenAPI + api.gen.ts drift
+#   bundle-secrets  next build with sentinel server secrets, then grep .next/static
+#
+# Not here yet (each lands with the code it gates): e2e (Playwright multi-phone + axe on the
+# compose stack), vitest, eslint/prettier, deploy.yml.
+#
+# Shape from OrderUp .github/workflows/ci.yml @ 2f86cd8 (service containers, role
+# bootstrap before migrations, alembic check), FieldPro @ 0670961 (OpenAPI drift) and
+# Ctrl+Alt+Defeat @ dcbda7d (bundle secret grep).
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  # Mirrors .env.example with the service containers port-mapped onto the runner.
+  ENVIRONMENT: test
+  DATABASE_URL: postgresql+asyncpg://fnh_app:fnh_app@localhost:5432/fnh_dev
+  MIGRATION_DATABASE_URL: postgresql+psycopg2://fnh:fnh@localhost:5432/fnh_dev
+  REDIS_URL: redis://localhost:6379/0
+  OWNER_PSQL_URL: postgresql://fnh:fnh@localhost:5432/fnh_dev
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: uv sync
+        working-directory: backend
+        run: uv sync --locked
+      - name: ruff check
+        working-directory: backend
+        run: uv run ruff check .
+      - name: ruff format --check
+        working-directory: backend
+        run: uv run ruff format --check .
+      - name: mypy (strict)
+        working-directory: backend
+        run: uv run mypy app scripts
+      - name: Repo rules (no sleeps in tests, no session-level GUC, revision id length)
+        working-directory: backend
+        run: uv run python scripts/check_repo_rules.py ..
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci
+      - name: tsc --noEmit
+        working-directory: frontend
+        run: npm run typecheck
+
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: ${{ env.PYTHON_VERSION }}
+      - working-directory: backend
+        run: uv sync --locked
+      - name: pytest tests/unit
+        working-directory: backend
+        run: uv run pytest tests/unit -q
+
+  integration:
+    name: integration (incl. isolation + RLS coverage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: fnh
+          POSTGRES_PASSWORD: fnh
+          POSTGRES_DB: fnh_dev
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fnh -d fnh_dev"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: ${{ env.PYTHON_VERSION }}
+      - working-directory: backend
+        run: uv sync --locked
+      - name: Bootstrap fnh_app + fnh_resolver roles
+        # Before migrations: it installs the default privileges that grant the app role DML
+        # on tables the owner creates, and migration 0001 refuses to run without both roles.
+        run: psql "$OWNER_PSQL_URL" -v ON_ERROR_STOP=1 -f backend/db/init/00-init-app-role.sql
+      - name: pytest (unit + integration) with coverage
+        # tests/integration/conftest.py runs `alembic upgrade head`, then every assertion
+        # runs as fnh_app through the RLS path. Retries are never used to get to green.
+        working-directory: backend
+        run: uv run pytest -q --cov=app --cov-report=term-missing:skip-covered --cov-fail-under=70
+      - name: Coverage gate — domain 100%
+        working-directory: backend
+        run: uv run coverage report --include="app/domain/*" --fail-under=100
+      - name: Coverage gate — services 80%
+        working-directory: backend
+        run: uv run coverage report --include="app/services/*" --fail-under=80
+
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: fnh
+          POSTGRES_PASSWORD: fnh
+          POSTGRES_DB: fnh_dev
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fnh -d fnh_dev"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend/tools/openapi/package-lock.json
+      - working-directory: backend
+        run: uv sync --locked
+      - run: psql "$OWNER_PSQL_URL" -v ON_ERROR_STOP=1 -f backend/db/init/00-init-app-role.sql
+      - name: alembic upgrade head
+        working-directory: backend
+        run: uv run alembic upgrade head
+      - name: alembic downgrade base, then upgrade head again
+        # Expand/contract means prod never downgrades, but a broken downgrade is how a
+        # migration's teardown rots unnoticed; tests and local resets rely on it.
+        working-directory: backend
+        run: uv run alembic downgrade base && uv run alembic upgrade head
+      - name: alembic check (models match migrations)
+        working-directory: backend
+        run: uv run alembic check
+      - name: Regenerate openapi.json and api.gen.ts
+        run: |
+          (cd backend && uv run python scripts/dump_openapi.py openapi.json)
+          (cd frontend/tools/openapi && npm ci)
+          (cd frontend && npm run gen:api)
+      - name: Assert no OpenAPI drift
+        run: |
+          if ! git diff --exit-code -- backend/openapi.json frontend/src/types/api.gen.ts; then
+            echo "::error::OpenAPI schema or generated types are out of sync. Run:"
+            echo "  (cd backend && uv run python scripts/dump_openapi.py openapi.json)"
+            echo "  (cd frontend && npm run gen:api)"
+            exit 1
+          fi
+
+  bundle-secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Sentinel values for every server-only secret in 02-environments.md. If any build
+      # path ever reads one into client code, its sentinel shows up in .next/static.
+      SESSION_SECRET: fnh-sentinel-session-secret-8c1f
+      DEVICE_TOKEN_PEPPER: fnh-sentinel-device-pepper-2b7e
+      TMDB_READ_TOKEN: fnh-sentinel-tmdb-token-5d93
+      EMAIL_API_KEY: fnh-sentinel-email-key-a4c0
+      SENTRY_DSN: https://fnh-sentinel-sentry-dsn@example.invalid/1
+      STORAGE_SECRET_ACCESS_KEY: fnh-sentinel-storage-secret-71e2
+      BACKUP_STORAGE_SECRET_ACCESS_KEY: fnh-sentinel-backup-secret-0f9d
+      DATABASE_URL: postgresql://fnh_app:fnh-sentinel-db-password-3a6b@db.invalid/fnh
+      MIGRATION_DATABASE_URL: postgresql://fnh:fnh-sentinel-owner-password-9e15@db.invalid/fnh
+      REDIS_URL: redis://default:fnh-sentinel-redis-password-c2d8@redis.invalid:6379
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: npm ci
+      - name: next build
+        working-directory: frontend
+        run: npm run build
+      - name: No server secret in the client bundle
+        working-directory: frontend
+        run: |
+          printf '%s\n' "$SESSION_SECRET" "$DEVICE_TOKEN_PEPPER" "$TMDB_READ_TOKEN" \
+            "$EMAIL_API_KEY" "fnh-sentinel-sentry-dsn" "$STORAGE_SECRET_ACCESS_KEY" \
+            "$BACKUP_STORAGE_SECRET_ACCESS_KEY" "fnh-sentinel-db-password-3a6b" \
+            "fnh-sentinel-owner-password-9e15" "fnh-sentinel-redis-password-c2d8" \
+            > "$RUNNER_TEMP/secrets.txt"
+          test -d .next/static
+          if grep -rFf "$RUNNER_TEMP/secrets.txt" .next/static; then
+            echo "::error::A server secret was found in .next/static"; exit 1
+          fi
+          echo "No sentinel found in $(find .next/static -type f | wc -l) static files"

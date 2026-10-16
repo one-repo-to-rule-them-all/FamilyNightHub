@@ -33,4 +33,14 @@ uv run pytest tests/integration   # needs the compose stack up
 
 Frontend (from `frontend/`): `npm install`, then `npm run dev` and open http://localhost:3000.
 
+After changing an API schema, regenerate the contract (CI fails on drift):
+
+```bash
+(cd backend && uv run python scripts/dump_openapi.py openapi.json)
+(cd frontend/tools/openapi && npm ci) && (cd frontend && npm run gen:api)
+```
+
+CI (`.github/workflows/ci.yml`) runs static, unit, integration (incl. isolation and RLS
+coverage), contract and bundle-secrets jobs; see `docs/architecture/07-cicd.md`.
+
 Local ports: Postgres 55432, Redis 56379, S3 58333, MailHog UI 58025, API 8000.
