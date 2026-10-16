@@ -5,10 +5,17 @@ import { Check, Hourglass, Smartphone } from "lucide-react";
 import Link from "next/link";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
-import { api, type ApiError, type Binding, type Person } from "@/lib/api";
+import { buttonVariants } from "@/components/ui/button";
+import { api, type ApiError, type Binding, type NightSummary, type Person } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const PEOPLE = ["people"] as const;
+
+const LIVE_LINK: Partial<Record<NightSummary["status"], string>> = {
+  voting: "Vote now",
+  revealed: "See tonight's movie",
+  tonight: "See tonight's movie",
+};
 
 const STATE_LABEL: Record<Person["binding"], string | null> = {
   mine: "That's you",
@@ -23,6 +30,11 @@ export function WhoGrid() {
   const claim = useMutation<Binding, ApiError, string>({
     mutationFn: api.claimPerson,
     onSettled: () => queryClient.invalidateQueries({ queryKey: PEOPLE }),
+  });
+  // The household's current night, if any, so a picked phone can go straight to it.
+  const live = useQuery<NightSummary[], ApiError>({
+    queryKey: ["nights", "live"],
+    queryFn: () => api.nights({ status: ["voting", "revealed", "tonight"], limit: 1 }),
   });
 
   if (people.isPending) {
@@ -51,6 +63,8 @@ export function WhoGrid() {
 
   const mine = people.data.filter((p) => p.binding === "mine");
   const pending = people.data.filter((p) => p.binding === "pending");
+  const current = live.data?.[0];
+  const currentLabel = current ? LIVE_LINK[current.status] : undefined;
 
   return (
     <div className="flex flex-col gap-5">
@@ -68,6 +82,16 @@ export function WhoGrid() {
           </p>
         ) : null}
       </div>
+
+      {mine.length > 0 && current && currentLabel ? (
+        <Link
+          href={`/s/${current.id}`}
+          className={cn(buttonVariants({ size: "tap" }), "w-full")}
+          data-testid="go-to-night"
+        >
+          {currentLabel}
+        </Link>
+      ) : null}
 
       <ApiErrorNotice error={claim.error} />
 

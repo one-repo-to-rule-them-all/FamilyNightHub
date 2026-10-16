@@ -10,24 +10,33 @@ export type SeededNight = {
   householdName: string;
   adminEmail: string;
   people: string[];
-  /** Signed `fnh_session` cookie value for the seeded admin (see seed_night.py). */
-  hostSession: string;
+  sessionId: string;
+  /** Shortlist titles in display order (empty unless seeded with `movies`). */
+  movies: string[];
+  /** A signed `fnh_session` value for the household's admin (see seed_night.py). */
+  hostCookie: string;
+};
+
+export type SeedOptions = {
+  /** Typed titles to put on the shortlist (0-8). */
+  movies?: number;
+  /** Open voting after adding the shortlist (needs at least 2 movies). */
+  openVoting?: boolean;
 };
 
 const BACKEND = path.resolve(__dirname, "../../../backend");
 
-/** A fresh household + open night through e2e/seed_night.py (same env as the API under test). */
-export function seedNight(): SeededNight {
+/** A fresh household + night through e2e/seed_night.py (same env as the API under test). */
+export function seedNight(options: SeedOptions = {}): SeededNight {
   const slug = `e2e-${randomBytes(5).toString("hex")}`;
-  const result = spawnSync(
-    "uv",
-    ["run", "python", "../frontend/e2e/seed_night.py", "--slug", slug],
-    {
-      cwd: BACKEND,
-      encoding: "utf8",
-      env: { ...process.env, PYTHONIOENCODING: "utf-8" },
-    },
-  );
+  const args = ["run", "python", "../frontend/e2e/seed_night.py", "--slug", slug];
+  if (options.movies) args.push("--movies", String(options.movies));
+  if (options.openVoting) args.push("--open-voting");
+  const result = spawnSync("uv", args, {
+    cwd: BACKEND,
+    encoding: "utf8",
+    env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+  });
   if (result.status !== 0) {
     throw new Error(`seed_night.py failed (${result.status}): ${result.stderr || result.error}`);
   }

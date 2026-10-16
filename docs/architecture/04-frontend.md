@@ -26,7 +26,9 @@ pairing explanation from the 401.
 |---|---|---|
 | `/` | `src/app/page.tsx` | "Scan the QR" landing |
 | `/j/[slug]` | `src/app/(public)/j/[slug]/` | Night-code entry → `POST /api/v1/join` → `/who`. Forgiving input (`src/lib/night-code.ts`: case, spaces, dashes; flags 0/O/1/I/L before sending). Shows the server's generic error, plus "Try again in N minutes" from `Retry-After` on a 429 |
-| `/who` | `src/app/(public)/who/` | Avatar grid from `GET /api/v1/people`; tiles show `mine` / `pending` / `taken` / `free`; a tap is `PUT /api/v1/devices/me/people/{id}`, then the grid refetches. Claiming a `taken` person makes it `pending` ("ask the host") |
+| `/who` | `src/app/(public)/who/` | Avatar grid from `GET /api/v1/people`; tiles show `mine` / `pending` / `taken` / `free`; a tap is `PUT /api/v1/devices/me/people/{id}`, then the grid refetches. Claiming a `taken` person makes it `pending` ("ask the host"). Once the phone holds someone, a "Vote now" / "See tonight's movie" button links to the household's live night (`GET /api/v1/sessions?status=voting&status=revealed&status=tonight&limit=1`) |
+| `/s/[session]` | `src/app/(public)/s/[session]/` | The night from the snapshot (`GET /api/v1/sessions/{id}`) via `useLiveSession`; see "Phone state machine" below. `draft` → "Almost ready"; `voting` → ballot (`voting-flow.tsx`); `revealed` → winner card + the rest of the ranking; `tonight` → winner + a placeholder where the photo drop goes; `closed` → summary + link to history |
+| `/history` | `src/app/(public)/history/` | Past nights from `GET /api/v1/sessions` (server default: revealed, tonight, closed): winner poster, date, turnout; each links to its `/s/[session]` |
 | `/login` | `src/app/(auth)/login/` | Email → `POST /api/v1/auth/magic-link`; shows the server's one answer, which is the same whether or not the address exists |
 | `/auth/callback?token=` | `src/app/(auth)/auth/callback/` | `POST /api/v1/auth/verify` once (guarded against StrictMode's double effect), then `router.replace("/host")` so the spent token leaves history. `referrer: no-referrer` |
 | `/host` | `src/app/host/` | Start a night (the code is shown once, see below), nights in progress, pending person claims with approve/reject (polled every 10s), **Use this browser as the TV** (`POST /devices/enroll {as_tv:true}`, then `/tv/{night}`), sign out |
@@ -92,11 +94,34 @@ card; `tonight` → **Add photos** + album + "Rate later"; `closed` → rating p
 and album. On first open after a night, the home screen shows a "How was *Movie*?" prompt, because
 nobody rates during the movie.
 
+**Built:** `draft`, `voting`, `revealed` (winner card from `result.winner_option_id`, plus the
+other placements and "N people voted"), `tonight` (winner + a dashed placeholder,
+`data-testid="photo-drop-placeholder"`, where the photo drop goes) and `closed` (winner, results,
+link to `/history`). Not built yet: photo drop, album, rating prompt. The accent (`marquee-glow`,
+`text-cinema`) is used only on the winner card; ranked posters on the ballot use a plain
+foreground ring and number badge. Server error messages are shown as-is (`ApiErrorNotice`), e.g.
+"This phone can't vote as them" or "Voting is not open"; a refused ballot also refetches the
+snapshot and the people list, so a stale screen catches up.
+
 **Who-are-you:** a grid of big avatar tiles (emoji + colour + name), not a dropdown. After a ballot
 is submitted, the phone shows "Pass to next person", which goes back to the grid.
 
+On `/s/[session]` the voter is one of the people this phone holds (`binding: "mine"` from
+`GET /api/v1/people`). One person → straight to the ballot. Several → a "Who's voting?" grid of just
+those people (tiles show "Voted" from `GET /sessions/{id}/ballots/mine`), and after Done the
+confirmation offers "Pass to next person" back to that grid. Nobody → "Pick who you are" (→ `/who`).
+The confirmation lists the ranks as the server saved them; "Change my picks" reopens the ballot
+pre-filled (ballots are replaceable until close).
+
 **Ballot:** tap a poster to make it 1, the next tap makes 2, then 3. Tap again to clear. "Done" is
 enabled after the first tap (partial ballots are allowed).
+
+The tap-to-rank logic is a pure reducer, `src/lib/ballot.ts` (unit-tested to 100%, gated in
+`vitest.config.mts`): picks are kept in rank order, the cap is the snapshot's `ballot_size`
+(k = min(3, options − 1), ADR-0006), a tap once full is ignored, and clearing a pick moves the ones
+below it up, so the `PUT /sessions/{id}/ballots` ranks always run 1..m with no gaps. Posters come
+from TMDB's image CDN (`w342`); typed titles without a poster get a title card
+(`src/components/poster.tsx`).
 
 ## State management
 
@@ -104,6 +129,13 @@ TanStack Query owns server state, with keys per session snapshot. `useLiveSessio
 an SSE ticket, opens `EventSource`, invalidates the snapshot on each event, refetches on
 `visibilitychange` and on reconnect, and polls every 5s while the stream is down. It exposes
 `data-live="ready|reconnecting"` for tests. There is no global client store beyond small UI state.
+
+**Built so far:** `src/hooks/use-live-session.ts` is the polling half only: query key
+`["night", id]`, `refetchInterval` 5s (also in a background tab), and a refetch on
+`visibilitychange` → visible. With no stream it always reports `live: "reconnecting"`, rendered as
+`data-live` on `/s/[session]`'s root (`data-testid="night-screen"`, which also carries
+`data-status`). The SSE half (ticket, `EventSource`, invalidate per event, `ready`) drops into the
+same hook without changing callers or tests.
 
 ## Photo drop
 
@@ -140,7 +172,7 @@ mutations never retry.
 | `npm run typecheck` | `tsc --noEmit` (TypeScript 7) |
 | `npm run lint:install`, then `npm run lint` | ESLint with `eslint-config-next`. ESLint, the Next config and the TypeScript 5 that typescript-eslint needs live in `tools/eslint/` (TypeScript 7 has no JS API for it), and `eslint.config.mjs` resolves its plugins from there. It also bans `waitForTimeout` / `setTimeout` in tests |
 | `npm run format:check` | Prettier + `prettier-plugin-tailwindcss` (class order) |
-| `npm test` | Vitest, `src/**/*.test.ts`: API client CSRF and error handling, night-code input, shortlist reducer and bounds, proxy-ballot ranking, reveal sequencing, QR/join link, night-code hand-off |
+| `npm test` | Vitest with v8 coverage, `src/**/*.test.ts`: API client CSRF and error handling, night-code input, the ballot reducer (100% gate on `src/lib/ballot.ts`), shortlist reducer and bounds, proxy-ballot ranking, reveal sequencing, QR/join link, night-code hand-off |
 | `npm run test:e2e` | Playwright + axe against the real API; see [`07-cicd.md`](07-cicd.md#running-e2e-locally) |
 
 ## Where to add new code

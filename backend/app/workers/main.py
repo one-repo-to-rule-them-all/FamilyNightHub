@@ -35,7 +35,7 @@ from sqlalchemy import text
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.logging import configure_logging
-from app.integrations.storage import NoopObjectStore
+from app.integrations.storage import NoopObjectStore, configured_storage
 from app.workers.tasks import auto_close_stale_sessions, sweep_orphan_uploads
 
 if TYPE_CHECKING:
@@ -119,8 +119,8 @@ async def startup(ctx: dict[str, Any]) -> None:
     init_sentry()  # first, so a failure in the rest of startup is captured
     configure_logging()
     log.info("worker_startup", environment=settings.ENVIRONMENT)
-    # Replaced by the real Tigris/SeaweedFS store when the photo pipeline lands.
-    ctx["storage"] = NoopObjectStore()
+    # The photos bucket (sweep deletes orphaned uploads); a no-op when storage is unset.
+    ctx["storage"] = configured_storage() or NoopObjectStore()
     await start_health_server(ctx, settings.WORKER_HEALTH_PORT)
 
 

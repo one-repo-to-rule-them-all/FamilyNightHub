@@ -20,9 +20,10 @@ export type Device = Schemas["DeviceOut"];
 export type JoinResult = Schemas["JoinOut"];
 export type Account = Schemas["AccountOut"];
 export type Night = Schemas["SessionOut"];
-export type NightStatus = Night["status"];
 export type NightOption = Schemas["OptionOut"];
+export type NightStatus = Night["status"];
 export type NightSummary = Schemas["NightSummaryOut"];
+export type OwnBallot = Schemas["OwnBallotOut"];
 export type Voter = Schemas["VoterOut"];
 export type TmdbResult = Schemas["TmdbResultOut"];
 export type Claim = Schemas["ClaimOut"];
@@ -161,14 +162,22 @@ export const api = {
   verifyMagicLink: (body: Schemas["VerifyIn"]) => request<Account>("POST", "/auth/verify", body),
   me: () => request<Account>("GET", "/auth/me"),
   logout: () => request<void>("POST", "/auth/logout"),
+  /** The night as every screen sees it (no ballots; `result` only from reveal on). */
+  night: (sessionId: string) => request<Night>("GET", `/sessions/${encodeURIComponent(sessionId)}`),
+  /** Nights newest first; the server defaults to revealed, tonight and closed (history). */
+  nights: (options: { status?: NightStatus[]; limit?: number } = {}) => {
+    const query = new URLSearchParams();
+    for (const status of options.status ?? []) query.append("status", status);
+    if (options.limit !== undefined) query.set("limit", String(options.limit));
+    const suffix = query.size > 0 ? `?${query.toString()}` : "";
+    return request<NightSummary[]>("GET", `/sessions${suffix}`);
+  },
+  myBallots: (sessionId: string) =>
+    request<OwnBallot[]>("GET", `/sessions/${encodeURIComponent(sessionId)}/ballots/mine`),
+  castBallot: (sessionId: string, body: Schemas["BallotIn"]) =>
+    request<void>("PUT", `/sessions/${encodeURIComponent(sessionId)}/ballots`, body),
 
   // Nights (host + TV screens). Mutations are host-only; reads work for any household viewer.
-  nights: (statuses: NightStatus[], limit = 20) => {
-    const query = new URLSearchParams(statuses.map((s) => ["status", s]));
-    query.set("limit", String(limit));
-    return request<NightSummary[]>("GET", `/sessions?${query.toString()}`);
-  },
-  night: (sessionId: string) => request<Night>("GET", `/sessions/${encodeURIComponent(sessionId)}`),
   createNight: (body: Schemas["SessionCreateIn"]) =>
     request<Schemas["SessionCreatedOut"]>("POST", "/sessions", body),
   rotateNightCode: (sessionId: string) =>

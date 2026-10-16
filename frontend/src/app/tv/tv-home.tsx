@@ -16,7 +16,7 @@ const ON_SCREEN = ["draft", "voting", "revealed", "tonight"] as const;
 export function useCurrentNight() {
   return useQuery<NightSummary | null, ApiError>({
     queryKey: ["nights", "current"],
-    queryFn: async () => (await api.nights([...ON_SCREEN], 1))[0] ?? null,
+    queryFn: async () => (await api.nights({ status: [...ON_SCREEN], limit: 1 }))[0] ?? null,
     refetchInterval: POLL_MS,
     refetchIntervalInBackground: true,
   });

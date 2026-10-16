@@ -164,3 +164,14 @@ def test_close_night_from_tonight_only() -> None:
     for status in ("draft", "voting", "revealed"):
         with pytest.raises(SessionRuleError):
             ss.close_night(status)
+
+
+@pytest.mark.parametrize("status", ["tonight", "closed"])
+def test_photos_open_from_tonight(status: str) -> None:
+    ss.check_photos_open(status)
+
+
+@pytest.mark.parametrize("status", ["draft", "voting", "revealed", "nonsense"])
+def test_photos_closed_before_the_pick(status: str) -> None:
+    with pytest.raises(SessionRuleError, match="Photos open"):
+        ss.check_photos_open(status)

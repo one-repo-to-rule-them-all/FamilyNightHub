@@ -131,7 +131,7 @@ function StartNight({ onCreated }: { onCreated: (created: Created) => void }) {
 function ActiveNights() {
   const nights = useQuery<NightSummary[], ApiError>({
     queryKey: ["nights", "active"],
-    queryFn: () => api.nights([...ACTIVE]),
+    queryFn: () => api.nights({ status: [...ACTIVE] }),
   });
 
   return (

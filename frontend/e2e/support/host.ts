@@ -12,7 +12,7 @@ export async function signInAsHost(context: BrowserContext, night: SeededNight, 
   await context.addCookies([
     {
       name: "fnh_session",
-      value: night.hostSession,
+      value: night.hostCookie,
       url: baseURL,
       httpOnly: true,
       secure: true,
