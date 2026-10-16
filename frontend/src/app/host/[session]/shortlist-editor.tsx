@@ -7,7 +7,7 @@ import { useEffect, useReducer } from "react";
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Poster } from "@/components/night/poster";
 import { Button } from "@/components/ui/button";
-import { nightKey } from "@/hooks/use-night-poll";
+import { nightKey } from "@/hooks/use-live-session";
 import { api, type ApiError, type Night } from "@/lib/api";
 import { MAX_OPTIONS, moveOption, shortlistReducer } from "@/lib/shortlist";
 

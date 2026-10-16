@@ -80,10 +80,10 @@ waits until `GET /devices/me` answers before the screen moves on. The API commit
 request-scoped dependency, and that commit can finish after the response has reached the
 browser, so the next device request could otherwise get a 401 (seen in CI).
 
-**Live data.** `src/hooks/use-night-poll.ts` polls the snapshot (and `…/voters` while voting) every
-5s, including in background tabs, and exposes the same `data-live` values as the planned SSE hook
-(`ready` / `reconnecting`, plus `connecting` before the first answer), so the swap to
-`useLiveSession` doesn't change tests.
+**Live data.** Both screens use `useLiveSession` (see "State management"); the host's who-voted list
+and the TV's turnout tiles use `useVoters` (`src/hooks/use-voters.ts`), keyed under the night so
+every live event refreshes them too, and polled only while the stream is down. The TV shows a
+"Reconnecting…" chip (`data-testid="tv-live-status"`) whenever it is.
 
 **Reveal.** Cosmetic, deterministic: two laps over the shortlist with a quadratic slow-down,
 stopping on the stored winner. `prefers-reduced-motion` (or opening on an already-`tonight` night)
@@ -135,12 +135,36 @@ an SSE ticket, opens `EventSource`, invalidates the snapshot on each event, refe
 `visibilitychange` and on reconnect, and polls every 5s while the stream is down. It exposes
 `data-live="ready|reconnecting"` for tests. There is no global client store beyond small UI state.
 
-**Built so far:** `src/hooks/use-live-session.ts` is the polling half only: query key
-`["night", id]`, `refetchInterval` 5s (also in a background tab), and a refetch on
-`visibilitychange` → visible. With no stream it always reports `live: "reconnecting"`, rendered as
-`data-live` on `/s/[session]`'s root (`data-testid="night-screen"`, which also carries
-`data-status`). The SSE half (ticket, `EventSource`, invalidate per event, `ready`) drops into the
-same hook without changing callers or tests.
+**How it works.** The hook (`src/hooks/use-live-session.ts`) owns query key `["night", id]` and a
+`LiveConnection` (`src/lib/live.ts`, React-free so its state machine is unit-tested with a fake
+`EventSource` and fake timers, gated at 100%):
+
+- **Connect:** `POST /api/v1/sse-tickets` → `new EventSource(/api/v1/sessions/{id}/stream?ticket=…)`.
+  `onopen` → `live: "ready"` and one invalidate (catches anything published before the subscription
+  or while down).
+- **Events are hints.** Every message invalidates `["night", id]` (by prefix that includes
+  `["night", id, "voters"]`). Messages are never parsed, so nothing on the stream can become screen
+  state; the snapshot is the only truth.
+- **Drops:** any `onerror` (network loss, the server's 30-minute close, a `degraded` frame followed
+  by the server ending the stream, a 401 for a spent ticket) closes the `EventSource` ourselves and
+  re-tickets after a backoff of 1s, 2s, 5s, 10s, then every 30s. The browser's own auto-retry is never
+  used: it would replay a single-use ticket. A failed ticket mint backs off the same way.
+- **Polling only while down:** `refetchInterval` is 5s while `live` is `reconnecting` (also in a
+  background tab, so a phone left on the ballot still sees the reveal) and off while `ready`.
+- **Wake-ups:** `visibilitychange` → visible refetches the snapshot; it and `online` also re-ticket
+  at once if the stream is waiting out a backoff (and reset the backoff if an attempt is in flight).
+- No `EventSource` at all (very old browser): stays `reconnecting` and polls.
+
+`live` renders as `data-live="ready|reconnecting"` on each screen's root (`/s/[session]`'s
+`data-testid="night-screen"`, `/host/[session]`'s and `/tv/[session]`'s root, all with
+`data-status`). E2E waits on it.
+
+**Proxying.** The stream goes through the Next `/api/*` rewrite like every other call (same-origin,
+so `EventSource` needs no CORS). Verified 2026-10-15 that both `next dev` and `next start` pass it
+through unbuffered: an event reached a client through the rewrite ~45ms after the mutation, with
+no `Content-Encoding` despite the client's `Accept-Encoding: gzip` (the API's
+`Cache-Control: no-cache, no-transform` is what stops Next compressing, and so buffering, it).
+Fly's proxy streams responses as-is (`deploy/*/api.fly.toml`), so nothing else needs configuring.
 
 ## Photo drop
 

@@ -9,7 +9,7 @@ import {
 } from "./support/phones";
 import { expect, seedNight, test } from "./support/seed";
 
-/** The snapshot is polled every 5s until SSE lands (useLiveSession), so reveal waits a cycle. */
+/** Generous: the reveal arrives live, but a dropped stream would fall back to the 5s poll. */
 const REVEAL_TIMEOUT = 15_000;
 
 const poster = (page: Page, title: string) =>
@@ -42,7 +42,7 @@ test.describe("phone voting", () => {
 
     await page.getByRole("link", { name: "Vote now" }).click();
     await expect(page).toHaveURL(new RegExp(`/s/${night.sessionId}$`));
-    await expect(page.getByTestId("night-screen")).toHaveAttribute("data-live", "reconnecting");
+    await expect(page.getByTestId("night-screen")).toHaveAttribute("data-live", "ready");
     await expect(page.getByRole("heading", { name: "Who's voting?" })).toBeVisible();
     await expectNoAxeViolations(page);
 

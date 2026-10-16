@@ -9,7 +9,8 @@ import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useNightPoll, useVoters } from "@/hooks/use-night-poll";
+import { useLiveSession } from "@/hooks/use-live-session";
+import { useVoters } from "@/hooks/use-voters";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { api, type ApiError, type Night, type Person } from "@/lib/api";
 import { joinUrl, qrShape } from "@/lib/join-link";
@@ -32,17 +33,18 @@ import { Reveal } from "./reveal";
  */
 const JOIN_SLUG: string | null = null;
 
-/** /tv/[session]: lobby → turnout → reveal, polled every 5s until SSE lands. */
+/** /tv/[session]: lobby → turnout → reveal, pushed live (polling only while the stream is down). */
 export function TvNight({ sessionId }: { sessionId: string }) {
   const router = useRouter();
-  const { night, live } = useNightPoll(sessionId);
+  const night = useLiveSession(sessionId);
+  const { live } = night;
   const status = night.data?.status;
   const people = useQuery<Person[], ApiError>({
     queryKey: ["people"],
     queryFn: api.people,
     refetchInterval: 30_000,
   });
-  const voters = useVoters(sessionId, status === "voting");
+  const voters = useVoters(sessionId, status === "voting", live);
   const current = useCurrentNight();
   useWakeLock();
 
@@ -81,7 +83,7 @@ export function TvNight({ sessionId }: { sessionId: string }) {
       <header className="flex items-baseline justify-between gap-[1em]">
         <h1 className="tv-title">{data.title || "Movie night"}</h1>
         {live === "reconnecting" ? (
-          <p className="tv-body text-muted-foreground" role="status">
+          <p className="tv-body text-muted-foreground" role="status" data-testid="tv-live-status">
             Reconnecting…
           </p>
         ) : null}

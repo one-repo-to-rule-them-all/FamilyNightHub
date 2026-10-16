@@ -182,6 +182,10 @@ export const api = {
   castBallot: (sessionId: string, body: Schemas["BallotIn"]) =>
     request<void>("PUT", `/sessions/${encodeURIComponent(sessionId)}/ballots`, body),
 
+  /** A 60s single-use ticket for this night's live stream (ADR-0004). */
+  sseTicket: (sessionId: string) =>
+    request<Schemas["SseTicketOut"]>("POST", "/sse-tickets", { session_id: sessionId }),
+
   // Nights (host + TV screens). Mutations are host-only; reads work for any household viewer.
   createNight: (body: Schemas["SessionCreateIn"]) =>
     request<Schemas["SessionCreatedOut"]>("POST", "/sessions", body),
@@ -243,6 +247,12 @@ export const api = {
   unreact: (sessionId: string, photoId: string, emoji: ReactionEmoji, personId: string) =>
     request<void>("DELETE", reactionPath(sessionId, photoId, emoji, personId)),
 };
+
+/** The live stream URL for `EventSource`: the ticket is the credential (no cookie, no CSRF). */
+export function liveStreamUrl(sessionId: string, ticket: string): string {
+  const query = new URLSearchParams({ ticket }).toString();
+  return `${BASE}/sessions/${encodeURIComponent(sessionId)}/stream?${query}`;
+}
 
 /**
  * Enrolls this browser (ADR-0002) and resolves once the new device cookie actually works.
