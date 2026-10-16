@@ -39,6 +39,117 @@
         "title": "AccountOut",
         "type": "object"
       },
+      "AdminDeviceOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_tv": {
+            "title": "Is Tv",
+            "type": "boolean"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "people": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceBindingOut"
+            },
+            "title": "People",
+            "type": "array"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "is_tv",
+          "last_seen_at",
+          "revoked_at",
+          "created_at",
+          "people"
+        ],
+        "title": "AdminDeviceOut",
+        "type": "object"
+      },
+      "AdminPersonOut": {
+        "properties": {
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_guest": {
+            "title": "Is Guest",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "avatar_emoji",
+          "color",
+          "is_guest",
+          "created_at"
+        ],
+        "title": "AdminPersonOut",
+        "type": "object"
+      },
       "BindingOut": {
         "properties": {
           "person_id": {
@@ -123,6 +234,39 @@
         "title": "CsrfOut",
         "type": "object"
       },
+      "DeviceBindingOut": {
+        "properties": {
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "pending"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "name",
+          "avatar_emoji",
+          "status"
+        ],
+        "title": "DeviceBindingOut",
+        "type": "object"
+      },
       "DeviceOut": {
         "properties": {
           "id": {
@@ -143,6 +287,27 @@
           "people"
         ],
         "title": "DeviceOut",
+        "type": "object"
+      },
+      "DeviceUpdateIn": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "title": "DeviceUpdateIn",
         "type": "object"
       },
       "EnrollIn": {
@@ -299,6 +464,19 @@
         "title": "JoinOut",
         "type": "object"
       },
+      "JoinSlugOut": {
+        "properties": {
+          "join_slug": {
+            "title": "Join Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "join_slug"
+        ],
+        "title": "JoinSlugOut",
+        "type": "object"
+      },
       "MagicLinkIn": {
         "properties": {
           "email": {
@@ -325,6 +503,90 @@
           "detail"
         ],
         "title": "MagicLinkOut",
+        "type": "object"
+      },
+      "MergeIn": {
+        "properties": {
+          "from_person_id": {
+            "format": "uuid",
+            "title": "From Person Id",
+            "type": "string"
+          },
+          "into_person_id": {
+            "format": "uuid",
+            "title": "Into Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_person_id",
+          "into_person_id"
+        ],
+        "title": "MergeIn",
+        "type": "object"
+      },
+      "MergeOut": {
+        "description": "What moved. `dropped_*` rows collided with the target's own and were discarded.",
+        "properties": {
+          "ballot_ranks_dropped": {
+            "title": "Ballot Ranks Dropped",
+            "type": "integer"
+          },
+          "ballot_ranks_moved": {
+            "title": "Ballot Ranks Moved",
+            "type": "integer"
+          },
+          "bindings_dropped": {
+            "title": "Bindings Dropped",
+            "type": "integer"
+          },
+          "bindings_moved": {
+            "title": "Bindings Moved",
+            "type": "integer"
+          },
+          "merged_from_id": {
+            "format": "uuid",
+            "title": "Merged From Id",
+            "type": "string"
+          },
+          "person": {
+            "$ref": "#/components/schemas/AdminPersonOut"
+          },
+          "photos_moved": {
+            "title": "Photos Moved",
+            "type": "integer"
+          },
+          "ratings_dropped": {
+            "title": "Ratings Dropped",
+            "type": "integer"
+          },
+          "ratings_moved": {
+            "title": "Ratings Moved",
+            "type": "integer"
+          },
+          "reactions_dropped": {
+            "title": "Reactions Dropped",
+            "type": "integer"
+          },
+          "reactions_moved": {
+            "title": "Reactions Moved",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "person",
+          "merged_from_id",
+          "ballot_ranks_moved",
+          "ballot_ranks_dropped",
+          "ratings_moved",
+          "ratings_dropped",
+          "photos_moved",
+          "reactions_moved",
+          "reactions_dropped",
+          "bindings_moved",
+          "bindings_dropped"
+        ],
+        "title": "MergeOut",
         "type": "object"
       },
       "NightCodeOut": {
@@ -462,6 +724,34 @@
         "title": "OptionOut",
         "type": "object"
       },
+      "PersonCreateIn": {
+        "properties": {
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "is_guest": {
+            "default": false,
+            "title": "Is Guest",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "avatar_emoji",
+          "color"
+        ],
+        "title": "PersonCreateIn",
+        "type": "object"
+      },
       "PersonOut": {
         "properties": {
           "avatar_emoji": {
@@ -505,6 +795,46 @@
           "binding"
         ],
         "title": "PersonOut",
+        "type": "object"
+      },
+      "PersonUpdateIn": {
+        "description": "Only the fields sent are changed.",
+        "properties": {
+          "avatar_emoji": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Emoji"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "PersonUpdateIn",
         "type": "object"
       },
       "ReorderIn": {
@@ -675,6 +1005,107 @@
         "title": "SessionOut",
         "type": "object"
       },
+      "SettingsOut": {
+        "properties": {
+          "default_age_cap": {
+            "anyOf": [
+              {
+                "enum": [
+                  "G",
+                  "PG",
+                  "PG-13",
+                  "R",
+                  "NC-17"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Age Cap"
+          },
+          "default_voting_method": {
+            "enum": [
+              "top3",
+              "approval",
+              "pick_one"
+            ],
+            "title": "Default Voting Method",
+            "type": "string"
+          },
+          "join_slug": {
+            "title": "Join Slug",
+            "type": "string"
+          },
+          "region": {
+            "title": "Region",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "join_slug",
+          "default_voting_method",
+          "default_age_cap",
+          "region",
+          "updated_at"
+        ],
+        "title": "SettingsOut",
+        "type": "object"
+      },
+      "SettingsUpdateIn": {
+        "description": "Only the fields sent are changed; `default_age_cap: null` clears the cap.",
+        "properties": {
+          "default_age_cap": {
+            "anyOf": [
+              {
+                "enum": [
+                  "G",
+                  "PG",
+                  "PG-13",
+                  "R",
+                  "NC-17"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Age Cap"
+          },
+          "default_voting_method": {
+            "anyOf": [
+              {
+                "const": "top3",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Voting Method"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          }
+        },
+        "title": "SettingsUpdateIn",
+        "type": "object"
+      },
       "TmdbResultOut": {
         "properties": {
           "poster_path": {
@@ -798,6 +1229,468 @@
         "summary": "Health",
         "tags": [
           "meta"
+        ]
+      }
+    },
+    "/api/v1/admin/devices": {
+      "get": {
+        "description": "Every device, live first (most recently seen first), then revoked.",
+        "operationId": "list_devices_api_v1_admin_devices_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminDeviceOut"
+                  },
+                  "title": "Response List Devices Api V1 Admin Devices Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Devices",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/devices/{device_id}": {
+      "patch": {
+        "description": "Set or clear (`null`) the label.",
+        "operationId": "update_device_api_v1_admin_devices__device_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDeviceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such device in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Device",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/devices/{device_id}/revoke": {
+      "post": {
+        "description": "Its cookie stops working on the next request and its people become free to claim.\nIdempotent and final.",
+        "operationId": "revoke_device_api_v1_admin_devices__device_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDeviceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such device in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Device",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/join-slug/rotate": {
+      "post": {
+        "description": "New fridge-QR slug; `/j/{old}` stops resolving immediately. Reprint the QR.",
+        "operationId": "rotate_join_slug_api_v1_admin_join_slug_rotate_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinSlugOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Rotate Join Slug",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/people": {
+      "get": {
+        "description": "Everyone not merged away; `guests_only` for the \"convert a guest\" list.",
+        "operationId": "list_people_api_v1_admin_people_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "guests_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Guests Only",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminPersonOut"
+                  },
+                  "title": "Response List People Api V1 Admin People Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List People",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Admins add anyone. A host running nights (`sessions:run`) may add a guest.",
+        "operationId": "create_person_api_v1_admin_people_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPersonOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Hosts may only add guests"
+          },
+          "409": {
+            "description": "Name already taken, or merging a person into themselves"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Person",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/people/merge": {
+      "post": {
+        "description": "Fold one person into another; the source is kept with `merged_into_id` set and\ndisappears from every list. Collision rules: 03-backend.md \"People admin\".",
+        "operationId": "merge_people_api_v1_admin_people_merge_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such (unmerged) person in this household"
+          },
+          "409": {
+            "description": "Name already taken, or merging a person into themselves"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Merge People",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/people/{person_id}": {
+      "patch": {
+        "description": "Rename / re-avatar / recolour; fields left out are unchanged.",
+        "operationId": "update_person_api_v1_admin_people__person_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPersonOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such (unmerged) person in this household"
+          },
+          "409": {
+            "description": "Name already taken, or merging a person into themselves"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Person",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/people/{person_id}/convert-to-member": {
+      "post": {
+        "description": "A guest becomes a family member (`is_guest = false`). Idempotent.",
+        "operationId": "convert_to_member_api_v1_admin_people__person_id__convert_to_member_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPersonOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such (unmerged) person in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Convert To Member",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/settings": {
+      "get": {
+        "operationId": "get_settings_api_v1_admin_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Settings",
+        "tags": [
+          "admin"
+        ]
+      },
+      "patch": {
+        "description": "Only the fields sent change. `default_voting_method` is `top3` until Phase 2;\n`default_age_cap: null` means no cap.",
+        "operationId": "update_settings_api_v1_admin_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Settings",
+        "tags": [
+          "admin"
         ]
       }
     },

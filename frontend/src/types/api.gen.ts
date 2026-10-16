@@ -21,6 +21,194 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Devices
+         * @description Every device, live first (most recently seen first), then revoked.
+         */
+        get: operations["list_devices_api_v1_admin_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/devices/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Device
+         * @description Set or clear (`null`) the label.
+         */
+        patch: operations["update_device_api_v1_admin_devices__device_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/devices/{device_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Device
+         * @description Its cookie stops working on the next request and its people become free to claim.
+         *     Idempotent and final.
+         */
+        post: operations["revoke_device_api_v1_admin_devices__device_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/join-slug/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Join Slug
+         * @description New fridge-QR slug; `/j/{old}` stops resolving immediately. Reprint the QR.
+         */
+        post: operations["rotate_join_slug_api_v1_admin_join_slug_rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List People
+         * @description Everyone not merged away; `guests_only` for the "convert a guest" list.
+         */
+        get: operations["list_people_api_v1_admin_people_get"];
+        put?: never;
+        /**
+         * Create Person
+         * @description Admins add anyone. A host running nights (`sessions:run`) may add a guest.
+         */
+        post: operations["create_person_api_v1_admin_people_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/people/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge People
+         * @description Fold one person into another; the source is kept with `merged_into_id` set and
+         *     disappears from every list. Collision rules: 03-backend.md "People admin".
+         */
+        post: operations["merge_people_api_v1_admin_people_merge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/people/{person_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Person
+         * @description Rename / re-avatar / recolour; fields left out are unchanged.
+         */
+        patch: operations["update_person_api_v1_admin_people__person_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/people/{person_id}/convert-to-member": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Convert To Member
+         * @description A guest becomes a family member (`is_guest = false`). Idempotent.
+         */
+        post: operations["convert_to_member_api_v1_admin_people__person_id__convert_to_member_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings_api_v1_admin_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Settings
+         * @description Only the fields sent change. `default_voting_method` is `top3` until Phase 2;
+         *     `default_age_cap: null` means no cap.
+         */
+        patch: operations["update_settings_api_v1_admin_settings_patch"];
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -429,6 +617,50 @@ export interface components {
              */
             role: "admin" | "host";
         };
+        /** AdminDeviceOut */
+        AdminDeviceOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Tv */
+            is_tv: boolean;
+            /** Label */
+            label: string | null;
+            /** Last Seen At */
+            last_seen_at: string | null;
+            /** People */
+            people: components["schemas"]["DeviceBindingOut"][];
+            /** Revoked At */
+            revoked_at: string | null;
+        };
+        /** AdminPersonOut */
+        AdminPersonOut: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Guest */
+            is_guest: boolean;
+            /** Name */
+            name: string;
+        };
         /** BindingOut */
         BindingOut: {
             /**
@@ -471,6 +703,23 @@ export interface components {
             /** Csrf Token */
             csrf_token: string;
         };
+        /** DeviceBindingOut */
+        DeviceBindingOut: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "pending";
+        };
         /** DeviceOut */
         DeviceOut: {
             /**
@@ -480,6 +729,11 @@ export interface components {
             id: string;
             /** People */
             people: components["schemas"]["PersonOut"][];
+        };
+        /** DeviceUpdateIn */
+        DeviceUpdateIn: {
+            /** Label */
+            label: string | null;
         };
         /** EnrollIn */
         EnrollIn: {
@@ -550,6 +804,11 @@ export interface components {
              */
             session_id: string;
         };
+        /** JoinSlugOut */
+        JoinSlugOut: {
+            /** Join Slug */
+            join_slug: string;
+        };
         /** MagicLinkIn */
         MagicLinkIn: {
             /** Email */
@@ -559,6 +818,49 @@ export interface components {
         MagicLinkOut: {
             /** Detail */
             detail: string;
+        };
+        /** MergeIn */
+        MergeIn: {
+            /**
+             * From Person Id
+             * Format: uuid
+             */
+            from_person_id: string;
+            /**
+             * Into Person Id
+             * Format: uuid
+             */
+            into_person_id: string;
+        };
+        /**
+         * MergeOut
+         * @description What moved. `dropped_*` rows collided with the target's own and were discarded.
+         */
+        MergeOut: {
+            /** Ballot Ranks Dropped */
+            ballot_ranks_dropped: number;
+            /** Ballot Ranks Moved */
+            ballot_ranks_moved: number;
+            /** Bindings Dropped */
+            bindings_dropped: number;
+            /** Bindings Moved */
+            bindings_moved: number;
+            /**
+             * Merged From Id
+             * Format: uuid
+             */
+            merged_from_id: string;
+            person: components["schemas"]["AdminPersonOut"];
+            /** Photos Moved */
+            photos_moved: number;
+            /** Ratings Dropped */
+            ratings_dropped: number;
+            /** Ratings Moved */
+            ratings_moved: number;
+            /** Reactions Dropped */
+            reactions_dropped: number;
+            /** Reactions Moved */
+            reactions_moved: number;
         };
         /** NightCodeOut */
         NightCodeOut: {
@@ -606,6 +908,20 @@ export interface components {
             /** Year */
             year: number | null;
         };
+        /** PersonCreateIn */
+        PersonCreateIn: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /**
+             * Is Guest
+             * @default false
+             */
+            is_guest: boolean;
+            /** Name */
+            name: string;
+        };
         /** PersonOut */
         PersonOut: {
             /** Avatar Emoji */
@@ -626,6 +942,18 @@ export interface components {
             is_guest: boolean;
             /** Name */
             name: string;
+        };
+        /**
+         * PersonUpdateIn
+         * @description Only the fields sent are changed.
+         */
+        PersonUpdateIn: {
+            /** Avatar Emoji */
+            avatar_emoji?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Name */
+            name?: string | null;
         };
         /** ReorderIn */
         ReorderIn: {
@@ -682,6 +1010,37 @@ export interface components {
             /** Voting Opened At */
             voting_opened_at: string | null;
         };
+        /** SettingsOut */
+        SettingsOut: {
+            /** Default Age Cap */
+            default_age_cap: ("G" | "PG" | "PG-13" | "R" | "NC-17") | null;
+            /**
+             * Default Voting Method
+             * @enum {string}
+             */
+            default_voting_method: "top3" | "approval" | "pick_one";
+            /** Join Slug */
+            join_slug: string;
+            /** Region */
+            region: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * SettingsUpdateIn
+         * @description Only the fields sent are changed; `default_age_cap: null` clears the cap.
+         */
+        SettingsUpdateIn: {
+            /** Default Age Cap */
+            default_age_cap?: ("G" | "PG" | "PG-13" | "R" | "NC-17") | null;
+            /** Default Voting Method */
+            default_voting_method?: "top3" | null;
+            /** Region */
+            region?: string | null;
+        };
         /** TmdbResultOut */
         TmdbResultOut: {
             /** Poster Path */
@@ -736,6 +1095,391 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+        };
+    };
+    list_devices_api_v1_admin_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDeviceOut"][];
+                };
+            };
+        };
+    };
+    update_device_api_v1_admin_devices__device_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDeviceOut"];
+                };
+            };
+            /** @description No such device in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_device_api_v1_admin_devices__device_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDeviceOut"];
+                };
+            };
+            /** @description No such device in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_join_slug_api_v1_admin_join_slug_rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinSlugOut"];
+                };
+            };
+        };
+    };
+    list_people_api_v1_admin_people_get: {
+        parameters: {
+            query?: {
+                guests_only?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPersonOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_person_api_v1_admin_people_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPersonOut"];
+                };
+            };
+            /** @description Hosts may only add guests */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Name already taken, or merging a person into themselves */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    merge_people_api_v1_admin_people_merge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeOut"];
+                };
+            };
+            /** @description No such (unmerged) person in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Name already taken, or merging a person into themselves */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_person_api_v1_admin_people__person_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPersonOut"];
+                };
+            };
+            /** @description No such (unmerged) person in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Name already taken, or merging a person into themselves */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    convert_to_member_api_v1_admin_people__person_id__convert_to_member_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPersonOut"];
+                };
+            };
+            /** @description No such (unmerged) person in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_settings_api_v1_admin_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+        };
+    };
+    update_settings_api_v1_admin_settings_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
