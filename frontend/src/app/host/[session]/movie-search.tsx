@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDebouncedValue } from "@/hooks/use-media";
-import { nightKey } from "@/hooks/use-night-poll";
+import { nightKey } from "@/hooks/use-live-session";
 import { api, type ApiError, type Night, type Schemas, type TmdbResult } from "@/lib/api";
 import { canAddOption, MAX_OPTIONS } from "@/lib/shortlist";
 

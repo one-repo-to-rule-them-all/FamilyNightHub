@@ -9,7 +9,7 @@ import { useEffect } from "react";
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Poster } from "@/components/night/poster";
 import { Button } from "@/components/ui/button";
-import { nightKey, useNightPoll } from "@/hooks/use-night-poll";
+import { type LiveState, nightKey, useLiveSession } from "@/hooks/use-live-session";
 import { api, type ApiError, type Night } from "@/lib/api";
 import { forgetNightCode } from "@/lib/night-code-handoff";
 import { canOpenVoting, MAX_OPTIONS, MIN_OPTIONS } from "@/lib/shortlist";
@@ -23,7 +23,8 @@ import { VotingPanel } from "./voting-panel";
 /** /host/[session]: shortlist → open voting → who has voted / proxy votes → close → winner. */
 export function NightBuilder({ sessionId }: { sessionId: string }) {
   const router = useRouter();
-  const { night, live } = useNightPoll(sessionId);
+  const night = useLiveSession(sessionId);
+  const { live } = night;
   const signedOut = night.error?.status === 401;
 
   useEffect(() => {
@@ -52,7 +53,7 @@ export function NightBuilder({ sessionId }: { sessionId: string }) {
       </div>
 
       {data.status === "draft" ? <DraftStage night={data} /> : null}
-      {data.status === "voting" ? <VotingStage night={data} /> : null}
+      {data.status === "voting" ? <VotingStage night={data} live={live} /> : null}
       {data.result ? <WinnerStage night={data} /> : null}
 
       {data.status !== "closed" ? <NightCodeCard sessionId={data.id} status={data.status} /> : null}
@@ -95,11 +96,11 @@ function DraftStage({ night }: { night: Night }) {
   );
 }
 
-function VotingStage({ night }: { night: Night }) {
+function VotingStage({ night, live }: { night: Night; live: LiveState }) {
   const close = useNightMutation<void>(night.id, () => api.closeVoting(night.id));
   return (
     <>
-      <VotingPanel night={night} />
+      <VotingPanel night={night} live={live} />
       <div className="flex flex-col gap-2">
         <ApiErrorNotice error={close.error} />
         <Button size="tap" disabled={close.isPending} onClick={() => close.mutate()}>

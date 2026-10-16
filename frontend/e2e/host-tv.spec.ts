@@ -5,7 +5,7 @@ import { expect, test } from "./support/seed";
 
 /** The tie-break seed the host's close pins (honoured only with ENVIRONMENT=test, 07-cicd.md). */
 const TEST_SEED = "424242";
-/** One 5s poll plus a little: the TV and host screens poll the snapshot until SSE lands. */
+/** Generous: updates arrive live (SSE), and a dropped stream falls back to the 5s poll. */
 const POLL = { timeout: 15_000 };
 
 test.describe("host and TV", () => {

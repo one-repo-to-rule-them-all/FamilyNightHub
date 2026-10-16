@@ -1,43 +1,66 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
-import { api, type ApiError, type Night } from "@/lib/api";
+import { api, type ApiError, liveStreamUrl, type Night } from "@/lib/api";
+import { LiveConnection, type LiveState, POLL_MS, pollWhileDown } from "@/lib/live";
 
-/** Seconds between snapshot polls while there is no live stream (04-frontend.md). */
-export const POLL_MS = 5_000;
-
-export type LiveState = "ready" | "reconnecting";
+export { type LiveState, POLL_MS };
 
 export const nightKey = (sessionId: string) => ["night", sessionId] as const;
 
 /**
  * The night snapshot, kept fresh (04-frontend.md "State management", ADR-0004).
  *
- * Today this is the fallback half of the planned hook only: poll every 5s and refetch when the
- * tab becomes visible again, reporting `live: "reconnecting"` (rendered as `data-live`). The SSE
- * half (mint a ticket, open EventSource, invalidate on each event, `live: "ready"` while the
- * stream is up) replaces the polling here without changing callers or tests.
+ * Mints an SSE ticket and opens the night's stream (`LiveConnection`). Every event, and every
+ * (re)open, invalidates `["night", id]`, which by prefix also refreshes anything keyed under it
+ * (the voters list). The snapshot is the only source of truth: events are never read. While the
+ * stream is down the snapshot polls every 5s, and it refetches when the tab becomes visible.
+ * `live` is `ready` while the stream is open, else `reconnecting`; screens render it as
+ * `data-live`, which the e2e specs wait on.
  */
 export function useLiveSession(sessionId: string) {
+  const queryClient = useQueryClient();
+  const [live, setLive] = useState<LiveState>("reconnecting");
+
   const query = useQuery<Night, ApiError>({
     queryKey: nightKey(sessionId),
     queryFn: () => api.night(sessionId),
-    refetchInterval: POLL_MS,
+    refetchInterval: pollWhileDown(live),
     // Keep polling in a background tab too: a phone left on the ballot must see the reveal.
     refetchIntervalInBackground: true,
   });
 
-  const { refetch } = query;
   useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void refetch();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [refetch]);
+    const refresh = () => void queryClient.invalidateQueries({ queryKey: nightKey(sessionId) });
+    // No EventSource (very old browser): stay `reconnecting` and keep polling.
+    const connection =
+      typeof EventSource === "undefined"
+        ? null
+        : new LiveConnection({
+            mintTicket: async () => (await api.sseTicket(sessionId)).ticket,
+            openStream: (ticket) => new EventSource(liveStreamUrl(sessionId, ticket)),
+            onHint: refresh,
+            onState: setLive,
+          });
+    connection?.start();
 
-  const live: LiveState = "reconnecting";
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      refresh();
+      connection?.wake();
+    };
+    const onOnline = () => connection?.wake();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+      connection?.stop();
+      setLive("reconnecting");
+    };
+  }, [queryClient, sessionId]);
+
   return { ...query, live };
 }

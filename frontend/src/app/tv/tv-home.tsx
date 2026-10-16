@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-import { POLL_MS } from "@/hooks/use-night-poll";
+import { POLL_MS } from "@/hooks/use-live-session";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { api, type ApiError, type NightSummary } from "@/lib/api";
 

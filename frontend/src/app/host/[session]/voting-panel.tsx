@@ -7,7 +7,8 @@ import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Avatar } from "@/components/night/avatar";
 import { Poster } from "@/components/night/poster";
 import { Button } from "@/components/ui/button";
-import { useVoters, votersKey } from "@/hooks/use-night-poll";
+import type { LiveState } from "@/hooks/use-live-session";
+import { useVoters, votersKey } from "@/hooks/use-voters";
 import { api, type ApiError, enrollDevice, type Night, type Person } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toggleRank, toRanks } from "@/lib/shortlist";
@@ -16,8 +17,8 @@ import { toggleRank, toRanks } from "@/lib/shortlist";
  * While voting: who has voted (avatars only; tallies stay hidden until reveal, ADR-0006), and a
  * proxy ballot for people without a phone.
  */
-export function VotingPanel({ night }: { night: Night }) {
-  const voters = useVoters(night.id, true);
+export function VotingPanel({ night, live }: { night: Night; live: LiveState }) {
+  const voters = useVoters(night.id, true, live);
   // The household's people come from the device-scoped GET /people (the only people list a host
   // can read today), so the host's browser must also be an enrolled device to list them.
   const people = useQuery<Person[], ApiError>({ queryKey: ["people"], queryFn: api.people });
