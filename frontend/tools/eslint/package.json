@@ -1,0 +1,10 @@
+{
+  "name": "fnh-eslint",
+  "private": true,
+  "description": "Isolated so typescript-eslint's TypeScript <6.1 peer does not collide with the app on TypeScript 7 (native compiler, no JS API). The config lives in ../../eslint.config.mjs and resolves its plugins from here.",
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.2",
+    "typescript": "5.9.3"
+  }
+}

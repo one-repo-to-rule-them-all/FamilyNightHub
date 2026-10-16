@@ -15,8 +15,37 @@ Deployed as `fnh-web` on Fly. Read the repo's `AGENTS.md` note: Next 16 uses `pr
 | admin | `/admin/*` | admin | People, devices, history, movies, photos, settings. Denser tables |
 | auth | `/login`, `/auth/callback` | admins/hosts | Magic link |
 
-`proxy.ts` redirects pages based on cookie presence only. That is a UX convenience; the API is the
-security boundary.
+`src/proxy.ts` redirects pages based on cookie presence only. That is a UX convenience; the API is
+the security boundary. Today: `/who` without `fnh_device` → `/`; `/host/*` without `fnh_session` →
+`/login`; `/login` with `fnh_session` → `/host`.
+
+**Built so far** (the rest of the table is still the plan):
+
+| Route | File | What it does |
+|---|---|---|
+| `/` | `src/app/page.tsx` | "Scan the QR" landing |
+| `/j/[slug]` | `src/app/(public)/j/[slug]/` | Night-code entry → `POST /api/v1/join` → `/who`. Forgiving input (`src/lib/night-code.ts`: case, spaces, dashes; flags 0/O/1/I/L before sending). Shows the server's generic error, plus "Try again in N minutes" from `Retry-After` on a 429 |
+| `/who` | `src/app/(public)/who/` | Avatar grid from `GET /api/v1/people`; tiles show `mine` / `pending` / `taken` / `free`; a tap is `PUT /api/v1/devices/me/people/{id}`, then the grid refetches. Claiming a `taken` person makes it `pending` ("ask the host") |
+| `/login` | `src/app/(auth)/login/` | Email → `POST /api/v1/auth/magic-link`; shows the server's one answer, which is the same whether or not the address exists |
+| `/auth/callback?token=` | `src/app/(auth)/auth/callback/` | `POST /api/v1/auth/verify` once (guarded against StrictMode's double effect), then `router.replace("/host")` so the spent token leaves history. `referrer: no-referrer` |
+| `/host` | `src/app/host/` | Placeholder: who is signed in, and sign out |
+
+## Design system
+
+[ADR-0008](decisions/ADR-0008-ctrl-alt-defeat-design-tokens.md): `src/app/globals.css` and
+`src/components/ui/{button,input,card,label}.tsx` are copied from Ctrl+Alt+Defeat @ `dcbda7d` (the
+header comment of each file records the commit and what FNH changed). Tailwind v4, shadcn
+`base-nova` (`components.json`), Geist via the `geist` package (local font files, so builds never
+fetch Google Fonts).
+
+- **Dark only.** The dark values live on `:root`; `<html class="dark">` keeps the primitives'
+  `dark:` variants on.
+- **One accent:** `--accent-cinema` (marquee red/amber; `bg-cinema`, `text-cinema`,
+  `bg-cinema-muted`). `--primary` points at it, so the default `Button` *is* the accent: use it for
+  the one primary action on a screen, and for winners (`marquee-glow`). Everything else is
+  `outline` / `secondary` / `ghost`.
+- **Tap targets ≥ 56px.** `Button size="tap"` (`h-14`) and `h-14`+ inputs on phone screens.
+  Avatar tiles are 160px tall.
 
 ## Phone state machine
 
@@ -51,9 +80,30 @@ The TV slideshow uses the Screen Wake Lock API where supported.
 
 ## API client & types
 
-`src/lib/api.ts` is a fetch wrapper with `credentials: "include"` and the CSRF header. Types are
-generated from `backend/openapi.json` into `src/types/api.gen.ts`. Don't hand-edit them; CI fails
-on drift (FieldPro pattern).
+`src/lib/api.ts` is a fetch wrapper over same-origin `/api/v1` (rewritten to fnh-api) with
+`credentials: "include"`. It fetches the double-submit token from `GET /api/v1/csrf` once (one
+in-flight promise shared by concurrent calls), sends it as `X-FNH-CSRF` on every mutation, and on a
+403 CSRF rejection refreshes it and retries once. Every non-2xx becomes an `ApiError` carrying the
+envelope's `code`, `message` and `request_id` plus `retryAfter` (seconds) from `Retry-After`; a
+non-envelope body or a transport failure becomes a generic "can't reach Family Night" error.
+Screens show `message` as-is, because the server already keeps it generic. One typed function per
+endpoint (`api.join`, `api.people`, `api.claimPerson`, ...).
+
+Types are generated from `backend/openapi.json` into `src/types/api.gen.ts`. Don't hand-edit them;
+CI fails on drift (FieldPro pattern).
+
+TanStack Query: one `QueryClient` per tab (`src/app/providers.tsx`). Queries don't retry a 4xx, and
+mutations never retry.
+
+## Tooling and tests
+
+| Command (in `frontend/`) | What |
+|---|---|
+| `npm run typecheck` | `tsc --noEmit` (TypeScript 7) |
+| `npm run lint:install`, then `npm run lint` | ESLint with `eslint-config-next`. ESLint, the Next config and the TypeScript 5 that typescript-eslint needs live in `tools/eslint/` (TypeScript 7 has no JS API for it), and `eslint.config.mjs` resolves its plugins from there. It also bans `waitForTimeout` / `setTimeout` in tests |
+| `npm run format:check` | Prettier + `prettier-plugin-tailwindcss` (class order) |
+| `npm test` | Vitest, `src/**/*.test.ts`: API client CSRF and error handling, night-code input |
+| `npm run test:e2e` | Playwright + axe against the real API; see [`07-cicd.md`](07-cicd.md#running-e2e-locally) |
 
 ## Where to add new code
 
