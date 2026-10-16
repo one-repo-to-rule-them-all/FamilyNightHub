@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 
 import { useCurrentNight } from "../tv-home";
 import { Reveal } from "./reveal";
+import { TvSlideshow } from "./slideshow";
 
 /**
  * No endpoint exposes the household's join slug to a device (or to a host) yet, so the TV can't
@@ -33,7 +34,7 @@ import { Reveal } from "./reveal";
  */
 const JOIN_SLUG: string | null = null;
 
-/** /tv/[session]: lobby → turnout → reveal, pushed live (polling only while the stream is down). */
+/** /tv/[session]: lobby → turnout → reveal → photo slideshow, pushed live (polling only while the stream is down). */
 export function TvNight({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const night = useLiveSession(sessionId);
@@ -103,7 +104,11 @@ export function TvNight({ sessionId }: { sessionId: string }) {
         </div>
       ) : null}
 
-      {data.result ? <Reveal night={data} animate={data.status === "revealed"} /> : null}
+      {data.status === "tonight" || data.status === "closed" ? (
+        <TvSlideshow night={data} live={live} />
+      ) : data.result ? (
+        <Reveal night={data} animate={data.status === "revealed"} />
+      ) : null}
     </div>
   );
 }

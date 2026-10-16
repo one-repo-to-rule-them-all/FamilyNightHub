@@ -7,8 +7,8 @@ type WakeLockLike = { request: (type: "screen") => Promise<WakeLockSentinelLike>
 
 /**
  * Keeps the TV's screen on with the Screen Wake Lock API where the browser has it (04-frontend.md).
- * The browser drops the lock whenever the tab is hidden, so it is re-requested on every return to
- * visible. Unsupported browsers and refusals (low battery, policy) are silently ignored: the screen
+ * The lock is released whenever the tab is hidden (the browser would drop it anyway) and
+ * re-requested on every return to visible. Unsupported browsers and refusals (low battery, policy) are silently ignored: the screen
  * still works, it just may dim.
  */
 export function useWakeLock(active = true): void {
@@ -31,7 +31,11 @@ export function useWakeLock(active = true): void {
       }
     };
     const onVisibility = () => {
-      if (document.visibilityState === "visible" && (!sentinel || sentinel.released)) {
+      if (document.visibilityState !== "visible") {
+        // Let go as soon as the tab is hidden rather than waiting on the browser to.
+        void sentinel?.release().catch(() => undefined);
+        sentinel = null;
+      } else if (!sentinel || sentinel.released) {
         void acquire();
       }
     };
