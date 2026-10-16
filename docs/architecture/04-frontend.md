@@ -38,6 +38,8 @@ pairing explanation from the 401.
 | `/admin/devices` | `src/app/admin/devices/` | Every device (live first, then revoked): label or "Unnamed phone", TV badge, bound people (pending marked), last seen, status. **Rename** (empty clears the label) and **Revoke** with a confirm that says it is final and the phone must rejoin with a night code as a new device |
 | `/admin/settings` | `src/app/admin/settings/` | **Join link**: the current `/j/{slug}` and **Rotate join link** behind a confirm warning that the printed fridge QR stops working at once; the new URL is shown after. **Defaults**: how we vote (Top 3 / Approval / Pick one, with the method's one-line explanation; new nights start with it, ADR-0010), age cap (none, G…NC-17) and region (two letters). **Streaming services**: checkboxes from `GET /api/v1/tmdb/providers` for the household's region, at most 20, saved with `PATCH /admin/settings {streaming_providers}`; JustWatch attribution (the response's `attribution`) and the TMDB notice under the list; a 503 says the list can't load and keeps the saved ones |
 | `/tv` | `src/app/tv/` | Follows the newest draft/voting/revealed/tonight night; an unpaired browser gets "sign in as host, then Use this browser as the TV" |
+| `/admin/movies` | `src/app/admin/movies/` | Bulk add ("One title per line, optional (year)", parsed by `src/lib/bulk-titles.ts`, 100 lines max, duplicates dropped) → per-line results: matched / already owned / added as typed; **ambiguous** and **not found** lines become radio groups (TMDB candidates, "Add as typed", "Skip") sent together with **Confirm choices**. A TMDB-down notice when titles were added as typed. Below it the library `DataTable`: title search, a Show filter (all / owned / not owned / watchlist / blocked), Owned/Watchlist/Blocked checkboxes (`PATCH` each), 50 per page. TMDB attribution line |
+| `/admin/history` | `src/app/admin/history/` | Past nights (`GET /api/v1/sessions`) in a `DataTable` with **Correct winner**: an inline form loads the snapshot, offers the night's other options as radios, requires a reason, and posts `…/correct-winner`; the table and `/history` then show the new winner |
 | `/tv/[session]` | `src/app/tv/[session]/` | Lobby (night code, join instructions, people tiles) → turnout tiles light up as ballots arrive (`GET …/voters`, never ranks) → reveal spinner (`src/lib/reveal.ts`) landing on `result.winner_option_id`, then every title's score in the method's unit (points, approvals or votes) and which tie-break step decided it. Screen Wake Lock where supported (released while the tab is hidden); once the night is `tonight`/`closed`, the photo slideshow (see "TV slideshow" below), and it follows the next night |
 
 ## Design system
@@ -115,11 +117,11 @@ a 1080p and a 4K TV read the same from the sofa.
 
 `/admin/*` (`src/app/admin/`) is for signed-in admins. `proxy.ts` sends a browser with no
 `fnh_session` to `/login`; the API is the boundary (`admin:people`, `admin:devices`,
-`admin:settings`), and a host who opens an admin screen gets that screen's 403 as an "Admins only"
+`admin:movies`, `admin:history`, `admin:settings`), and a host who opens an admin screen gets that screen's 403 as an "Admins only"
 panel (`admin-error.tsx`), not a raw error. `/host` links admins to `/admin`, which opens on People.
 
 - **Layout** (`admin-shell.tsx`): wider than the phone column (`max-w-5xl`), a People / Devices /
-  Settings nav with `aria-current`, a "Back to host" link; a 401 from `GET /auth/me` goes to
+  Movies / History / Settings nav (wraps on a narrow phone) with `aria-current`, a "Back to host" link; a 401 from `GET /auth/me` goes to
   `/login`.
 - **Denser tables**: every admin list is a `DataTable` (`src/components/ui/data-table.tsx`), a real
   `<table>` with a caption, column headers, a row-header cell, per-row `data-*` attributes and an
@@ -362,5 +364,3 @@ New phone screen → `app/(public)/…` plus a hook in `src/hooks/`. New admin t
 
 - No service-worker offline mode beyond the upload queue. No push notifications.
 - No zip download. No light theme toggle (dark only in v1).
-- The bulk add for owned titles comes later in Phase 2 (the generator UI and approval/pick-one
-  ballots are built).

@@ -102,6 +102,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/movies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Movies
+         * @description The household's library, alphabetical. `q` searches titles; each flag filter is
+         *     optional (left out = either).
+         */
+        get: operations["list_movies_api_v1_admin_movies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/movies/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Add
+         * @description Resolve typed titles through TMDB search and mark the matches owned. Ambiguous lines
+         *     come back with candidates for `/bulk/confirm`. If TMDB is off or down, the remaining
+         *     lines are added as typed titles (`added_manual`) and `tmdb_unavailable` is true.
+         */
+        post: operations["bulk_add_api_v1_admin_movies_bulk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/movies/bulk/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Confirm
+         * @description The admin's picks for ambiguous lines (a `tmdb_id`) or "add as typed" (none).
+         */
+        post: operations["bulk_confirm_api_v1_admin_movies_bulk_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/movies/{movie_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Movie
+         * @description Set owned / watchlist / blocked; flags left out are unchanged.
+         */
+        patch: operations["update_movie_api_v1_admin_movies__movie_id__patch"];
+        trace?: never;
+    };
     "/api/v1/admin/people": {
         parameters: {
             query?: never;
@@ -181,6 +264,28 @@ export interface paths {
          * @description A guest becomes a family member (`is_guest = false`). Idempotent.
          */
         post: operations["convert_to_member_api_v1_admin_people__person_id__convert_to_member_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/sessions/{session_id}/correct-winner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Correct Winner
+         * @description Make another option of the same night its winner, with a reason. Only for nights
+         *     that are revealed, tonight or closed. Audited as `session.winner_corrected` with
+         *     old/new and the reason. Returns the night's snapshot.
+         */
+        post: operations["correct_winner_api_v1_admin_sessions__session_id__correct_winner_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1041,6 +1146,33 @@ export interface components {
             /** Revoked At */
             revoked_at: string | null;
         };
+        /** AdminMovieOut */
+        AdminMovieOut: {
+            /** Blocked */
+            blocked: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Owned */
+            owned: boolean;
+            /** Poster Path */
+            poster_path: string | null;
+            /** Title */
+            title: string;
+            /** Tmdb Id */
+            tmdb_id: number | null;
+            /** Watchlist */
+            watchlist: boolean;
+            /** Year */
+            year: number | null;
+        };
         /** AdminPersonOut */
         AdminPersonOut: {
             /** Avatar Emoji */
@@ -1098,6 +1230,58 @@ export interface components {
              */
             status: "active" | "pending";
         };
+        /**
+         * BulkAddIn
+         * @description Typed titles, one per line in the UI ("Title (year)" parsed client-side).
+         */
+        BulkAddIn: {
+            /** Titles */
+            titles: components["schemas"]["TypedTitleIn"][];
+        };
+        /** BulkConfirmIn */
+        BulkConfirmIn: {
+            /** Picks */
+            picks: components["schemas"]["BulkPickIn"][];
+        };
+        /** BulkLineOut */
+        BulkLineOut: {
+            /** Already Owned */
+            already_owned: boolean;
+            /** Candidates */
+            candidates: components["schemas"]["TmdbResultOut"][];
+            movie: components["schemas"]["AdminMovieOut"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "matched" | "ambiguous" | "not_found" | "added_manual";
+            /** Title */
+            title: string;
+            /** Year */
+            year: number | null;
+        };
+        /**
+         * BulkPickIn
+         * @description An answer for an ambiguous or not-found line: `tmdb_id` to use that TMDB title, or
+         *     leave it out to add the title as typed (no TMDB id).
+         */
+        BulkPickIn: {
+            /** Title */
+            title: string;
+            /** Tmdb Id */
+            tmdb_id?: number | null;
+            /** Year */
+            year?: number | null;
+        };
+        /** BulkResultOut */
+        BulkResultOut: {
+            /** Attribution */
+            attribution: string;
+            /** Lines */
+            lines: components["schemas"]["BulkLineOut"][];
+            /** Tmdb Unavailable */
+            tmdb_unavailable: boolean;
+        };
         /** CandidateOut */
         CandidateOut: {
             /** Movie Id */
@@ -1145,6 +1329,16 @@ export interface components {
              * Format: date-time
              */
             requested_at: string;
+        };
+        /** CorrectWinnerIn */
+        CorrectWinnerIn: {
+            /**
+             * Option Id
+             * Format: uuid
+             */
+            option_id: string;
+            /** Reason */
+            reason: string;
         };
         /** CsrfOut */
         CsrfOut: {
@@ -1337,6 +1531,29 @@ export interface components {
             reactions_dropped: number;
             /** Reactions Moved */
             reactions_moved: number;
+        };
+        /**
+         * MovieFlagsIn
+         * @description Only the flags sent are changed.
+         */
+        MovieFlagsIn: {
+            /** Blocked */
+            blocked?: boolean | null;
+            /** Owned */
+            owned?: boolean | null;
+            /** Watchlist */
+            watchlist?: boolean | null;
+        };
+        /** MoviePageOut */
+        MoviePageOut: {
+            /** Items */
+            items: components["schemas"]["AdminMovieOut"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
         };
         /** MyReactionOut */
         MyReactionOut: {
@@ -1787,6 +2004,13 @@ export interface components {
             /** Year */
             year: number | null;
         };
+        /** TypedTitleIn */
+        TypedTitleIn: {
+            /** Title */
+            title: string;
+            /** Year */
+            year?: number | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -2014,6 +2238,150 @@ export interface operations {
             };
         };
     };
+    list_movies_api_v1_admin_movies_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                owned?: boolean | null;
+                watchlist?: boolean | null;
+                blocked?: boolean | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MoviePageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_add_api_v1_admin_movies_bulk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAddIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResultOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_confirm_api_v1_admin_movies_bulk_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResultOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_movie_api_v1_admin_movies__movie_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                movie_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MovieFlagsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminMovieOut"];
+                };
+            };
+            /** @description No such movie in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_people_api_v1_admin_people_get: {
         parameters: {
             query?: {
@@ -2210,6 +2578,55 @@ export interface operations {
             };
             /** @description No such (unmerged) person in this household */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correct_winner_api_v1_admin_sessions__session_id__correct_winner_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CorrectWinnerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description No such night in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The night has no winner yet, the option is not on its shortlist, or it is already the winner */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

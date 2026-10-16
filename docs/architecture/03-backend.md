@@ -32,11 +32,12 @@ backend/app/
 | Live | `/api/v1/sse-tickets`, `/api/v1/sessions/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md) |
 | Photos | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}` | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below |
 | Ratings | `PUT /api/v1/sessions/{id}/ratings`, `PUT …/ratings/proxy`, `GET …/ratings/mine` | 1–5 per person, once the night is `tonight`/`closed`: a phone rates as its bound people, a host proxy-rates (`ballots:proxy`), a phone reads back its own people's scores. See "Ratings" |
-| Movies | `/api/v1/movies`, `GET /api/v1/tmdb/search?q=` | Library, owned flag (later); TMDB search proxy for hosts (503 when TMDB is off or down) |
+| Movies | `GET /api/v1/tmdb/search?q=` | TMDB search proxy for hosts (503 when TMDB is off or down). The library itself is admin-only (next rows) |
 | Admin people | `GET/POST /api/v1/admin/people`, `PATCH /admin/people/{id}`, `POST /admin/people/{id}/convert-to-member`, `POST /admin/people/merge` | Add, rename/re-avatar/recolour, guest → member, merge (`admin:people`; hosts may add guests). See "People and devices admin" |
 | Admin devices | `GET /api/v1/admin/devices`, `PATCH /admin/devices/{id}`, `POST /admin/devices/{id}/revoke` | The "Devices" list with each device's people, label, revoke (`admin:devices`) |
 | Admin settings | `GET/PATCH /api/v1/admin/settings`, `POST /admin/join-slug/rotate` | Household defaults and the fridge-QR slug (`admin:settings`) |
-| Admin (later) | `/api/v1/admin/*` | History edit, winner correction, photo hard delete |
+| Admin movies | `GET /api/v1/admin/movies?q=&owned=&watchlist=&blocked=&limit=&offset=`, `PATCH /admin/movies/{id}`, `POST /admin/movies/bulk`, `POST /admin/movies/bulk/confirm` | Library search/filter/paginate, flags, bulk add of owned titles through TMDB search (`admin:movies`). See "Library and history admin" |
+| Admin history | `POST /api/v1/admin/sessions/{id}/correct-winner` | Correct a past night's winner with a reason (`admin:history`); ranking and seed untouched. See "Library and history admin" |
 | Health | `/api/health` | DB + Redis |
 
 ## Request lifecycle
@@ -201,6 +202,51 @@ Audit actions: `person.created`, `person.updated` (`data.fields`), `person.conve
 `person.merged` (`target_id` = the target), `device.relabeled`, `device.revoked`,
 `settings.updated` (`data` = from/to of the fields sent), `household.join_slug_rotated` (no
 slug values).
+
+## Library and history admin
+
+Both under `/api/v1/admin/*` with the admin rules above (device cookie 401, role without the
+permission 403, other household 404, CSRF on every mutation, an audit row per write).
+
+- **Library** (`services/library_service.py`, `api/v1/admin/movies.py`, `admin:movies`). `GET`
+  lists the household's `movies` alphabetically: `q` is a case-insensitive title substring
+  (`%`/`_` escaped), each of `owned`/`watchlist`/`blocked` filters when sent, `limit` 1–200
+  (default 50) and `offset`; the response carries `total`. `PATCH /{id}` sets any of the three
+  flags and audits `movie.updated` with from/to for the flags that changed (none changed → no
+  row). The generator rolls `owned AND NOT blocked` first ([ADR-0007](decisions/ADR-0007-candidate-generator-order.md)).
+- **Bulk add** (`POST /bulk {titles: [{title, year?}]}`, 1–100 lines; the UI parses "Title
+  (year)" lines). Each line goes through `movie_service.search` (the global `tmdb_cache`, so a
+  re-paste costs no TMDB calls) and `domain/library.classify`, which matches only when there is
+  one sensible answer, because a wrong "owned" title skews every roll:
+  a year first narrows results to that release year; then **one** result whose title equals the
+  typed title (ignoring case, accents, punctuation and spacing) is `matched`, two or more
+  (remakes) are `ambiguous`; with a year and one result left it is `matched` even if spelled
+  differently; otherwise any results are `ambiguous` (top 5 candidates) and none is
+  `not_found`. A match is upserted by TMDB id through `movie_service.upsert_from_tmdb`
+  (details, so runtime/genres feed the generator's filters) and set `owned`; `already_owned`
+  says it was owned before. **TMDB off or down**: that line and every later one is added as a
+  typed title with no TMDB id (`added_manual`, reusing an existing typed row of the same
+  title/year) and `tmdb_unavailable` is true; after the first failure no further line calls
+  TMDB, so a hung TMDB costs one timeout, not one per line. `POST /bulk/confirm {picks:
+  [{title, year?, tmdb_id?}]}` resolves the admin's answers: a `tmdb_id` is upserted and owned
+  (a TMDB 404 comes back `not_found`; TMDB down → added as typed), no `tmdb_id` adds the title
+  as typed. Both responses carry `attribution` (the TMDB notice). One audit row per call that
+  owned something new: `movie.bulk_added` / `movie.bulk_confirmed` with per-status counts,
+  the newly owned `movie_ids` and `tmdb_unavailable`.
+- **Correct a winner** (`POST /admin/sessions/{id}/correct-winner {option_id, reason}`,
+  `session_service.correct_winner`, `admin:history`). [ADR-0006](decisions/ADR-0006-voting-rules-and-tie-break.md):
+  history stores the full ranking, so a correction is a re-close with an audit row. The
+  session row is locked through `_lock` (which also persists a pending settle);
+  `session_state.check_can_correct_winner` allows only `revealed`/`tonight`/`closed` (draft or
+  voting → 409). The option must be on **this** night's shortlist (another night's option, an
+  unknown id or another household's → 409; the composite FK on `(winner_option_id, id)` is the
+  backstop), and must differ from the current winner (409). Only `winner_option_id` changes:
+  `ranking` and `tie_seed` stay exactly as tallied, so the snapshot's `placements` still show
+  how the family voted while `result.winner_option_id`, `/history` and the ratings average
+  follow the correction. Reason: whitespace-collapsed, 1–500 chars. Audited as
+  `session.winner_corrected` with `from_option_id`/`to_option_id`, both titles,
+  `ranked_winner_option_id` (the tally's pick) and the reason; publishes `winner_corrected`.
+  Never re-tallies. Returns the snapshot.
 
 ## Voting
 
@@ -369,6 +415,7 @@ snapshot version. Every event is a hint: clients refetch `GET /sessions/{id}` (o
 | `revealed` | close-voting when it actually tallies (not the idempotent repeat) |
 | `photo_added` | a photo upload completes (`pending → ready`) |
 | `rating_count` | a rating set or replaced (phone or proxy) |
+| `winner_corrected` | an admin corrected the night's winner |
 | `degraded` | the stream itself, never published |
 
 The lazy `revealed → tonight` settle publishes nothing: readers already see `tonight`. The

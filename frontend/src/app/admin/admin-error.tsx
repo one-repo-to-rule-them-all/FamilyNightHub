@@ -21,8 +21,8 @@ export function AdminQueryError({ error }: { error: ApiError | null }) {
       <div className="flex flex-col gap-2">
         <p className="text-lg font-medium">Admins only</p>
         <p className="text-muted-foreground">
-          Your account can run nights but can&apos;t change the household&apos;s people, devices or
-          settings. Ask an admin if something here needs changing.
+          Your account can run nights but can&apos;t change the household&apos;s people, devices,
+          movies, past nights or settings. Ask an admin if something here needs changing.
         </p>
         <Link
           href="/host"

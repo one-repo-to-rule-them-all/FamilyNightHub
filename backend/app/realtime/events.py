@@ -22,9 +22,18 @@ BALLOT_COUNT = "ballot_count"  # someone's ballot landed; refetch who has voted
 REVEALED = "revealed"  # close-voting tallied the night
 PHOTO_ADDED = "photo_added"  # photos PR (#10) publishes this once an upload completes
 RATING_COUNT = "rating_count"  # someone rated the night; refetch the family average
+WINNER_CORRECTED = "winner_corrected"  # an admin corrected the night's winner (ADR-0006)
 
 PUBLISHED_EVENTS: frozenset[str] = frozenset(
-    {STATUS_CHANGED, SHORTLIST_CHANGED, BALLOT_COUNT, REVEALED, PHOTO_ADDED, RATING_COUNT}
+    {
+        STATUS_CHANGED,
+        SHORTLIST_CHANGED,
+        BALLOT_COUNT,
+        REVEALED,
+        PHOTO_ADDED,
+        RATING_COUNT,
+        WINNER_CORRECTED,
+    }
 )
 
 # Synthesized by the stream itself, never published: the Redis subscription gave up, so

@@ -540,6 +540,66 @@ async def close(
     publish_after_commit(db, session_id, events.STATUS_CHANGED)
 
 
+async def correct_winner(
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    account_id: uuid.UUID,
+    session_id: uuid.UUID,
+    option_id: uuid.UUID,
+    reason: str,
+) -> None:
+    """Admin history edit (ADR-0006): point `winner_option_id` at another option of the
+    same night. The stored ranking and tie seed are left exactly as the tally made them, so
+    the audit row plus the ranking always show both what the vote said and what the family
+    decided. Never re-tallies."""
+    status = await _lock(db, household_id, account_id, session_id)
+    _rule(session_state.check_can_correct_winner, status)
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT s.winner_option_id AS current, s.ranking, o.id AS option_id,
+                       m.title AS new_title, cm.title AS old_title
+                FROM sessions s
+                LEFT JOIN options o ON o.id = :o AND o.session_id = s.id
+                LEFT JOIN movies m ON m.id = o.movie_id AND m.household_id = o.household_id
+                LEFT JOIN options co ON co.id = s.winner_option_id AND co.session_id = s.id
+                LEFT JOIN movies cm ON cm.id = co.movie_id AND cm.household_id = co.household_id
+                WHERE s.id = :s
+                """
+            ),
+            {"s": session_id, "o": option_id},
+        )
+    ).one()
+    if row.option_id is None:
+        raise Conflict("That movie was not on this night's shortlist")
+    if row.current == option_id:
+        raise Conflict("That movie is already the winner")
+    await db.execute(
+        text("UPDATE sessions SET winner_option_id = :o WHERE id = :s"),
+        {"o": option_id, "s": session_id},
+    )
+    # What the tally picked: placements are stored in final order, winner first.
+    placements = (row.ranking or {}).get("placements") or []
+    ranked: str | None = placements[0]["option_id"] if placements else None
+    await _audit(
+        db,
+        household_id,
+        account_id,
+        "session.winner_corrected",
+        session_id,
+        {
+            "from_option_id": None if row.current is None else str(row.current),
+            "to_option_id": str(option_id),
+            "from_title": row.old_title,
+            "to_title": row.new_title,
+            "ranked_winner_option_id": ranked,
+            "reason": reason,
+        },
+    )
+    publish_after_commit(db, session_id, events.WINNER_CORRECTED)
+
+
 def _result(row: Any) -> VotingResult | None:
     """The stored outcome, but only once the night is revealed (ADR-0006)."""
     if not session_state.shows_result(row.status) or row.ranking is None:
