@@ -24,6 +24,9 @@ export type NightOption = Schemas["OptionOut"];
 export type NightStatus = Night["status"];
 export type NightSummary = Schemas["NightSummaryOut"];
 export type OwnBallot = Schemas["OwnBallotOut"];
+export type Voter = Schemas["VoterOut"];
+export type TmdbResult = Schemas["TmdbResultOut"];
+export type Claim = Schemas["ClaimOut"];
 export type Photo = Schemas["PhotoOut"];
 export type PhotoCreated = Schemas["PhotoCreatedOut"];
 /** The album's fixed reaction set (the path parameter's enum). */
@@ -178,6 +181,55 @@ export const api = {
     request<OwnBallot[]>("GET", `/sessions/${encodeURIComponent(sessionId)}/ballots/mine`),
   castBallot: (sessionId: string, body: Schemas["BallotIn"]) =>
     request<void>("PUT", `/sessions/${encodeURIComponent(sessionId)}/ballots`, body),
+
+  // Nights (host + TV screens). Mutations are host-only; reads work for any household viewer.
+  createNight: (body: Schemas["SessionCreateIn"]) =>
+    request<Schemas["SessionCreatedOut"]>("POST", "/sessions", body),
+  rotateNightCode: (sessionId: string) =>
+    request<Schemas["NightCodeOut"]>(
+      "POST",
+      `/sessions/${encodeURIComponent(sessionId)}/night-code`,
+    ),
+  addOption: (sessionId: string, body: Schemas["OptionIn"]) =>
+    request<Night>("POST", `/sessions/${encodeURIComponent(sessionId)}/options`, body),
+  removeOption: (sessionId: string, optionId: string) =>
+    request<Night>(
+      "DELETE",
+      `/sessions/${encodeURIComponent(sessionId)}/options/${encodeURIComponent(optionId)}`,
+    ),
+  reorderOptions: (sessionId: string, optionIds: string[]) =>
+    request<Night>("PUT", `/sessions/${encodeURIComponent(sessionId)}/options/order`, {
+      option_ids: optionIds,
+    }),
+  openVoting: (sessionId: string) =>
+    request<Night>("POST", `/sessions/${encodeURIComponent(sessionId)}/open-voting`),
+  closeVoting: (sessionId: string) =>
+    request<Night>("POST", `/sessions/${encodeURIComponent(sessionId)}/close-voting`),
+  closeNight: (sessionId: string) =>
+    request<Night>("POST", `/sessions/${encodeURIComponent(sessionId)}/close`),
+  voters: (sessionId: string) =>
+    request<Schemas["VotersOut"]>("GET", `/sessions/${encodeURIComponent(sessionId)}/voters`),
+  proxyBallot: (sessionId: string, body: Schemas["BallotIn"]) =>
+    request<void>("PUT", `/sessions/${encodeURIComponent(sessionId)}/ballots/proxy`, body),
+  searchTmdb: (q: string) =>
+    request<TmdbResult[]>("GET", `/tmdb/search?${new URLSearchParams({ q }).toString()}`),
+
+  // Host device actions (ADR-0002).
+  claims: () => request<Claim[]>("GET", "/devices/claims"),
+  approveClaim: (deviceId: string, personId: string) =>
+    request<void>(
+      "POST",
+      `/devices/${encodeURIComponent(deviceId)}/people/${encodeURIComponent(personId)}/approve`,
+    ),
+  rejectClaim: (deviceId: string, personId: string) =>
+    request<void>(
+      "POST",
+      `/devices/${encodeURIComponent(deviceId)}/people/${encodeURIComponent(personId)}/reject`,
+    ),
+  enroll: (body: Schemas["EnrollIn"]) =>
+    request<Schemas["EnrollOut"]>("POST", "/devices/enroll", body),
+
+  // The night's photo album (ADR-0005).
   /** The album, newest first. Every URL is a presigned GET that expires in 10 minutes. */
   photos: (sessionId: string) =>
     request<Photo[]>("GET", `/sessions/${encodeURIComponent(sessionId)}/photos`),
@@ -191,6 +243,30 @@ export const api = {
   unreact: (sessionId: string, photoId: string, emoji: ReactionEmoji, personId: string) =>
     request<void>("DELETE", reactionPath(sessionId, photoId, emoji, personId)),
 };
+
+/**
+ * Enrolls this browser (ADR-0002) and resolves once the new device cookie actually works.
+ *
+ * The API commits the enroll in a request-scoped dependency, which can finish after the response
+ * has reached the browser, so the very next device request may still get a 401. Waiting on
+ * `GET /devices/me` here keeps every caller (TV pairing, the host's proxy-vote list) from racing it.
+ */
+export async function enrollDevice(
+  body: Schemas["EnrollIn"],
+  { attempts = 20, delayMs = 150 }: { attempts?: number; delayMs?: number } = {},
+): Promise<Schemas["EnrollOut"]> {
+  const enrolled = await api.enroll(body);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await api.myDevice();
+      return enrolled;
+    } catch (error) {
+      const notYet = error instanceof ApiError && error.status === 401;
+      if (!notYet || attempt >= attempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
 
 function photoPath(sessionId: string, photoId: string): string {
   return `/sessions/${encodeURIComponent(sessionId)}/photos/${encodeURIComponent(photoId)}`;

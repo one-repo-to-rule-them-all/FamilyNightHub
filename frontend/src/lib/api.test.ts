@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { api, ApiError, configureApi, CSRF_HEADER, retryAfterHint, toApiError } from "./api";
+import {
+  api,
+  ApiError,
+  configureApi,
+  CSRF_HEADER,
+  enrollDevice,
+  retryAfterHint,
+  toApiError,
+} from "./api";
 
 type Call = { url: string; init: RequestInit };
 
@@ -200,5 +208,56 @@ describe("retryAfterHint", () => {
   it("is null without Retry-After or for other statuses", () => {
     expect(retryAfterHint(tooMany(null))).toBeNull();
     expect(retryAfterHint(new ApiError(400, "http_error", "Bad", null, 30))).toBeNull();
+  });
+});
+
+describe("enrollDevice", () => {
+  const unauthorized = () => json(401, envelope("unauthorized", "Not signed in"));
+
+  it("waits until the new device cookie works (the enroll commit can land after the response)", async () => {
+    const calls = transport(
+      json(200, { csrf_token: "tok-1" }),
+      json(200, { device_id: "d", is_tv: true }),
+      unauthorized(),
+      unauthorized(),
+      json(200, { id: "d", people: [] }),
+    );
+
+    await expect(enrollDevice({ as_tv: true }, { delayMs: 0 })).resolves.toEqual({
+      device_id: "d",
+      is_tv: true,
+    });
+    expect(calls.map((c) => `${c.init.method} ${c.url}`)).toEqual([
+      "GET /api/v1/csrf",
+      "POST /api/v1/devices/enroll",
+      "GET /api/v1/devices/me",
+      "GET /api/v1/devices/me",
+      "GET /api/v1/devices/me",
+    ]);
+  });
+
+  it("gives up after the last attempt with the server's error", async () => {
+    transport(
+      json(200, { csrf_token: "tok-1" }),
+      json(200, { device_id: "d", is_tv: false }),
+      unauthorized(),
+      unauthorized(),
+    );
+    await expect(enrollDevice({ as_tv: false }, { attempts: 2, delayMs: 0 })).rejects.toMatchObject(
+      {
+        status: 401,
+      },
+    );
+  });
+
+  it("does not retry anything but a 401", async () => {
+    transport(
+      json(200, { csrf_token: "tok-1" }),
+      json(200, { device_id: "d", is_tv: false }),
+      json(500, envelope("internal_error", "Something went wrong")),
+    );
+    await expect(enrollDevice({ as_tv: false }, { delayMs: 0 })).rejects.toMatchObject({
+      status: 500,
+    });
   });
 });
