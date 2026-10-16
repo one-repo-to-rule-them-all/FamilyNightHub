@@ -1,15 +1,17 @@
 # PR gate for Family Night Hub (docs/architecture/07-cicd.md).
 #
-# Jobs run in parallel; branch protection should require all five:
-#   static          ruff, ruff format, mypy, repo rules, actionlint, tsc
-#   unit            pytest tests/unit (no data plane)
+# Jobs run in parallel; branch protection should require all six:
+#   static          ruff, ruff format, mypy, repo rules, actionlint, tsc, eslint, prettier
+#   unit            pytest tests/unit (no data plane), vitest
 #   integration     pytest everything against real Postgres + Redis as fnh_app, incl. the
 #                   isolation suite and the RLS coverage test; coverage gates
 #   contract        alembic upgrade + check (models == migrations), OpenAPI + api.gen.ts drift
 #   bundle-secrets  next build with sentinel server secrets, then grep .next/static
+#   e2e             Playwright (phone viewports + axe) against the real API and Next, on
+#                   Postgres + Redis + MailHog service containers
 #
-# Not here yet (each lands with the code it gates): e2e (Playwright multi-phone + axe on the
-# compose stack), vitest, eslint/prettier. Deploys live in deploy.yml.
+# Not here yet: multi-phone/TV E2E with SSE and tmdb-fake (lands with voting).
+# Deploys live in deploy.yml.
 #
 # Shape from OrderUp .github/workflows/ci.yml @ 2f86cd8 (service containers, role
 # bootstrap before migrations, alembic check), FieldPro @ 0670961 (OpenAPI drift) and
@@ -54,7 +56,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend/tools/eslint/package-lock.json
       - name: uv sync
         working-directory: backend
         run: uv sync --locked
@@ -78,6 +82,15 @@ jobs:
       - name: tsc --noEmit
         working-directory: frontend
         run: npm run typecheck
+      - name: npm ci (tools/eslint, isolated for its TypeScript 5 peer)
+        working-directory: frontend
+        run: npm run lint:install
+      - name: eslint
+        working-directory: frontend
+        run: npm run lint
+      - name: prettier --check
+        working-directory: frontend
+        run: npm run format:check
 
   unit:
     runs-on: ubuntu-latest
@@ -93,6 +106,17 @@ jobs:
       - name: pytest tests/unit
         working-directory: backend
         run: uv run pytest tests/unit -q
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci
+      - name: vitest
+        working-directory: frontend
+        run: npm test
 
   integration:
     name: integration (incl. isolation + RLS coverage)
@@ -235,3 +259,81 @@ jobs:
             echo "::error::A server secret was found in .next/static"; exit 1
           fi
           echo "No sentinel found in $(find .next/static -type f | wc -l) static files"
+
+  e2e:
+    name: e2e (Playwright + axe, real API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # The API under test: app role through RLS, real CSRF/cookies, magic links over SMTP to
+      # MailHog. Every test seeds its own household (frontend/e2e/seed_night.py), so nothing is
+      # shared between tests and retries stay at 0 (07-cicd.md).
+      EMAIL_MODE: smtp
+      SMTP_HOST: localhost
+      SMTP_PORT: "1025"
+      MAILHOG_URL: http://localhost:8025
+      FRONTEND_BASE_URL: http://localhost:3000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      E2E_API_PORT: "8000"
+      E2E_WEB_PORT: "3000"
+      # Rewrites are baked into the build, so `next build` needs it too.
+      API_INTERNAL_URL: http://localhost:8000
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: fnh
+          POSTGRES_PASSWORD: fnh
+          POSTGRES_DB: fnh_dev
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fnh -d fnh_dev"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      mailhog:
+        image: mailhog/mailhog:v1.0.1
+        ports: ["1025:1025", "8025:8025"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: backend
+        run: uv sync --locked
+      - name: Bootstrap fnh_app + fnh_resolver roles
+        run: psql "$OWNER_PSQL_URL" -v ON_ERROR_STOP=1 -f backend/db/init/00-init-app-role.sql
+      - name: alembic upgrade head
+        working-directory: backend
+        run: uv run alembic upgrade head
+      - name: npm ci
+        working-directory: frontend
+        run: npm ci
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: next build
+        working-directory: frontend
+        run: npm run build
+      - name: Playwright (starts uvicorn + next start itself)
+        working-directory: frontend
+        run: npm run test:e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 7
