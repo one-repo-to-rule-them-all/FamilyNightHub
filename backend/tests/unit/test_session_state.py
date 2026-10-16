@@ -124,6 +124,48 @@ def test_effective_status_leaves_other_statuses_alone(status: str) -> None:
     assert ss.effective_status(status, NOW - timedelta(days=1), NOW) == status
 
 
+def test_settle_persists_tonight_only_once_readers_see_it() -> None:
+    old = NOW - ss.REVEAL_SETTLE
+    assert ss.settle("revealed", old, NOW) == "tonight"
+    assert ss.settle("revealed", NOW - timedelta(seconds=29), NOW) is None
+    assert ss.settle("revealed", None, NOW) is None
+
+
+@pytest.mark.parametrize("status", ["draft", "voting", "tonight", "closed"])
+def test_settle_leaves_other_statuses_alone(status: str) -> None:
+    assert ss.settle(status, NOW - timedelta(days=1), NOW) is None
+
+
+@pytest.mark.parametrize("status", STATUSES)
+def test_results_show_only_from_reveal_on(status: str) -> None:
+    assert ss.shows_result(status) is (status in ("revealed", "tonight", "closed"))
+
+
+@pytest.mark.parametrize("status", STATUSES)
+def test_ballots_only_while_voting(status: str) -> None:
+    if status == "voting":
+        ss.check_can_vote(status)
+    else:
+        with pytest.raises(SessionRuleError, match="Voting is not open"):
+            ss.check_can_vote(status)
+
+
+def test_close_voting_is_idempotent() -> None:
+    assert ss.close_voting("voting") == "revealed"
+    for done in ("revealed", "tonight", "closed"):
+        assert ss.close_voting(done) is None
+    with pytest.raises(SessionRuleError):
+        ss.close_voting("draft")
+
+
+def test_close_night_from_tonight_only() -> None:
+    assert ss.close_night("tonight") == "closed"
+    assert ss.close_night("closed") is None
+    for status in ("draft", "voting", "revealed"):
+        with pytest.raises(SessionRuleError):
+            ss.close_night(status)
+
+
 @pytest.mark.parametrize("status", ["tonight", "closed"])
 def test_photos_open_from_tonight(status: str) -> None:
     ss.check_photos_open(status)

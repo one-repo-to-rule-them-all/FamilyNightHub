@@ -28,17 +28,17 @@ class Conflict(ServiceError):
         self.reason = reason
 
 
-class Invalid(ServiceError):
-    """The request is well-formed but what it points at fails a check (e.g. an uploaded
-    photo of the wrong type or size). 422."""
+class Unavailable(ServiceError):
+    """An optional integration is unconfigured or down (e.g. TMDB). 503."""
 
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
 
 
-class Unavailable(ServiceError):
-    """An optional integration is unconfigured or down (e.g. TMDB). 503."""
+class Invalid(ServiceError):
+    """Well-formed input that breaks a domain rule (e.g. a ballot ranking 4 options), or
+    an upload that fails its check (a photo of the wrong type or size). 422."""
 
     def __init__(self, reason: str) -> None:
         super().__init__(reason)

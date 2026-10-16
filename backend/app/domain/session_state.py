@@ -104,3 +104,38 @@ def effective_status(status: str, revealed_at: datetime | None, now: datetime) -
     if status == "revealed" and revealed_at is not None and now - revealed_at >= REVEAL_SETTLE:
         return "tonight"
     return status
+
+
+def settle(status: str, revealed_at: datetime | None, now: datetime) -> Status | None:
+    """The status the next write must persist when readers already see `tonight`, else None."""
+    if effective_status(status, revealed_at, now) != status:
+        return transition(status, "settle")
+    return None
+
+
+RESULT_STATUSES = frozenset({"revealed", "tonight", "closed"})
+
+
+def shows_result(status: str) -> bool:
+    """Ranking and winner stay hidden until reveal (ADR-0006)."""
+    return status in RESULT_STATUSES
+
+
+def check_can_vote(status: str) -> None:
+    """Ballots are cast and replaced only while voting is open."""
+    if status != "voting":
+        raise SessionRuleError("Voting is not open")
+
+
+def close_voting(status: str) -> Status | None:
+    """voting -> revealed. None if voting already closed: a repeat close is a no-op."""
+    if status in RESULT_STATUSES:
+        return None
+    return transition(status, "close_voting")
+
+
+def close_night(status: str) -> Status | None:
+    """tonight -> closed. None if already closed."""
+    if status == "closed":
+        return None
+    return transition(status, "close")

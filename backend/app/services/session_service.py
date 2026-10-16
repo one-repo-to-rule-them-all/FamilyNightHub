@@ -1,10 +1,12 @@
-"""Nights: create, night code, shortlist, open voting, snapshot (03-backend.md "Voting").
+"""Nights: create, night code, shortlist, open/close voting, reveal, history (03-backend.md).
 
 Rules come from app/domain/session_state.py; this module loads, locks and persists. Every
 mutation takes the session row `FOR UPDATE` first, so two hosts racing (adding the 9th
 option, opening twice) serialize on it. Every state change writes an audit row. The
 night code is returned in plaintext exactly once, by `create` and `rotate_code`; only its
-peppered hash is stored. The snapshot never carries ballots or tallies (ADR-0004/0006).
+peppered hash is stored. The snapshot never carries ballots, and carries the ranking
+and winner only from reveal on (ADR-0004/0006). `revealed -> tonight` is lazy: readers see
+`tonight` 30s after reveal, and the next write through `_lock` persists it.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import hash_night_code
 from app.domain import night_code, session_state
 from app.domain.session_state import SessionRuleError
+from app.domain.voting import METHODS
 from app.integrations.tmdb import TmdbClient
 from app.services import movie_service
 from app.services.errors import Conflict, NotFound
@@ -49,6 +52,26 @@ class OptionView:
 
 
 @dataclass(frozen=True)
+class Placement:
+    option_id: uuid.UUID
+    place: int
+    score: int
+    first_places: int
+
+
+@dataclass(frozen=True)
+class VotingResult:
+    """The stored outcome of close_voting; shown from reveal on."""
+
+    winner_option_id: uuid.UUID
+    tie_seed: int
+    tie_group: list[uuid.UUID]
+    tiebreak: str
+    ballot_count: int
+    placements: list[Placement]
+
+
+@dataclass(frozen=True)
 class Snapshot:
     id: uuid.UUID
     title: str | None
@@ -61,6 +84,29 @@ class Snapshot:
     voting_opened_at: datetime | None
     revealed_at: datetime | None
     closed_at: datetime | None
+    # None until the night is revealed (ADR-0006: tallies are hidden while voting).
+    result: VotingResult | None
+
+
+@dataclass(frozen=True)
+class Winner:
+    option_id: uuid.UUID
+    movie_id: uuid.UUID
+    title: str
+    year: int | None
+    poster_path: str | None
+
+
+@dataclass(frozen=True)
+class NightSummary:
+    id: uuid.UUID
+    title: str | None
+    status: str
+    created_at: datetime
+    revealed_at: datetime | None
+    closed_at: datetime | None
+    winner: Winner | None
+    turnout: int
 
 
 @dataclass(frozen=True)
@@ -93,15 +139,33 @@ async def _audit(
     )
 
 
-async def _lock(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.UUID) -> str:
-    """Lock the session row and return its status; NotFound if absent or not ours."""
-    status: str | None = await db.scalar(
-        text("SELECT status FROM sessions WHERE id = :s AND household_id = :h FOR UPDATE"),
-        {"s": session_id, "h": household_id},
-    )
-    if status is None:
+async def _lock(
+    db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, session_id: uuid.UUID
+) -> str:
+    """Lock the session row and return its status; NotFound if absent or not ours.
+    A reveal that readers already see as `tonight` is persisted here (the lazy settle)."""
+    row = (
+        await db.execute(
+            text(
+                "SELECT status, revealed_at FROM sessions "
+                "WHERE id = :s AND household_id = :h FOR UPDATE"
+            ),
+            {"s": session_id, "h": household_id},
+        )
+    ).first()
+    if row is None:
         raise NotFound
-    return status
+    status: str = row.status
+    settled = session_state.settle(status, row.revealed_at, datetime.now(UTC))
+    if settled is None:
+        return status
+    await db.execute(
+        text("UPDATE sessions SET status = :st WHERE id = :s"), {"st": settled, "s": session_id}
+    )
+    await _audit(
+        db, household_id, account_id, "session.settled", session_id, {"from": status, "to": settled}
+    )
+    return settled
 
 
 async def _option_ids(db: AsyncSession, session_id: uuid.UUID) -> list[uuid.UUID]:
@@ -170,7 +234,9 @@ async def rotate_code(
     generate: Any = night_code.generate,
 ) -> str:
     """New code, old one stops working. Phones already joined keep their device cookie."""
-    _rule(session_state.check_can_rotate_code, await _lock(db, household_id, session_id))
+    _rule(
+        session_state.check_can_rotate_code, await _lock(db, household_id, account_id, session_id)
+    )
 
     async def write(code_hash: str) -> None:
         await db.execute(
@@ -191,7 +257,7 @@ async def add_option(
     choice: OptionInput,
     client: TmdbClient | None,
 ) -> uuid.UUID:
-    status = await _lock(db, household_id, session_id)
+    status = await _lock(db, household_id, account_id, session_id)
     existing = await _option_ids(db, session_id)
     _rule(session_state.check_can_add_option, status, len(existing))
 
@@ -251,7 +317,10 @@ async def remove_option(
     session_id: uuid.UUID,
     option_id: uuid.UUID,
 ) -> None:
-    _rule(session_state.check_shortlist_editable, await _lock(db, household_id, session_id))
+    _rule(
+        session_state.check_shortlist_editable,
+        await _lock(db, household_id, account_id, session_id),
+    )
     deleted = await db.execute(
         text("DELETE FROM options WHERE id = :o AND session_id = :s RETURNING id"),
         {"o": option_id, "s": session_id},
@@ -283,7 +352,7 @@ async def reorder(
     session_id: uuid.UUID,
     ordered: list[uuid.UUID],
 ) -> None:
-    status = await _lock(db, household_id, session_id)
+    status = await _lock(db, household_id, account_id, session_id)
     _rule(session_state.check_shortlist_editable, status)
     current = await _option_ids(db, session_id)
     _rule(session_state.check_reorder, [str(o) for o in current], [str(o) for o in ordered])
@@ -294,7 +363,7 @@ async def reorder(
 async def open_voting(
     db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, session_id: uuid.UUID
 ) -> None:
-    status = await _lock(db, household_id, session_id)
+    status = await _lock(db, household_id, account_id, session_id)
     count = len(await _option_ids(db, session_id))
     try:
         opened = session_state.open_voting(status, count)
@@ -317,13 +386,122 @@ async def open_voting(
     )
 
 
+async def _ballots(db: AsyncSession, session_id: uuid.UUID) -> list[dict[str, int]]:
+    rows = await db.execute(
+        text("SELECT person_id, option_id, rank FROM ballot_ranks WHERE session_id = :s"),
+        {"s": session_id},
+    )
+    by_person: dict[uuid.UUID, dict[str, int]] = {}
+    for r in rows:
+        by_person.setdefault(r.person_id, {})[str(r.option_id)] = r.rank
+    return list(by_person.values())
+
+
+_REVEAL = text(
+    "UPDATE sessions SET status = :st, ranking = :ranking, tie_seed = :seed, "
+    "winner_option_id = :w, revealed_at = now() WHERE id = :s"
+).bindparams(bindparam("ranking", type_=JSONB))
+
+
+async def close_voting(
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    account_id: uuid.UUID,
+    session_id: uuid.UUID,
+    *,
+    seed: int,
+) -> None:
+    """voting -> revealed: tally, tie-break, then store ranking + seed + winner in this one
+    transaction (ADR-0006). Idempotent: once revealed, a repeat (or a racing second host,
+    serialized on the row lock) changes nothing and the first result stands."""
+    status = await _lock(db, household_id, account_id, session_id)
+    try:
+        new_status = session_state.close_voting(status)
+    except SessionRuleError as err:
+        raise Conflict(err.reason) from None
+    if new_status is None:
+        return
+    method: str = await db.scalar(
+        text("SELECT voting_method FROM sessions WHERE id = :s"), {"s": session_id}
+    )
+    options = [str(o) for o in await _option_ids(db, session_id)]
+    ranking = METHODS[method](options, await _ballots(db, session_id), seed=seed)
+    await db.execute(
+        _REVEAL,
+        {
+            "st": new_status,
+            "ranking": ranking.to_json(),
+            "seed": ranking.seed,
+            "w": uuid.UUID(ranking.winner),
+            "s": session_id,
+        },
+    )
+    await _audit(
+        db,
+        household_id,
+        account_id,
+        "session.voting_closed",
+        session_id,
+        {
+            "from": status,
+            "to": new_status,
+            "ballots": ranking.ballot_count,
+            "winner_option_id": ranking.winner,
+            "tiebreak": ranking.tiebreak,
+        },
+    )
+
+
+async def close(
+    db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, session_id: uuid.UUID
+) -> None:
+    """tonight -> closed: the night code stops joining. Idempotent once closed."""
+    status = await _lock(db, household_id, account_id, session_id)
+    try:
+        new_status = session_state.close_night(status)
+    except SessionRuleError as err:
+        raise Conflict(err.reason) from None
+    if new_status is None:
+        return
+    await db.execute(
+        text("UPDATE sessions SET status = :st, closed_at = now() WHERE id = :s"),
+        {"st": new_status, "s": session_id},
+    )
+    await _audit(
+        db,
+        household_id,
+        account_id,
+        "session.closed",
+        session_id,
+        {"from": status, "to": new_status},
+    )
+
+
+def _result(row: Any) -> VotingResult | None:
+    """The stored outcome, but only once the night is revealed (ADR-0006)."""
+    if not session_state.shows_result(row.status) or row.ranking is None:
+        return None
+    ranking: dict[str, Any] = row.ranking
+    return VotingResult(
+        winner_option_id=row.winner_option_id,
+        tie_seed=int(row.tie_seed),
+        tie_group=[uuid.UUID(o) for o in ranking["tie_group"]],
+        tiebreak=ranking["tiebreak"],
+        ballot_count=ranking["ballot_count"],
+        placements=[
+            Placement(uuid.UUID(p["option_id"]), p["place"], p["score"], p["first_places"])
+            for p in ranking["placements"]
+        ],
+    )
+
+
 async def snapshot(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.UUID) -> Snapshot:
     row = (
         await db.execute(
             text(
                 "SELECT id, title, status, voting_method, ballot_size, created_at, "
-                "voting_opened_at, revealed_at, closed_at FROM sessions "
-                "WHERE id = :s AND household_id = :h"
+                "voting_opened_at, revealed_at, closed_at, ranking, tie_seed, "
+                "winner_option_id FROM sessions WHERE id = :s AND household_id = :h"
             ),
             {"s": session_id, "h": household_id},
         )
@@ -357,4 +535,51 @@ async def snapshot(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.U
         voting_opened_at=row.voting_opened_at,
         revealed_at=row.revealed_at,
         closed_at=row.closed_at,
+        result=_result(row),
     )
+
+
+# Readers asking for `tonight` must also get stored `revealed` rows that have settled.
+_STORED_AS = {"tonight": ("revealed", "tonight")}
+
+
+async def history(
+    db: AsyncSession, household_id: uuid.UUID, statuses: list[str], limit: int
+) -> list[NightSummary]:
+    """Nights newest first, with the winner, the date and how many people voted. Filtered
+    on the status readers see, so a settled reveal counts as `tonight`."""
+    stored = sorted({s for want in statuses for s in _STORED_AS.get(want, (want,))})
+    rows = await db.execute(
+        text(
+            """
+            SELECT s.id, s.title, s.status, s.created_at, s.revealed_at, s.closed_at,
+                   s.winner_option_id, o.movie_id, m.title AS movie_title, m.year,
+                   m.poster_path,
+                   (SELECT count(DISTINCT br.person_id) FROM ballot_ranks br
+                     WHERE br.session_id = s.id) AS turnout
+            FROM sessions s
+            LEFT JOIN options o ON o.id = s.winner_option_id AND o.session_id = s.id
+            LEFT JOIN movies m ON m.id = o.movie_id AND m.household_id = o.household_id
+            WHERE s.household_id = :h AND s.status = ANY(:stored)
+            ORDER BY coalesce(s.revealed_at, s.created_at) DESC, s.id
+            """
+        ),
+        {"h": household_id, "stored": stored},
+    )
+    now = datetime.now(UTC)
+    nights: list[NightSummary] = []
+    for r in rows:
+        status = session_state.effective_status(r.status, r.revealed_at, now)
+        if status not in statuses:
+            continue
+        winner = None
+        if r.winner_option_id is not None and session_state.shows_result(r.status):
+            winner = Winner(r.winner_option_id, r.movie_id, r.movie_title, r.year, r.poster_path)
+        nights.append(
+            NightSummary(
+                r.id, r.title, status, r.created_at, r.revealed_at, r.closed_at, winner, r.turnout
+            )
+        )
+        if len(nights) == limit:
+            break
+    return nights
