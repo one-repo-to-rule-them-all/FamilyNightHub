@@ -11,12 +11,14 @@ import hashlib
 import hmac
 import secrets
 import uuid
+from dataclasses import dataclass
 
 from fastapi import Response
 
 from app.core.config import settings
 
 DEVICE_COOKIE = "fnh_device"
+ACCOUNT_COOKIE = "fnh_session"
 CSRF_COOKIE = "fnh_csrf"
 CSRF_HEADER = "X-FNH-CSRF"
 
@@ -42,6 +44,71 @@ def hash_night_code(code: str, household_id: uuid.UUID) -> str:
     Bound to the household so equal codes in two households hash differently.
     """
     return _digest(f"night:{household_id}:{code}")
+
+
+def hash_magic_link_token(token: str) -> str:
+    return _digest(f"magic:{token}")
+
+
+# --- Account sessions: signed, stateless cookie ------------------------------------
+#
+# Payload is `{account_id}.{household_id}.{issued_at}` signed with HMAC-SHA256 under
+# SESSION_SECRET. Role and disabled state are NOT in the cookie: CurrentAccount re-reads
+# the account row on every request, so disabling an account cuts its sessions at once.
+# Trade-off: a single stolen session cannot be revoked on its own (disable the account or
+# rotate SESSION_SECRET). See 03-backend.md "Account sessions".
+
+
+@dataclass(frozen=True)
+class AccountClaims:
+    account_id: uuid.UUID
+    household_id: uuid.UUID
+    issued_at: int
+
+
+def _session_mac(payload: str) -> str:
+    return hmac.new(
+        settings.SESSION_SECRET.encode(), f"session:{payload}".encode(), hashlib.sha256
+    ).hexdigest()
+
+
+def sign_account_session(account_id: uuid.UUID, household_id: uuid.UUID, now: int) -> str:
+    payload = f"{account_id}.{household_id}.{now}"
+    return f"{payload}.{_session_mac(payload)}"
+
+
+def verify_account_session(value: str, now: int) -> AccountClaims | None:
+    """Claims for a well-signed, unexpired cookie; None for anything else."""
+    parts = value.split(".")
+    if len(parts) != 4:
+        return None
+    payload, mac = ".".join(parts[:3]), parts[3]
+    if not hmac.compare_digest(mac.encode(), _session_mac(payload).encode()):
+        return None
+    try:
+        claims = AccountClaims(uuid.UUID(parts[0]), uuid.UUID(parts[1]), int(parts[2]))
+    except ValueError:
+        return None
+    max_age = settings.ACCOUNT_SESSION_MAX_AGE_DAYS * 86400
+    if not (claims.issued_at <= now < claims.issued_at + max_age):
+        return None
+    return claims
+
+
+def set_account_cookie(response: Response, value: str) -> None:
+    response.set_cookie(
+        ACCOUNT_COOKIE,
+        value,
+        max_age=settings.ACCOUNT_SESSION_MAX_AGE_DAYS * 86400,
+        path="/",
+        secure=True,
+        httponly=True,
+        samesite="lax",
+    )
+
+
+def clear_account_cookie(response: Response) -> None:
+    response.delete_cookie(ACCOUNT_COOKIE, path="/", secure=True, httponly=True, samesite="lax")
 
 
 def set_device_cookie(response: Response, token: str) -> None:

@@ -114,7 +114,7 @@ async def test_cannot_join_without_a_live_code_for_this_household(
     slug, code = {
         "wrong_code": (a.slug, "ZZZ999"),
         "malformed_code": (a.slug, "!!"),
-        "unknown_slug": ("no-such-family", CODE),
+        "unknown_slug": (f"no-such-{a.slug}", CODE),  # unique: budgets persist in Redis
         "other_households_code": (a.slug, "BBB234"),
         "closed_night": (a.slug, CODE),
     }[case]

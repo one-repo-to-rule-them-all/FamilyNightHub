@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from app.core.config import settings
 from app.core.dependencies import CsrfProtected
-from app.core.rate_limit import Budget, record_failure, retry_after
+from app.core.rate_limit import Budget, retry_after, spend
 from app.core.security import (
     CSRF_COOKIE,
     DEVICE_COOKIE,
@@ -56,7 +56,7 @@ async def join(body: JoinIn, request: Request, response: Response) -> JoinOut:
             label=body.device_label,
         )
     except InvalidJoin:
-        await record_failure(budget, body.slug)
+        await spend(budget, body.slug)
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, "That code doesn't match tonight's night."
         ) from None

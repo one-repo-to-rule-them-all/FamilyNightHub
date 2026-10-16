@@ -40,6 +40,26 @@ class DeviceOut(BaseModel):
     people: list[PersonOut]
 
 
+class MagicLinkIn(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+
+class MagicLinkOut(BaseModel):
+    detail: str
+
+
+class VerifyIn(BaseModel):
+    token: str = Field(min_length=20, max_length=128)
+
+
+class AccountOut(BaseModel):
+    id: uuid.UUID
+    email: str
+    display_name: str
+    role: Literal["admin", "host"]
+    household_name: str
+
+
 class BindingOut(BaseModel):
     person_id: uuid.UUID
     status: Literal["active", "pending"]

@@ -38,7 +38,29 @@ class Settings(BaseSettings):
     # Sliding expiry: re-issue the cookie and stamp last_seen_at at most this often.
     DEVICE_TOUCH_INTERVAL_SECONDS: int = 3600
 
+    # --- Accounts (ADR-0002: hosts and admins sign in by magic link) ---
+    MAGIC_LINK_TTL_MINUTES: int = 15
+    # Signed, stateless session cookie (03-backend.md "Account sessions").
+    ACCOUNT_SESSION_MAX_AGE_DAYS: int = 30
+    # Where the emailed link points: the frontend's /auth/callback page.
+    FRONTEND_BASE_URL: str = "http://localhost:3000"
+
+    # --- Email ---
+    # "log" prints the message (dev without MailHog, tests); "smtp" sends it. MailHog locally,
+    # the provider's SMTP endpoint (e.g. Resend) on Fly with EMAIL_API_KEY as the password.
+    EMAIL_MODE: Literal["log", "smtp"] = "log"
+    EMAIL_FROM: str = "Family Night <movie-night@localhost>"
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 51025
+    SMTP_USERNAME: str | None = None
+    EMAIL_API_KEY: str | None = None
+    SMTP_STARTTLS: bool = False
+
     # --- Rate limiting ---
+    # Magic-link requests per email address (every request counts, known or not, so the
+    # limiter reveals nothing about which emails have accounts).
+    MAGIC_LINK_REQUEST_LIMIT: int = 5
+    MAGIC_LINK_REQUEST_WINDOW_SECONDS: int = 900
     # Join failures per join slug (never per client IP: a family shares one NAT address,
     # and forwarded headers are spoofable). 30 per 15 min puts a 6-char night code out of
     # brute-force reach; a host-approved join still works if someone burns the budget.
