@@ -32,11 +32,11 @@ primary_region = "dfw"
   EMAIL_MODE = "smtp"
   SMTP_STARTTLS = "true"
   # Photos bucket (ADR-0005). Plain env, not secrets: without them STORAGE_BUCKET would
-  # fall back to the code default "fnh-photos", which is PRODUCTION's bucket. Rename here
+  # fall back to the code default "fnh-photos", a bucket we don't own. Rename here
   # if the global Tigris name is taken (runbooks/first-deploy.md step 4). The keys are
   # secrets: STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY.
   STORAGE_ENDPOINT = "https://fly.storage.tigris.dev"
-  STORAGE_BUCKET = "fnh-photos"
+  STORAGE_BUCKET = "fnh-rbj-photos"
   STORAGE_REGION = "auto"
 
 [http_service]
