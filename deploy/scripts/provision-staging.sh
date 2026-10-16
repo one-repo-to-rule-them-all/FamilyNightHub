@@ -79,7 +79,9 @@ say "Step 2: apps"
 for app in "$API" "$WORKER" "$WEB"; do
   if app_exists "$app"; then note "$app exists"; else fly apps create "$app" --org "$ORG"; fi
 done
-if fly ips list -a "$API" 2>/dev/null | grep -qi "private"; then
+# Match the JSON type field: the table output also prints a docs link containing "private",
+# which made a fresh app look allocated (and the web's .flycast URL then fails).
+if fly ips list -a "$API" --json 2>/dev/null | grep -q '"Type": *"private_v6"'; then
   note "$API already has a private address"
 else
   fly ips allocate-v6 --private -a "$API"
