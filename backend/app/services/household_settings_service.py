@@ -27,6 +27,7 @@ class HouseholdSettings:
     default_voting_method: str
     default_age_cap: str | None
     region: str
+    streaming_providers: list[int]
     updated_at: datetime
 
 
@@ -56,14 +57,19 @@ async def get(db: AsyncSession, household_id: uuid.UUID) -> HouseholdSettings:
         await db.execute(
             text(
                 "SELECT h.join_slug, s.default_voting_method, s.default_age_cap, s.region, "
-                "s.updated_at FROM households h JOIN settings s ON s.household_id = h.id "
-                "WHERE h.id = :h"
+                "s.streaming_providers, s.updated_at "
+                "FROM households h JOIN settings s ON s.household_id = h.id WHERE h.id = :h"
             ),
             {"h": household_id},
         )
     ).one()
     return HouseholdSettings(
-        row.join_slug, row.default_voting_method, row.default_age_cap, row.region, row.updated_at
+        row.join_slug,
+        row.default_voting_method,
+        row.default_age_cap,
+        row.region,
+        list(row.streaming_providers or []),
+        row.updated_at,
     )
 
 
@@ -75,7 +81,7 @@ async def update(
 ) -> HouseholdSettings:
     """`changes` holds only the fields the caller sent (None clears `default_age_cap`).
     Column names come from this fixed allow-list, never from the request."""
-    allowed = ("default_voting_method", "default_age_cap", "region")
+    allowed = ("default_voting_method", "default_age_cap", "region", "streaming_providers")
     fields = {k: v for k, v in changes.items() if k in allowed}
     current = await get(db, household_id)
     if fields:

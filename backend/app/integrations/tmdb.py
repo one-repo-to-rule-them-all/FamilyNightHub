@@ -8,6 +8,7 @@ also inject an httpx transport. Nothing in CI ever reaches the real API.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
@@ -15,6 +16,9 @@ from urllib.parse import urlencode
 import httpx
 
 from app.core.config import settings
+from app.domain.generator import GENRE_NAMES
+
+MAX_CACHE_KEY = 300  # tmdb_cache.cache_key is String(300)
 
 
 class TmdbUnavailable(Exception):
@@ -38,7 +42,12 @@ class TmdbMovie:
 def cache_key(path: str, params: dict[str, str]) -> str:
     """Stable key for `tmdb_cache`: the path plus its params in sorted order."""
     query = urlencode(sorted(params.items()))
-    return f"{path}?{query}" if query else path
+    key = f"{path}?{query}" if query else path
+    if len(key) <= MAX_CACHE_KEY:
+        return key
+    # Long discover queries (many providers) still fit the column, and stay readable.
+    digest = hashlib.sha256(key.encode()).hexdigest()
+    return f"{key[: MAX_CACHE_KEY - 65]}#{digest}"
 
 
 def _year(release_date: Any) -> int | None:
@@ -69,6 +78,68 @@ def parse_movie(item: dict[str, Any]) -> TmdbMovie:
 
 def parse_search(payload: dict[str, Any]) -> list[TmdbMovie]:
     return [parse_movie(r) for r in payload.get("results") or [] if isinstance(r, dict)]
+
+
+@dataclass(frozen=True)
+class DiscoverPage:
+    movies: list[TmdbMovie]
+    total_pages: int
+
+
+def parse_discover(payload: dict[str, Any]) -> DiscoverPage:
+    """A /discover/movie page. List results carry `genre_ids`, mapped to TMDB's names."""
+    movies = []
+    for item in payload.get("results") or []:
+        if not isinstance(item, dict) or item.get("adult") is True:
+            continue
+        movie = parse_movie(item)
+        names = tuple(GENRE_NAMES[g] for g in item.get("genre_ids") or [] if g in GENRE_NAMES)
+        movies.append(
+            TmdbMovie(movie.tmdb_id, movie.title, movie.year, movie.poster_path, genres=names)
+        )
+    total = payload.get("total_pages")
+    return DiscoverPage(movies, total if isinstance(total, int) and total > 0 else 1)
+
+
+# Release types (TMDB /movie/{id}/release_dates): theatrical first, premiere last-but-one.
+_CERT_TYPE_ORDER = (3, 2, 4, 5, 6, 1)
+
+
+def parse_us_cert(payload: dict[str, Any]) -> str | None:
+    """The US certification from /movie/{id}/release_dates: the first non-empty one by
+    release type (theatrical, limited, digital, physical, TV, premiere). None if unrated."""
+    best: tuple[int, str] | None = None
+    for country in payload.get("results") or []:
+        if not isinstance(country, dict) or country.get("iso_3166_1") != "US":
+            continue
+        for rel in country.get("release_dates") or []:
+            cert = rel.get("certification") if isinstance(rel, dict) else None
+            if not isinstance(cert, str) or not cert.strip():
+                continue
+            rtype = rel.get("type")
+            rank = _CERT_TYPE_ORDER.index(rtype) if rtype in _CERT_TYPE_ORDER else 99
+            if best is None or rank < best[0]:
+                best = (rank, cert.strip()[:8])
+    return None if best is None else best[1]
+
+
+@dataclass(frozen=True)
+class Provider:
+    provider_id: int
+    name: str
+
+
+def parse_flatrate(payload: dict[str, Any], region: str) -> list[Provider]:
+    """Subscription (flatrate) providers for `region` from /movie/{id}/watch/providers.
+    This data comes from JustWatch and must be attributed wherever it is shown."""
+    country = (payload.get("results") or {}).get(region)
+    if not isinstance(country, dict):
+        return []
+    return [
+        Provider(int(p["provider_id"]), str(p["provider_name"]))
+        for p in country.get("flatrate") or []
+        if isinstance(p, dict) and p.get("provider_id") is not None and p.get("provider_name")
+    ]
 
 
 class TmdbClient:
@@ -116,3 +187,30 @@ def configured_client() -> TmdbClient | None:
     return TmdbClient(
         settings.TMDB_BASE_URL, settings.TMDB_READ_TOKEN, timeout=settings.TMDB_TIMEOUT_SECONDS
     )
+
+
+@dataclass(frozen=True)
+class ListedProvider:
+    provider_id: int
+    name: str
+    logo_path: str | None
+    priority: int
+
+
+def parse_provider_list(payload: dict[str, Any], region: str) -> list[ListedProvider]:
+    """/watch/providers/movie, most prominent in `region` first (JustWatch data)."""
+    out = []
+    for p in payload.get("results") or []:
+        if not isinstance(p, dict) or p.get("provider_id") is None or not p.get("provider_name"):
+            continue
+        priorities = p.get("display_priorities") or {}
+        priority = priorities.get(region, p.get("display_priority"))
+        out.append(
+            ListedProvider(
+                int(p["provider_id"]),
+                str(p["provider_name"]),
+                _str_or_none(p.get("logo_path")),
+                priority if isinstance(priority, int) else 9999,
+            )
+        )
+    return sorted(out, key=lambda p: (p.priority, p.name))
