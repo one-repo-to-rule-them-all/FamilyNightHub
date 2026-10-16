@@ -2,8 +2,13 @@
 
 The household always comes from the credential. `current_device` resolves the cookie via
 the ADR-0009 resolver (no GUC needed), then `device_db` opens the one transaction the
-request runs in, with `app.household_id` set. Commit happens when the dependency exits,
-before the response is sent.
+request runs in, with `app.household_id` set.
+
+The three transaction dependencies are declared with `scope="function"`: they exit, and so
+COMMIT, when the path operation returns and BEFORE the response is sent. FastAPI's default
+("request") would commit after the client already has its 200, so a phone refetching right
+after a write could read the pre-write state, and a failed commit would surface after
+success was reported. tests/integration/test_commit_before_response.py pins this.
 """
 
 from __future__ import annotations
@@ -87,7 +92,7 @@ async def _touch_device(session: AsyncSession, device: DeviceContext, response: 
         set_device_cookie(response, device.token)
 
 
-DeviceDb = Annotated[AsyncSession, Depends(device_db)]
+DeviceDb = Annotated[AsyncSession, Depends(device_db, scope="function")]
 
 
 @dataclass(frozen=True)
@@ -127,7 +132,7 @@ async def account_db(account: CurrentAccount) -> AsyncIterator[AsyncSession]:
         yield session
 
 
-AccountDb = Annotated[AsyncSession, Depends(account_db)]
+AccountDb = Annotated[AsyncSession, Depends(account_db, scope="function")]
 
 
 def require_permission(permission: Permission) -> Callable[..., Awaitable[AccountContext]]:
@@ -177,7 +182,7 @@ async def viewer_db(viewer: CurrentViewer, response: Response) -> AsyncIterator[
         yield session
 
 
-ViewerDb = Annotated[AsyncSession, Depends(viewer_db)]
+ViewerDb = Annotated[AsyncSession, Depends(viewer_db, scope="function")]
 
 
 async def require_csrf(request: Request) -> None:
