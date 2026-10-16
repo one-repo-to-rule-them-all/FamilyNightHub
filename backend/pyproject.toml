@@ -64,3 +64,6 @@ markers = ["integration: needs Postgres + Redis (docker compose up -d db redis)"
 [tool.coverage.run]
 source = ["app"]
 branch = true
+# SQLAlchemy async runs DB calls in greenlets; without this, lines that resume after an
+# awaited query are reported as missed even though tests execute them.
+concurrency = ["greenlet", "thread"]

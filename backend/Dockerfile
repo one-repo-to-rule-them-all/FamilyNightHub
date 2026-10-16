@@ -23,4 +23,6 @@ COPY migrations ./migrations
 USER fnh
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# No --forwarded-allow-ips "*": trusting X-Forwarded-For from anyone lets a client spoof its
+# address. Nothing keys on client IP (rate limits key on slugs; app/core/rate_limit.py).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
