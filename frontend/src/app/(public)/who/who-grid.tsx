@@ -8,6 +8,7 @@ import { ApiErrorNotice } from "@/components/api-error-notice";
 import { RatePromptCard } from "@/components/night/rate-prompt-card";
 import { buttonVariants } from "@/components/ui/button";
 import { api, type ApiError, type Binding, type NightSummary, type Person } from "@/lib/api";
+import { pendingPollInterval } from "@/lib/live";
 import { cn } from "@/lib/utils";
 
 const PEOPLE = ["people"] as const;
@@ -27,7 +28,12 @@ const STATE_LABEL: Record<Person["binding"], string | null> = {
 
 export function WhoGrid() {
   const queryClient = useQueryClient();
-  const people = useQuery<Person[], ApiError>({ queryKey: PEOPLE, queryFn: api.people });
+  // While a claim waits for the host, poll so the tile flips to `mine` once it is approved.
+  const people = useQuery<Person[], ApiError>({
+    queryKey: PEOPLE,
+    queryFn: api.people,
+    refetchInterval: (query) => pendingPollInterval(query.state.data),
+  });
   const claim = useMutation<Binding, ApiError, string>({
     mutationFn: api.claimPerson,
     onSettled: () => queryClient.invalidateQueries({ queryKey: PEOPLE }),

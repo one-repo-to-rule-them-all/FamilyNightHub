@@ -16,6 +16,7 @@ import { canOpenVoting, MAX_OPTIONS, MIN_OPTIONS } from "@/lib/shortlist";
 
 import { NightCodeCard } from "../night-code-card";
 import { STATUS_LABEL } from "../status";
+import { CandidateRoller } from "./candidate-roller";
 import { MovieSearch } from "./movie-search";
 import { ShortlistEditor } from "./shortlist-editor";
 import { VotingPanel } from "./voting-panel";
@@ -76,6 +77,7 @@ function DraftStage({ night }: { night: Night }) {
   return (
     <>
       <ShortlistEditor night={night} />
+      <CandidateRoller night={night} />
       <MovieSearch night={night} />
       <div className="flex flex-col gap-2">
         <ApiErrorNotice error={open.error} />

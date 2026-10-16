@@ -230,6 +230,13 @@ export const api = {
     request<Schemas["VotersOut"]>("GET", `/sessions/${encodeURIComponent(sessionId)}/voters`),
   proxyBallot: (sessionId: string, body: Schemas["BallotIn"]) =>
     request<void>("PUT", `/sessions/${encodeURIComponent(sessionId)}/ballots/proxy`, body),
+  /** Roll candidates for a draft night (ADR-0007). Nothing is added; picks go via addOption. */
+  generate: (sessionId: string, body: Schemas["GenerateIn"]) =>
+    request<Schemas["GenerateOut"]>(
+      "POST",
+      `/sessions/${encodeURIComponent(sessionId)}/generate`,
+      body,
+    ),
   searchTmdb: (q: string) =>
     request<TmdbResult[]>("GET", `/tmdb/search?${new URLSearchParams({ q }).toString()}`),
 

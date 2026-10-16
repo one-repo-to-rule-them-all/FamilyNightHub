@@ -32,7 +32,7 @@ from app.domain import generator
 from app.domain.generator import Candidate, Filters, History, Key, Pools, Title
 from app.integrations import tmdb
 from app.integrations.tmdb import TmdbClient, TmdbMovie, TmdbNotFound
-from app.services import movie_service
+from app.services import movie_service, rating_service
 from app.services.errors import Conflict, NotFound, Unavailable
 
 PAGE_WINDOW = 50
@@ -117,27 +117,27 @@ async def _skip_keys(db: AsyncSession, household_id: uuid.UUID, session_id: uuid
 
 async def _history(db: AsyncSession, household_id: uuid.UUID) -> History:
     """Winners revealed in the last 12 months, with the family's average rating of that
-    title across every night it won."""
-    rows = await db.execute(
-        text(
-            f"""
-            SELECT m.id, m.tmdb_id,
-                   (SELECT avg(r.score) FROM ratings r
-                      JOIN sessions s2 ON s2.id = r.session_id
-                      JOIN options o2 ON o2.id = s2.winner_option_id
-                     WHERE o2.movie_id = m.id) AS avg_score
-              FROM sessions s
-              JOIN options o ON o.id = s.winner_option_id
-              JOIN movies m ON m.id = o.movie_id
-             WHERE s.household_id = :h
-               AND s.revealed_at >= now() - interval '{HISTORY_MONTHS} months'
-            """
-        ),
-        {"h": household_id},
-    )
+    title across every night it won (`rating_service.average_ratings`, one query)."""
+    rows = (
+        await db.execute(
+            text(
+                f"""
+                SELECT DISTINCT m.id, m.tmdb_id
+                  FROM sessions s
+                  JOIN options o ON o.id = s.winner_option_id
+                  JOIN movies m ON m.id = o.movie_id
+                 WHERE s.household_id = :h
+                   AND s.revealed_at >= now() - interval '{HISTORY_MONTHS} months'
+                """
+            ),
+            {"h": household_id},
+        )
+    ).all()
+    averages = await rating_service.average_ratings(db, [r.id for r in rows])
     watched: dict[Key, float | None] = {}
     for r in rows:
-        avg = None if r.avg_score is None else float(r.avg_score)
+        rating = averages.get(r.id)
+        avg = None if rating is None else rating.average
         for key in generator.keys_of(r.tmdb_id, r.id):
             watched[key] = avg
     return History(watched)

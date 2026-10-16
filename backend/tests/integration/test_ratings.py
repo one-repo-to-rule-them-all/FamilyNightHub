@@ -324,6 +324,8 @@ async def test_average_rating_for_the_generator(two_households: Pair) -> None:
         last_year = await rating_service.average_rating(db, movie, year_ago)
         ever = await rating_service.average_rating(db, movie, year_ago - timedelta(days=3650))
         unrated = await rating_service.average_rating(db, uuid.uuid4(), year_ago)
+        batch = await rating_service.average_ratings(db, [movie, uuid.uuid4()])
+        none_asked = await rating_service.average_ratings(db, [])
     async with household_session(b.household_id) as db:
         cross_household = await rating_service.average_rating(db, movie, year_ago)
 
@@ -331,5 +333,7 @@ async def test_average_rating_for_the_generator(two_households: Pair) -> None:
     assert ever is not None and ever.count == 3
     assert ever.average == pytest.approx(10 / 3)
     assert unrated is None
+    assert batch == {movie: ever}  # no `since`: every night it won; unrated ids are absent
+    assert none_asked == {}
     assert cross_household is None
     assert other_night  # household b's night exists but never counts for a's movie

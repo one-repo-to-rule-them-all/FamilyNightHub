@@ -285,6 +285,25 @@ async def test_history_skips_recent_unless_loved_and_blocked_never_roll(
     assert body["attribution"]["justwatch"] is None
 
 
+async def test_the_rescue_line_is_an_average_of_exactly_four(two_households: Pair) -> None:
+    """ADR-0007: a recent winner rolls again only if its family average is 4 or higher.
+    The average spans every night it won, so an older night counts toward it too."""
+    a, _ = two_households
+    four = await _movie(a, "Average 4.0", owned=True)
+    just_under = await _movie(a, "Average 3.9", owned=True)
+    lifted = await _movie(a, "Lifted by an old night", owned=True)
+    await _watched(a, four, timedelta(days=200), [5, 3])
+    await _watched(a, just_under, timedelta(days=90), [4] * 9 + [3])
+    await _watched(a, lifted, timedelta(days=20), [3])
+    await _watched(a, lifted, timedelta(days=500), [5, 5])  # avg over both nights: 13/3
+    with tmdb(None):
+        async with phone() as p:
+            await _host(p, a)
+            sid = await _night(p)
+            resp = await _generate(p, sid, {"count": 20, "age_cap": None})
+    assert {c["movie_id"] for c in resp.json()["candidates"]} == {str(four), str(lifted)}
+
+
 async def test_titles_already_on_the_shortlist_are_not_rolled(two_households: Pair) -> None:
     a, _ = two_households
     first = await _movie(a, "Already picked", owned=True)
