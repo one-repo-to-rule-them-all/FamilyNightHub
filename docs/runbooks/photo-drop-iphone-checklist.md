@@ -46,5 +46,9 @@ what you want.
 - **5 fails:** stop the release. The GPS strip is a privacy property (ADR-0005); the bucket copy
   must be deleted (admin hard delete) and the pipeline fixed first.
 - **PUTs fail with a CORS error in the console:** the bucket's CORS rule doesn't list the web
-  origin (Tigris bucket config for `fnh-web-staging` / prod; locally and in CI
-  `frontend/e2e/setup_bucket.py` sets it).
+  origin. On staging / prod the deploy sets it (`deploy/bucket-cors.sh`, 07-cicd "Photos bucket
+  CORS"): check the last Deploy run's "Photos bucket CORS" step. A "Bucket CORS skipped" notice
+  means the environment lacks `PHOTOS_BUCKET` / `BUCKET_ADMIN_*` ([restore runbook
+  §1.4](restore.md#14-tigris-buckets)); a new web origin goes in that environment's
+  `api.fly.toml` `CORS_ALLOWED_ORIGINS`, then redeploy. Locally and in CI,
+  `frontend/e2e/setup_bucket.py` sets it.

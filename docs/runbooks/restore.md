@@ -103,6 +103,12 @@ reads the `STORAGE_*` / `BACKUP_STORAGE_*` names in 02's secrets map, so remove 
 ones (`fly secrets unset`) and set the 02 names (`STORAGE_ENDPOINT=https://fly.storage.tigris.dev`,
 `STORAGE_REGION=auto`). `BACKUP_STORAGE_*` stays inert until `backup_new_photos` lands.
 
+**CORS for phone uploads.** Create one more key per photos bucket that can change its config
+(Tigris dashboard, scoped to that bucket only) and put it **only** in the GitHub environment,
+never on a Fly app: secrets `BUCKET_ADMIN_ACCESS_KEY_ID` / `BUCKET_ADMIN_SECRET_ACCESS_KEY`, plus
+variable `PHOTOS_BUCKET` (`fnh-photos-staging` on `staging`, `fnh-photos` on `production`). The
+next Deploy run sets the rule (07-cicd "Photos bucket CORS"); re-run it by hand to apply now.
+
 ### 1.5 Secrets (02 "Secrets map")
 
 ```bash
