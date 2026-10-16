@@ -27,7 +27,12 @@ export default defineConfig({
   use: { baseURL, trace: "retain-on-failure" },
   projects: [
     { name: "pixel", use: { ...devices["Pixel 7"] } },
-    { name: "iphone", use: { ...devices["iPhone 13"], browserName: "chromium" } },
+    {
+      name: "iphone",
+      use: { ...devices["iPhone 13"], browserName: "chromium" },
+      // The acceptance journey opens its own iPhone and Pixel contexts; once per run is enough.
+      testIgnore: /acceptance\.spec\.ts/,
+    },
   ],
   webServer: [
     {

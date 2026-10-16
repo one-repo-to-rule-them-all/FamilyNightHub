@@ -1,29 +1,16 @@
-import { type Page } from "@playwright/test";
-
 import {
   apiFromPhone,
   expectNoAxeViolations,
   hostClosesVoting,
   joinAs,
   newPhone,
+  poster,
+  vote,
 } from "./support/phones";
 import { expect, seedNight, test } from "./support/seed";
 
 /** Generous: the reveal arrives live, but a dropped stream would fall back to the 5s poll. */
 const REVEAL_TIMEOUT = 15_000;
-
-const poster = (page: Page, title: string) =>
-  page.getByRole("button", { name: new RegExp(`^(Pick \\d )?${title}`) });
-
-/** Tap posters in order, then Done; the confirmation lists what the server saved. */
-async function vote(page: Page, name: string, titles: string[]) {
-  await expect(page.getByTestId("voting-as")).toHaveText(name);
-  for (const title of titles) await poster(page, title).click();
-  await page.getByRole("button", { name: "Done" }).click();
-  await expect(page.getByRole("heading", { name: `Thanks, ${name}!` })).toBeVisible();
-  const saved = page.getByTestId("saved-picks").getByRole("listitem");
-  await expect(saved).toHaveText(titles.map((title, i) => `Pick ${i + 1}${title}`));
-}
 
 test.describe("phone voting", () => {
   test("two phones vote for their own people and see the same winner", async ({

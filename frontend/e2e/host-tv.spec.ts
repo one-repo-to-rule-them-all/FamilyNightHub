@@ -1,6 +1,11 @@
 import { devices } from "@playwright/test";
 
-import { castPhoneBallot, expectNoAxeViolations, signInAsHost } from "./support/host";
+import {
+  castPhoneBallot,
+  expectNoAxeViolations,
+  pinTieBreakSeed,
+  signInAsHost,
+} from "./support/host";
 import { expect, test } from "./support/seed";
 
 /** The tie-break seed the host's close pins (honoured only with ENVIRONMENT=test, 07-cicd.md). */
@@ -134,11 +139,7 @@ test.describe("host and TV", () => {
     await expectNoAxeViolations(tv);
 
     // --- Close with a pinned tie-break seed; the TV spins and lands on the stored winner.
-    await page.route("**/api/v1/sessions/*/close-voting", (route) =>
-      route.continue({
-        headers: { ...route.request().headers(), "x-fnh-test-seed": TEST_SEED },
-      }),
-    );
+    await pinTieBreakSeed(page, TEST_SEED);
     await page.getByRole("button", { name: "Close voting" }).click();
     await expect(page.getByTestId("winner-title")).toHaveText("Paddington");
 

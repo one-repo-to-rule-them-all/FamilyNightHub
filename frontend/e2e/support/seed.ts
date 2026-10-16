@@ -4,17 +4,21 @@ import path from "node:path";
 
 import { test as base } from "@playwright/test";
 
-export type SeededNight = {
+/** A household and its people (Ava, Leo, Mia), with no night yet. */
+export type SeededHousehold = {
   slug: string;
-  nightCode: string;
   householdName: string;
   adminEmail: string;
   people: string[];
+  /** A signed `fnh_session` value for the household's admin (see seed_night.py). */
+  hostCookie: string;
+};
+
+export type SeededNight = SeededHousehold & {
+  nightCode: string;
   sessionId: string;
   /** Shortlist titles in display order (empty unless seeded with `movies`). */
   movies: string[];
-  /** A signed `fnh_session` value for the household's admin (see seed_night.py). */
-  hostCookie: string;
 };
 
 export type SeedOptions = {
@@ -30,11 +34,21 @@ const BACKEND = path.resolve(__dirname, "../../../backend");
 
 /** A fresh household + night through e2e/seed_night.py (same env as the API under test). */
 export function seedNight(options: SeedOptions = {}): SeededNight {
-  const slug = `e2e-${randomBytes(5).toString("hex")}`;
-  const args = ["run", "python", "../frontend/e2e/seed_night.py", "--slug", slug];
+  const args: string[] = [];
   if (options.movies) args.push("--movies", String(options.movies));
   if (options.openVoting) args.push("--open-voting");
   if (options.tonight) args.push("--tonight");
+  return runSeed(args) as SeededNight;
+}
+
+/** A fresh household with its people and no night: the host starts one through the UI. */
+export function seedHousehold(): SeededHousehold {
+  return runSeed(["--no-night"]);
+}
+
+function runSeed(extra: string[]): SeededHousehold {
+  const slug = `e2e-${randomBytes(5).toString("hex")}`;
+  const args = ["run", "python", "../frontend/e2e/seed_night.py", "--slug", slug, ...extra];
   const result = spawnSync("uv", args, {
     cwd: BACKEND,
     encoding: "utf8",
@@ -44,7 +58,7 @@ export function seedNight(options: SeedOptions = {}): SeededNight {
     throw new Error(`seed_night.py failed (${result.status}): ${result.stderr || result.error}`);
   }
   const line = result.stdout.trim().split(/\r?\n/).at(-1) ?? "";
-  return JSON.parse(line) as SeededNight;
+  return JSON.parse(line) as SeededHousehold;
 }
 
 /** `night`: a household of its own per test, so tests never share state and need no cleanup. */

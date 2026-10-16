@@ -11,6 +11,8 @@ shortlist. `--movies N` adds N typed titles through session_service (the host's 
 `--open-voting` opens voting, so ballot_size = min(3, N - 1) exactly as the API would fix it.
 `--tonight` goes on through the host's close (no ballots, pinned seed) and backdates the reveal
 past REVEAL_SETTLE, so the night is `tonight` and its photo album is open (ADR-0005).
+`--no-night` seeds the household and its people only (`sessionId`/`nightCode` are null): the
+acceptance spec starts its night from the host's phone, as a family would.
 `hostCookie` is a signed `fnh_session` value for the household's admin, so a test can act as
 the host through the API (close voting with X-FNH-Test-Seed) without a magic-link round trip.
 
@@ -27,12 +29,13 @@ import json
 import os
 import sys
 import time
+import uuid
 
 sys.path.insert(0, os.getcwd())
 
 from sqlalchemy import text  # noqa: E402
 
-from app.cli import bootstrap  # noqa: E402
+from app.cli import Bootstrapped, bootstrap  # noqa: E402
 from app.core.database import household_session  # noqa: E402
 from app.core.security import hash_night_code, sign_account_session  # noqa: E402
 from app.domain import night_code  # noqa: E402
@@ -56,11 +59,14 @@ MOVIES = [
 ]
 
 
-async def seed(slug: str, movies: int, open_voting: bool, tonight: bool) -> dict[str, object]:
+async def seed(
+    slug: str, movies: int, open_voting: bool, tonight: bool, night: bool = True
+) -> dict[str, object]:
     household = f"E2E {slug}"
     email = f"host-{slug}@e2e.test"
     created = await bootstrap(household, slug, email, "E2E Host")
-    code = night_code.generate()
+    code: str | None = night_code.generate() if night else None
+    session_id = None
     titles = MOVIES[:movies]
     async with household_session(created.household_id) as db:
         for name, emoji, color in PEOPLE:
@@ -71,7 +77,27 @@ async def seed(slug: str, movies: int, open_voting: bool, tonight: bool) -> dict
                 ),
                 {"h": created.household_id, "n": name, "e": emoji, "c": color},
             )
-        session_id = (
+    if code is not None:
+        session_id = await _seed_night(created, code, titles, open_voting, tonight)
+    return {
+        "slug": slug,
+        "nightCode": code,
+        "householdName": household,
+        "adminEmail": email,
+        "people": [name for name, _, _ in PEOPLE],
+        "sessionId": None if session_id is None else str(session_id),
+        "movies": titles,
+        "hostCookie": sign_account_session(
+            created.account_id, created.household_id, int(time.time())
+        ),
+    }
+
+
+async def _seed_night(
+    created: Bootstrapped, code: str, titles: list[str], open_voting: bool, tonight: bool
+) -> uuid.UUID:
+    async with household_session(created.household_id) as db:
+        session_id: uuid.UUID = (
             await db.execute(
                 text(
                     "INSERT INTO sessions (household_id, title, status, night_code_hash, "
@@ -108,18 +134,7 @@ async def seed(slug: str, movies: int, open_voting: bool, tonight: bool) -> dict
                 ),
                 {"s": session_id},
             )
-    return {
-        "slug": slug,
-        "nightCode": code,
-        "householdName": household,
-        "adminEmail": email,
-        "people": [name for name, _, _ in PEOPLE],
-        "sessionId": str(session_id),
-        "movies": titles,
-        "hostCookie": sign_account_session(
-            created.account_id, created.household_id, int(time.time())
-        ),
-    }
+    return session_id
 
 
 def main() -> int:
@@ -128,10 +143,14 @@ def main() -> int:
     parser.add_argument("--movies", type=int, default=0, choices=range(len(MOVIES) + 1))
     parser.add_argument("--open-voting", action="store_true")
     parser.add_argument("--tonight", action="store_true", help="needs --movies >= 2")
+    parser.add_argument("--no-night", action="store_true", help="household and people only")
     args = parser.parse_args()
     if args.tonight and args.movies < 2:
         parser.error("--tonight needs --movies 2 or more")
-    print(json.dumps(asyncio.run(seed(args.slug, args.movies, args.open_voting, args.tonight))))
+    if args.no_night and (args.movies or args.open_voting or args.tonight):
+        parser.error("--no-night takes no --movies, --open-voting or --tonight")
+    seeded = seed(args.slug, args.movies, args.open_voting, args.tonight, not args.no_night)
+    print(json.dumps(asyncio.run(seeded)))
     return 0
 
 

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { api, type ApiError, liveStreamUrl, type Night } from "@/lib/api";
-import { LiveConnection, type LiveState, POLL_MS, pollWhileDown } from "@/lib/live";
+import { LiveConnection, type LiveState, nightPollInterval, POLL_MS } from "@/lib/live";
 
 export { type LiveState, POLL_MS };
 
@@ -16,7 +16,8 @@ export const nightKey = (sessionId: string) => ["night", sessionId] as const;
  * Mints an SSE ticket and opens the night's stream (`LiveConnection`). Every event, and every
  * (re)open, invalidates `["night", id]`, which by prefix also refreshes anything keyed under it
  * (the voters list). The snapshot is the only source of truth: events are never read. While the
- * stream is down the snapshot polls every 5s, and it refetches when the tab becomes visible.
+ * stream is down (or the night is `revealed`) the snapshot polls every 5s, and it refetches
+ * when the tab becomes visible.
  * `live` is `ready` while the stream is open, else `reconnecting`; screens render it as
  * `data-live`, which the e2e specs wait on.
  */
@@ -27,7 +28,8 @@ export function useLiveSession(sessionId: string) {
   const query = useQuery<Night, ApiError>({
     queryKey: nightKey(sessionId),
     queryFn: () => api.night(sessionId),
-    refetchInterval: pollWhileDown(live),
+    // Also while `revealed`: the lazy settle into `tonight` sends no event (see live.ts).
+    refetchInterval: (query) => nightPollInterval(live, query.state.data?.status),
     // Keep polling in a background tab too: a phone left on the ballot must see the reveal.
     refetchIntervalInBackground: true,
   });
