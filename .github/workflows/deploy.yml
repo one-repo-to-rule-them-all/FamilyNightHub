@@ -164,7 +164,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6; pinned: this job holds FLY_API_TOKEN
         if: steps.gate.outputs.enabled == 'true'
       - name: Pull images by digest
         # --local-only below pushes from this runner's Docker daemon to Fly's registry, so
@@ -264,7 +264,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6; pinned: this job holds FLY_API_TOKEN
         if: steps.gate.outputs.enabled == 'true'
       - name: Pull the digests staging ran
         if: steps.gate.outputs.enabled == 'true'
