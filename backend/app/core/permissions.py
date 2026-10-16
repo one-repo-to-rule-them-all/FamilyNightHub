@@ -13,12 +13,12 @@ Permission = Literal[
     "ballots:proxy",  # vote on behalf of anyone (kids without phones)
     "devices:enroll",  # let a phone in without the night code; pair the TV
     "devices:approve",  # approve a claim on a person bound to another phone
-    "admin:people",  # rename, merge, guests
-    "admin:devices",  # revoke devices, rotate the join slug
+    "admin:people",  # add, rename, merge, convert guests (hosts may add guests)
+    "admin:devices",  # devices list, label, revoke
     "admin:history",  # edit past nights, correct a winner
     "admin:movies",
     "admin:photos",  # hard delete
-    "admin:settings",
+    "admin:settings",  # household settings, rotate the join slug
     "admin:accounts",  # invite hosts
 ]
 
