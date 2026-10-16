@@ -30,7 +30,7 @@ backend/app/
 | Sessions | `POST /api/v1/sessions`, `GET /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/open-voting` | Host (`sessions:run`): create (code shown once), rotate code, shortlist, open voting. Snapshot: any device or account of the household. Close/reveal land with ballots |
 | Ballots | `/api/v1/sessions/{id}/ballots` | Upsert own ballot; host proxy ballot |
 | Live | `/api/v1/sse-tickets`, `/api/v1/sessions/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md) |
-| Photos | `/api/v1/sessions/{id}/photos` | Presign, complete, list (presigned GETs), react, hide/delete |
+| Photos | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}` | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below |
 | Ratings | `/api/v1/sessions/{id}/ratings` | 1–5 per person, once the night is `tonight`/`closed` |
 | Movies | `/api/v1/movies`, `GET /api/v1/tmdb/search?q=` | Library, owned flag (later); TMDB search proxy for hosts (503 when TMDB is off or down) |
 | Admin | `/api/v1/admin/*` | People merge/rename, device revoke, history edit, settings |
@@ -146,6 +146,42 @@ that writes an audit row. `close_voting` runs the tally module, then the tie-bre
 `ranking jsonb`, `tie_seed` and `winner_option_id` in one transaction
 ([ADR-0006](decisions/ADR-0006-voting-rules-and-tie-break.md)). `revealed → tonight` is lazy: the
 snapshot reports `tonight` once `revealed_at` is 30s old, and the next write persists it (no timer).
+
+## Photos
+
+`services/photo_service.py` over `integrations/storage.py` ([ADR-0005](decisions/ADR-0005-photo-pipeline-and-storage.md)).
+Photo bytes never touch the API.
+
+- **Create** (`POST …/photos`, device, `{person_id, taken_on?}`): the person must be actively
+  bound to the device (403), and the night's *effective* status must be `tonight` or `closed`
+  (409 otherwise; a reveal counts once it has settled, `domain/session_state.check_photos_open`).
+  Inserts a `pending` row with keys `households/{hid}/sessions/{sid}/{photo_id}.jpg` and
+  `…_thumb.jpg` and returns two presigned PUTs (5 min, `Content-Type: image/jpeg` signed in, so
+  the bucket refuses any other type). `taken_on` is the EXIF date, stored as midnight UTC. A
+  night holds at most 500 photos (a runaway-queue backstop, 409).
+- **Complete** (`POST …/{pid}/complete`): only the creating device (any other caller gets 404).
+  HEADs both objects: present, `image/jpeg`, 1 byte–10 MB, else **422** and the row stays
+  `pending` (the worker sweeps pending rows after 24h). Then `bytes` and `status = ready`.
+  Idempotent. A presigned PUT cannot cap size, which is why this check exists.
+- **Album** (`GET …/photos`, any device or account): `ready` photos newest first, each with
+  uploader name/avatar/color, reaction counts, `my_reactions` (people bound to the calling
+  device) and **fresh presigned GETs (10 min) minted per request after the household check**.
+  Hidden photos are listed only for accounts with `sessions:run` (so they can unhide);
+  devices and the TV never see them. No credential → 401 before any URL is minted.
+- **Reactions** (`PUT/DELETE …/reactions/{emoji}?person_id=`): allowlist ❤️ 😂 😮 👍 🎉 🍿
+  (422 otherwise), only on `ready` photos (404), only as a bound person (403). Both idempotent.
+- **Moderation.** Hide/unhide is `sessions:run`: the host running the night in the room is the
+  person who notices a bad photo, and hiding is reversible, so no new permission. Hard delete
+  is `admin:photos` (admins only): one transaction writes the `photo_deletions` tombstone,
+  deletes the row (reactions cascade), audits `photo.deleted`, then deletes both objects; a
+  storage failure rolls it all back (503) and a retry is safe. The worker purges the backup
+  copies from the tombstone. Audit actions (`target_type = 'photo'`): `photo.hidden`,
+  `photo.unhidden`, `photo.deleted`.
+- **Storage client.** boto3 (sync) — presigning is local CPU work; HEAD and DELETE run in
+  `asyncio.to_thread`. Services depend on the `PhotoStorage` protocol; tests swap in an
+  in-memory fake through the `photo_storage` dependency. `tests/integration/test_storage_s3.py`
+  exercises the real client against SeaweedFS and is skipped unless `STORAGE_TEST_ENDPOINT` is set
+  (CI has no S3 service yet). Unconfigured storage → photo routes answer 503.
 
 ## Live updates
 

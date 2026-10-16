@@ -74,6 +74,20 @@ class Settings(BaseSettings):
     TMDB_READ_TOKEN: str | None = None
     TMDB_TIMEOUT_SECONDS: float = 5.0
 
+    # --- Photos bucket (ADR-0005, 05-data.md "Object storage") ---
+    # Tigris on Fly, the SeaweedFS compose service locally. Unset endpoint or keys = photos
+    # off: the photo routes answer 503. Read/write on this bucket only; the backup bucket's
+    # credentials (BACKUP_STORAGE_*) belong to the worker and are never read by the API.
+    STORAGE_ENDPOINT: str | None = None
+    # Where phones reach the bucket, if not STORAGE_ENDPOINT (e.g. the API runs inside
+    # compose but presigned URLs must name localhost). SigV4 signs the host, so presigned
+    # URLs are minted against this one.
+    STORAGE_PUBLIC_ENDPOINT: str | None = None
+    STORAGE_BUCKET: str = "fnh-photos"
+    STORAGE_ACCESS_KEY_ID: str | None = None
+    STORAGE_SECRET_ACCESS_KEY: str | None = None
+    STORAGE_REGION: str = "auto"
+
     # --- HTTP ---
     CORS_ALLOWED_ORIGINS: str = "http://localhost:3000"
 

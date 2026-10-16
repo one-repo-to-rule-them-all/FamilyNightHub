@@ -122,3 +122,14 @@ def test_revealed_settles_into_tonight_after_30s() -> None:
 @pytest.mark.parametrize("status", ["draft", "voting", "tonight", "closed"])
 def test_effective_status_leaves_other_statuses_alone(status: str) -> None:
     assert ss.effective_status(status, NOW - timedelta(days=1), NOW) == status
+
+
+@pytest.mark.parametrize("status", ["tonight", "closed"])
+def test_photos_open_from_tonight(status: str) -> None:
+    ss.check_photos_open(status)
+
+
+@pytest.mark.parametrize("status", ["draft", "voting", "revealed", "nonsense"])
+def test_photos_closed_before_the_pick(status: str) -> None:
+    with pytest.raises(SessionRuleError, match="Photos open"):
+        ss.check_photos_open(status)

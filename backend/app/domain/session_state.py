@@ -89,6 +89,16 @@ def check_reorder(current: list[str], requested: list[str]) -> None:
         raise SessionRuleError("Reorder must list every option in this shortlist exactly once")
 
 
+PHOTO_STATUSES: frozenset[str] = frozenset({"tonight", "closed"})
+
+
+def check_photos_open(effective: str) -> None:
+    """ADR-0005: the album opens once the movie is picked (`tonight`) and stays open after
+    the night closes. Pass the *effective* status, so a settled reveal counts as tonight."""
+    if effective not in PHOTO_STATUSES:
+        raise SessionRuleError("Photos open once tonight's movie is picked")
+
+
 def effective_status(status: str, revealed_at: datetime | None, now: datetime) -> str:
     """What a reader should see: `revealed` turns into `tonight` after REVEAL_SETTLE."""
     if status == "revealed" and revealed_at is not None and now - revealed_at >= REVEAL_SETTLE:

@@ -91,6 +91,9 @@ services:
       # Any token works against the fake; the real one is a fly secret (api only).
       TMDB_BASE_URL: http://tmdb-fake:8000
       TMDB_READ_TOKEN: dev-fake-tmdb-token
+      # The API reaches SeaweedFS inside the network; phones get URLs signed for localhost.
+      STORAGE_ENDPOINT: http://s3:8333
+      STORAGE_PUBLIC_ENDPOINT: http://localhost:58333
     volumes:
       - ./backend/app:/app/app
       - ./backend/migrations:/app/migrations
