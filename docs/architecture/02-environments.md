@@ -44,7 +44,7 @@ under 5 GB comes to roughly $10–30/mo. Not $0 by design (ADR-0001).
 | `REDIS_URL` | fly secrets | api, worker |
 | `STORAGE_*` (photos bucket, read/write) | fly secrets | api, worker |
 | `BACKUP_STORAGE_*` (backup bucket, write-only) | fly secrets | **worker only** |
-| `TMDB_READ_TOKEN` | fly secrets | api only (never `NEXT_PUBLIC_*`) |
+| `TMDB_READ_TOKEN` (with plain-env `TMDB_BASE_URL`; unset token = search off, typed titles only) | fly secrets | api only (never `NEXT_PUBLIC_*`) |
 | `SESSION_SECRET`, `DEVICE_TOKEN_PEPPER` | fly secrets | api |
 | `EMAIL_API_KEY` (SMTP password; with `SMTP_HOST`/`SMTP_PORT`/`SMTP_USERNAME`/`SMTP_STARTTLS`, `EMAIL_MODE=smtp`, `EMAIL_FROM`) | fly secrets (+ plain env for the non-secret ones) | api, worker |
 | `SENTRY_DSN` | fly secrets | all |

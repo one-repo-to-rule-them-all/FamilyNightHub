@@ -1,0 +1,87 @@
+"""Request/response schemas for nights, the shortlist and TMDB search. The OpenAPI contract.
+
+The night snapshot deliberately has no ballot, tally or ranking fields (ADR-0004/0006).
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, Field, model_validator
+
+from app.domain.session_state import MAX_OPTIONS
+
+SessionStatus = Literal["draft", "voting", "revealed", "tonight", "closed"]
+OptionSource = Literal["manual", "owned", "streaming", "tmdb"]
+
+
+class SessionCreateIn(BaseModel):
+    title: str | None = Field(default=None, max_length=120)
+
+
+class SessionCreatedOut(BaseModel):
+    session_id: uuid.UUID
+    # Shown once: only its hash is stored, so it cannot be fetched again. Rotate if lost.
+    night_code: str
+
+
+class NightCodeOut(BaseModel):
+    night_code: str
+
+
+class OptionIn(BaseModel):
+    """Exactly one of: a movie already in the library, a TMDB id (upserts the library row),
+    or a typed title (for when TMDB is off or doesn't have it)."""
+
+    movie_id: uuid.UUID | None = None
+    tmdb_id: int | None = Field(default=None, gt=0)
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    year: int | None = Field(default=None, ge=1870, le=2100)
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> OptionIn:
+        given = [v for v in (self.movie_id, self.tmdb_id, self.title) if v is not None]
+        if len(given) != 1:
+            raise ValueError("give exactly one of movie_id, tmdb_id or title")
+        if self.title is not None and not self.title.strip():
+            raise ValueError("title must not be blank")
+        if self.year is not None and self.title is None:
+            raise ValueError("year goes with a typed title only")
+        return self
+
+
+class ReorderIn(BaseModel):
+    option_ids: list[uuid.UUID] = Field(max_length=MAX_OPTIONS)
+
+
+class OptionOut(BaseModel):
+    id: uuid.UUID
+    movie_id: uuid.UUID
+    title: str
+    year: int | None
+    poster_path: str | None
+    source: OptionSource
+    position: int
+
+
+class SessionOut(BaseModel):
+    id: uuid.UUID
+    title: str | None
+    status: SessionStatus
+    voting_method: Literal["top3", "approval", "pick_one"]
+    # k = min(3, options - 1), fixed when voting opens; null while in draft (ADR-0006).
+    ballot_size: int | None
+    options: list[OptionOut]
+    created_at: datetime
+    voting_opened_at: datetime | None
+    revealed_at: datetime | None
+    closed_at: datetime | None
+
+
+class TmdbResultOut(BaseModel):
+    tmdb_id: int
+    title: str
+    year: int | None
+    poster_path: str | None
