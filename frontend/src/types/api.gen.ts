@@ -495,6 +495,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stream Session */
+        get: operations["stream_session_api_v1_sessions__session_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/voters": {
         parameters: {
             query?: never;
@@ -509,6 +526,27 @@ export interface paths {
         get: operations["voters_api_v1_sessions__session_id__voters_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sse-tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Sse Ticket
+         * @description A 60s single-use ticket for this night's live stream. Another household's night
+         *     (or an unknown one) is 404.
+         */
+        post: operations["create_sse_ticket_api_v1_sse_tickets_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -893,6 +931,21 @@ export interface components {
             voting_method: "top3" | "approval" | "pick_one";
             /** Voting Opened At */
             voting_opened_at: string | null;
+        };
+        /** SseTicketIn */
+        SseTicketIn: {
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+        };
+        /** SseTicketOut */
+        SseTicketOut: {
+            /** Expires In */
+            expires_in: number;
+            /** Ticket */
+            ticket: string;
         };
         /** TmdbResultOut */
         TmdbResultOut: {
@@ -2007,6 +2060,46 @@ export interface operations {
             };
         };
     };
+    stream_session_api_v1_sessions__session_id__stream_get: {
+        parameters: {
+            query: {
+                ticket: string;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Live hints for the night */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
+                };
+            };
+            /** @description Ticket invalid, expired, already used or for another night */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     voters_api_v1_sessions__session_id__voters_get: {
         parameters: {
             query?: never;
@@ -2028,6 +2121,46 @@ export interface operations {
                 };
             };
             /** @description No such night in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_sse_ticket_api_v1_sse_tickets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SseTicketIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SseTicketOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
             404: {
                 headers: {
                     [name: string]: unknown;

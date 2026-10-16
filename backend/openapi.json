@@ -888,6 +888,38 @@
         "title": "SessionOut",
         "type": "object"
       },
+      "SseTicketIn": {
+        "properties": {
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "SseTicketIn",
+        "type": "object"
+      },
+      "SseTicketOut": {
+        "properties": {
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "ticket": {
+            "title": "Ticket",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket",
+          "expires_in"
+        ],
+        "title": "SseTicketOut",
+        "type": "object"
+      },
       "TmdbResultOut": {
         "properties": {
           "poster_path": {
@@ -2333,6 +2365,58 @@
         ]
       }
     },
+    "/api/v1/sessions/{session_id}/stream": {
+      "get": {
+        "operationId": "stream_session_api_v1_sessions__session_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "title": "Ticket",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Live hints for the night"
+          },
+          "401": {
+            "description": "Ticket invalid, expired, already used or for another night"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Session",
+        "tags": [
+          "live"
+        ]
+      }
+    },
     "/api/v1/sessions/{session_id}/voters": {
       "get": {
         "description": "Who has voted (avatar tiles light up on the TV). Never ranks or tallies.",
@@ -2377,6 +2461,51 @@
         "summary": "Voters",
         "tags": [
           "ballots"
+        ]
+      }
+    },
+    "/api/v1/sse-tickets": {
+      "post": {
+        "description": "A 60s single-use ticket for this night's live stream. Another household's night\n(or an unknown one) is 404.",
+        "operationId": "create_sse_ticket_api_v1_sse_tickets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SseTicketIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseTicketOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Sse Ticket",
+        "tags": [
+          "live"
         ]
       }
     },
