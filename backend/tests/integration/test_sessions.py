@@ -36,6 +36,7 @@ SNAPSHOT_KEYS = {
     "voting_opened_at",
     "revealed_at",
     "closed_at",
+    "result",
 }
 OPTION_KEYS = {"id", "movie_id", "title", "year", "poster_path", "source", "position"}
 

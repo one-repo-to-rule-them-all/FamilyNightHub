@@ -27,8 +27,8 @@ backend/app/
 | Auth | `/api/v1/auth/{magic-link,verify,me,logout}` | Magic-link request/verify for admins and hosts, current account, logout |
 | People/devices | `/api/v1/people`, `/api/v1/devices/me`, `PUT/DELETE /api/v1/devices/me/people/{id}` | Avatar grid with each tile's binding state, bind or unbind a person to this device |
 | Host devices | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}` | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it); review pending person claims (`devices:enroll` / `devices:approve`) |
-| Sessions | `POST /api/v1/sessions`, `GET /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/open-voting` | Host (`sessions:run`): create (code shown once), rotate code, shortlist, open voting. Snapshot: any device or account of the household. Close/reveal land with ballots |
-| Ballots | `/api/v1/sessions/{id}/ballots` | Upsert own ballot; host proxy ballot |
+| Sessions | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}` | Host (`sessions:run`): create (code shown once), rotate code, shortlist, open/close voting, close the night. Snapshot and history: any device or account of the household |
+| Ballots | `PUT /api/v1/sessions/{id}/ballots`, `PUT …/ballots/proxy`, `GET …/ballots/mine`, `GET …/voters` | Phone casts/replaces a bound person's ballot; host proxy ballot (`ballots:proxy`); a phone reads back its own people's ballots; who has voted (avatars only) |
 | Live | `/api/v1/sse-tickets`, `/api/v1/sessions/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md) |
 | Photos | `/api/v1/sessions/{id}/photos` | Presign, complete, list (presigned GETs), react, hide/delete |
 | Ratings | `/api/v1/sessions/{id}/ratings` | 1–5 per person, once the night is `tonight`/`closed` |
@@ -47,7 +47,8 @@ A ballot submit goes through these steps:
    GUC with `set_config(..., true)`; it also slides the cookie and `last_seen_at` at most hourly.
 4. `BallotService` checks the session is `voting`, that the person is bound to the device
    (`people_service.require_can_act_as`: an **active** binding; pending claims don't count) or the caller is a host, and that the ranks are valid for `k`. It then replaces the ballot rows.
-5. It publishes `ballot_count` to `session:{id}`.
+5. It publishes `ballot_count` to `session:{id}` (lands with `stream.py`; until then the TV
+   polls `GET …/voters`).
 6. Commit, then 204.
 
 Target time is under 150 ms p95.
@@ -127,14 +128,18 @@ hosts serialize) and persists; the rules are pure functions in `domain/session_s
   (`PUT …/options/order`) must list every option exactly once. Each edit returns the snapshot.
 - **Snapshot** (`GET /sessions/{id}`) is readable by any device of the household (`ViewerDb`
   slides the device cookie as usual) or account: status, voting method, `ballot_size` (null in
-  `draft`), options with title/year/poster, timestamps. Never ballots, tallies, ranking, seed or
-  winner ([ADR-0004](decisions/ADR-0004-sse-live-updates.md), [ADR-0006](decisions/ADR-0006-voting-rules-and-tie-break.md)).
+  `draft`), options with title/year/poster, timestamps, and `result`. Never ballots; `result`
+  (ranking, winner, tie group, seed) is null until the night is revealed
+  ([ADR-0004](decisions/ADR-0004-sse-live-updates.md), [ADR-0006](decisions/ADR-0006-voting-rules-and-tie-break.md)).
 - Errors: other household or unknown id → 404; wrong state or limits → 409 with a host-readable
   reason; device-only caller on a host route → 401, an account without `sessions:run` → 403.
 
 Audit actions (`audit_events`, `target_type = 'session'`): `session.created`,
 `session.code_rotated`, `session.option_added`, `session.option_removed`, `session.reordered`,
-`session.voting_opened` (`data` records from/to, option count, ballot size).
+`session.voting_opened` (`data` records from/to, option count, ballot size),
+`session.voting_closed` (from/to, ballot count, winner, which tie-break decided),
+`session.settled`, `session.closed`, and `ballot.proxy_cast` (`data` is the person only, never
+the ranks).
 
 ## Voting
 
@@ -145,7 +150,47 @@ action)` refuses anything else; `closed` is terminal). `open_voting` needs 2–8
 that writes an audit row. `close_voting` runs the tally module, then the tie-break, then stores
 `ranking jsonb`, `tie_seed` and `winner_option_id` in one transaction
 ([ADR-0006](decisions/ADR-0006-voting-rules-and-tie-break.md)). `revealed → tonight` is lazy: the
-snapshot reports `tonight` once `revealed_at` is 30s old, and the next write persists it (no timer).
+snapshot reports `tonight` once `revealed_at` is 30s old, and the next write persists it (no timer):
+every host write locks the row through `session_service._lock`, which applies
+`session_state.settle` and audits `session.settled`. Reads never write.
+
+**Tally** (`domain/voting/`, pure, 100% covered). `base.py` defines `tally(options, ballots, *,
+seed) -> Ranking`; `top3.py` is the v1 method. A ballot ranks 1..m options, `1 ≤ m ≤ k`, with no
+gaps (rank 1 alone is fine); rank r is worth `k − r + 1`. The full order is: points, then (1) most
+first-place votes, (2) head-to-head among the options still level (one win per rival that more
+ballots rank it above than below; unranked counts as below every ranked option), then (3) a
+lottery drawn from `random.Random(seed)` over the option ids in sorted order, so neither ballot
+order nor shortlist order can change the result. `Ranking` records every placement (place,
+points, first places), the tie group (options level with the winner on points before tie-breaks)
+and which step decided the winner (`none`, `first_places`, `head_to_head`, `random`). Zero ballots
+is a full tie decided by the seed. Hypothesis properties cover winner-is-shortlisted, ballot and
+shortlist order independence, seed reproducibility, partial ballots and zero ballots.
+
+**Ballots** (`services/ballot_service.py`, `api/v1/ballots.py`). `PUT …/ballots` from a phone
+needs an **active** binding to the person (`people_service.require_can_act_as`; a pending
+claim or another phone's person is 403). `PUT …/ballots/proxy` is for hosts with `ballots:proxy`
+and stores `cast_by_account_id`, `is_proxy = true`. Both need status `voting` (else 409),
+validate against k (else 422) and replace the person's rows in the request's transaction. The
+session row is read `FOR SHARE`, so a ballot and `close_voting` (`FOR UPDATE`) serialize: a ballot
+either lands before the tally or sees `revealed` and gets 409. `GET …/voters` (any device or
+account) lists who has voted as person id, avatar emoji and colour; `GET …/ballots/mine` returns
+the ballots of the people actively bound to the calling phone. Nothing returns anyone else's
+ranks.
+
+**Close and reveal.** `POST …/close-voting` (`sessions:run`) locks the row, and on `voting`
+tallies, stores ranking/seed/winner, sets `revealed` and `revealed_at`, and audits. On
+`revealed`/`tonight`/`closed` it is a no-op that returns the stored result, so a double tap or two
+hosts racing yield one result (a racing close waits on the row lock, then sees `revealed`). The
+seed is `secrets.randbits(64)`; with `ENVIRONMENT=test` only, the `X-FNH-Test-Seed` header pins it
+(it is not in the OpenAPI contract, and is ignored in every other environment). The snapshot's
+`result` carries the placements, winner, tie group, tie-break step and the seed as a decimal
+string (64 bits overflow a JS number). `POST …/close` moves `tonight → closed` (idempotent;
+`revealed` that hasn't settled yet is 409) and releases the night code.
+
+**History.** `GET /sessions?status=…&limit=…` (any device or account) lists nights newest first
+with the winner's title/year/poster, dates and turnout (people with a ballot). The default
+filter is `revealed`, `tonight`, `closed`; filtering uses the status readers see, so a settled
+reveal counts as `tonight`. A winner appears only once a night's status is revealed or later.
 
 ## Live updates
 
