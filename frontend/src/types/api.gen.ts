@@ -203,8 +203,8 @@ export interface paths {
         head?: never;
         /**
          * Update Settings
-         * @description Only the fields sent change. `default_voting_method` is `top3` until Phase 2;
-         *     `default_age_cap: null` means no cap.
+         * @description Only the fields sent change. `default_voting_method` is what new nights start
+         *     with; `default_age_cap: null` means no cap.
          */
         patch: operations["update_settings_api_v1_admin_settings_patch"];
         trace?: never;
@@ -460,6 +460,7 @@ export interface paths {
         /**
          * Create Session
          * @description Start a night in `draft`. The night code is in this response and nowhere else.
+         *     `voting_method` defaults to the household's `default_voting_method`.
          */
         post: operations["create_session_api_v1_sessions_post"];
         delete?: never;
@@ -485,7 +486,11 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Session
+         * @description Change a draft night's voting method (ADR-0010). 409 once voting has opened.
+         */
+        patch: operations["update_session_api_v1_sessions__session_id__patch"];
         trace?: never;
     };
     "/api/v1/sessions/{session_id}/ballots": {
@@ -1067,7 +1072,9 @@ export interface components {
         /**
          * BallotIn
          * @description One person's ballot, replacing any earlier one. Ranks run 1..m with no gaps,
-         *     m <= the night's ballot_size; rank 1 alone is fine.
+         *     m <= the night's ballot_size. top3: rank 1 alone is fine. pick_one: one option at
+         *     rank 1. approval: the approved options numbered 1..m; that order means nothing
+         *     (ADR-0010). An empty ballot is never valid.
          */
         BallotIn: {
             /**
@@ -1658,6 +1665,8 @@ export interface components {
         SessionCreateIn: {
             /** Title */
             title?: string | null;
+            /** Voting Method */
+            voting_method?: ("top3" | "approval" | "pick_one") | null;
         };
         /** SessionCreatedOut */
         SessionCreatedOut: {
@@ -1706,6 +1715,17 @@ export interface components {
             /** Voting Opened At */
             voting_opened_at: string | null;
         };
+        /**
+         * SessionUpdateIn
+         * @description Draft-only changes (ADR-0010): the method locks with the shortlist.
+         */
+        SessionUpdateIn: {
+            /**
+             * Voting Method
+             * @enum {string}
+             */
+            voting_method: "top3" | "approval" | "pick_one";
+        };
         /** SettingsOut */
         SettingsOut: {
             /** Default Age Cap */
@@ -1735,7 +1755,7 @@ export interface components {
             /** Default Age Cap */
             default_age_cap?: ("G" | "PG" | "PG-13" | "R" | "NC-17") | null;
             /** Default Voting Method */
-            default_voting_method?: "top3" | null;
+            default_voting_method?: ("top3" | "approval" | "pick_one") | null;
             /** Region */
             region?: string | null;
             /** Streaming Providers */
@@ -2765,6 +2785,55 @@ export interface operations {
             };
             /** @description No such night (or option/movie) in this household */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_session_api_v1_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not allowed in the night's current state */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

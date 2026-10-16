@@ -11,7 +11,15 @@ import { Poster } from "@/components/poster";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { nightKey } from "@/hooks/use-live-session";
 import { api, type ApiError, type Night, type OwnBallot, type Person } from "@/lib/api";
-import { ballotReducer, canSubmit, initialBallot, rankOf, toRanks } from "@/lib/ballot";
+import {
+  ballotPrompt,
+  ballotReducer,
+  canSubmit,
+  initialBallot,
+  pickCount,
+  rankOf,
+  toRanks,
+} from "@/lib/ballot";
 import { cn } from "@/lib/utils";
 
 const PEOPLE = ["people"] as const;
@@ -20,9 +28,10 @@ const ballotsKey = (sessionId: string) => ["ballots", sessionId] as const;
 type Cast = { personId: string; ranks: { option_id: string; rank: number }[] };
 
 /**
- * Voting: pick who is voting (only when this phone holds several people), rank posters, Done,
- * then "Pass to next person" back to the grid (04-frontend.md "Ballot"). Ballots are replaceable
- * until close, so a person who already voted can change their picks.
+ * Voting: pick who is voting (only when this phone holds several people), fill the ballot for the
+ * night's method (rank for top3, tap one for pick_one, tick several for approval), Done, then
+ * "Pass to next person" back to the grid (04-frontend.md "Ballot"). Ballots are replaceable until
+ * close, so a person who already voted can change their picks.
  */
 export function VotingFlow({ night }: { night: Night }) {
   const queryClient = useQueryClient();
@@ -80,7 +89,7 @@ export function VotingFlow({ night }: { night: Night }) {
 
   if (!voter) {
     return (
-      <PhoneScreen title="Who's voting?" lede="Tap your picture, then rank the movies.">
+      <PhoneScreen title="Who's voting?" lede="Tap your picture, then pick the movies.">
         {error}
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {mine.map((person) => {
@@ -133,7 +142,7 @@ export function VotingFlow({ night }: { night: Night }) {
                 key={r.option_id}
                 className="flex items-center gap-3 rounded-xl bg-card px-4 py-3 text-lg ring-1 ring-foreground/10"
               >
-                <RankBadge rank={r.rank} />
+                {night.voting_method === "top3" ? <RankBadge rank={r.rank} /> : <PickedBadge />}
                 {titles.get(r.option_id)}
               </li>
             ))}
@@ -197,20 +206,15 @@ function BallotForm({
   onSubmit: (ranks: { option_id: string; rank: number }[]) => void;
 }) {
   const size = night.ballot_size ?? 0;
+  const ranked = night.voting_method === "top3";
   const [ballot, dispatch] = useReducer(ballotReducer, size, (k) =>
-    ballotReducer(initialBallot(k), { type: "load", ranks: savedRanks }),
+    ballotReducer(initialBallot(k, night.voting_method), { type: "load", ranks: savedRanks }),
   );
   const options = [...night.options].sort((a, b) => a.position - b.position);
+  const prompt = ballotPrompt(ballot);
 
   return (
-    <PhoneScreen
-      title="Rank your favourites"
-      lede={
-        size === 1
-          ? "Tap the one you want to watch."
-          : `Tap your favourite first, then your next. Up to ${size} picks.`
-      }
-    >
+    <PhoneScreen title={prompt.title} lede={prompt.lede}>
       <div className="flex items-center justify-between gap-3 rounded-xl bg-card p-3 ring-1 ring-foreground/10">
         <span className="flex items-center gap-3 text-lg">
           <Avatar person={voter} small />
@@ -226,10 +230,10 @@ function BallotForm({
       </div>
 
       <p aria-live="polite" className="text-muted-foreground" data-testid="pick-count">
-        {ballot.picks.length} of {size} picked
+        {pickCount(ballot)}
       </p>
 
-      <ul className="grid grid-cols-2 gap-3">
+      <ul className="grid grid-cols-2 gap-3" data-method={night.voting_method}>
         {options.map((option) => {
           const rank = rankOf(ballot, option.id);
           return (
@@ -237,7 +241,7 @@ function BallotForm({
               <button
                 type="button"
                 aria-pressed={rank !== null}
-                data-rank={rank ?? undefined}
+                data-rank={ranked ? (rank ?? undefined) : undefined}
                 onClick={() => dispatch({ type: "tap", optionId: option.id })}
                 className={cn(
                   "relative flex w-full flex-col gap-2 rounded-2xl p-1.5 text-left ring-1 ring-foreground/10 transition-transform outline-none focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.98]",
@@ -253,7 +257,7 @@ function BallotForm({
                 </span>
                 {rank !== null ? (
                   <span className="absolute top-3 left-3">
-                    <RankBadge rank={rank} />
+                    {ranked ? <RankBadge rank={rank} /> : <PickedBadge />}
                   </span>
                 ) : null}
               </button>
@@ -283,6 +287,15 @@ function RankBadge({ rank }: { rank: number }) {
     <span className="flex size-9 items-center justify-center rounded-full bg-foreground text-lg font-semibold text-background">
       <span className="sr-only">Pick </span>
       {rank}
+    </span>
+  );
+}
+
+function PickedBadge() {
+  return (
+    <span className="flex size-9 items-center justify-center rounded-full bg-foreground text-background">
+      <Check aria-hidden className="size-5" />
+      <span className="sr-only">Picked</span>
     </span>
   );
 }

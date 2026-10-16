@@ -1,6 +1,7 @@
 "use client";
 
 import { type UseQueryResult, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Check } from "lucide-react";
 import { useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
@@ -10,8 +11,9 @@ import { Button } from "@/components/ui/button";
 import type { LiveState } from "@/hooks/use-live-session";
 import { useVoters, votersKey } from "@/hooks/use-voters";
 import { api, type ApiError, enrollDevice, type Night, type Person } from "@/lib/api";
+import { ballotReducer } from "@/lib/ballot";
+import { toRanks } from "@/lib/shortlist";
 import { cn } from "@/lib/utils";
-import { toggleRank, toRanks } from "@/lib/shortlist";
 
 /**
  * While voting: who has voted (avatars only; tallies stay hidden until reveal, ADR-0006), and a
@@ -71,6 +73,19 @@ function ProxyBallot({
   const [ranked, setRanked] = useState<string[]>([]);
   const [saved, setSaved] = useState<string | null>(null);
   const k = night.ballot_size ?? 1;
+  const method = night.voting_method;
+  const isRanked = method === "top3";
+  // The phone's reducer, so a proxy ballot follows the same per-method rules (ADR-0010).
+  const tap = (optionId: string) =>
+    setRanked(
+      (picks) => ballotReducer({ method, picks, size: k }, { type: "tap", optionId }).picks,
+    );
+  const how =
+    method === "approval"
+      ? "tick every movie they'd watch"
+      : k === 1
+        ? "pick their movie"
+        : `rank up to ${k}`;
 
   const enroll = useMutation<unknown, ApiError>({
     mutationFn: () => enrollDevice({ as_tv: false, device_label: "Host browser" }),
@@ -93,10 +108,7 @@ function ProxyBallot({
       <h2 id="proxy-vote" className="text-xl font-semibold">
         Vote for someone
       </h2>
-      <p className="text-muted-foreground">
-        For kids without a phone: pick them, then {k === 1 ? "pick their movie" : `rank up to ${k}`}
-        .
-      </p>
+      <p className="text-muted-foreground">For kids without a phone: pick them, then {how}.</p>
 
       {people.error?.status === 401 ? (
         <div className="flex flex-col gap-2 rounded-xl bg-muted p-4">
@@ -151,9 +163,13 @@ function ProxyBallot({
       {person ? (
         <div className="flex flex-col gap-3">
           <p className="text-base">
-            Ranking for <strong>{person.name}</strong>: tap in order of preference.
+            {isRanked ? "Ranking" : "Voting"} for <strong>{person.name}</strong>:{" "}
+            {isRanked ? "tap in order of preference." : how + "."}
           </p>
-          <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label="Rank titles">
+          <ul
+            className="grid grid-cols-3 gap-2 sm:grid-cols-4"
+            aria-label={isRanked ? "Rank titles" : "Pick titles"}
+          >
             {night.options.map((option) => {
               const rank = ranked.indexOf(option.id) + 1;
               return (
@@ -161,8 +177,14 @@ function ProxyBallot({
                   <button
                     type="button"
                     aria-pressed={rank > 0}
-                    aria-label={rank > 0 ? `${option.title}, rank ${rank}` : option.title}
-                    onClick={() => setRanked((r) => toggleRank(r, option.id, k))}
+                    aria-label={
+                      rank === 0
+                        ? option.title
+                        : isRanked
+                          ? `${option.title}, rank ${rank}`
+                          : `${option.title}, picked`
+                    }
+                    onClick={() => tap(option.id)}
                     className="relative flex w-full flex-col gap-1 rounded-lg text-left outline-none focus-visible:ring-3 focus-visible:ring-ring"
                   >
                     <Poster title={option.title} posterPath={option.poster_path} width="w185" />
@@ -172,7 +194,7 @@ function ProxyBallot({
                         aria-hidden
                         className="absolute top-1 left-1 flex size-8 items-center justify-center rounded-full bg-foreground text-lg font-semibold text-background"
                       >
-                        {rank}
+                        {isRanked ? rank : <Check className="size-5" />}
                       </span>
                     ) : null}
                   </button>

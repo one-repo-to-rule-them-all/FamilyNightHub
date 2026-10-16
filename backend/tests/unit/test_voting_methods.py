@@ -235,6 +235,7 @@ def test_approval_breaks_ties_on_sole_approvals_then_seed(night: Night, seed: in
     assert r.tiebreak != "head_to_head"
     sole = {p.option_id: p.first_places for p in r.placements}
     assert sole == {o: sum(b.keys() == {o} for b in ballots) for o in options}
+    assert sole[r.winner] == max(sole[o] for o in r.tie_group)
     if r.tiebreak == "first_places":
         assert all(sole[o] < sole[r.winner] for o in r.tie_group if o != r.winner)
 
