@@ -1,7 +1,7 @@
 # PR gate for Family Night Hub (docs/architecture/07-cicd.md).
 #
 # Jobs run in parallel; branch protection should require all five:
-#   static          ruff, ruff format, mypy, repo rules, tsc
+#   static          ruff, ruff format, mypy, repo rules, actionlint, tsc
 #   unit            pytest tests/unit (no data plane)
 #   integration     pytest everything against real Postgres + Redis as fnh_app, incl. the
 #                   isolation suite and the RLS coverage test; coverage gates
@@ -9,7 +9,7 @@
 #   bundle-secrets  next build with sentinel server secrets, then grep .next/static
 #
 # Not here yet (each lands with the code it gates): e2e (Playwright multi-phone + axe on the
-# compose stack), vitest, eslint/prettier, deploy.yml.
+# compose stack), vitest, eslint/prettier. Deploys live in deploy.yml.
 #
 # Shape from OrderUp .github/workflows/ci.yml @ 2f86cd8 (service containers, role
 # bootstrap before migrations, alembic check), FieldPro @ 0670961 (OpenAPI drift) and
@@ -70,6 +70,8 @@ jobs:
       - name: Repo rules (no sleeps in tests, no session-level GUC, revision id length)
         working-directory: backend
         run: uv run python scripts/check_repo_rules.py ..
+      - name: actionlint (workflow files, incl. deploy.yml)
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
       - name: npm ci
         working-directory: frontend
         run: npm ci

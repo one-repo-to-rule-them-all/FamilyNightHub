@@ -78,7 +78,8 @@ If anything in these docs disagrees with the code below, the code wins. (Paths a
 | Design tokens | `frontend/src/app/globals.css` |
 | Generated API types | `frontend/src/types/api.gen.ts` (from `backend/openapi.json`) |
 | CI / deploy | `.github/workflows/ci.yml`, `.github/workflows/deploy.yml` |
-| Fly config | `deploy/{staging,prod}/*.fly.toml` |
+| Fly config | `deploy/{staging,prod}/*.fly.toml`, `frontend/Dockerfile` (+ `docker-entrypoint.sh`) |
+| Provisioning, restore, rollback | `docs/runbooks/restore.md` |
 
 ## Glossary — what's that thing?
 

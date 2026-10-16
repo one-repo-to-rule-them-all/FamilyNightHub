@@ -91,3 +91,19 @@ def test_configured_storage_needs_endpoint_and_keys(monkeypatch: pytest.MonkeyPa
 
 def test_reaction_schema_matches_the_service_allowlist() -> None:
     assert get_args(Reaction) == photo_service.REACTIONS
+
+
+async def test_delete_objects_deletes_each_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    store = _store()
+    deleted: list[str] = []
+
+    def record(**kw: str) -> None:
+        deleted.append(kw["Key"])
+
+    monkeypatch.setattr(store._s3, "delete_object", record)
+    await store.delete_objects(["a.jpg", "a_thumb.jpg"])
+    assert deleted == ["a.jpg", "a_thumb.jpg"]
+
+
+async def test_noop_store_deletes_nothing() -> None:
+    await storage.NoopObjectStore().delete_objects(["a.jpg"])

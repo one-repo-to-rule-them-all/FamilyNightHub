@@ -10,17 +10,21 @@ a hard delete, which run on a worker thread via `asyncio.to_thread`. aioboto3 wo
 aiobotocore's botocore range and add a dependency for those few calls.
 
 Services depend on the `PhotoStorage` protocol, never on boto3, so tests swap in an
-in-memory fake through the `photo_storage` FastAPI dependency.
+in-memory fake through the `photo_storage` FastAPI dependency. The worker depends only on
+the narrower `ObjectStore` (bulk delete for `sweep_orphan_uploads`); `S3PhotoStorage`
+implements both, and `NoopObjectStore` stands in when storage is not configured.
 """
 
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cache
 from typing import Any, Protocol
 
 import boto3
+import structlog
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -30,6 +34,9 @@ JPEG = "image/jpeg"
 # ADR-0005: uploads get 5 minutes, views 10.
 PUT_TTL_SECONDS = 300
 GET_TTL_SECONDS = 600
+
+
+log = structlog.get_logger()
 
 
 class StorageUnavailable(Exception):
@@ -56,6 +63,20 @@ class PhotoStorage(Protocol):
     async def delete(self, key: str) -> None:
         """Idempotent: deleting a missing key succeeds."""
         ...
+
+
+class ObjectStore(Protocol):
+    async def delete_objects(self, keys: Sequence[str]) -> None:
+        """Delete these keys. Missing keys are not an error (idempotent sweeps)."""
+        ...
+
+
+class NoopObjectStore:
+    """Used by the worker when storage is not configured. Logs the count, not the keys:
+    keys embed household and session ids."""
+
+    async def delete_objects(self, keys: Sequence[str]) -> None:
+        log.info("storage_delete_skipped_noop_store", count=len(keys))
 
 
 def _client(endpoint: str, access_key: str, secret_key: str, region: str) -> Any:
@@ -130,6 +151,10 @@ class S3PhotoStorage:
             await asyncio.to_thread(self._s3.delete_object, Bucket=self.bucket, Key=key)
         except (ClientError, BotoCoreError) as err:
             raise StorageUnavailable(type(err).__name__) from err
+
+    async def delete_objects(self, keys: Sequence[str]) -> None:
+        for key in keys:
+            await self.delete(key)
 
 
 @cache

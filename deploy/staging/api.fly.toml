@@ -1,0 +1,63 @@
+# fnh-api-staging: FastAPI (ADR-0001, 02-environments.md). Image: backend/Dockerfile.
+# CI deploys it with `flyctl deploy --config deploy/staging/api.fly.toml --image ...`
+# (.github/workflows/deploy.yml). One-time setup: docs/runbooks/restore.md "Provisioning".
+# Layout from FieldPro deploy/ @ 0670961; settings from OrderUp backend/fly.*.toml @ 2f86cd8.
+#
+# PRIVATE: the API has no public IP. fnh-web reaches it over Flycast
+# (http://fnh-api-staging.flycast -> internal_port 8000), so device and session cookies stay
+# first-party on the web origin. Not `.internal`: that dials the machine directly over IPv6,
+# and uvicorn binds IPv4 0.0.0.0. Flycast goes through fly-proxy, which also gives the
+# health-check routing and load balancing `.internal` skips.
+
+app = "fnh-api-staging"
+primary_region = "dfw"
+
+# Runs once per deploy in a throwaway machine, before new machines take traffic. Alembic
+# reads MIGRATION_DATABASE_URL (owner role), set as a secret on this app only. Migrations
+# must be expand/contract: the previous release keeps serving until this succeeds.
+[deploy]
+  release_command = "alembic upgrade head"
+  strategy = "rolling"
+
+# Non-secret config only. Secrets (02 "Secrets map"): DATABASE_URL, MIGRATION_DATABASE_URL,
+# REDIS_URL, SESSION_SECRET, DEVICE_TOKEN_PEPPER, EMAIL_API_KEY, SENTRY_DSN, STORAGE_*,
+# TMDB_READ_TOKEN. Never BACKUP_STORAGE_* here (worker only).
+[env]
+  ENVIRONMENT = "staging"
+  FRONTEND_BASE_URL = "https://fnh-web-staging.fly.dev"
+  CORS_ALLOWED_ORIGINS = "https://fnh-web-staging.fly.dev"
+  EMAIL_MODE = "smtp"
+  SMTP_STARTTLS = "true"
+
+[http_service]
+  internal_port = 8000
+  # Flycast is plain HTTP inside the private network; a forced redirect would break it.
+  force_https = false
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # 02: movie night is bursty; keep a warm machine so the reveal never waits on a cold start.
+  min_machines_running = 1
+  processes = ["app"]
+
+  # SSE (ADR-0004) holds one connection per phone/TV for the whole night: count
+  # connections, not requests. fly-proxy streams responses (no buffering to disable here);
+  # the SSE route must send `Cache-Control: no-cache, no-transform` so the Next proxy in
+  # fnh-web does not gzip-buffer it, and a heartbeat inside the proxy idle timeout (02).
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 150
+    hard_limit = 200
+
+  # Gates the deploy: DB through the RLS path plus a Redis ping (app/api/v1/health.py).
+  # OrderUp saw an HTTP check stick on an early "connection refused"; the grace period
+  # covers boot. If it ever sticks, compare with `fly checks list` before removing it.
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "15s"
+    timeout = "5s"
+    method = "GET"
+    path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

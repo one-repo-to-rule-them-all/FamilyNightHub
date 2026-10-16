@@ -91,6 +91,17 @@ class Settings(BaseSettings):
     # --- HTTP ---
     CORS_ALLOWED_ORIGINS: str = "http://localhost:3000"
 
+    # --- Worker (06-background-worker.md) ---
+    # Liveness only: the tiny /health listener Fly and compose probe with curl.
+    WORKER_HEALTH_PORT: int = 8081
+    WORKER_JOB_TIMEOUT_SECONDS: int = 300
+    # Long enough for after_job_end to read a failed job's result back from Redis.
+    WORKER_KEEP_RESULT_SECONDS: int = 3600
+    # Nights left in `tonight` longer than this are closed; pending uploads older than this
+    # are swept.
+    STALE_SESSION_HOURS: int = 24
+    ORPHAN_UPLOAD_HOURS: int = 24
+
     # --- Observability ---
     SENTRY_DSN: str | None = None
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1
