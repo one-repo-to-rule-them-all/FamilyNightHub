@@ -28,11 +28,11 @@ release machine.
 
 ## 0. Decide and pre-flight (once)
 
-- [ ] 🌐 **Postgres flavour and cost.** Read [ADR-0013](../architecture/decisions/ADR-0013-hosting-cost-correction.md)
-      (Proposed). Its recommendation: self-operated Postgres (legacy `fly postgres create`),
-      not Managed Postgres, which costs $38/mo per environment and can't create our roles.
-      Upstash Fixed for production. Staging scaled to zero when idle. Accept it, or amend it,
-      before step 3.
+- [x] **Postgres flavour and cost: decided** ([ADR-0013](../architecture/decisions/ADR-0013-hosting-cost-correction.md),
+      Accepted 2026-10-16): self-operated Postgres (legacy `fly postgres create`, or the
+      `postgres:16` app fallback), not Managed Postgres. Upstash Fixed for production,
+      pay-as-you-go for staging. Staging scaled to zero when idle (step at the end).
+      Expected bill: about $30/mo.
 - [ ] 🌐 **A domain for email.** The production magic links need a sending domain you control
       (step 6). Without one, staging can still send to your own address only.
 - [ ] ⌨️ Tools: `flyctl` (`fly version` ≥ 0.3.211), `gh` (signed in, repo admin), `psql` 16,

@@ -2,10 +2,9 @@
 
 ## Status
 
-Proposed (2026-10-15). Corrects the cost line of [ADR-0001](ADR-0001-fly-fastapi-postgres-hosting.md)
+Accepted (2026-10-16, owner decision; proposed 2026-10-15). Corrects the cost line of [ADR-0001](ADR-0001-fly-fastapi-postgres-hosting.md)
 ("roughly $10–30/mo, verify current Fly pricing at setup"). ADR-0001's decision itself (Fly.io,
-three apps per environment, Postgres, Upstash, Tigris) stands. **Owner decision needed before
-provisioning** ([`runbooks/first-deploy.md`](../../runbooks/first-deploy.md) step 0).
+three apps per environment, Postgres, Upstash, Tigris) stands.
 
 ## Context
 

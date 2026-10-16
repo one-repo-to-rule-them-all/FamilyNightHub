@@ -27,8 +27,8 @@ drop the `-staging` suffix and use `deploy/prod/`.
    snapshots". If MPG is chosen, sections 1.2 and 2.1 change to MPG's own connection and
    restore commands, and ADR-0001's cost line needs a superseding ADR. Prices checked on
    2026-10-15 are in [ADR-0013](../architecture/decisions/ADR-0013-hosting-cost-correction.md)
-   (Proposed). It recommends this legacy flavour: MPG is $38/mo per environment and has no
-   superuser or CREATEROLE to create our roles. **Owner decision.**
+   (Accepted 2026-10-16), which chose this legacy flavour: MPG is $38/mo per environment and
+   has no superuser or CREATEROLE to create our roles.
 2. **Bucket names.** Tigris bucket names are global. If `fnh-photos`, `fnh-photos-staging` or
    `fnh-photos-backup` are taken, pick new names and update 02 and 05.
 3. **Deploy-token scope.** `FLY_API_TOKEN` must deploy three apps. A per-app deploy token

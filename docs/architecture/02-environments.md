@@ -38,11 +38,10 @@ windows, but Fly's auto-start is triggered by fly-proxy traffic, and nothing eve
 a request: a stopped worker would never wake, and its crons would silently stop.
 
 **Cost:** ADR-0001 estimated roughly $10–30/mo. Checked against 2026-10-15 prices in
-[ADR-0013](decisions/ADR-0013-hosting-cost-correction.md) (Proposed): this topology on Managed
-Postgres with both environments always on is about **$125/mo**. Its recommendation is
+[ADR-0013](decisions/ADR-0013-hosting-cost-correction.md) (Accepted): this topology on Managed
+Postgres with both environments always on is about **$125/mo**. The accepted plan is
 self-operated Postgres, Upstash Fixed for production, and staging scaled to zero when idle,
-which comes to about **$30/mo**. Not $0 by design (ADR-0001). **Owner decision before
-provisioning.**
+which comes to about **$30/mo**. Not $0 by design (ADR-0001). Decided 2026-10-16.
 
 **First deploy:** one ordered checklist, from an empty Fly org to the fridge QR, is
 [`runbooks/first-deploy.md`](../runbooks/first-deploy.md).
