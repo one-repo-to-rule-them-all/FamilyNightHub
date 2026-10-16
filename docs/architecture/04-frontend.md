@@ -74,6 +74,11 @@ fridge QR" and leaves the QR off until one does.
 device-scoped `GET /people`, so the host's browser is offered "Add this browser as a device"
 (`POST /devices/enroll {as_tv:false}`) before it can list them.
 
+**Enroll, then wait.** Both enroll paths go through `enrollDevice()` in `src/lib/api.ts`, which
+waits until `GET /devices/me` answers before the screen moves on. The API commits the enroll in a
+request-scoped dependency, and that commit can finish after the response has reached the
+browser, so the next device request could otherwise get a 401 (seen in CI).
+
 **Live data.** `src/hooks/use-night-poll.ts` polls the snapshot (and `…/voters` while voting) every
 5s, including in background tabs, and exposes the same `data-live` values as the planned SSE hook
 (`ready` / `reconnecting`, plus `connecting` before the first answer), so the swap to

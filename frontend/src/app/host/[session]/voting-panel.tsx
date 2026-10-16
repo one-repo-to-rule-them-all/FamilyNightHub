@@ -8,7 +8,7 @@ import { Avatar } from "@/components/night/avatar";
 import { Poster } from "@/components/night/poster";
 import { Button } from "@/components/ui/button";
 import { useVoters, votersKey } from "@/hooks/use-night-poll";
-import { api, type ApiError, type Night, type Person } from "@/lib/api";
+import { api, type ApiError, enrollDevice, type Night, type Person } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toggleRank, toRanks } from "@/lib/shortlist";
 
@@ -72,7 +72,7 @@ function ProxyBallot({
   const k = night.ballot_size ?? 1;
 
   const enroll = useMutation<unknown, ApiError>({
-    mutationFn: () => api.enroll({ as_tv: false, device_label: "Host browser" }),
+    mutationFn: () => enrollDevice({ as_tv: false, device_label: "Host browser" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["people"] }),
   });
   const cast = useMutation<void, ApiError, { personId: string; ranked: string[] }>({

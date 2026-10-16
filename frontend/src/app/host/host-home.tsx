@@ -11,7 +11,14 @@ import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { api, type Account, type ApiError, type Claim, type NightSummary } from "@/lib/api";
+import {
+  api,
+  type Account,
+  type ApiError,
+  type Claim,
+  enrollDevice,
+  type NightSummary,
+} from "@/lib/api";
 import { rememberNightCode } from "@/lib/night-code-handoff";
 
 import { NightCodeCard } from "./night-code-card";
@@ -252,7 +259,7 @@ function UseAsTv({ sessionId }: { sessionId: string | null }) {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
   const enroll = useMutation<unknown, ApiError>({
-    mutationFn: () => api.enroll({ as_tv: true, device_label: "Living-room TV" }),
+    mutationFn: () => enrollDevice({ as_tv: true, device_label: "Living-room TV" }),
     onSuccess: () => {
       queryClient.clear();
       router.replace(sessionId ? `/tv/${sessionId}` : "/tv");

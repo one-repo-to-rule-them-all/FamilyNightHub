@@ -225,6 +225,30 @@ export const api = {
     request<Schemas["EnrollOut"]>("POST", "/devices/enroll", body),
 };
 
+/**
+ * Enrolls this browser (ADR-0002) and resolves once the new device cookie actually works.
+ *
+ * The API commits the enroll in a request-scoped dependency, which can finish after the response
+ * has reached the browser, so the very next device request may still get a 401. Waiting on
+ * `GET /devices/me` here keeps every caller (TV pairing, the host's proxy-vote list) from racing it.
+ */
+export async function enrollDevice(
+  body: Schemas["EnrollIn"],
+  { attempts = 20, delayMs = 150 }: { attempts?: number; delayMs?: number } = {},
+): Promise<Schemas["EnrollOut"]> {
+  const enrolled = await api.enroll(body);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await api.myDevice();
+      return enrolled;
+    } catch (error) {
+      const notYet = error instanceof ApiError && error.status === 401;
+      if (!notYet || attempt >= attempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 /** "Try again in 2 minutes." for a 429, or null when the server gave no Retry-After. */
 export function retryAfterHint(error: ApiError): string | null {
   if (error.status !== 429 || error.retryAfter === null) return null;
