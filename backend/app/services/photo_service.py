@@ -24,6 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain import session_state
 from app.domain.session_state import SessionRuleError
 from app.integrations.storage import JPEG, PUT_TTL_SECONDS, PhotoStorage, StorageUnavailable
+from app.realtime import events
+from app.realtime.publisher import publish_after_commit
 from app.services import people_service
 from app.services.errors import Conflict, Invalid, NotFound, Unavailable
 
@@ -225,6 +227,7 @@ async def complete(
         text("UPDATE photos SET status = 'ready', bytes = :b WHERE id = :p"),
         {"b": size, "p": photo_id},
     )
+    publish_after_commit(db, session_id, events.PHOTO_ADDED)
 
 
 async def album(

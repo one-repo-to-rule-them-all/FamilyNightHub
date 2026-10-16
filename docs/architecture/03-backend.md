@@ -50,9 +50,8 @@ A ballot submit goes through these steps:
    GUC with `set_config(..., true)`; it also slides the cookie and `last_seen_at` at most hourly.
 4. `BallotService` checks the session is `voting`, that the person is bound to the device
    (`people_service.require_can_act_as`: an **active** binding; pending claims don't count) or the caller is a host, and that the ranks are valid for `k`. It then replaces the ballot rows.
-5. It publishes `ballot_count` to `session:{id}` (lands with `stream.py`; until then the TV
-   polls `GET …/voters`).
-6. Commit, then 204.
+5. It queues a `ballot_count` hint for `session:{id}` (count changed, nothing else).
+6. Commit, then the hint is published (see "Live updates"), then 204.
 
 Target time is under 150 ms p95.
 
@@ -287,9 +286,57 @@ Photo bytes never touch the API.
 
 ## Live updates
 
-The Redis channel `session:{id}` carries `{type, session_id, version}`. `stream.py` subscribes and
-forwards events, sends a heartbeat every 15s, and closes after 30 minutes so clients re-ticket.
-Events never carry ballots or tallies before reveal.
+[ADR-0004](decisions/ADR-0004-sse-live-updates.md). Code: `app/realtime/` (`events.py`,
+`tickets.py`, `publisher.py`) and `app/api/v1/stream.py`, adapted from OrderUp
+`backend/app/realtime/` and `api/v1/portal/sse.py` @ 2f86cd8.
+
+**Tickets.** `POST /api/v1/sse-tickets {session_id}` (any device or account of the
+household, CSRF-protected) returns `{ticket, expires_in: 60}`; another household's or an
+unknown night is 404. The ticket is 256 random bits stored at `sse_ticket:{ticket}` with the
+household and night, 60s TTL (and an `exp` stamp checked against an injectable clock), and is
+consumed with `GETDEL`, so it opens exactly one stream.
+
+**Stream.** `GET /api/v1/sessions/{id}/stream?ticket=` consumes the ticket before any
+response starts; a missing, used, expired or other-night ticket is 401 (and is burned). The
+channel comes from the ticket's night only. The response is `text/event-stream` with
+`Cache-Control: no-cache, no-transform` (keeps the Next proxy from gzip-buffering it, see
+02-environments) and `X-Accel-Buffering: no`. It sends `: connected` right after
+subscribing, `: heartbeat` after 15s of quiet, and ends after 30 minutes so the client
+re-tickets. If Redis fails it sends a `degraded` frame and ends.
+
+**Events.** Unnamed `data:` frames, so `EventSource.onmessage` sees all of them:
+`{"type", "session_id", "version"}` and nothing else. The stream rebuilds each frame from
+those three fields, so a stray field a publisher added can't reach a phone. `version` is a
+per-night counter (`INCR live_version:{id}`) for spotting duplicates and gaps; it is not a
+snapshot version. Every event is a hint: clients refetch `GET /sessions/{id}` (or
+`…/voters`).
+
+| Type | Published by |
+|---|---|
+| `shortlist_changed` | add, remove, reorder an option |
+| `status_changed` | open voting; close the night |
+| `ballot_count` | any ballot cast or replaced (phone or proxy) |
+| `revealed` | close-voting when it actually tallies (not the idempotent repeat) |
+| `photo_added` | a photo upload completes (`pending → ready`) |
+| `degraded` | the stream itself, never published |
+
+The lazy `revealed → tonight` settle publishes nothing: readers already see `tonight`. The
+worker's stale-night auto-close doesn't publish either (nobody is watching a day-old night).
+
+**After commit.** Services call `publish_after_commit(db, session_id, type)`, which queues
+a hook on the session (`core/database.after_commit`); `household_session` runs the hooks
+only once its transaction has committed, so a refetch triggered by the hint sees the new
+state and a rolled-back write publishes nothing. Publishing is best-effort: a Redis failure
+is logged and never fails the request. An unregistered type raises (a typo would otherwise
+fail silently forever).
+
+**Disconnects.** Phones drop streams constantly, so no subscription may outlive its client.
+Under ASGI spec < 2.4 Starlette cancels the generator mid-await; its cleanup
+(`UNSUBSCRIBE`, close) runs in a shielded cancel scope. Under 2.4 Starlette abandons the
+generator after a failed send; `LiveStreamResponse` closes it. The request-ID middleware is
+pure ASGI for the same reason. Tests drive the route as a raw ASGI client
+(`tests/integration/live_stream.py`) and check `PUBSUB NUMSUB` after hanging up in both
+modes.
 
 ## Candidates
 
