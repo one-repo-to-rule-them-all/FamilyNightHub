@@ -564,8 +564,11 @@ async def test_tonight_is_lazy_and_the_next_write_persists_it(two_households: Pa
     assert body["status"] == "closed" and body["closed_at"] is not None
     assert body["result"] is not None  # history keeps the result
     actions = await _actions(a, sid)
-    assert actions[-2:] == ["session.settled", "session.closed"]
+    # Both rows come from one transaction, so they share created_at (now() is the
+    # transaction start) and their relative order is not observable. Assert presence.
+    assert sorted(actions[-2:]) == ["session.closed", "session.settled"]
     assert actions.count("session.closed") == 1
+    assert actions.count("session.settled") == 1
     async with phone() as late:
         assert (await late.join(a.slug, code)).status_code == 400  # the code is released
 
