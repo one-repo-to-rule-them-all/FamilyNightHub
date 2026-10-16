@@ -262,7 +262,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Sessions
+         * @description Nights newest first: winner, date and turnout. Defaults to revealed, tonight and
+         *     closed; `status` may repeat. A winner appears only once a night is revealed.
+         */
+        get: operations["list_sessions_api_v1_sessions_get"];
         put?: never;
         /**
          * Create Session
@@ -284,11 +289,112 @@ export interface paths {
         };
         /**
          * Get Session
-         * @description The night as every screen sees it. Never ballots or tallies.
+         * @description The night as every screen sees it. Never ballots; `result` only from reveal on.
          */
         get: operations["get_session_api_v1_sessions__session_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/ballots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Cast Ballot
+         * @description Cast or replace the ballot of a person bound to this phone.
+         */
+        put: operations["cast_ballot_api_v1_sessions__session_id__ballots_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/ballots/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Ballots
+         * @description Ballots of the people actively bound to this phone, so it can show and edit them.
+         */
+        get: operations["my_ballots_api_v1_sessions__session_id__ballots_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/ballots/proxy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Cast Proxy Ballot
+         * @description Host votes on someone's behalf (stored with is_proxy and the host's account).
+         */
+        put: operations["cast_proxy_ballot_api_v1_sessions__session_id__ballots_proxy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Night
+         * @description tonight -> closed: the night code stops joining. Idempotent.
+         */
+        post: operations["close_night_api_v1_sessions__session_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/close-voting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Voting
+         * @description voting -> revealed: tally, tie-break, store the ranking and winner. Idempotent: a
+         *     repeat returns the stored result unchanged.
+         */
+        post: operations["close_voting_api_v1_sessions__session_id__close_voting_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -389,6 +495,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}/voters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Voters
+         * @description Who has voted (avatar tiles light up on the TV). Never ranks or tallies.
+         */
+        get: operations["voters_api_v1_sessions__session_id__voters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tmdb/search": {
         parameters: {
             query?: never;
@@ -428,6 +554,20 @@ export interface components {
              * @enum {string}
              */
             role: "admin" | "host";
+        };
+        /**
+         * BallotIn
+         * @description One person's ballot, replacing any earlier one. Ranks run 1..m with no gaps,
+         *     m <= the night's ballot_size; rank 1 alone is fine.
+         */
+        BallotIn: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Ranks */
+            ranks: components["schemas"]["RankIn"][];
         };
         /** BindingOut */
         BindingOut: {
@@ -565,6 +705,33 @@ export interface components {
             /** Night Code */
             night_code: string;
         };
+        /** NightSummaryOut */
+        NightSummaryOut: {
+            /** Closed At */
+            closed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Revealed At */
+            revealed_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "voting" | "revealed" | "tonight" | "closed";
+            /** Title */
+            title: string | null;
+            /** Turnout */
+            turnout: number;
+            winner: components["schemas"]["WinnerOut"] | null;
+        };
         /**
          * OptionIn
          * @description Exactly one of: a movie already in the library, a TMDB id (upserts the library row),
@@ -606,6 +773,16 @@ export interface components {
             /** Year */
             year: number | null;
         };
+        /** OwnBallotOut */
+        OwnBallotOut: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Ranks */
+            ranks: components["schemas"]["RankOut"][];
+        };
         /** PersonOut */
         PersonOut: {
             /** Avatar Emoji */
@@ -626,6 +803,40 @@ export interface components {
             is_guest: boolean;
             /** Name */
             name: string;
+        };
+        /** PlacementOut */
+        PlacementOut: {
+            /** First Places */
+            first_places: number;
+            /**
+             * Option Id
+             * Format: uuid
+             */
+            option_id: string;
+            /** Place */
+            place: number;
+            /** Score */
+            score: number;
+        };
+        /** RankIn */
+        RankIn: {
+            /**
+             * Option Id
+             * Format: uuid
+             */
+            option_id: string;
+            /** Rank */
+            rank: number;
+        };
+        /** RankOut */
+        RankOut: {
+            /**
+             * Option Id
+             * Format: uuid
+             */
+            option_id: string;
+            /** Rank */
+            rank: number;
         };
         /** ReorderIn */
         ReorderIn: {
@@ -665,6 +876,7 @@ export interface components {
             id: string;
             /** Options */
             options: components["schemas"]["OptionOut"][];
+            result: components["schemas"]["VotingResultOut"] | null;
             /** Revealed At */
             revealed_at: string | null;
             /**
@@ -710,6 +922,66 @@ export interface components {
         VerifyIn: {
             /** Token */
             token: string;
+        };
+        /** VoterOut */
+        VoterOut: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /**
+         * VotersOut
+         * @description Who has voted, for the TV's avatar tiles. Never what they ranked.
+         */
+        VotersOut: {
+            /** Voted */
+            voted: components["schemas"]["VoterOut"][];
+        };
+        /** VotingResultOut */
+        VotingResultOut: {
+            /** Ballot Count */
+            ballot_count: number;
+            /** Placements */
+            placements: components["schemas"]["PlacementOut"][];
+            /** Tie Group */
+            tie_group: string[];
+            /** Tie Seed */
+            tie_seed: string;
+            /**
+             * Tiebreak
+             * @enum {string}
+             */
+            tiebreak: "none" | "first_places" | "head_to_head" | "random";
+            /**
+             * Winner Option Id
+             * Format: uuid
+             */
+            winner_option_id: string;
+        };
+        /** WinnerOut */
+        WinnerOut: {
+            /**
+             * Movie Id
+             * Format: uuid
+             */
+            movie_id: string;
+            /**
+             * Option Id
+             * Format: uuid
+             */
+            option_id: string;
+            /** Poster Path */
+            poster_path: string | null;
+            /** Title */
+            title: string;
+            /** Year */
+            year: number | null;
         };
     };
     responses: never;
@@ -1159,6 +1431,38 @@ export interface operations {
             };
         };
     };
+    list_sessions_api_v1_sessions_get: {
+        parameters: {
+            query?: {
+                status?: ("draft" | "voting" | "revealed" | "tonight" | "closed")[] | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NightSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_session_api_v1_sessions_post: {
         parameters: {
             query?: never;
@@ -1214,6 +1518,238 @@ export interface operations {
             };
             /** @description No such night (or option/movie) in this household */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cast_ballot_api_v1_sessions__session_id__ballots_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BallotIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description This phone isn't (actively) bound to that person */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or person) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Voting is not open */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The ranks break the night's ballot rules */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    my_ballots_api_v1_sessions__session_id__ballots_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnBallotOut"][];
+                };
+            };
+            /** @description No such night in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cast_proxy_ballot_api_v1_sessions__session_id__ballots_proxy_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BallotIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description This phone isn't (actively) bound to that person */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or person) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Voting is not open */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The ranks break the night's ballot rules */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    close_night_api_v1_sessions__session_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not allowed in the night's current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_voting_api_v1_sessions__session_id__close_voting_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not allowed in the night's current state */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1455,6 +1991,44 @@ export interface operations {
             };
             /** @description Not allowed in the night's current state */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    voters_api_v1_sessions__session_id__voters_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VotersOut"];
+                };
+            };
+            /** @description No such night in this household */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

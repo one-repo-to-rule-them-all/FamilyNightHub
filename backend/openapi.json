@@ -39,6 +39,31 @@
         "title": "AccountOut",
         "type": "object"
       },
+      "BallotIn": {
+        "description": "One person's ballot, replacing any earlier one. Ranks run 1..m with no gaps,\nm <= the night's ballot_size; rank 1 alone is fine.",
+        "properties": {
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "ranks": {
+            "items": {
+              "$ref": "#/components/schemas/RankIn"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Ranks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "person_id",
+          "ranks"
+        ],
+        "title": "BallotIn",
+        "type": "object"
+      },
       "BindingOut": {
         "properties": {
           "person_id": {
@@ -340,6 +365,92 @@
         "title": "NightCodeOut",
         "type": "object"
       },
+      "NightSummaryOut": {
+        "properties": {
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "revealed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revealed At"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "voting",
+              "revealed",
+              "tonight",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "turnout": {
+            "title": "Turnout",
+            "type": "integer"
+          },
+          "winner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WinnerOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "created_at",
+          "revealed_at",
+          "closed_at",
+          "winner",
+          "turnout"
+        ],
+        "title": "NightSummaryOut",
+        "type": "object"
+      },
       "OptionIn": {
         "description": "Exactly one of: a movie already in the library, a TMDB id (upserts the library row),\nor a typed title (for when TMDB is off or doesn't have it).",
         "properties": {
@@ -462,6 +573,28 @@
         "title": "OptionOut",
         "type": "object"
       },
+      "OwnBallotOut": {
+        "properties": {
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "ranks": {
+            "items": {
+              "$ref": "#/components/schemas/RankOut"
+            },
+            "title": "Ranks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "person_id",
+          "ranks"
+        ],
+        "title": "OwnBallotOut",
+        "type": "object"
+      },
       "PersonOut": {
         "properties": {
           "avatar_emoji": {
@@ -505,6 +638,75 @@
           "binding"
         ],
         "title": "PersonOut",
+        "type": "object"
+      },
+      "PlacementOut": {
+        "properties": {
+          "first_places": {
+            "title": "First Places",
+            "type": "integer"
+          },
+          "option_id": {
+            "format": "uuid",
+            "title": "Option Id",
+            "type": "string"
+          },
+          "place": {
+            "title": "Place",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "option_id",
+          "place",
+          "score",
+          "first_places"
+        ],
+        "title": "PlacementOut",
+        "type": "object"
+      },
+      "RankIn": {
+        "properties": {
+          "option_id": {
+            "format": "uuid",
+            "title": "Option Id",
+            "type": "string"
+          },
+          "rank": {
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Rank",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "option_id",
+          "rank"
+        ],
+        "title": "RankIn",
+        "type": "object"
+      },
+      "RankOut": {
+        "properties": {
+          "option_id": {
+            "format": "uuid",
+            "title": "Option Id",
+            "type": "string"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "option_id",
+          "rank"
+        ],
+        "title": "RankOut",
         "type": "object"
       },
       "ReorderIn": {
@@ -604,6 +806,16 @@
             "title": "Options",
             "type": "array"
           },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VotingResultOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "revealed_at": {
             "anyOf": [
               {
@@ -670,7 +882,8 @@
           "created_at",
           "voting_opened_at",
           "revealed_at",
-          "closed_at"
+          "closed_at",
+          "result"
         ],
         "title": "SessionOut",
         "type": "object"
@@ -770,6 +983,148 @@
           "token"
         ],
         "title": "VerifyIn",
+        "type": "object"
+      },
+      "VoterOut": {
+        "properties": {
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "avatar_emoji",
+          "color"
+        ],
+        "title": "VoterOut",
+        "type": "object"
+      },
+      "VotersOut": {
+        "description": "Who has voted, for the TV's avatar tiles. Never what they ranked.",
+        "properties": {
+          "voted": {
+            "items": {
+              "$ref": "#/components/schemas/VoterOut"
+            },
+            "title": "Voted",
+            "type": "array"
+          }
+        },
+        "required": [
+          "voted"
+        ],
+        "title": "VotersOut",
+        "type": "object"
+      },
+      "VotingResultOut": {
+        "properties": {
+          "ballot_count": {
+            "title": "Ballot Count",
+            "type": "integer"
+          },
+          "placements": {
+            "items": {
+              "$ref": "#/components/schemas/PlacementOut"
+            },
+            "title": "Placements",
+            "type": "array"
+          },
+          "tie_group": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Tie Group",
+            "type": "array"
+          },
+          "tie_seed": {
+            "title": "Tie Seed",
+            "type": "string"
+          },
+          "tiebreak": {
+            "enum": [
+              "none",
+              "first_places",
+              "head_to_head",
+              "random"
+            ],
+            "title": "Tiebreak",
+            "type": "string"
+          },
+          "winner_option_id": {
+            "format": "uuid",
+            "title": "Winner Option Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "winner_option_id",
+          "tie_seed",
+          "tie_group",
+          "tiebreak",
+          "ballot_count",
+          "placements"
+        ],
+        "title": "VotingResultOut",
+        "type": "object"
+      },
+      "WinnerOut": {
+        "properties": {
+          "movie_id": {
+            "format": "uuid",
+            "title": "Movie Id",
+            "type": "string"
+          },
+          "option_id": {
+            "format": "uuid",
+            "title": "Option Id",
+            "type": "string"
+          },
+          "poster_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Poster Path"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "option_id",
+          "movie_id",
+          "title",
+          "year",
+          "poster_path"
+        ],
+        "title": "WinnerOut",
         "type": "object"
       }
     }
@@ -1286,6 +1641,80 @@
       }
     },
     "/api/v1/sessions": {
+      "get": {
+        "description": "Nights newest first: winner, date and turnout. Defaults to revealed, tonight and\nclosed; `status` may repeat. A winner appears only once a night is revealed.",
+        "operationId": "list_sessions_api_v1_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "draft",
+                      "voting",
+                      "revealed",
+                      "tonight",
+                      "closed"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NightSummaryOut"
+                  },
+                  "title": "Response List Sessions Api V1 Sessions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sessions",
+        "tags": [
+          "sessions"
+        ]
+      },
       "post": {
         "description": "Start a night in `draft`. The night code is in this response and nowhere else.",
         "operationId": "create_session_api_v1_sessions_post",
@@ -1329,7 +1758,7 @@
     },
     "/api/v1/sessions/{session_id}": {
       "get": {
-        "description": "The night as every screen sees it. Never ballots or tallies.",
+        "description": "The night as every screen sees it. Never ballots; `result` only from reveal on.",
         "operationId": "get_session_api_v1_sessions__session_id__get",
         "parameters": [
           {
@@ -1369,6 +1798,255 @@
           }
         },
         "summary": "Get Session",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/ballots": {
+      "put": {
+        "description": "Cast or replace the ballot of a person bound to this phone.",
+        "operationId": "cast_ballot_api_v1_sessions__session_id__ballots_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BallotIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't (actively) bound to that person"
+          },
+          "404": {
+            "description": "No such night (or person) in this household"
+          },
+          "409": {
+            "description": "Voting is not open"
+          },
+          "422": {
+            "description": "The ranks break the night's ballot rules"
+          }
+        },
+        "summary": "Cast Ballot",
+        "tags": [
+          "ballots"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/ballots/mine": {
+      "get": {
+        "description": "Ballots of the people actively bound to this phone, so it can show and edit them.",
+        "operationId": "my_ballots_api_v1_sessions__session_id__ballots_mine_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OwnBallotOut"
+                  },
+                  "title": "Response My Ballots Api V1 Sessions  Session Id  Ballots Mine Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Ballots",
+        "tags": [
+          "ballots"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/ballots/proxy": {
+      "put": {
+        "description": "Host votes on someone's behalf (stored with is_proxy and the host's account).",
+        "operationId": "cast_proxy_ballot_api_v1_sessions__session_id__ballots_proxy_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BallotIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't (actively) bound to that person"
+          },
+          "404": {
+            "description": "No such night (or person) in this household"
+          },
+          "409": {
+            "description": "Voting is not open"
+          },
+          "422": {
+            "description": "The ranks break the night's ballot rules"
+          }
+        },
+        "summary": "Cast Proxy Ballot",
+        "tags": [
+          "ballots"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/close": {
+      "post": {
+        "description": "tonight -> closed: the night code stops joining. Idempotent.",
+        "operationId": "close_night_api_v1_sessions__session_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "Not allowed in the night's current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Night",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/close-voting": {
+      "post": {
+        "description": "voting -> revealed: tally, tie-break, store the ranking and winner. Idempotent: a\nrepeat returns the stored result unchanged.",
+        "operationId": "close_voting_api_v1_sessions__session_id__close_voting_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "Not allowed in the night's current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Voting",
         "tags": [
           "sessions"
         ]
@@ -1652,6 +2330,53 @@
         "summary": "Remove Option",
         "tags": [
           "sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/voters": {
+      "get": {
+        "description": "Who has voted (avatar tiles light up on the TV). Never ranks or tallies.",
+        "operationId": "voters_api_v1_sessions__session_id__voters_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VotersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Voters",
+        "tags": [
+          "ballots"
         ]
       }
     },
