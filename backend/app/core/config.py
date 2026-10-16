@@ -67,6 +67,13 @@ class Settings(BaseSettings):
     JOIN_FAILURE_LIMIT: int = 30
     JOIN_FAILURE_WINDOW_SECONDS: int = 900
 
+    # --- TMDB (03-backend.md "Candidates") ---
+    # Server-only. Unset token = TMDB off: search answers 503 and the shortlist takes typed
+    # titles. Locally and in CI the base URL points at the tmdb-fake service.
+    TMDB_BASE_URL: str = "https://api.themoviedb.org/3"
+    TMDB_READ_TOKEN: str | None = None
+    TMDB_TIMEOUT_SECONDS: float = 5.0
+
     # --- HTTP ---
     CORS_ALLOWED_ORIGINS: str = "http://localhost:3000"
 
