@@ -33,7 +33,7 @@ _UPSERT_CACHE = text(
 ).bindparams(bindparam("p", type_=JSONB))
 
 
-async def _cached_get(
+async def cached_get(
     db: AsyncSession, client: TmdbClient | None, path: str, params: dict[str, str]
 ) -> dict[str, Any]:
     if client is None:
@@ -58,6 +58,19 @@ async def _cached_get(
     return payload
 
 
+async def providers(
+    db: AsyncSession, client: TmdbClient | None, household_id: uuid.UUID
+) -> list[tmdb.ListedProvider]:
+    """Streaming services TMDB knows in the household's region, for the settings picker."""
+    region: str = (
+        await db.scalar(
+            text("SELECT region FROM settings WHERE household_id = :h"), {"h": household_id}
+        )
+    ) or "US"
+    payload = await cached_get(db, client, "/watch/providers/movie", {"watch_region": region})
+    return tmdb.parse_provider_list(payload, region)
+
+
 def _normalize_query(q: str) -> str:
     return " ".join(q.split())
 
@@ -67,13 +80,13 @@ async def search(db: AsyncSession, client: TmdbClient | None, q: str) -> list[Tm
     if not query:
         return []
     params = {"query": query.casefold(), "include_adult": "false", "page": "1"}
-    payload = await _cached_get(db, client, "/search/movie", params)
+    payload = await cached_get(db, client, "/search/movie", params)
     return tmdb.parse_search(payload)[:SEARCH_LIMIT]
 
 
 async def details(db: AsyncSession, client: TmdbClient | None, tmdb_id: int) -> TmdbMovie:
     try:
-        payload = await _cached_get(db, client, f"/movie/{tmdb_id}", {})
+        payload = await cached_get(db, client, f"/movie/{tmdb_id}", {})
     except TmdbNotFound:
         raise NotFound("No such movie on TMDB") from None
     return tmdb.parse_movie(payload)
@@ -114,7 +127,31 @@ async def upsert_from_tmdb(
             },
         )
     ).scalar_one()
+    # Best effort: usually already cached by the generator; the cap re-checks it anyway.
+    await us_cert(db, household_id, client, movie.tmdb_id)
     return movie_id
+
+
+async def us_cert(
+    db: AsyncSession, household_id: uuid.UUID, client: TmdbClient | None, tmdb_id: int
+) -> str | None:
+    """The US certification from /movie/{id}/release_dates (through the cache), written
+    onto the household's `movies` row for that id if there is one (ADR-0007: the cap is
+    enforced locally against it). None if unrated or TMDB can't say."""
+    try:
+        payload = await cached_get(db, client, f"/movie/{tmdb_id}/release_dates", {})
+    except (Unavailable, TmdbNotFound):
+        return None
+    cert = tmdb.parse_us_cert(payload)
+    if cert is not None:
+        await db.execute(
+            text(
+                "UPDATE movies SET us_cert = :c WHERE household_id = :h AND tmdb_id = :t "
+                "AND us_cert IS DISTINCT FROM :c"
+            ),
+            {"c": cert, "h": household_id, "t": tmdb_id},
+        )
+    return cert
 
 
 async def upsert_manual(

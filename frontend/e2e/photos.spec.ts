@@ -1,9 +1,16 @@
-import path from "node:path";
-
-import { type APIRequestContext, type Page } from "@playwright/test";
+import { type APIRequestContext } from "@playwright/test";
 import exifr from "exifr";
 
 import { apiFromPhone, expectNoAxeViolations, joinAs, newPhone } from "./support/phones";
+import {
+  addPhotos,
+  type AlbumPhoto,
+  HEIC_FIXTURE,
+  JPEG_FIXTURE,
+  openNight,
+  PRESIGNED,
+  recordApiAnswers,
+} from "./support/photos";
 import { expect, seedNight, test } from "./support/seed";
 
 /**
@@ -12,29 +19,6 @@ import { expect, seedNight, test } from "./support/seed";
  * gps.heic can't be decoded by Chromium, so it goes through the heic-to worker, as an iPhone's
  * photo would on Chrome or Firefox. Both fixtures carry GPS; what lands in the bucket must not.
  */
-const FIXTURES = path.join(__dirname, "fixtures");
-const JPEG_FIXTURE = path.join(FIXTURES, "gps.jpg");
-const HEIC_FIXTURE = path.join(FIXTURES, "gps.heic");
-/** Processing (incl. loading the HEIC decoder) and both PUTs. */
-const UPLOAD_TIMEOUT = 30_000;
-const PRESIGNED = /X-Amz-Signature=/i;
-
-type AlbumPhoto = { id: string; person_name: string; url: string; thumb_url: string };
-
-async function openNight(page: Page, sessionId: string) {
-  await page.goto(`/s/${sessionId}`);
-  await expect(page.getByTestId("night-screen")).toHaveAttribute("data-status", "tonight");
-  await expect(page.getByRole("heading", { name: "Photos from tonight" })).toBeVisible();
-}
-
-async function addPhotos(page: Page, files: string[]) {
-  await page.getByTestId("photo-input").setInputFiles(files);
-  const rows = page.getByTestId("upload-list").getByRole("listitem");
-  await expect(rows).toHaveCount(files.length);
-  for (const row of await rows.all()) {
-    await expect(row).toHaveAttribute("data-state", "done", { timeout: UPLOAD_TIMEOUT });
-  }
-}
 
 /** The stored bytes, fetched through the presigned URL the album handed out. */
 async function storedBytes(request: APIRequestContext, url: string): Promise<Buffer> {
@@ -139,12 +123,7 @@ test.describe("photo drop", () => {
     // A fresh context: no device cookie, no account session.
     const strangerPage = await newPhone(browser);
     // Every API answer this phone gets, read in full as it passes through.
-    const answers: string[] = [];
-    await strangerPage.context().route("**/api/**", async (route) => {
-      const response = await route.fetch();
-      answers.push(`${route.request().url()} ${await response.text()}`);
-      await route.fulfill({ response });
-    });
+    const answers = await recordApiAnswers(strangerPage.context());
 
     await strangerPage.goto(`/albums/${night.sessionId}`);
     await expect(

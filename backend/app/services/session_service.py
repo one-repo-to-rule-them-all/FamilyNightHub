@@ -123,6 +123,8 @@ class OptionInput:
     tmdb_id: int | None = None
     title: str | None = None
     year: int | None = None
+    # With tmdb_id: `streaming` when the generator found it on a household service.
+    source: str | None = None
 
 
 _AUDIT = text(
@@ -280,7 +282,7 @@ async def add_option(
         source = "owned" if row.owned else ("tmdb" if row.tmdb_id is not None else "manual")
     elif choice.tmdb_id is not None:
         movie_id = await movie_service.upsert_from_tmdb(db, household_id, client, choice.tmdb_id)
-        source = "tmdb"
+        source = choice.source or "tmdb"
     else:
         assert choice.title is not None
         movie_id = await movie_service.upsert_manual(db, household_id, choice.title, choice.year)

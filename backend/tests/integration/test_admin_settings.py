@@ -66,9 +66,29 @@ async def test_admin_reads_and_patches_settings(two_households: Pair) -> None:
         assert (await p.client.get(SETTINGS)).json()["region"] == "US"
 
 
+async def test_admin_sets_the_streaming_services(two_households: Pair) -> None:
+    a, _ = two_households
+    async with phone() as p:
+        _as_admin(p, a)
+        assert (await p.client.get(SETTINGS)).json()["streaming_providers"] == []
+        resp = await p.patch(SETTINGS, {"streaming_providers": [337, 8, 337]})
+        assert resp.status_code == 200
+        assert resp.json()["streaming_providers"] == [8, 337]
+        assert (await p.patch(SETTINGS, {"region": "CA"})).json()["streaming_providers"] == [8, 337]
+        assert (await p.patch(SETTINGS, {"streaming_providers": []})).json()[
+            "streaming_providers"
+        ] == []
+    assert (await _audit(a, "settings.updated"))[0] == {
+        "from": {"streaming_providers": []},
+        "to": {"streaming_providers": [8, 337]},
+    }
+
+
 @pytest.mark.parametrize(
     "body",
     [
+        {"streaming_providers": [0]},
+        {"streaming_providers": list(range(1, 22))},
         {"default_voting_method": "approval"},  # Phase 2
         {"default_voting_method": "pick_one"},
         {"default_age_cap": "PG13"},

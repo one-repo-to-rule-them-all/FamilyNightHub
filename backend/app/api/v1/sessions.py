@@ -27,6 +27,10 @@ from app.core.dependencies import (
 )
 from app.domain.voting.base import MAX_SEED
 from app.schemas.sessions import (
+    AttributionOut,
+    CandidateOut,
+    GenerateIn,
+    GenerateOut,
     NightCodeOut,
     NightSummaryOut,
     OptionIn,
@@ -41,7 +45,7 @@ from app.schemas.sessions import (
     VotingResultOut,
     WinnerOut,
 )
-from app.services import session_service
+from app.services import generator_service, session_service
 from app.services.errors import Conflict, Forbidden, Invalid, NotFound, ServiceError, Unavailable
 from app.services.rating_service import RatingAverage
 
@@ -230,7 +234,11 @@ async def add_option(
     session_id: uuid.UUID, body: OptionIn, account: CanRun, db: AccountDb, client: Tmdb
 ) -> SessionOut:
     choice = session_service.OptionInput(
-        movie_id=body.movie_id, tmdb_id=body.tmdb_id, title=body.title, year=body.year
+        movie_id=body.movie_id,
+        tmdb_id=body.tmdb_id,
+        title=body.title,
+        year=body.year,
+        source=body.source,
     )
     try:
         await session_service.add_option(
@@ -239,6 +247,61 @@ async def add_option(
     except ServiceError as err:
         raise_http(err)
     return await _out(db, account.household_id, session_id)
+
+
+@router.post(
+    "/{session_id}/generate",
+    response_model=GenerateOut,
+    dependencies=[CsrfProtected],
+    responses=EDIT,
+)
+async def generate_candidates(
+    session_id: uuid.UUID,
+    body: GenerateIn,
+    account: CanRun,
+    db: AccountDb,
+    client: Tmdb,
+    x_fnh_test_seed: Annotated[str | None, Header(include_in_schema=False)] = None,
+) -> GenerateOut:
+    """Roll candidates for a draft night (ADR-0007): owned titles first, then the
+    household's streaming services, then anywhere on TMDB. Nothing is added: the host adds
+    picks through POST .../options (`movie_id` for owned, else `tmdb_id` + `source`).
+    With TMDB off or down, owned titles still roll and `tmdb_unavailable` is true."""
+    req = generator_service.GenerateInput(
+        count=body.count,
+        genre=body.genre,
+        max_runtime=body.max_runtime,
+        **({"age_cap": body.age_cap} if "age_cap" in body.model_fields_set else {}),
+    )
+    try:
+        roll = await generator_service.generate(
+            db, account.household_id, session_id, req, client, seed=tie_seed(x_fnh_test_seed)
+        )
+    except ServiceError as err:
+        raise_http(err)
+    streaming = any(c.source == "streaming" for c in roll.candidates)
+    return GenerateOut(
+        candidates=[
+            CandidateOut(
+                movie_id=c.title.movie_id if c.source == "owned" else None,
+                tmdb_id=c.title.tmdb_id,
+                title=c.title.title,
+                year=c.title.year,
+                poster_path=c.title.poster_path,
+                source=c.source,
+                us_cert=c.title.us_cert,
+                runtime=c.title.runtime,
+                providers=list(c.title.providers),
+            )
+            for c in roll.candidates
+        ],
+        age_cap=roll.age_cap,
+        tmdb_unavailable=roll.tmdb_unavailable,
+        attribution=AttributionOut(
+            tmdb=generator_service.TMDB_NOTICE,
+            justwatch=generator_service.JUSTWATCH_NOTICE if streaming else None,
+        ),
+    )
 
 
 @router.delete(

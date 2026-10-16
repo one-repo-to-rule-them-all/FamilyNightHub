@@ -154,3 +154,31 @@ async def test_a_blank_query_returns_nothing_and_an_empty_one_is_422(two_househo
             await _host(p, a)
             assert (await p.client.get(SEARCH, params={"q": "   "})).json() == []
             assert (await p.client.get(SEARCH, params={"q": ""})).status_code == 422
+
+
+async def test_hosts_list_streaming_services_for_the_settings_picker(
+    two_households: Pair,
+) -> None:
+    a, _ = two_households
+    with tmdb(fake_client()):
+        async with phone() as p:
+            await _host(p, a)
+            resp = await p.client.get("/api/v1/tmdb/providers")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert [x["name"] for x in body["providers"]][:2] == ["Netflix", "Disney Plus"]
+    assert body["providers"][0] == {
+        "provider_id": 8,
+        "name": "Netflix",
+        "logo_path": "/fake-netflix.jpg",
+    }
+    assert "JustWatch" in body["attribution"]
+
+
+async def test_streaming_services_need_tmdb(two_households: Pair) -> None:
+    a, _ = two_households
+    with tmdb(None):
+        async with phone() as p:
+            await _host(p, a)
+            resp = await p.client.get("/api/v1/tmdb/providers")
+    assert resp.status_code == 503

@@ -150,6 +150,31 @@
         "title": "AdminPersonOut",
         "type": "object"
       },
+      "AttributionOut": {
+        "properties": {
+          "justwatch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Justwatch"
+          },
+          "tmdb": {
+            "title": "Tmdb",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tmdb",
+          "justwatch"
+        ],
+        "title": "AttributionOut",
+        "type": "object"
+      },
       "BallotIn": {
         "description": "One person's ballot, replacing any earlier one. Ranks run 1..m with no gaps,\nm <= the night's ballot_size; rank 1 alone is fine.",
         "properties": {
@@ -196,6 +221,110 @@
           "status"
         ],
         "title": "BindingOut",
+        "type": "object"
+      },
+      "CandidateOut": {
+        "properties": {
+          "movie_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Movie Id"
+          },
+          "poster_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Poster Path"
+          },
+          "providers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "runtime": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtime"
+          },
+          "source": {
+            "enum": [
+              "owned",
+              "streaming",
+              "tmdb"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tmdb_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tmdb Id"
+          },
+          "us_cert": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Us Cert"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "movie_id",
+          "tmdb_id",
+          "title",
+          "year",
+          "poster_path",
+          "source",
+          "us_cert",
+          "runtime",
+          "providers"
+        ],
+        "title": "CandidateOut",
         "type": "object"
       },
       "ClaimOut": {
@@ -375,6 +504,127 @@
           "is_tv"
         ],
         "title": "EnrollOut",
+        "type": "object"
+      },
+      "GenerateIn": {
+        "description": "Roll candidates without adding them. Omit `age_cap` to use the night's cap (else the\nhousehold default); send `age_cap: null` for no cap tonight.",
+        "properties": {
+          "age_cap": {
+            "anyOf": [
+              {
+                "enum": [
+                  "G",
+                  "PG",
+                  "PG-13",
+                  "R",
+                  "NC-17"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Cap"
+          },
+          "count": {
+            "default": 12,
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "genre": {
+            "anyOf": [
+              {
+                "enum": [
+                  "Action",
+                  "Adventure",
+                  "Animation",
+                  "Comedy",
+                  "Crime",
+                  "Documentary",
+                  "Drama",
+                  "Family",
+                  "Fantasy",
+                  "History",
+                  "Horror",
+                  "Music",
+                  "Mystery",
+                  "Romance",
+                  "Science Fiction",
+                  "TV Movie",
+                  "Thriller",
+                  "War",
+                  "Western"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genre"
+          },
+          "max_runtime": {
+            "anyOf": [
+              {
+                "maximum": 400.0,
+                "minimum": 30.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Runtime"
+          }
+        },
+        "title": "GenerateIn",
+        "type": "object"
+      },
+      "GenerateOut": {
+        "properties": {
+          "age_cap": {
+            "anyOf": [
+              {
+                "enum": [
+                  "G",
+                  "PG",
+                  "PG-13",
+                  "R",
+                  "NC-17"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Cap"
+          },
+          "attribution": {
+            "$ref": "#/components/schemas/AttributionOut"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateOut"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "tmdb_unavailable": {
+            "title": "Tmdb Unavailable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "candidates",
+          "age_cap",
+          "tmdb_unavailable",
+          "attribution"
+        ],
+        "title": "GenerateOut",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -757,6 +1007,21 @@
               }
             ],
             "title": "Movie Id"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "streaming",
+                  "tmdb"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
           },
           "title": {
             "anyOf": [
@@ -1207,6 +1472,57 @@
         "title": "PlacementOut",
         "type": "object"
       },
+      "ProviderOut": {
+        "properties": {
+          "logo_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Path"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "provider_id",
+          "name",
+          "logo_path"
+        ],
+        "title": "ProviderOut",
+        "type": "object"
+      },
+      "ProvidersOut": {
+        "properties": {
+          "attribution": {
+            "title": "Attribution",
+            "type": "string"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderOut"
+            },
+            "title": "Providers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "providers",
+          "attribution"
+        ],
+        "title": "ProvidersOut",
+        "type": "object"
+      },
       "RankIn": {
         "properties": {
           "option_id": {
@@ -1540,6 +1856,13 @@
             "title": "Region",
             "type": "string"
           },
+          "streaming_providers": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Streaming Providers",
+            "type": "array"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -1551,6 +1874,7 @@
           "default_voting_method",
           "default_age_cap",
           "region",
+          "streaming_providers",
           "updated_at"
         ],
         "title": "SettingsOut",
@@ -1599,6 +1923,22 @@
               }
             ],
             "title": "Region"
+          },
+          "streaming_providers": {
+            "anyOf": [
+              {
+                "items": {
+                  "exclusiveMinimum": 0.0,
+                  "type": "integer"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Streaming Providers"
           }
         },
         "title": "SettingsUpdateIn",
@@ -3262,6 +3602,66 @@
         ]
       }
     },
+    "/api/v1/sessions/{session_id}/generate": {
+      "post": {
+        "description": "Roll candidates for a draft night (ADR-0007): owned titles first, then the\nhousehold's streaming services, then anywhere on TMDB. Nothing is added: the host adds\npicks through POST .../options (`movie_id` for owned, else `tmdb_id` + `source`).\nWith TMDB off or down, owned titles still roll and `tmdb_unavailable` is true.",
+        "operationId": "generate_candidates_api_v1_sessions__session_id__generate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "Not allowed in the night's current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Candidates",
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
     "/api/v1/sessions/{session_id}/night-code": {
       "post": {
         "description": "Replace the code (lost, or leaked beyond the room). The old one stops working.",
@@ -4331,6 +4731,31 @@
         "summary": "Create Sse Ticket",
         "tags": [
           "live"
+        ]
+      }
+    },
+    "/api/v1/tmdb/providers": {
+      "get": {
+        "description": "Streaming services in the household's region, for picking `streaming_providers`\nin settings. The data comes from JustWatch: show `attribution` with it.",
+        "operationId": "providers_api_v1_tmdb_providers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvidersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "description": "TMDB not configured or unavailable"
+          }
+        },
+        "summary": "Providers",
+        "tags": [
+          "movies"
         ]
       }
     },

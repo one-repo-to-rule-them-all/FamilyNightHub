@@ -12,9 +12,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.dependencies import AccountContext, AccountDb, require_permission
 from app.integrations.tmdb import TmdbClient, configured_client
-from app.schemas.sessions import TmdbResultOut
+from app.schemas.sessions import ProviderOut, ProvidersOut, TmdbResultOut
 from app.services import movie_service
 from app.services.errors import Unavailable
+from app.services.generator_service import JUSTWATCH_NOTICE
 
 router = APIRouter(prefix="/tmdb", tags=["movies"])
 
@@ -45,3 +46,24 @@ async def search(
         TmdbResultOut(tmdb_id=m.tmdb_id, title=m.title, year=m.year, poster_path=m.poster_path)
         for m in movies
     ]
+
+
+@router.get(
+    "/providers",
+    response_model=ProvidersOut,
+    responses={503: {"description": "TMDB not configured or unavailable"}},
+)
+async def providers(account: CanRun, db: AccountDb, client: Tmdb) -> ProvidersOut:
+    """Streaming services in the household's region, for picking `streaming_providers`
+    in settings. The data comes from JustWatch: show `attribution` with it."""
+    try:
+        listed = await movie_service.providers(db, client, account.household_id)
+    except Unavailable as err:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, err.reason) from None
+    return ProvidersOut(
+        providers=[
+            ProviderOut(provider_id=p.provider_id, name=p.name, logo_path=p.logo_path)
+            for p in listed
+        ],
+        attribution=JUSTWATCH_NOTICE,
+    )
