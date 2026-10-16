@@ -70,7 +70,8 @@ class Session(Base):
             "status IN ('draft', 'voting', 'revealed', 'tonight', 'closed')", name="status"
         ),
         CheckConstraint("voting_method IN ('top3', 'approval', 'pick_one')", name="voting_method"),
-        CheckConstraint("ballot_size BETWEEN 1 AND 3", name="ballot_size"),
+        # 1..8 since ADR-0010: approval may hold the whole shortlist.
+        CheckConstraint("ballot_size BETWEEN 1 AND 8", name="ballot_size"),
         scoped_fk("host_account_id", "accounts"),
         # The winner must be one of this session's own options (05-data.md).
         ForeignKeyConstraint(
@@ -129,13 +130,15 @@ class Option(Base):
 
 
 class BallotRank(Base):
-    """One row per (person, rank). Replaced wholesale on each submit until close."""
+    """One row per (person, rank). Replaced wholesale on each submit until close. For
+    approval the rank is a 1..m ordinal of the approvals with no meaning (ADR-0010);
+    the per-method limit (top3 <= 3) is enforced in domain/voting, not here."""
 
     __tablename__ = "ballot_ranks"
     __table_args__ = (
         UniqueConstraint("session_id", "person_id", "rank"),
         UniqueConstraint("session_id", "person_id", "option_id"),
-        CheckConstraint("rank BETWEEN 1 AND 3", name="rank"),
+        CheckConstraint("rank BETWEEN 1 AND 8", name="rank"),
         CheckConstraint(
             "cast_by_device_id IS NOT NULL OR cast_by_account_id IS NOT NULL", name="cast_by"
         ),

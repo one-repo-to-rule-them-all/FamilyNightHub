@@ -147,8 +147,8 @@ class SettingsOut(BaseModel):
 class SettingsUpdateIn(BaseModel):
     """Only the fields sent are changed; `default_age_cap: null` clears the cap."""
 
-    # Phase 1 ships top-3 only (ADR-0006); approval and pick-one land in Phase 2.
-    default_voting_method: Literal["top3"] | None = None
+    # Any method (ADR-0006, ADR-0010); a new night starts with it.
+    default_voting_method: Literal["top3", "approval", "pick_one"] | None = None
     default_age_cap: AgeCap | None = None
     region: str | None = None
     # Replaces the whole list; [] means no streaming services.
