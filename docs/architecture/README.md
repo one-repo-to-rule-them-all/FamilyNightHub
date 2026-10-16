@@ -36,6 +36,7 @@ The numbered docs go **broad → narrow**.
 | Candidate generator draws owned → streaming → TMDB | [`ADR-0007`](decisions/ADR-0007-candidate-generator-order.md) |
 | Inherit Ctrl+Alt+Defeat design tokens | [`ADR-0008`](decisions/ADR-0008-ctrl-alt-defeat-design-tokens.md) |
 | Pre-auth lookups (device, magic link, slug) via narrow definer functions | [`ADR-0009`](decisions/ADR-0009-pre-auth-lookups-via-definer-functions.md) |
+| Approval and pick-one voting: ballots, storage, faithful tie-break (extends ADR-0006) | [`ADR-0010`](decisions/ADR-0010-approval-and-pick-one-voting.md) |
 
 ## The 30-second mental model
 

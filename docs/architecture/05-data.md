@@ -45,7 +45,11 @@ erDiagram
 ```
 
 Integrity constraints: `ballot_ranks` has `unique(session_id, person_id, rank)`,
-`unique(session_id, person_id, option_id)` and `check(rank between 1 and 3)`. `ratings` has
+`unique(session_id, person_id, option_id)` and `check(rank between 1 and 8)`; `sessions` has
+`check(ballot_size between 1 and 8)`. Both were 1..3 until migration `0002_voting_methods_ranks`:
+an approval ballot may hold the whole shortlist (up to 8) and stores its approvals as ordinals
+1..m, which keeps the rank uniqueness. top3's own `rank ≤ 3` is enforced in `domain/voting`
+([ADR-0010](decisions/ADR-0010-approval-and-pick-one-voting.md)). `ratings` has
 `check(score between 1 and 5)`. `sessions.winner_option_id` must belong to the same session
 (enforced by a composite FK on `(id, session_id)`), and so must a ballot's `option_id`.
 
