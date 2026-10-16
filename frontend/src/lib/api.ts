@@ -1,0 +1,167 @@
+/**
+ * Browser client for the FNH API (04-frontend.md "API client & types").
+ *
+ * - Same-origin `/api/*` (next.config.ts rewrites it to fnh-api), `credentials: "include"` so the
+ *   httpOnly `fnh_device` / `fnh_session` cookies ride along.
+ * - CSRF is double-submit (ADR-0002): GET /api/v1/csrf once, cache the token, and send it as
+ *   `X-FNH-CSRF` on every mutation. A 403 CSRF rejection (cookie cleared or rotated) refreshes the
+ *   token and retries once.
+ * - Every non-2xx is the envelope `{"error": {code, message, request_id}}` (backend app/main.py),
+ *   surfaced as `ApiError`. Screens show `message` as-is: the server already keeps it generic.
+ *
+ * Types come from src/types/api.gen.ts (generated from backend/openapi.json; never hand-edited).
+ */
+import type { components } from "@/types/api.gen";
+
+export type Schemas = components["schemas"];
+export type Person = Schemas["PersonOut"];
+export type Binding = Schemas["BindingOut"];
+export type Device = Schemas["DeviceOut"];
+export type JoinResult = Schemas["JoinOut"];
+export type Account = Schemas["AccountOut"];
+
+export const CSRF_HEADER = "X-FNH-CSRF";
+const BASE = "/api/v1";
+const NETWORK_MESSAGE = "Can't reach Family Night right now. Check your Wi-Fi and try again.";
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly requestId: string | null;
+  /** Seconds from the Retry-After header (429s), or null. */
+  readonly retryAfter: number | null;
+
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    requestId: string | null = null,
+    retryAfter: number | null = null,
+  ) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.requestId = requestId;
+    this.retryAfter = retryAfter;
+  }
+}
+
+type Method = "GET" | "POST" | "PUT" | "DELETE";
+type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
+let fetchImpl: FetchLike = (input, init) => fetch(input, init);
+let csrfToken: Promise<string> | null = null;
+
+/** Test seam: swap the transport and forget the cached CSRF token. */
+export function configureApi(options: { fetch?: FetchLike } = {}): void {
+  fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
+  csrfToken = null;
+}
+
+function parseRetryAfter(value: string | null): number | null {
+  if (!value) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds);
+  const date = Date.parse(value);
+  if (Number.isNaN(date)) return null;
+  return Math.max(0, Math.ceil((date - Date.now()) / 1000));
+}
+
+/** Maps any non-2xx response onto ApiError, whether or not the body is the envelope. */
+export async function toApiError(response: Response): Promise<ApiError> {
+  const retryAfter = parseRetryAfter(response.headers.get("Retry-After"));
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Not JSON (a proxy error page, an empty 502): fall through to the generic message.
+  }
+  const envelope = (body as { error?: Record<string, unknown> } | null)?.error;
+  if (envelope && typeof envelope.message === "string") {
+    return new ApiError(
+      response.status,
+      typeof envelope.code === "string" ? envelope.code : "http_error",
+      envelope.message,
+      typeof envelope.request_id === "string" ? envelope.request_id : null,
+      retryAfter,
+    );
+  }
+  return new ApiError(response.status, "unknown_error", NETWORK_MESSAGE, null, retryAfter);
+}
+
+async function send(path: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetchImpl(`${BASE}${path}`, { ...init, credentials: "include" });
+  } catch {
+    throw new ApiError(0, "network_error", NETWORK_MESSAGE);
+  }
+}
+
+function fetchCsrfToken(): Promise<string> {
+  if (!csrfToken) {
+    csrfToken = (async () => {
+      const response = await send("/csrf", { method: "GET" });
+      if (!response.ok) throw await toApiError(response);
+      const body = (await response.json()) as Schemas["CsrfOut"];
+      return body.csrf_token;
+    })();
+    // A failed fetch must not poison every later mutation.
+    csrfToken.catch(() => {
+      csrfToken = null;
+    });
+  }
+  return csrfToken;
+}
+
+function isCsrfRejection(error: ApiError): boolean {
+  return error.status === 403 && error.message.startsWith("CSRF");
+}
+
+async function request<T>(method: Method, path: string, body?: unknown, retried = false) {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (method !== "GET") headers[CSRF_HEADER] = await fetchCsrfToken();
+
+  const response = await send(path, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const error = await toApiError(response);
+    if (!retried && method !== "GET" && isCsrfRejection(error)) {
+      csrfToken = null;
+      return request<T>(method, path, body, true);
+    }
+    throw error;
+  }
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
+/** One function per endpoint the UI uses, typed from the generated schema. */
+export const api = {
+  join: (body: Schemas["JoinIn"]) => request<JoinResult>("POST", "/join", body),
+  people: () => request<Person[]>("GET", "/people"),
+  myDevice: () => request<Device>("GET", "/devices/me"),
+  claimPerson: (personId: string) =>
+    request<Binding>("PUT", `/devices/me/people/${encodeURIComponent(personId)}`),
+  releasePerson: (personId: string) =>
+    request<void>("DELETE", `/devices/me/people/${encodeURIComponent(personId)}`),
+  requestMagicLink: (body: Schemas["MagicLinkIn"]) =>
+    request<Schemas["MagicLinkOut"]>("POST", "/auth/magic-link", body),
+  verifyMagicLink: (body: Schemas["VerifyIn"]) => request<Account>("POST", "/auth/verify", body),
+  me: () => request<Account>("GET", "/auth/me"),
+  logout: () => request<void>("POST", "/auth/logout"),
+};
+
+/** "Try again in 2 minutes." for a 429, or null when the server gave no Retry-After. */
+export function retryAfterHint(error: ApiError): string | null {
+  if (error.status !== 429 || error.retryAfter === null) return null;
+  const seconds = error.retryAfter;
+  if (seconds < 60)
+    return `Try again in ${Math.max(1, seconds)} second${seconds === 1 ? "" : "s"}.`;
+  const minutes = Math.ceil(seconds / 60);
+  return `Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+}

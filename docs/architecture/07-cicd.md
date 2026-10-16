@@ -1,7 +1,8 @@
 # 07 — CI/CD
 
-`ci.yml` exists with the `static`, `unit`, `integration`, `contract` and `bundle-secrets` jobs
-(status column below). `e2e` and `deploy.yml` are still intended, not built. It combines OrderUp's
+`ci.yml` exists with the `static`, `unit`, `integration`, `contract`, `bundle-secrets` and `e2e`
+jobs (status column below). The multi-phone/TV part of `e2e`, and `deploy.yml`, are still intended,
+not built. It combines OrderUp's
 Fly deploy with CAD's "secret never in bundle" and multi-browser Playwright gates. The owner is a
 QA/CI engineer, so the bar is **deterministic, trustworthy green**.
 
@@ -21,11 +22,11 @@ flowchart TB
 
 | Job | Purpose | Source of truth | Status |
 |---|---|---|---|
-| `static` | ruff check + format, mypy strict, repo rules (`backend/scripts/check_repo_rules.py`: no sleeps/fixed waits in tests, no session-level `app.*` GUC, revision ids of 32 chars or fewer), `tsc --noEmit` | `.github/workflows/ci.yml` | Built. eslint/prettier land with the first real UI |
-| `unit` | pytest `tests/unit` (+ Hypothesis tally properties), vitest (photo pipeline incl. GPS-strip fixture) | `backend/tests/unit`, `frontend/src/**/*.test.ts` | pytest built; vitest lands with the photo pipeline |
+| `static` | ruff check + format, mypy strict, repo rules (`backend/scripts/check_repo_rules.py`: no sleeps/fixed waits in tests, no session-level `app.*` GUC, revision ids of 32 chars or fewer), `tsc --noEmit`, eslint (`eslint-config-next`, run from `frontend/tools/eslint/`), prettier --check | `.github/workflows/ci.yml` | Built |
+| `unit` | pytest `tests/unit` (+ Hypothesis tally properties), vitest (API client CSRF + error envelope, night-code input; later the photo pipeline incl. GPS-strip fixture) | `backend/tests/unit`, `frontend/src/**/*.test.ts` | Built (photo-pipeline vitest lands with the pipeline) |
 | `integration` | Whole pytest suite against Postgres + Redis service containers as `fnh_app`, after the role bootstrap. **Includes the isolation suite** (two seeded households, every table) and `test_rls_coverage`. Coverage gates run here | `backend/tests/integration` | Built. SeaweedFS service joins with the photo endpoints; endpoint-level isolation joins with the endpoints |
 | `contract` | `alembic upgrade` → `downgrade base` → `upgrade` round trip, `alembic check` (models match migrations), `openapi.json` + `api.gen.ts` drift | ci.yml | Built |
-| `e2e` | compose stack, Playwright: 4 phone contexts (iPhone + Pixel descriptors) + TV context; unauthenticated context must get 0 photo URLs; axe | `frontend/e2e/` | Not built |
+| `e2e` | Postgres + Redis + MailHog service containers, role bootstrap + migrations, `next build`, then Playwright starts uvicorn and `next start`. Phone viewports (Pixel 7, and iPhone 13 on Chromium) with axe (WCAG 2.1 AA): join with the night code → pick an avatar, wrong code, lookalike characters, cookie redirects, magic-link request → emailed link → `/host` → sign out, bad and replayed tokens. Each test seeds its own household (`frontend/e2e/seed_night.py`). Later: 4 phone contexts + TV context, SSE, tmdb-fake, "unauthenticated context gets 0 photo URLs" | `frontend/e2e/` | Built (join + sign-in); multi-phone/TV lands with voting |
 | `bundle-secrets` | `next build` with sentinel values for every server secret, then grep `.next/static` for each. Verified by a deliberate leak (`next.config` `env` + client component) that the grep catches | ci.yml | Built |
 
 `ENVIRONMENT=test` in CI. TypeScript types come from `openapi-typescript`, installed in its own
@@ -40,6 +41,24 @@ green.
 **E2E determinism rules:** wait for `data-live="ready"` before acting; assert on server-derived
 text with `expect.poll`/`toHaveText`; tie-break seeds are injected through a test-only header that
 is accepted only when `ENVIRONMENT=test`; TMDB is always `tmdb-fake`.
+
+## Running E2E locally
+
+Use a database of your own so parallel work never collides (the shared compose Postgres is on
+`localhost:55432`, MailHog's API on `58025`):
+
+```bash
+docker exec fnh-db-1 createdb -U fnh fnh_e2e
+docker exec -i fnh-db-1 psql -U fnh -d fnh_e2e -v ON_ERROR_STOP=1 < backend/db/init/00-init-app-role.sql
+(cd backend && MIGRATION_DATABASE_URL=postgresql+psycopg2://fnh:fnh@localhost:55432/fnh_e2e uv run alembic upgrade head)
+cd frontend && npx playwright install chromium
+DATABASE_URL=postgresql+asyncpg://fnh_app:fnh_app@localhost:55432/fnh_e2e REDIS_URL=redis://localhost:56379/5 EMAIL_MODE=smtp SMTP_PORT=51025 FRONTEND_BASE_URL=http://localhost:3201 MAILHOG_URL=http://localhost:58025 npm run test:e2e
+```
+
+Playwright starts uvicorn (`E2E_API_PORT`, default 8201) and `next dev` (`E2E_WEB_PORT`, default
+3201), or reuses them if they are already running with the same env. Without `MAILHOG_URL` the
+emailed-link test is skipped. Chromium only: the API's cookies are `Secure`, and Chromium is the
+engine that keeps them on `http://localhost`.
 
 ## Deploy workflow
 
