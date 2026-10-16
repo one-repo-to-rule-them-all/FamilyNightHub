@@ -55,6 +55,12 @@ release machine.
 - [ ] 🌐 Create the Fly org and add a payment method. New orgs get no free allowance.
 - [ ] ⌨️ `fly auth login`. Then `fly orgs list` and note `<org>`.
 
+> **Staging steps 2–9 are scripted:** `bash deploy/scripts/provision-staging.sh` (owner runs it
+> in Git Bash from the repo root). It generates every password itself, asks for each
+> provider-issued credential at a hidden prompt, pipes the Fly deploy token straight into
+> GitHub, and is safe to re-run. The manual steps below stay the reference, and the
+> procedure for production (step 14).
+
 ## 2. Apps
 
 - [ ] ⌨️ Create the three apps and give the API a private Flycast address only
