@@ -1,6 +1,6 @@
 # fnh-web: Next.js standalone (ADR-0001). Image: frontend/Dockerfile. The only
-# PRODUCTION: promoted by manual approval with the same image digest staging ran.
 # public app: it serves the UI and proxies /api/* to fnh-api over Flycast.
+# PRODUCTION: promoted by manual approval with the same image digest staging ran.
 # Layout from FieldPro deploy/ @ 0670961; settings from OrderUp frontend/fly.*.toml @ 2f86cd8.
 
 app = "fnh-web"

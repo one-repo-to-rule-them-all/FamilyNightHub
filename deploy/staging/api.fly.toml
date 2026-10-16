@@ -20,14 +20,23 @@ primary_region = "dfw"
   strategy = "rolling"
 
 # Non-secret config only. Secrets (02 "Secrets map"): DATABASE_URL, MIGRATION_DATABASE_URL,
-# REDIS_URL, SESSION_SECRET, DEVICE_TOKEN_PEPPER, EMAIL_API_KEY, SENTRY_DSN, STORAGE_*,
-# TMDB_READ_TOKEN. Never BACKUP_STORAGE_* here (worker only).
+# REDIS_URL, SESSION_SECRET, DEVICE_TOKEN_PEPPER, SMTP_HOST, SMTP_PORT, SMTP_USERNAME,
+# EMAIL_API_KEY, EMAIL_FROM, SENTRY_DSN, STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY,
+# TMDB_READ_TOKEN. Never BACKUP_STORAGE_* here (worker only). Exact commands:
+# docs/runbooks/first-deploy.md.
 [env]
   ENVIRONMENT = "staging"
   FRONTEND_BASE_URL = "https://fnh-web-staging.fly.dev"
   CORS_ALLOWED_ORIGINS = "https://fnh-web-staging.fly.dev"
   EMAIL_MODE = "smtp"
   SMTP_STARTTLS = "true"
+  # Photos bucket (ADR-0005). Plain env, not secrets: without them STORAGE_BUCKET would
+  # fall back to the code default "fnh-photos", which is PRODUCTION's bucket. Rename here
+  # if the global Tigris name is taken (runbooks/first-deploy.md step 4). The keys are
+  # secrets: STORAGE_ACCESS_KEY_ID, STORAGE_SECRET_ACCESS_KEY.
+  STORAGE_ENDPOINT = "https://fly.storage.tigris.dev"
+  STORAGE_BUCKET = "fnh-photos-staging"
+  STORAGE_REGION = "auto"
 
 [http_service]
   internal_port = 8000
