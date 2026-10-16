@@ -101,6 +101,12 @@ credentials (OrderUp pattern). Rollback means redeploying the previous `sha-<com
 without the release command ([runbook §3](../runbooks/restore.md#3-roll-back-a-deploy)).
 Migrations are expand/contract, so rolling back code never needs a down-migration.
 
+**CI disabled means no automatic deploy.** The trigger is CI completing on a push, so nothing
+deploys while `ci.yml` is disabled. A `workflow_dispatch` run of CI doesn't count either, since its
+event isn't `push`. Run Deploy by hand
+([`first-deploy.md`](../runbooks/first-deploy.md) step 10). `setup-flyctl` is pinned to a commit
+SHA because its job holds `FLY_API_TOKEN`.
+
 **Inert until provisioned.** Each deploy job reads `FLY_API_TOKEN` from its environment. If it is
 empty, the job emits a notice and skips its steps instead of failing `main`, and production then
 skips too. **Give `production` its required reviewer before adding its token.** GitHub creates a

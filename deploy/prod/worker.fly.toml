@@ -1,7 +1,7 @@
 # fnh-worker: ARQ worker (06-background-worker.md). Same image as fnh-api,
-# PRODUCTION: promoted by manual approval with the same image digest staging ran.
 # different process. CI deploys it with `--image` after the API (whose release command
 # migrates first). Layout from FieldPro deploy/ @ 0670961.
+# PRODUCTION: promoted by manual approval with the same image digest staging ran.
 
 app = "fnh-worker"
 primary_region = "dfw"
@@ -10,11 +10,20 @@ primary_region = "dfw"
   app = "python -m app.workers.main"
 
 # No release_command: the API's runs the migrations for the shared database.
-# Secrets: DATABASE_URL (fnh_app), REDIS_URL, SENTRY_DSN, STORAGE_*, EMAIL_API_KEY, and the
-# backup bucket's BACKUP_STORAGE_* - which exist ONLY on this app (06 "Gotchas").
+# Secrets: DATABASE_URL (fnh_app), REDIS_URL, SENTRY_DSN, STORAGE_ACCESS_KEY_ID,
+# STORAGE_SECRET_ACCESS_KEY, the backup bucket's BACKUP_STORAGE_* (prod; ONLY on this app,
+# 06 "Gotchas"), and SESSION_SECRET + DEVICE_TOKEN_PEPPER. The worker never uses those two,
+# but Settings refuses to load in staging/production without non-placeholder values, so
+# the worker crash-loops without them. Give it its OWN random values, never the API's: a
+# compromised worker then can't forge sessions. (If a worker task ever needs to hash a
+# device token or night code, switch to the API's values.) No email: the worker sends none.
 [env]
   ENVIRONMENT = "production"
   WORKER_HEALTH_PORT = "8081"
+  # Same bucket as the API: sweep_orphan_uploads deletes abandoned uploads from it.
+  STORAGE_ENDPOINT = "https://fly.storage.tigris.dev"
+  STORAGE_BUCKET = "fnh-photos"
+  STORAGE_REGION = "auto"
 
 # No [http_service], on purpose. Fly auto-start is driven by fly-proxy traffic, and nothing
 # ever sends the worker a request, so an auto-stopped worker would never wake and the

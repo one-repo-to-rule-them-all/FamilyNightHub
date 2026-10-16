@@ -1,5 +1,9 @@
 # Runbook: provisioning, restore and rollback
 
+**First time?** Follow [`first-deploy.md`](first-deploy.md), the ordered checklist. It links back
+into the sections here and adds the steps around them: email DNS, GitHub environments, the
+first admin and the fridge QR.
+
 Phase 1 deliverable named in [`02-environments.md`](../architecture/02-environments.md). Three
 parts: **provision** an environment from nothing (do this once per environment), **restore**
 data after a loss, and **roll back** a bad deploy. Commands use staging names; for production
@@ -21,8 +25,10 @@ drop the `-staging` suffix and use `deploy/prod/`.
 
    This runbook is written for the **legacy** flavour because 02 assumes "Fly's daily volume
    snapshots". If MPG is chosen, sections 1.2 and 2.1 change to MPG's own connection and
-   restore commands, and ADR-0001's cost line needs a superseding ADR. **Owner decision:
-   not made in this PR.**
+   restore commands, and ADR-0001's cost line needs a superseding ADR. Prices checked on
+   2026-10-15 are in [ADR-0013](../architecture/decisions/ADR-0013-hosting-cost-correction.md)
+   (Proposed). It recommends this legacy flavour: MPG is $38/mo per environment and has no
+   superuser or CREATEROLE to create our roles. **Owner decision.**
 2. **Bucket names.** Tigris bucket names are global. If `fnh-photos`, `fnh-photos-staging` or
    `fnh-photos-backup` are taken, pick new names and update 02 and 05.
 3. **Deploy-token scope.** `FLY_API_TOKEN` must deploy three apps. A per-app deploy token
@@ -89,7 +95,9 @@ Production: confirm daily snapshots are on and retained 7 days
 
 `fly redis create` (Fly-provisioned Upstash) or upstash.com, region near `dfw`. Use **DB 0**
 (Upstash has no other): ARQ uses the `arq:` prefix and SSE the `session:*` channels on the same
-instance. `REDIS_URL=rediss://default:<pw>@<host>:6379`.
+instance. `REDIS_URL` exactly as printed: `redis://default:<pw>@fly-<name>.upstash.io:6379`
+over Fly's private network for `fly redis create`, `rediss://…` (TLS) from upstash.com. Plan:
+ADR-0013 (an idle ARQ worker polls about 5M commands/month).
 
 ### 1.4 Tigris buckets
 
@@ -100,8 +108,9 @@ instance. `REDIS_URL=rediss://default:<pw>@<host>:6379`.
 
 `fly storage create` sets `AWS_*`/`BUCKET_NAME` secrets on whichever app it targets. The app
 reads the `STORAGE_*` / `BACKUP_STORAGE_*` names in 02's secrets map, so remove the auto-set
-ones (`fly secrets unset`) and set the 02 names (`STORAGE_ENDPOINT=https://fly.storage.tigris.dev`,
-`STORAGE_REGION=auto`). `BACKUP_STORAGE_*` stays inert until `backup_new_photos` lands.
+ones (`fly secrets unset`) and set only the keys under the 02 names (`STORAGE_ACCESS_KEY_ID`,
+`STORAGE_SECRET_ACCESS_KEY`). `STORAGE_ENDPOINT`, `STORAGE_BUCKET` and `STORAGE_REGION` are in the
+api and worker fly.toml `[env]`. `BACKUP_STORAGE_*` stays inert until `backup_new_photos` lands.
 
 **CORS for phone uploads.** Create one more key per photos bucket that can change its config
 (Tigris dashboard, scoped to that bucket only) and put it **only** in the GitHub environment,
@@ -116,15 +125,20 @@ fly secrets set -a fnh-api-staging --stage \
   DATABASE_URL=... MIGRATION_DATABASE_URL=... REDIS_URL=... \
   SESSION_SECRET="$(openssl rand -base64 48)" DEVICE_TOKEN_PEPPER="$(openssl rand -base64 48)" \
   SMTP_HOST=... SMTP_PORT=587 SMTP_USERNAME=... EMAIL_API_KEY=... EMAIL_FROM="Family Night <...>" \
-  SENTRY_DSN=... TMDB_READ_TOKEN=... STORAGE_...=...
+  SENTRY_DSN=... TMDB_READ_TOKEN=... STORAGE_ACCESS_KEY_ID=... STORAGE_SECRET_ACCESS_KEY=...
 
+# The worker's SESSION_SECRET / DEVICE_TOKEN_PEPPER are its OWN random values: unused, but
+# Settings refuses to load in staging/production without them (the worker crash-loops).
+# No email secrets: the worker sends none.
 fly secrets set -a fnh-worker-staging --stage \
   DATABASE_URL=... REDIS_URL=... SENTRY_DSN=... \
-  SMTP_HOST=... SMTP_PORT=587 SMTP_USERNAME=... EMAIL_API_KEY=... STORAGE_...=...
+  SESSION_SECRET="$(openssl rand -hex 32)" DEVICE_TOKEN_PEPPER="$(openssl rand -hex 32)" \
+  STORAGE_ACCESS_KEY_ID=... STORAGE_SECRET_ACCESS_KEY=...
 # production only: BACKUP_STORAGE_...=... on fnh-worker, and nowhere else
-
-fly secrets set -a fnh-web-staging --stage SENTRY_DSN=...   # optional
 ```
+
+`fnh-web` needs no secrets (the frontend reads no server env besides `API_INTERNAL_URL`).
+Exact, ordered commands: [`first-deploy.md`](first-deploy.md) step 8.
 
 - `--stage` defers the restart to the first deploy.
 - The API refuses to boot in staging/production with the `dev-insecure-*` placeholders.
