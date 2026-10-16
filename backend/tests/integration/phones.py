@@ -47,6 +47,9 @@ class Phone:
     async def post(self, path: str, body: dict[str, Any] | None = None) -> Response:
         return await self.client.post(path, json=body, headers={CSRF_HEADER: await self.csrf()})
 
+    async def patch(self, path: str, body: dict[str, Any]) -> Response:
+        return await self.client.patch(path, json=body, headers={CSRF_HEADER: await self.csrf()})
+
     def sign_in_as(self, account_id: uuid.UUID, household_id: uuid.UUID) -> None:
         """Skip the magic link (covered in test_auth.py): set a validly signed session."""
         value = sign_account_session(account_id, household_id, int(time.time()))

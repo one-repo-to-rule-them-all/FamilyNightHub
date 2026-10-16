@@ -152,3 +152,100 @@ async def reject_claim(
     if deleted.first() is None:
         raise NotFound
     await _audit(db, household_id, account_id, "claim.rejected", "person", person_id)
+
+
+# --- Admin "Devices" list (ADR-0002: a lost phone holds a live token until revoked) ---
+
+
+@dataclass(frozen=True)
+class DeviceBinding:
+    person_id: uuid.UUID
+    name: str
+    avatar_emoji: str
+    status: str
+
+
+@dataclass(frozen=True)
+class DeviceSummary:
+    id: uuid.UUID
+    label: str | None
+    is_tv: bool
+    last_seen_at: datetime | None
+    revoked_at: datetime | None
+    created_at: datetime
+    people: list[DeviceBinding]
+
+
+async def list_devices(db: AsyncSession) -> list[DeviceSummary]:
+    """Live devices first (most recently seen first), then revoked ones."""
+    devices = (
+        await db.execute(
+            text(
+                "SELECT id, label, is_tv, last_seen_at, revoked_at, created_at FROM devices "
+                "ORDER BY revoked_at IS NOT NULL, last_seen_at DESC NULLS LAST, created_at DESC"
+            )
+        )
+    ).all()
+    bindings: dict[uuid.UUID, list[DeviceBinding]] = {d.id: [] for d in devices}
+    rows = await db.execute(
+        text(
+            """
+            SELECT dp.device_id, p.id, p.name, p.avatar_emoji, dp.status
+            FROM device_people dp
+            JOIN people p ON p.id = dp.person_id AND p.household_id = dp.household_id
+            WHERE p.merged_into_id IS NULL
+            ORDER BY dp.status, lower(p.name)
+            """
+        )
+    )
+    for r in rows:
+        bindings[r.device_id].append(DeviceBinding(r.id, r.name, r.avatar_emoji, r.status))
+    return [
+        DeviceSummary(
+            d.id, d.label, d.is_tv, d.last_seen_at, d.revoked_at, d.created_at, bindings[d.id]
+        )
+        for d in devices
+    ]
+
+
+async def get_device(db: AsyncSession, device_id: uuid.UUID) -> DeviceSummary:
+    for device in await list_devices(db):
+        if device.id == device_id:
+            return device
+    raise NotFound
+
+
+async def set_label(
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    account_id: uuid.UUID,
+    device_id: uuid.UUID,
+    label: str | None,
+) -> DeviceSummary:
+    updated = await db.execute(
+        text("UPDATE devices SET label = :l WHERE id = :d RETURNING id"),
+        {"l": label, "d": device_id},
+    )
+    if updated.first() is None:
+        raise NotFound
+    await _audit(db, household_id, account_id, "device.relabeled", "device", device_id)
+    return await get_device(db, device_id)
+
+
+async def revoke(
+    db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, device_id: uuid.UUID
+) -> DeviceSummary:
+    """Final: there is no un-revoke; the phone rejoins with a night code as a new device.
+    The ADR-0009 resolver ignores revoked devices, so the cookie is dead on its next
+    request, and its bindings stop counting as "taken" (people_service). Bindings are kept
+    for the record. Revoking an already revoked device changes nothing."""
+    revoked = await db.execute(
+        text(
+            "UPDATE devices SET revoked_at = now() WHERE id = :d AND revoked_at IS NULL "
+            "RETURNING id"
+        ),
+        {"d": device_id},
+    )
+    if revoked.first() is not None:
+        await _audit(db, household_id, account_id, "device.revoked", "device", device_id)
+    return await get_device(db, device_id)
