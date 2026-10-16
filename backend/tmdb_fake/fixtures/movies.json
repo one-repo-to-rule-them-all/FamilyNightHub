@@ -1,0 +1,423 @@
+[
+  {
+    "id": 862,
+    "title": "Toy Story",
+    "original_title": "Toy Story",
+    "release_date": "1995-11-22",
+    "poster_path": "/fake-toy-story.jpg",
+    "runtime": 81,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Animation"
+      },
+      {
+        "id": 2,
+        "name": "Adventure"
+      },
+      {
+        "id": 3,
+        "name": "Family"
+      },
+      {
+        "id": 4,
+        "name": "Comedy"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for Toy Story.",
+    "vote_count": 1000,
+    "popularity": 100.0
+  },
+  {
+    "id": 863,
+    "title": "Toy Story 2",
+    "original_title": "Toy Story 2",
+    "release_date": "1999-10-30",
+    "poster_path": "/fake-toy-story-2.jpg",
+    "runtime": 92,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Animation"
+      },
+      {
+        "id": 2,
+        "name": "Comedy"
+      },
+      {
+        "id": 3,
+        "name": "Family"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for Toy Story 2.",
+    "vote_count": 999,
+    "popularity": 99.0
+  },
+  {
+    "id": 10193,
+    "title": "Toy Story 3",
+    "original_title": "Toy Story 3",
+    "release_date": "2010-06-16",
+    "poster_path": "/fake-toy-story-3.jpg",
+    "runtime": 103,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Animation"
+      },
+      {
+        "id": 2,
+        "name": "Family"
+      },
+      {
+        "id": 3,
+        "name": "Comedy"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for Toy Story 3.",
+    "vote_count": 998,
+    "popularity": 98.0
+  },
+  {
+    "id": 14160,
+    "title": "Up",
+    "original_title": "Up",
+    "release_date": "2009-05-28",
+    "poster_path": "/fake-up.jpg",
+    "runtime": 96,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Animation"
+      },
+      {
+        "id": 2,
+        "name": "Comedy"
+      },
+      {
+        "id": 3,
+        "name": "Family"
+      },
+      {
+        "id": 4,
+        "name": "Adventure"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for Up.",
+    "vote_count": 997,
+    "popularity": 97.0
+  },
+  {
+    "id": 116149,
+    "title": "Paddington",
+    "original_title": "Paddington",
+    "release_date": "2014-11-24",
+    "poster_path": "/fake-paddington.jpg",
+    "runtime": 95,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Comedy"
+      },
+      {
+        "id": 2,
+        "name": "Family"
+      },
+      {
+        "id": 3,
+        "name": "Adventure"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for Paddington.",
+    "vote_count": 996,
+    "popularity": 96.0
+  },
+  {
+    "id": 346648,
+    "title": "Paddington 2",
+    "original_title": "Paddington 2",
+    "release_date": "2017-11-09",
+    "poster_path": "/fake-paddington-2.jpg",
+    "runtime": 104,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Adventure"
+      },
+      {
+        "id": 2,
+        "name": "Comedy"
+      },
+      {
+        "id": 3,
+        "name": "Family"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for Paddington 2.",
+    "vote_count": 995,
+    "popularity": 95.0
+  },
+  {
+    "id": 12,
+    "title": "Finding Nemo",
+    "original_title": "Finding Nemo",
+    "release_date": "2003-05-30",
+    "poster_path": "/fake-finding-nemo.jpg",
+    "runtime": 100,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Animation"
+      },
+      {
+        "id": 2,
+        "name": "Family"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for Finding Nemo.",
+    "vote_count": 994,
+    "popularity": 94.0
+  },
+  {
+    "id": 277834,
+    "title": "Moana",
+    "original_title": "Moana",
+    "release_date": "2016-11-23",
+    "poster_path": "/fake-moana.jpg",
+    "runtime": 107,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Adventure"
+      },
+      {
+        "id": 2,
+        "name": "Comedy"
+      },
+      {
+        "id": 3,
+        "name": "Family"
+      },
+      {
+        "id": 4,
+        "name": "Animation"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for Moana.",
+    "vote_count": 993,
+    "popularity": 93.0
+  },
+  {
+    "id": 354912,
+    "title": "Coco",
+    "original_title": "Coco",
+    "release_date": "2017-10-27",
+    "poster_path": "/fake-coco.jpg",
+    "runtime": 105,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Family"
+      },
+      {
+        "id": 2,
+        "name": "Animation"
+      },
+      {
+        "id": 3,
+        "name": "Fantasy"
+      },
+      {
+        "id": 4,
+        "name": "Music"
+      },
+      {
+        "id": 5,
+        "name": "Comedy"
+      },
+      {
+        "id": 6,
+        "name": "Adventure"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for Coco.",
+    "vote_count": 992,
+    "popularity": 92.0
+  },
+  {
+    "id": 150540,
+    "title": "Inside Out",
+    "original_title": "Inside Out",
+    "release_date": "2015-06-09",
+    "poster_path": "/fake-inside-out.jpg",
+    "runtime": 95,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Animation"
+      },
+      {
+        "id": 2,
+        "name": "Family"
+      },
+      {
+        "id": 3,
+        "name": "Adventure"
+      },
+      {
+        "id": 4,
+        "name": "Drama"
+      },
+      {
+        "id": 5,
+        "name": "Comedy"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for Inside Out.",
+    "vote_count": 991,
+    "popularity": 91.0
+  },
+  {
+    "id": 2062,
+    "title": "Ratatouille",
+    "original_title": "Ratatouille",
+    "release_date": "2007-06-28",
+    "poster_path": "/fake-ratatouille.jpg",
+    "runtime": 111,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Animation"
+      },
+      {
+        "id": 2,
+        "name": "Comedy"
+      },
+      {
+        "id": 3,
+        "name": "Family"
+      },
+      {
+        "id": 4,
+        "name": "Fantasy"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for Ratatouille.",
+    "vote_count": 990,
+    "popularity": 90.0
+  },
+  {
+    "id": 808,
+    "title": "Shrek",
+    "original_title": "Shrek",
+    "release_date": "2001-05-18",
+    "poster_path": "/fake-shrek.jpg",
+    "runtime": 90,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Animation"
+      },
+      {
+        "id": 2,
+        "name": "Comedy"
+      },
+      {
+        "id": 3,
+        "name": "Fantasy"
+      },
+      {
+        "id": 4,
+        "name": "Adventure"
+      },
+      {
+        "id": 5,
+        "name": "Family"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for Shrek.",
+    "vote_count": 989,
+    "popularity": 89.0
+  },
+  {
+    "id": 9806,
+    "title": "The Incredibles",
+    "original_title": "The Incredibles",
+    "release_date": "2004-10-27",
+    "poster_path": "/fake-the-incredibles.jpg",
+    "runtime": 116,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Action"
+      },
+      {
+        "id": 2,
+        "name": "Adventure"
+      },
+      {
+        "id": 3,
+        "name": "Animation"
+      },
+      {
+        "id": 4,
+        "name": "Family"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for The Incredibles.",
+    "vote_count": 988,
+    "popularity": 88.0
+  },
+  {
+    "id": 10681,
+    "title": "WALL·E",
+    "original_title": "WALL·E",
+    "release_date": "2008-06-22",
+    "poster_path": "/fake-wall-e.jpg",
+    "runtime": 98,
+    "genres": [
+      {
+        "id": 1,
+        "name": "Animation"
+      },
+      {
+        "id": 2,
+        "name": "Family"
+      },
+      {
+        "id": 3,
+        "name": "Science Fiction"
+      }
+    ],
+    "adult": false,
+    "overview": "Fixture entry for WALL·E.",
+    "vote_count": 987,
+    "popularity": 87.0
+  },
+  {
+    "id": 999001,
+    "title": "Untitled Poster Test",
+    "original_title": "Untitled Poster Test",
+    "release_date": "",
+    "poster_path": null,
+    "runtime": null,
+    "genres": [],
+    "adult": false,
+    "overview": "Fixture entry for Untitled Poster Test.",
+    "vote_count": 986,
+    "popularity": 86.0
+  }
+]

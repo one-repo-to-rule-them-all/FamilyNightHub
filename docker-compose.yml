@@ -2,7 +2,7 @@
 # this one). Deployed images come from backend/Dockerfile and frontend/Dockerfile.
 # Shape copied from OrderUp docker-compose.yml @ 2f86cd8 (bind-mounted source, issue #81).
 #
-# Services still to land in later PRs: worker (ARQ), web, tmdb-fake.
+# Services still to land in later PRs: worker (ARQ), web.
 services:
   db:
     image: postgres:16
@@ -55,6 +55,24 @@ services:
       - "51025:1025"
       - "58025:8025"
 
+  # Stands in for TMDB v3 (02-environments.md): fixtures for /search/movie and /movie/{id}.
+  # Runs from the api image with the fake's source bind-mounted; never the real API.
+  tmdb-fake:
+    build:
+      context: ./backend
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./backend/tmdb_fake:/app/tmdb_fake:ro
+    command: ["uvicorn", "tmdb_fake.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "58100:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   api:
     build:
       context: ./backend
@@ -70,6 +88,9 @@ services:
       EMAIL_MODE: smtp
       SMTP_HOST: mailhog
       SMTP_PORT: "1025"
+      # Any token works against the fake; the real one is a fly secret (api only).
+      TMDB_BASE_URL: http://tmdb-fake:8000
+      TMDB_READ_TOKEN: dev-fake-tmdb-token
     volumes:
       - ./backend/app:/app/app
       - ./backend/migrations:/app/migrations
@@ -87,6 +108,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      tmdb-fake:
         condition: service_healthy
 
 volumes:
