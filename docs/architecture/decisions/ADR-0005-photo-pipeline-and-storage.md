@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-15). Photo drop ships in Phase 1 by owner decision.
+Accepted (2026-10-15). Photo drop ships in Phase 1 by owner decision.
 
 ## Context
 

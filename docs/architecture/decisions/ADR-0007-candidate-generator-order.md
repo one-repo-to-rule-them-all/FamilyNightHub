@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-15). Generator ships in Phase 2. Phase 1 uses a manual shortlist.
+Accepted (2026-10-15). Generator ships in Phase 2. Phase 1 uses a manual shortlist.
 
 ## Context
 

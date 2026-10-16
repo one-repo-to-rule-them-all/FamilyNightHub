@@ -1,10 +1,20 @@
+# Node / Next
 node_modules/
 .next/
 out/
-.env
-.env*.local
-.vercel/
 *.tsbuildinfo
 next-env.d.ts
-supabase/.branches/
-supabase/.temp/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Env
+.env
+.env*.local

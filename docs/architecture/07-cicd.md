@@ -1,6 +1,7 @@
 # 07 — CI/CD
 
-No pipeline exists yet (the repo is empty). This is the intended pipeline. It combines OrderUp's
+`ci.yml` exists with the `static`, `unit`, `integration`, `contract` and `bundle-secrets` jobs
+(status column below). `e2e` and `deploy.yml` are still intended, not built. It combines OrderUp's
 Fly deploy with CAD's "secret never in bundle" and multi-browser Playwright gates. The owner is a
 QA/CI engineer, so the bar is **deterministic, trustworthy green**.
 
@@ -10,26 +11,29 @@ QA/CI engineer, so the bar is **deterministic, trustworthy green**.
 flowchart TB
     PR["push / PR"] --> S["static: ruff, mypy, eslint, prettier, tsc"]
     PR --> U["unit: pytest unit + domain 100% + vitest"]
-    PR --> I["integration: pytest vs Postgres+Redis+MinIO services (incl. isolation + RLS coverage)"]
-    S & U & I --> E["e2e: docker compose (api, worker, web, tmdb-fake, minio) → Playwright multi-phone + axe"]
+    PR --> I["integration: pytest vs Postgres+Redis+SeaweedFS services (incl. isolation + RLS coverage)"]
+    S & U & I --> E["e2e: docker compose (api, worker, web, tmdb-fake, seaweedfs) → Playwright multi-phone + axe"]
     E -- "all green" --> M["merge to main"]
     M --> B["build images → GHCR"] --> ST["deploy staging (release_command migrates)"] --> SM["smoke: /api/health + scripted join/vote"] --> G["manual approval"] --> P["deploy prod (same digest)"]
 ```
 
 ## CI jobs
 
-| Job | Purpose | Source of truth |
-|---|---|---|
-| `static` | ruff, mypy, eslint, prettier, `tsc --noEmit` | `.github/workflows/ci.yml` |
-| `unit` | pytest `tests/unit` (+ Hypothesis tally properties), vitest (photo pipeline incl. GPS-strip fixture) | `backend/tests/unit`, `frontend/src/**/*.test.ts` |
-| `integration` | pytest against real Postgres/Redis/MinIO service containers | `backend/tests/integration` |
-| `isolation` | two-household seed; every endpoint and table returns nothing cross-household; `test_rls_coverage` | `backend/tests/integration/test_isolation.py` |
-| `contract` | `openapi.json` and `api.gen.ts` drift check; Alembic `check` (models match migrations) | ci.yml |
-| `e2e` | compose stack, Playwright: 4 phone contexts (iPhone + Pixel descriptors) + TV context; unauthenticated context must get 0 photo URLs; axe | `frontend/e2e/` |
-| `bundle-secrets` | build web, grep `.next/static` for every server secret value | ci.yml |
+| Job | Purpose | Source of truth | Status |
+|---|---|---|---|
+| `static` | ruff check + format, mypy strict, repo rules (`backend/scripts/check_repo_rules.py`: no sleeps/fixed waits in tests, no session-level `app.*` GUC, revision ids of 32 chars or fewer), `tsc --noEmit` | `.github/workflows/ci.yml` | Built. eslint/prettier land with the first real UI |
+| `unit` | pytest `tests/unit` (+ Hypothesis tally properties), vitest (photo pipeline incl. GPS-strip fixture) | `backend/tests/unit`, `frontend/src/**/*.test.ts` | pytest built; vitest lands with the photo pipeline |
+| `integration` | Whole pytest suite against Postgres + Redis service containers as `fnh_app`, after the role bootstrap. **Includes the isolation suite** (two seeded households, every table) and `test_rls_coverage`. Coverage gates run here | `backend/tests/integration` | Built. SeaweedFS service joins with the photo endpoints; endpoint-level isolation joins with the endpoints |
+| `contract` | `alembic upgrade` → `downgrade base` → `upgrade` round trip, `alembic check` (models match migrations), `openapi.json` + `api.gen.ts` drift | ci.yml | Built |
+| `e2e` | compose stack, Playwright: 4 phone contexts (iPhone + Pixel descriptors) + TV context; unauthenticated context must get 0 photo URLs; axe | `frontend/e2e/` | Not built |
+| `bundle-secrets` | `next build` with sentinel values for every server secret, then grep `.next/static` for each. Verified by a deliberate leak (`next.config` `env` + client component) that the grep catches | ci.yml | Built |
+
+`ENVIRONMENT=test` in CI. TypeScript types come from `openapi-typescript`, installed in its own
+package (`frontend/tools/openapi/`) because it needs a TypeScript 5 peer and the app runs
+TypeScript 7.
 
 **Coverage / quality gates:** `app/domain/**` at 100% line coverage, services at 80% or more,
-overall at 70% or more, with ratchets that only go up. Any test using `waitForTimeout` or `sleep`
+overall at 70% or more (all three enforced in the `integration` job), with ratchets that only go up. Any test using `waitForTimeout` or `sleep`
 fails lint. E2E retries = 0 on PRs. A flaky test is quarantined with an issue, never retried into
 green.
 

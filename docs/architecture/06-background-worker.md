@@ -19,13 +19,14 @@ flowchart LR
 | Task | Trigger | What it does |
 |---|---|---|
 | `backup_new_photos` | cron 03:00 local daily | Copy `ready` photos with `backed_up_at IS NULL` to the backup bucket; stamp `backed_up_at` |
-| `propagate_photo_deletes` | cron 03:30 daily | Delete backup objects for photos hard-deleted in the last day |
+| `propagate_photo_deletes` | cron 03:30 daily | Delete backup objects listed in `photo_deletions` with `backup_purged_at IS NULL`; stamp it |
 | `sweep_orphan_uploads` | cron hourly | Delete `pending` photo rows older than 24h and any objects under their keys |
 | `refresh_tmdb_cache` | cron weekly | Re-fetch cached movie details older than 30 days (TMDB caching terms) |
-| `pg_dump_weekly` | cron Sunday 04:00 | `pg_dump` to the backup bucket; keep 8 |
+| `pg_dump_weekly` | cron Sunday 04:00 | `pg_dump` to the backup bucket; keep 8. **Open:** `fnh_app` cannot dump RLS-forced tables, so this needs a dedicated read-only role and its own ADR before it is built |
 | `auto_close_stale_sessions` | cron hourly | Move nights left in `tonight` for more than 24h to `closed` |
 
-Every task iterates households and sets `app.household_id` per household (RLS stays on for the worker).
+Every task lists households with `worker_list_household_ids()` (ADR-0009) and sets
+`app.household_id` per household (RLS stays on for the worker). Cron times are America/Chicago.
 
 ## Lifecycle & reliability
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-15). Resolves the scope's open question "which design pattern is ctrl alt
+Accepted (2026-10-15). Resolves the scope's open question "which design pattern is ctrl alt
 defeat?" (answer: the `gaming-league-tracker` app).
 
 ## Context

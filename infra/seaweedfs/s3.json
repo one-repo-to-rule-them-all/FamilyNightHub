@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "fnh-dev",
+      "credentials": [{ "accessKey": "fnh-dev-access", "secretKey": "fnh-dev-secret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

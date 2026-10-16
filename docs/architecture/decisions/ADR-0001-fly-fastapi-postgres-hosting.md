@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-10-15). Supersedes the "Next.js on Vercel + new dedicated Supabase project" stack in
+Accepted (2026-10-15). Supersedes the "Next.js on Vercel + new dedicated Supabase project" stack in
 the original scope doc (2026-10-14).
 
 ## Context
