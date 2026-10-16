@@ -6,7 +6,8 @@ Redis. It mirrors the OrderUp/FieldPro backend layout, so the FieldPro "pitfalls
 ## App structure
 
 `backend/app/main.py` builds the app with middleware in this order: request ID → CORS-aware error
-envelope (FieldPro `cors.py` pattern) → rate limit (join, magic link) → routers under `/api/v1`.
+envelope (FieldPro `cors.py` pattern) → routers under `/api/v1`. Rate limiting is not middleware: it
+is a failure budget the join (and later magic-link) handlers consult (`core/rate_limit.py`).
 
 ```
 backend/app/
@@ -22,9 +23,9 @@ backend/app/
 
 | Area | Path prefix | Notes |
 |---|---|---|
-| Join | `/api/v1/join` | Validate household slug and night code, mint device cookie (rate-limited) |
+| Join | `GET /api/v1/csrf`, `POST /api/v1/join` | Issue the CSRF cookie; validate slug + night code, mint the device cookie (failure-budgeted) |
 | Auth | `/api/v1/auth` | Magic-link request/verify for admins and hosts; logout |
-| People/devices | `/api/v1/people`, `/api/v1/devices/me` | Avatar grid, bind or unbind a person to this device |
+| People/devices | `/api/v1/people`, `/api/v1/devices/me`, `PUT/DELETE /api/v1/devices/me/people/{id}` | Avatar grid with each tile's binding state, bind or unbind a person to this device |
 | Sessions | `/api/v1/sessions` | Create, shortlist, open/close voting, snapshot |
 | Ballots | `/api/v1/sessions/{id}/ballots` | Upsert own ballot; host proxy ballot |
 | Live | `/api/v1/sse-tickets`, `/api/v1/sessions/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md) |
@@ -41,8 +42,10 @@ A ballot submit goes through these steps:
 1. Pydantic validates `{person_id, ranks: [{option_id, rank}]}`.
 2. `CurrentDevice` hashes the cookie token and resolves it with `auth_resolve_device()`
    ([ADR-0009](decisions/ADR-0009-pre-auth-lookups-via-definer-functions.md)); unknown or revoked → 401.
-3. `CurrentHousehold` opens a transaction and runs `SET LOCAL app.household_id`.
-4. `BallotService` checks the session is `voting`, that the person is bound to the device (or the caller is a host), and that the ranks are valid for `k`. It then replaces the ballot rows.
+3. `DeviceDb` (`core/dependencies.py`) opens the request's one transaction and sets the household
+   GUC with `set_config(..., true)`; it also slides the cookie and `last_seen_at` at most hourly.
+4. `BallotService` checks the session is `voting`, that the person is bound to the device
+   (`people_service.require_can_act_as`: an **active** binding; pending claims don't count) or the caller is a host, and that the ranks are valid for `k`. It then replaces the ballot rows.
 5. It publishes `ballot_count` to `session:{id}`.
 6. Commit, then 204.
 
@@ -66,8 +69,25 @@ any household transaction opens; everything after runs under RLS.
 
 The permission map (`core/permissions.py`) is the single source of truth. Hosts get `sessions:run`
 and `ballots:proxy`; admins get everything. Join flow rules are in
-[ADR-0002](decisions/ADR-0002-device-identity-and-join-flow.md). Cookie-authenticated mutations
-require `SameSite=Lax` plus a CSRF header (`X-FNH-CSRF` echoed from a readable cookie).
+[ADR-0002](decisions/ADR-0002-device-identity-and-join-flow.md). Cookie-authenticated mutations,
+and the join itself, require `SameSite=Lax` plus a CSRF header: `X-FNH-CSRF` must equal the
+readable `fnh_csrf` cookie that `GET /api/v1/csrf` issues (double-submit, constant-time compare).
+
+**Join.** The slug is a door, not a key. `POST /api/v1/join` resolves the slug (ADR-0009), then
+looks for a non-closed session whose `night_code_hash` matches
+`HMAC(pepper, "night:{household_id}:{code}")`. Codes are 6 characters from a 31-symbol alphabet
+without 0/O/1/I/L (`domain/night_code.py`), case- and separator-insensitive. Every failure
+(unknown slug, malformed, wrong, closed) returns the same 400, so the endpoint does not reveal
+which slugs exist. A phone that already holds a live token for the household reuses its device.
+The device cookie is `fnh_device`: 256-bit token, `HttpOnly; Secure; SameSite=Lax`, 365-day
+sliding `Max-Age`.
+
+**Rate limiting.** Join *failures* are counted per slug (`JOIN_FAILURE_LIMIT` per
+`JOIN_FAILURE_WINDOW_SECONDS`, default 30 per 15 min), never per client IP: a family shares one
+NAT address, and forwarded headers are spoofable (uvicorn does not trust them). Once a slug's
+budget is spent, joins get 429 with `Retry-After`, even with the right code, until the window
+ends; successful joins cost nothing. A host-approved join is the fallback if someone burns the
+budget on purpose. If Redis is down the limiter fails open and logs.
 
 ## Voting
 
