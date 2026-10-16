@@ -67,6 +67,13 @@ All three apps run `shared-cpu-1x`/512 MB in `dfw`.
   image. The SSE route must send `Cache-Control: no-cache, no-transform`, which makes Next skip
   compression, plus a heartbeat comment well inside fly-proxy's idle timeout.
   Both apps count concurrency by connections, not requests.
+- **Photos bucket CORS (ADR-0005).** Phones PUT to the bucket and load photos from it through
+  presigned URLs, cross-origin from `fnh-web`, so each bucket allows its environment's web origin:
+  `PUT` and `GET`, header `content-type`, max age 600. The deploy workflow sets it from
+  `deploy/<env>/api.fly.toml`'s `CORS_ALLOWED_ORIGINS` (one source for the API and the bucket)
+  with a separate bucket-admin key held only in the GitHub environment. The API's `STORAGE_*` key
+  stays object read/write; a compromised API can't widen the rule. Locally and in CI,
+  `frontend/e2e/setup_bucket.py` does the same for SeaweedFS.
 
 ## Secrets map
 
@@ -83,6 +90,7 @@ All three apps run `shared-cpu-1x`/512 MB in `dfw`.
 | `SENTRY_DSN` | fly secrets | all |
 | `API_INTERNAL_URL` (not secret) | `web.fly.toml` `[env]` | web (server only, read at boot) |
 | `FLY_API_TOKEN` | GitHub environment secret (`staging`, `production`) | deploy workflow |
+| `BUCKET_ADMIN_ACCESS_KEY_ID`, `BUCKET_ADMIN_SECRET_ACCESS_KEY` (photos bucket config, for its CORS rule; with environment variable `PHOTOS_BUCKET`) | GitHub environment secret (`staging`, `production`), **never** fly secrets | deploy workflow only (`deploy/bucket-cors.sh`) |
 
 ## Migrations & health
 

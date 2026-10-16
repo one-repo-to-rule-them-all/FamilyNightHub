@@ -81,7 +81,8 @@ can also be run by hand (`workflow_dispatch`) after provisioning.
 1. **build** (matrix): one image for api + worker (`backend/`), one for web (`frontend/`). Both are
    pushed to GHCR as `ghcr.io/<owner>/fnh-{backend,web}:sha-<commit>`, and each digest is handed
    on as an artifact.
-2. **deploy-staging** (GitHub environment `staging`): pull both images **by digest**, then
+2. **deploy-staging** (GitHub environment `staging`): set the photos bucket's CORS rule for the
+   web origin (`deploy/bucket-cors.sh`, below), pull both images **by digest**, then
    `flyctl deploy --image … --local-only` for `fnh-api-staging` (its `release_command` runs
    Alembic before new machines start; `--no-public-ips`), `fnh-worker-staging` and
    `fnh-web-staging`, in that order. Then the smoke test: `GET
@@ -100,11 +101,24 @@ empty, the job emits a notice and skips its steps instead of failing `main`, and
 skips too. **Give `production` its required reviewer before adding its token.** GitHub creates a
 referenced environment without protection rules.
 
+**Photos bucket CORS.** `deploy/bucket-cors.sh deploy/<env>/api.fly.toml` runs before the Fly
+deploys and is the Tigris twin of `frontend/e2e/setup_bucket.py`: it `put-bucket-cors` the rule
+phones need (origins = that environment's `CORS_ALLOWED_ORIGINS`, each checked to be a bare
+`https://` origin; methods `PUT`, `GET`; header `content-type`; max age 600), then reads it back
+and fails the job if it differs. Replacing the whole rule set makes it idempotent. It has its own
+gate: `vars.PHOTOS_BUCKET` plus secrets `BUCKET_ADMIN_ACCESS_KEY_ID` /
+`BUCKET_ADMIN_SECRET_ACCESS_KEY` on the environment. None set = a notice and a skip; some but not
+all = the job fails, since a half-provisioned bucket is a mistake, not a choice. The admin key is
+passed to that step alone (not the job's env), and it is never a Fly secret, so the API's own
+bucket key never gains bucket-config rights. Production's CORS step sits in `deploy-production`,
+so it runs only when that job does (staging deployed, reviewer approved).
+
 ## Secrets map
 
 | Secret | Where stored | Consumed by |
 |---|---|---|
 | `FLY_API_TOKEN` (staging, prod) | GitHub environments `staging`, `production` | deploy.yml |
+| `BUCKET_ADMIN_ACCESS_KEY_ID`, `BUCKET_ADMIN_SECRET_ACCESS_KEY` + variable `PHOTOS_BUCKET` (staging, prod) | GitHub environments `staging`, `production` | deploy.yml's bucket CORS step only |
 | `GHCR` push | `GITHUB_TOKEN` | deploy.yml |
 | App secrets | `fly secrets` (see [`02-environments.md`](02-environments.md)) | Fly apps |
 | CI test secrets | none needed (local services, tmdb-fake) | — |
@@ -113,6 +127,6 @@ referenced environment without protection rules.
 
 Worth knowing so you don't assume green means safe:
 - Real iOS Safari HEIC behaviour. WebKit in Playwright is not iOS, so there is a manual iPhone checklist before each release that touches photos: [`runbooks/photo-drop-iphone-checklist.md`](../runbooks/photo-drop-iphone-checklist.md).
-- The deployed (Tigris) buckets' CORS rule for the web origin. CI sets it only on its own SeaweedFS.
+- That the deployed (Tigris) buckets' CORS rule actually lets a browser in. The deploy sets it and reads it back, but no browser preflight runs against Tigris; the iPhone checklist is where a phone PUT first crosses it.
 - Live TMDB terms and parameter behaviour, because CI uses the fake. Re-verify against the live docs before building the generator.
 - Load, backup restore (rehearsed manually), and keeping the docs in sync with the code.
