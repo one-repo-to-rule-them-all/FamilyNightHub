@@ -264,7 +264,9 @@ jobs:
   e2e:
     name: e2e (Playwright + axe, real API)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 25, up from 20: acceptance.spec.ts is one ~1.5-2 min journey (7 browsers, a 30s real
+    # reveal settle) on top of the existing specs; the margin covers a cold runner.
+    timeout-minutes: 25
     env:
       # The API under test: app role through RLS, real CSRF/cookies, magic links over SMTP to
       # MailHog. Every test seeds its own household (frontend/e2e/seed_night.py), so nothing is

@@ -42,10 +42,13 @@ Do these in order. Record the date and result of each in the release PR.
       owner decisions) and section 1 (apps, Postgres roles, Upstash Redis, Tigris buckets, secrets,
       GitHub environments, first deploy and first admin). Staging first, then production.
 - [ ] **Tigris bucket CORS.** Phones PUT and GET the bucket cross-origin, so each deployed bucket
-      (`fnh-photos-staging`, `fnh-photos`) needs a CORS rule for its web origin: methods PUT and
-      GET, allowed header `content-type` (04-frontend.md "Bucket CORS"). CI only sets it on its own
-      SeaweedFS (`frontend/e2e/setup_bucket.py`). Check: a photo added on staging uploads without
-      a CORS error in the browser console.
+      needs a CORS rule for its web origin (04-frontend.md "Bucket CORS"). The Deploy workflow sets
+      it with `deploy/bucket-cors.sh` and reads it back (07-cicd.md "Photos bucket CORS"), but only
+      once the bucket-admin key and `PHOTOS_BUCKET` are on each GitHub environment
+      ([`restore.md`](restore.md) §1.4, "CORS for phone uploads"); without them the step skips
+      with a notice. Check: the Deploy run's CORS step ran (not skipped) for staging and
+      production, and a photo added on staging uploads with no CORS error in the console. No
+      browser preflight against Tigris runs in CI.
 - [ ] **Real-iPhone HEIC checklist** on staging:
       [`photo-drop-iphone-checklist.md`](photo-drop-iphone-checklist.md). CI runs Chromium with an
       iPhone viewport; WebKit in Playwright is not iOS Safari, and the GPS strip on a real HEIC is a
