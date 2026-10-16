@@ -30,10 +30,40 @@ real iPhone. Its data is synthetic. Never copy production photos into it.
 
 **production.** Promoted by manual approval. The API runs on `shared-cpu-1x`/512 MB. Movie night is
 bursty, so `min_machines_running = 1` on `fnh-api` and `fnh-web` keeps cold starts off the reveal
-moment. The worker can auto-stop between cron windows.
+moment. The worker runs **continuously** (one machine). It was planned to auto-stop between cron
+windows, but Fly's auto-start is triggered by fly-proxy traffic, and nothing ever sends the worker
+a request: a stopped worker would never wake, and its crons would silently stop.
 
 **Cost (estimate, verify at setup):** two or three small machines plus small Fly Postgres plus storage
-under 5 GB comes to roughly $10–30/mo. Not $0 by design (ADR-0001).
+under 5 GB comes to roughly $10–30/mo. Not $0 by design (ADR-0001). **Open, for the owner:** this
+figure predates Fly's Managed Postgres. Re-check it against current pricing for Managed Postgres
+versus legacy self-operated Fly Postgres before provisioning. If the choice moves the total out of
+range, record it in a new ADR superseding ADR-0001's cost line
+([runbook §0](../runbooks/restore.md#0-decide-before-provisioning)).
+
+## Fly topology and the `/api` proxy
+
+| App | Config | Public? | Notes |
+|---|---|---|---|
+| `fnh-web(-staging)` | `deploy/*/web.fly.toml` | yes, `*.fly.dev` | Next standalone, `frontend/Dockerfile`. Proxies `/api/*` to the API |
+| `fnh-api(-staging)` | `deploy/*/api.fly.toml` | **no**, Flycast only | `release_command = "alembic upgrade head"`, HTTP check on `/api/health` |
+| `fnh-worker(-staging)` | `deploy/*/worker.fly.toml` | no services | Same image as the API, `python -m app.workers.main`, check on `:8081/health` |
+
+All three apps run `shared-cpu-1x`/512 MB in `dfw`.
+
+- **Web → API goes over Flycast** (`API_INTERNAL_URL=http://fnh-api(-staging).flycast`), not
+  `.internal`. `.internal` dials the machine directly over IPv6, while uvicorn binds IPv4
+  `0.0.0.0` (verified: the IPv6 dial is refused). Flycast also routes through fly-proxy, so the
+  API's health check and load balancing apply. The API gets no public IP (`--no-public-ips`).
+- **One web image for both environments.** Next freezes `rewrites()` destinations at build time.
+  The image is built with a placeholder origin, and `frontend/docker-entrypoint.sh` swaps in the
+  runtime `API_INTERNAL_URL` at boot. Without it, the container refuses to start.
+- **SSE through the chain (ADR-0004).** fly-proxy streams responses. The Next proxy in `fnh-web`
+  gzips any compressible response for clients that send `Accept-Encoding: gzip` (every browser),
+  which **buffers an SSE stream until it ends**. That was verified locally against the built
+  image. The SSE route must send `Cache-Control: no-cache, no-transform`, which makes Next skip
+  compression, plus a heartbeat comment well inside fly-proxy's idle timeout.
+  Both apps count concurrency by connections, not requests.
 
 ## Secrets map
 
@@ -48,20 +78,25 @@ under 5 GB comes to roughly $10–30/mo. Not $0 by design (ADR-0001).
 | `SESSION_SECRET`, `DEVICE_TOKEN_PEPPER` | fly secrets | api |
 | `EMAIL_API_KEY` (SMTP password; with `SMTP_HOST`/`SMTP_PORT`/`SMTP_USERNAME`/`SMTP_STARTTLS`, `EMAIL_MODE=smtp`, `EMAIL_FROM`) | fly secrets (+ plain env for the non-secret ones) | api, worker |
 | `SENTRY_DSN` | fly secrets | all |
-| `FLY_API_TOKEN` | GitHub environment secret | deploy workflow |
+| `API_INTERNAL_URL` (not secret) | `web.fly.toml` `[env]` | web (server only, read at boot) |
+| `FLY_API_TOKEN` | GitHub environment secret (`staging`, `production`) | deploy workflow |
 
 ## Migrations & health
 
 - **Roles:** provisioning runs `backend/db/init/00-init-app-role.sql` once per database as a role
   with `CREATEROLE`. It creates `fnh_app` (runtime) and `fnh_resolver` (ADR-0009). Migration
-  `0001` refuses to run if either is missing. Compose runs the script automatically.
+  `0001` refuses to run if either is missing. Compose runs the script automatically. On Fly, follow
+  [runbook §1.2](../runbooks/restore.md#12-postgres-legacy-fly-postgres): never `fly postgres
+  attach`, and replace the script's dev password for `fnh_app` straight away.
 - **First admin:** after the first deploy, `fly ssh console -a fnh-api -C "python -m app.cli
   bootstrap --household ... --slug ... --email ... --name ..."` creates the household, its
   settings and the admin account, and prints the fridge-QR URL. Locally: `docker compose -p fnh
   exec api python -m app.cli bootstrap ...`; magic links land in MailHog (`:58025`).
 - **When migrations run:** Fly `release_command = "alembic upgrade head"` on `fnh-api`, using the owner role, before new machines start. Migrations must be backward-compatible with the previous release (expand/contract).
 - **Health checks:** `GET /api/health` (DB `select 1` with GUC set for a sentinel household, plus a Redis ping) gates the deploy, and the uptime monitor pings it every 5 minutes.
-- **Postgres backups:** Fly's daily volume snapshots plus a weekly `pg_dump` from the worker into the backup bucket. Restore runbook: `docs/runbooks/restore.md` (Phase 1 deliverable).
+- **Postgres backups:** Fly's daily volume snapshots. The weekly `pg_dump` from the worker is not
+  built: it waits on its own ADR (06). Provisioning, restore and rollback:
+  [`docs/runbooks/restore.md`](../runbooks/restore.md).
 
 ## Known gaps
 
