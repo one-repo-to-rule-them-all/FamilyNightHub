@@ -15,6 +15,8 @@ past REVEAL_SETTLE, so the night is `tonight` and its photo album is open (ADR-0
 acceptance spec starts its night from the host's phone, as a family would.
 `hostCookie` is a signed `fnh_session` value for the household's admin, so a test can act as
 the host through the API (close voting with X-FNH-Test-Seed) without a magic-link round trip.
+`--host-account` also adds a second account with the `host` role (no `admin:*` permissions) and
+prints its signed session as `hostOnlyCookie` (null otherwise), for the admin screens' 403s.
 
 Every test seeds its own household, so tests never share state and reruns need no cleanup.
 It goes through app.cli.bootstrap (the real first-admin path) and household_session (RLS, GUC
@@ -60,7 +62,12 @@ MOVIES = [
 
 
 async def seed(
-    slug: str, movies: int, open_voting: bool, tonight: bool, night: bool = True
+    slug: str,
+    movies: int,
+    open_voting: bool,
+    tonight: bool,
+    night: bool = True,
+    host_account: bool = False,
 ) -> dict[str, object]:
     household = f"E2E {slug}"
     email = f"host-{slug}@e2e.test"
@@ -77,6 +84,17 @@ async def seed(
                 ),
                 {"h": created.household_id, "n": name, "e": emoji, "c": color},
             )
+        host_id: uuid.UUID | None = None
+        if host_account:
+            host_id = (
+                await db.execute(
+                    text(
+                        "INSERT INTO accounts (household_id, email, display_name, role) "
+                        "VALUES (:h, :e, 'E2E Helper', 'host') RETURNING id"
+                    ),
+                    {"h": created.household_id, "e": f"helper-{slug}@e2e.test"},
+                )
+            ).scalar_one()
     if code is not None:
         session_id = await _seed_night(created, code, titles, open_voting, tonight)
     return {
@@ -90,6 +108,9 @@ async def seed(
         "hostCookie": sign_account_session(
             created.account_id, created.household_id, int(time.time())
         ),
+        "hostOnlyCookie": None
+        if host_id is None
+        else sign_account_session(host_id, created.household_id, int(time.time())),
     }
 
 
@@ -144,12 +165,20 @@ def main() -> int:
     parser.add_argument("--open-voting", action="store_true")
     parser.add_argument("--tonight", action="store_true", help="needs --movies >= 2")
     parser.add_argument("--no-night", action="store_true", help="household and people only")
+    parser.add_argument("--host-account", action="store_true", help="add a host-role account")
     args = parser.parse_args()
     if args.tonight and args.movies < 2:
         parser.error("--tonight needs --movies 2 or more")
     if args.no_night and (args.movies or args.open_voting or args.tonight):
         parser.error("--no-night takes no --movies, --open-voting or --tonight")
-    seeded = seed(args.slug, args.movies, args.open_voting, args.tonight, not args.no_night)
+    seeded = seed(
+        args.slug,
+        args.movies,
+        args.open_voting,
+        args.tonight,
+        not args.no_night,
+        args.host_account,
+    )
     print(json.dumps(asyncio.run(seeded)))
     return 0
 

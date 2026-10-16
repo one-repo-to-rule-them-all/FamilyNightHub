@@ -12,6 +12,8 @@ export type SeededHousehold = {
   people: string[];
   /** A signed `fnh_session` value for the household's admin (see seed_night.py). */
   hostCookie: string;
+  /** A signed `fnh_session` for a second, host-role account (only with `hostAccount`). */
+  hostOnlyCookie: string | null;
 };
 
 export type SeededNight = SeededHousehold & {
@@ -28,6 +30,8 @@ export type SeedOptions = {
   openVoting?: boolean;
   /** Close voting and settle the reveal: the night is `tonight`, so photos are open. */
   tonight?: boolean;
+  /** Also add a host-role account (no admin permissions): `hostOnlyCookie`. */
+  hostAccount?: boolean;
 };
 
 const BACKEND = path.resolve(__dirname, "../../../backend");
@@ -38,6 +42,7 @@ export function seedNight(options: SeedOptions = {}): SeededNight {
   if (options.movies) args.push("--movies", String(options.movies));
   if (options.openVoting) args.push("--open-voting");
   if (options.tonight) args.push("--tonight");
+  if (options.hostAccount) args.push("--host-account");
   return runSeed(args) as SeededNight;
 }
 
