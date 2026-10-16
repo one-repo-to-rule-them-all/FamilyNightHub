@@ -85,7 +85,9 @@ Migrations run as the owner role in the Fly release command and must be expand/c
 
 Bucket `fnh-photos` (private, no public ACL, no listing for app credentials beyond its prefix).
 Key layout: `households/{hid}/sessions/{sid}/{photo_id}.jpg` and `…_thumb.jpg`. Presigned PUTs last
-5 minutes; presigned GETs last 10. Bucket `fnh-photos-backup` is written only by the worker using
+5 minutes and sign `Content-Type: image/jpeg`; presigned GETs last 10. `photos.bytes` is the full
+image's size as HEAD reported it on `complete`; `photos.taken_at` holds the EXIF date at midnight
+UTC (the phone sends a date only). Reactions are limited to a six-emoji allowlist in the service. Bucket `fnh-photos-backup` is written only by the worker using
 separate credentials. Deletes remove both copies within 24h. See
 [ADR-0005](decisions/ADR-0005-photo-pipeline-and-storage.md).
 

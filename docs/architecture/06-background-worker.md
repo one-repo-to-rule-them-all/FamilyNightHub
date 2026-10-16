@@ -20,7 +20,7 @@ flowchart LR
 |---|---|---|---|
 | `backup_new_photos` | cron 03:00 local daily | Copy `ready` photos with `backed_up_at IS NULL` to the backup bucket; stamp `backed_up_at` | Not built: lands with the photo pipeline |
 | `propagate_photo_deletes` | cron 03:30 daily | Delete backup objects listed in `photo_deletions` with `backup_purged_at IS NULL`; stamp it | Not built: lands with the photo pipeline |
-| `sweep_orphan_uploads` | cron hourly at :40 | Delete `pending` photo rows older than 24h and any objects under their keys (storage first, then the row) | **Built.** Storage is a no-op `ObjectStore` until the pipeline adds a real client |
+| `sweep_orphan_uploads` | cron hourly at :40 | Delete `pending` photo rows older than 24h and any objects under their keys (storage first, then the row) | **Built.** Deletes through the photos-bucket client (`integrations/storage.py`); a logging no-op when `STORAGE_*` is unset |
 | `refresh_tmdb_cache` | cron weekly | Re-fetch cached movie details older than 30 days (TMDB caching terms) | Not built: lands with TMDB |
 | `pg_dump_weekly` | cron Sunday 04:00 | `pg_dump` to the backup bucket; keep 8. **Open:** `fnh_app` cannot dump RLS-forced tables, so this needs a dedicated read-only role and its own ADR before it is built | Blocked on an ADR |
 | `auto_close_stale_sessions` | cron hourly at :10 | Move nights revealed more than 24h ago to `closed` (stamp `closed_at`, write a `session.auto_closed` audit row in the same statement). Covers `revealed` as well as `tonight`, because revealed → tonight is lazy (03) and an untouched night stays `revealed` in the table | **Built** |

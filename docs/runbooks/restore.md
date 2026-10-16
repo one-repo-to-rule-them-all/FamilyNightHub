@@ -100,8 +100,8 @@ instance. `REDIS_URL=rediss://default:<pw>@<host>:6379`.
 
 `fly storage create` sets `AWS_*`/`BUCKET_NAME` secrets on whichever app it targets. The app
 reads the `STORAGE_*` / `BACKUP_STORAGE_*` names in 02's secrets map, so remove the auto-set
-ones (`fly secrets unset`) and set the 02 names. The photo pipeline adds the settings that read
-them; until then they are inert.
+ones (`fly secrets unset`) and set the 02 names (`STORAGE_ENDPOINT=https://fly.storage.tigris.dev`,
+`STORAGE_REGION=auto`). `BACKUP_STORAGE_*` stays inert until `backup_new_photos` lands.
 
 ### 1.5 Secrets (02 "Secrets map")
 

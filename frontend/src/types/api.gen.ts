@@ -683,6 +683,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Photos
+         * @description The album, newest first. URLs are minted per request and expire in 10 minutes.
+         *     Hidden photos appear only for accounts that may unhide them.
+         */
+        get: operations["list_photos_api_v1_sessions__session_id__photos_get"];
+        put?: never;
+        /**
+         * Create Photo
+         * @description Start an upload: a `pending` photo plus presigned PUTs for the JPEG and its thumbnail.
+         *     PUT both, then call `complete`.
+         */
+        post: operations["create_photo_api_v1_sessions__session_id__photos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/photos/{photo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Photo
+         * @description Hard delete (admins): both objects, the row and its reactions. A tombstone tells the
+         *     worker to purge the backup copies within 24h.
+         */
+        delete: operations["delete_photo_api_v1_sessions__session_id__photos__photo_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/photos/{photo_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Complete Photo
+         * @description Check both uploads (HEAD: image/jpeg, 1 byte..10 MB) and publish the photo.
+         */
+        post: operations["complete_photo_api_v1_sessions__session_id__photos__photo_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/photos/{photo_id}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hide Photo
+         * @description Soft hide: gone from every phone and the TV, kept for an unhide. Idempotent.
+         */
+        post: operations["hide_photo_api_v1_sessions__session_id__photos__photo_id__hide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/photos/{photo_id}/reactions/{emoji}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Add Reaction
+         * @description Idempotent.
+         */
+        put: operations["add_reaction_api_v1_sessions__session_id__photos__photo_id__reactions__emoji__put"];
+        post?: never;
+        /**
+         * Remove Reaction
+         * @description Idempotent.
+         */
+        delete: operations["remove_reaction_api_v1_sessions__session_id__photos__photo_id__reactions__emoji__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/photos/{photo_id}/unhide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unhide Photo */
+        post: operations["unhide_photo_api_v1_sessions__session_id__photos__photo_id__unhide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/voters": {
         parameters: {
             query?: never;
@@ -1002,6 +1130,16 @@ export interface components {
             /** Reactions Moved */
             reactions_moved: number;
         };
+        /** MyReactionOut */
+        MyReactionOut: {
+            /** Emoji */
+            emoji: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
         /** NightCodeOut */
         NightCodeOut: {
             /** Night Code */
@@ -1132,6 +1270,91 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** PhotoCreateIn */
+        PhotoCreateIn: {
+            /**
+             * Person Id
+             * Format: uuid
+             * @description Who is sharing it: a person bound to this device
+             */
+            person_id: string;
+            /**
+             * Taken On
+             * @description EXIF DateTimeOriginal, date only (read on the phone)
+             */
+            taken_on?: string | null;
+        };
+        /** PhotoCreatedOut */
+        PhotoCreatedOut: {
+            /**
+             * Expires In
+             * @description Seconds the upload URLs stay valid
+             */
+            expires_in: number;
+            /**
+             * Photo Id
+             * Format: uuid
+             */
+            photo_id: string;
+            /**
+             * Thumb Upload Url
+             * @description PUT the thumbnail JPEG here, same content type
+             */
+            thumb_upload_url: string;
+            /**
+             * Upload Url
+             * @description PUT the full JPEG here with Content-Type: image/jpeg
+             */
+            upload_url: string;
+        };
+        /** PhotoOut */
+        PhotoOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * My Reactions
+             * @description Reactions by people bound to the calling device (empty for accounts)
+             */
+            my_reactions: components["schemas"]["MyReactionOut"][];
+            /** Person Avatar Emoji */
+            person_avatar_emoji: string;
+            /** Person Color */
+            person_color: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Person Name */
+            person_name: string;
+            /** Reactions */
+            reactions: components["schemas"]["ReactionCountOut"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "hidden";
+            /** Taken On */
+            taken_on: string | null;
+            /**
+             * Thumb Url
+             * @description Presigned GET for the thumbnail (10 min)
+             */
+            thumb_url: string;
+            /**
+             * Url
+             * @description Presigned GET for the full image (10 min)
+             */
+            url: string;
+        };
         /** PlacementOut */
         PlacementOut: {
             /** First Places */
@@ -1165,6 +1388,13 @@ export interface components {
             option_id: string;
             /** Rank */
             rank: number;
+        };
+        /** ReactionCountOut */
+        ReactionCountOut: {
+            /** Count */
+            count: number;
+            /** Emoji */
+            emoji: string;
         };
         /** ReorderIn */
         ReorderIn: {
@@ -2734,6 +2964,384 @@ export interface operations {
                 content?: never;
             };
             /** @description Not allowed in the night's current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_photos_api_v1_sessions__session_id__photos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoOut"][];
+                };
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_photo_api_v1_sessions__session_id__photos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoCreatedOut"];
+                };
+            };
+            /** @description The person is not bound to this device */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The album isn't open (before the pick) or is full */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_photo_api_v1_sessions__session_id__photos__photo_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    complete_photo_api_v1_sessions__session_id__photos__photo_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Upload missing, not a JPEG, or over 10 MB */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    hide_photo_api_v1_sessions__session_id__photos__photo_id__hide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The photo hasn't finished uploading */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_reaction_api_v1_sessions__session_id__photos__photo_id__reactions__emoji__put: {
+        parameters: {
+            query: {
+                /** @description Who is reacting */
+                person_id: string;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+                photo_id: string;
+                emoji: "❤️" | "😂" | "😮" | "👍" | "🎉" | "🍿";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The person is not bound to this device */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such visible photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_reaction_api_v1_sessions__session_id__photos__photo_id__reactions__emoji__delete: {
+        parameters: {
+            query: {
+                /** @description Whose reaction to remove */
+                person_id: string;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+                photo_id: string;
+                emoji: "❤️" | "😂" | "😮" | "👍" | "🎉" | "🍿";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The person is not bound to this device */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such visible photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unhide_photo_api_v1_sessions__session_id__photos__photo_id__unhide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The photo hasn't finished uploading */
             409: {
                 headers: {
                     [name: string]: unknown;

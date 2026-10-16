@@ -229,6 +229,7 @@ jobs:
       TMDB_READ_TOKEN: fnh-sentinel-tmdb-token-5d93
       EMAIL_API_KEY: fnh-sentinel-email-key-a4c0
       SENTRY_DSN: https://fnh-sentinel-sentry-dsn@example.invalid/1
+      STORAGE_ACCESS_KEY_ID: fnh-sentinel-storage-key-id-6a4b
       STORAGE_SECRET_ACCESS_KEY: fnh-sentinel-storage-secret-71e2
       BACKUP_STORAGE_SECRET_ACCESS_KEY: fnh-sentinel-backup-secret-0f9d
       DATABASE_URL: postgresql://fnh_app:fnh-sentinel-db-password-3a6b@db.invalid/fnh
@@ -250,7 +251,7 @@ jobs:
         working-directory: frontend
         run: |
           printf '%s\n' "$SESSION_SECRET" "$DEVICE_TOKEN_PEPPER" "$TMDB_READ_TOKEN" \
-            "$EMAIL_API_KEY" "fnh-sentinel-sentry-dsn" "$STORAGE_SECRET_ACCESS_KEY" \
+            "$EMAIL_API_KEY" "fnh-sentinel-sentry-dsn" "$STORAGE_ACCESS_KEY_ID" "$STORAGE_SECRET_ACCESS_KEY" \
             "$BACKUP_STORAGE_SECRET_ACCESS_KEY" "fnh-sentinel-db-password-3a6b" \
             "fnh-sentinel-owner-password-9e15" "fnh-sentinel-redis-password-c2d8" \
             > "$RUNNER_TEMP/secrets.txt"

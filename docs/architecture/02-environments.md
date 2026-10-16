@@ -23,7 +23,10 @@ See [ADR-0001](decisions/ADR-0001-fly-fastapi-postgres-hosting.md).
 
 **dev.** `docker compose up -d`, then `docker compose run --rm api alembic upgrade head` and the seed
 (one household, six people with emoji avatars, twenty owned movies, a past night with photos). SeaweedFS
-stands in for Tigris because both are S3-compatible. Set `STORAGE_ENDPOINT` accordingly.
+stands in for Tigris because both are S3-compatible. Set `STORAGE_ENDPOINT` accordingly; when the
+API reaches the bucket at a different address than phones do (the compose `api` service uses
+`http://s3:8333`), set `STORAGE_PUBLIC_ENDPOINT` to the phone-facing one (`http://localhost:58333`):
+SigV4 signs the host, so presigned URLs are minted against it.
 
 **staging.** It gets the same deploy as prod on every merge to `main` and is used to test on a
 real iPhone. Its data is synthetic. Never copy production photos into it.
@@ -72,7 +75,7 @@ All three apps run `shared-cpu-1x`/512 MB in `dfw`.
 | `DATABASE_URL` (app role `fnh_app`) | fly secrets | api, worker |
 | `MIGRATION_DATABASE_URL` (owner role) | fly secrets (release command only) | api release_command |
 | `REDIS_URL` | fly secrets | api, worker |
-| `STORAGE_*` (photos bucket, read/write) | fly secrets | api, worker |
+| `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` (photos bucket, read/write; with plain-env `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_REGION`, optional `STORAGE_PUBLIC_ENDPOINT`; unset endpoint or keys = photo routes answer 503) | fly secrets (+ plain env for the non-secret ones) | api, worker |
 | `BACKUP_STORAGE_*` (backup bucket, write-only) | fly secrets | **worker only** |
 | `TMDB_READ_TOKEN` (with plain-env `TMDB_BASE_URL`; unset token = search off, typed titles only) | fly secrets | api only (never `NEXT_PUBLIC_*`) |
 | `SESSION_SECRET`, `DEVICE_TOKEN_PEPPER` | fly secrets | api |
