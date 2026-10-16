@@ -90,7 +90,7 @@ test.describe("host and TV", () => {
     await expect(page.getByTestId("shortlist-item")).toHaveText([/Paddington/, /Moana/]);
     // Server-derived: the order survives a reload.
     await page.reload();
-    await expect(page.getByTestId("shortlist-item")).toHaveText([/Paddington/, /Moana/]);
+    await expect(page.getByTestId("shortlist-item")).toHaveText([/Paddington/, /Moana/], POLL);
     await expectNoAxeViolations(page);
 
     await openVoting.click();
@@ -125,7 +125,9 @@ test.describe("host and TV", () => {
     await expect(page.getByRole("button", { name: "Paddington, rank 1" })).toBeVisible();
     await page.getByRole("button", { name: "Save Mia's vote" }).click();
     await expect(page.getByTestId("proxy-saved")).toHaveText("Saved Mia's vote.");
-    await expect(page.getByTestId("voted-count")).toHaveText("2 so far");
+    // The API commits the ballot after answering, so the immediate refetch can still say 1: the
+    // next poll catches up.
+    await expect(page.getByTestId("voted-count")).toHaveText("2 so far", POLL);
     const miaTile = tv.getByTestId("tv-tile").and(tv.locator('[data-person="Mia"]'));
     await expect(miaTile).toHaveAttribute("data-voted", "true", POLL);
     await expect(tv.getByTestId("tv-headline")).toHaveText(`2 of ${night.people.length} voted`);
