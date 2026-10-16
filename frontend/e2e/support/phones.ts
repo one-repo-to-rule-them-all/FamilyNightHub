@@ -101,3 +101,12 @@ export async function hostClosesVoting(
   expect(response.status()).toBe(200);
   return response.json();
 }
+
+/** The host ends the night (`tonight → closed`) straight against the API, like hostClosesVoting. */
+export async function hostClosesNight(request: APIRequestContext, night: SeededNight) {
+  const csrf = "e2e-host-csrf";
+  const response = await request.post(`${API_URL}/api/v1/sessions/${night.sessionId}/close`, {
+    headers: { Cookie: `fnh_session=${night.hostCookie}; fnh_csrf=${csrf}`, "X-FNH-CSRF": csrf },
+  });
+  expect(response.status()).toBe(200);
+}

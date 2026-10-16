@@ -811,6 +811,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}/ratings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rate
+         * @description Set or replace the score of a person bound to this phone.
+         */
+        put: operations["rate_api_v1_sessions__session_id__ratings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/ratings/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Ratings
+         * @description Scores of the people actively bound to this phone (null until each has rated).
+         */
+        get: operations["my_ratings_api_v1_sessions__session_id__ratings_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/ratings/proxy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rate Proxy
+         * @description Host rates on someone's behalf (audited as `rating.proxy_rated`).
+         */
+        put: operations["rate_proxy_api_v1_sessions__session_id__ratings_proxy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/stream": {
         parameters: {
             query?: never;
@@ -1197,6 +1257,7 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            rating: components["schemas"]["RatingSummaryOut"] | null;
             /** Revealed At */
             revealed_at: string | null;
             /**
@@ -1260,6 +1321,16 @@ export interface components {
             person_id: string;
             /** Ranks */
             ranks: components["schemas"]["RankOut"][];
+        };
+        /** OwnRatingOut */
+        OwnRatingOut: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Score */
+            score: number | null;
         };
         /** PersonCreateIn */
         PersonCreateIn: {
@@ -1427,6 +1498,29 @@ export interface components {
             /** Rank */
             rank: number;
         };
+        /**
+         * RatingIn
+         * @description One person's score for the night's movie, replacing any earlier one.
+         */
+        RatingIn: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Score */
+            score: number;
+        };
+        /**
+         * RatingSummaryOut
+         * @description The family's average only: never anyone's own score.
+         */
+        RatingSummaryOut: {
+            /** Average */
+            average: number | null;
+            /** Count */
+            count: number;
+        };
         /** ReactionCountOut */
         ReactionCountOut: {
             /** Count */
@@ -1472,6 +1566,7 @@ export interface components {
             id: string;
             /** Options */
             options: components["schemas"]["OptionOut"][];
+            rating: components["schemas"]["RatingSummaryOut"] | null;
             result: components["schemas"]["VotingResultOut"] | null;
             /** Revealed At */
             revealed_at: string | null;
@@ -3395,6 +3490,152 @@ export interface operations {
                 content?: never;
             };
             /** @description The photo hasn't finished uploading */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rate_api_v1_sessions__session_id__ratings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RatingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description This phone isn't (actively) bound to that person */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or person) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ratings are not open yet */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_ratings_api_v1_sessions__session_id__ratings_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnRatingOut"][];
+                };
+            };
+            /** @description No such night in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rate_proxy_api_v1_sessions__session_id__ratings_proxy_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RatingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description This phone isn't (actively) bound to that person */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or person) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ratings are not open yet */
             409: {
                 headers: {
                     [name: string]: unknown;

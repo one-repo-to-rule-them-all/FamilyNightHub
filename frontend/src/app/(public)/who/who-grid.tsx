@@ -5,6 +5,7 @@ import { Check, Hourglass, Smartphone } from "lucide-react";
 import Link from "next/link";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
+import { RatePromptCard } from "@/components/night/rate-prompt-card";
 import { buttonVariants } from "@/components/ui/button";
 import { api, type ApiError, type Binding, type NightSummary, type Person } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,7 @@ export function WhoGrid() {
 
   return (
     <div className="flex flex-col gap-5">
+      <RatePromptCard />
       <div aria-live="polite" className="flex flex-col gap-3 empty:hidden">
         {mine.length > 0 ? (
           <p className="rounded-xl bg-cinema-muted p-4 text-base" data-testid="who-status">
