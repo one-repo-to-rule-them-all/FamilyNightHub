@@ -7,10 +7,13 @@ import {
   poster,
   vote,
 } from "./support/phones";
+import { signInAsHost } from "./support/host";
 import { expect, seedNight, test } from "./support/seed";
 
 /** Generous: the reveal arrives live, but a dropped stream would fall back to the 5s poll. */
 const REVEAL_TIMEOUT = 15_000;
+/** /who polls every 5s while a claim is pending; /host's claim list polls too. */
+const POLL = { timeout: 15_000 };
 
 test.describe("phone voting", () => {
   test("two phones vote for their own people and see the same winner", async ({
@@ -145,6 +148,39 @@ test.describe("phone voting", () => {
     // The refusal refreshes who this phone is, so it now asks to pick again.
     await expect(page.getByRole("link", { name: "Pick who you are" })).toBeVisible();
 
+    await phoneB.context().close();
+  });
+
+  test("a pending claim flips to mine on /who once the host approves, with no reload", async ({
+    page,
+    browser,
+    baseURL,
+  }) => {
+    const night = seedNight({ movies: 2, openVoting: true });
+    await joinAs(page, night, ["Ava"]);
+
+    // Phone B asks for Ava, who is on the first phone: it waits on /who for the host.
+    const phoneB = await newPhone(browser);
+    await joinAs(phoneB, night, ["Leo"]);
+    const avaOnB = phoneB.getByRole("button", { name: /^Ava/ });
+    await avaOnB.click();
+    await expect(avaOnB).toHaveAttribute("data-binding", "pending");
+
+    // The host approves from /host in their own browser.
+    const hostContext = await browser.newContext({ baseURL: baseURL as string });
+    await signInAsHost(hostContext, night, baseURL as string);
+    const host = await hostContext.newPage();
+    await host.goto("/host");
+    await host.getByRole("button", { name: "Approve Ava" }).click(POLL);
+    await expect(host.getByText("No phones are waiting.")).toBeVisible();
+
+    // /who polls while a claim is pending, so the tile flips to mine on its own.
+    await expect(avaOnB).toHaveAttribute("data-binding", "mine", POLL);
+    await expect(phoneB.getByTestId("who-status")).toHaveText(
+      "You're in as Ava & Leo. Voting opens on the TV.",
+    );
+
+    await hostContext.close();
     await phoneB.context().close();
   });
 

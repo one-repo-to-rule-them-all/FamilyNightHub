@@ -6,6 +6,7 @@ import {
   type LiveState,
   POLL_MS,
   nightPollInterval,
+  pendingPollInterval,
   pollWhileDown,
   type StreamLike,
 } from "./live";
@@ -82,6 +83,18 @@ describe("nightPollInterval", () => {
       expect(nightPollInterval("ready", status)).toBe(false);
       expect(nightPollInterval("reconnecting", status)).toBe(POLL_MS);
     }
+  });
+});
+
+describe("pendingPollInterval", () => {
+  it("polls while any person is pending, so an approval shows without a reload", () => {
+    expect(pendingPollInterval([{ binding: "mine" }, { binding: "pending" }])).toBe(POLL_MS);
+  });
+
+  it("stops once nothing is pending, and before the list has loaded", () => {
+    expect(pendingPollInterval([{ binding: "mine" }, { binding: "free" }])).toBe(false);
+    expect(pendingPollInterval([])).toBe(false);
+    expect(pendingPollInterval(undefined)).toBe(false);
   });
 });
 

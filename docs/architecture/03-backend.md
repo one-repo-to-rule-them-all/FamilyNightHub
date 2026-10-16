@@ -288,11 +288,13 @@ The table (`ratings`, unique (session, person), `check(score between 1 and 5)`) 
   `tonight`/`closed` (`session_state.shows_rating`); before that `rating` is null. No endpoint
   returns another person's score.
 - **Live.** Every rating publishes `rating_count` after commit, and screens refetch the snapshot.
-- **For the generator.** `rating_service.average_rating(db, movie_id, since)` returns the family's
-  `RatingAverage(average, count)` for a library movie over the nights it won whose reveal (or
-  creation) is at or after `since`, or None if it wasn't rated in that window (ADR-0007's "skip
-  titles watched in the last 12 months unless the average is 4 or higher"). It is household-scoped
-  by the caller's RLS transaction.
+- **For the generator.** `rating_service.average_ratings(db, movie_ids, since=None)` returns, in
+  one query, the family's `RatingAverage(average, count)` for each library movie over the nights
+  it won whose reveal (or creation) is at or after `since` (None: every night it won); a movie
+  with no rating in that window has no entry. The generator passes its recent winners with no
+  `since`, then applies ADR-0007's "skip titles watched in the last 12 months unless the average
+  is 4 or higher". `average_rating(db, movie_id, since)` is the single-movie form (None when
+  unrated). Both are household-scoped by the caller's RLS transaction.
 - Other household's night → 404; a device on the proxy route → 401; an account without
   `ballots:proxy` → 403; a score outside 1–5 → 422.
 
@@ -415,7 +417,9 @@ otherwise. `services/generator_service.py` loads the inputs and calls the pure
   load-bearing: TMDB orders `NR` at 0, so `certification.lte` returns NR titles. Unrated titles
   (no cert, `NR`, anything else unknown) never roll on a capped night.
 - **History:** winners revealed in the last 12 months are skipped unless the family's average
-  rating of that title (over every night it won) is 4 or higher; unrated means no rescue.
+  rating of that title (over every night it won) is 4 or higher; unrated means no rescue. The
+  averages come from `rating_service.average_ratings` in one batched query for all recent winners
+  (see Ratings, "For the generator").
   Blocked titles and titles already on the shortlist are always skipped; no duplicates across
   pools (a title is the same by TMDB id or library id).
 - **Caching:** every TMDB response goes through `tmdb_cache` (30 days, stale-on-outage). A learned
