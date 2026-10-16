@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
 
-import { AdminGuard, AdminNav } from "./admin-shell";
+import { AdminShell } from "./admin-shell";
 
 export const metadata: Metadata = { title: { default: "Admin", template: "%s · Admin" } };
 
-/** The admin area: wider than the phone column, denser tables (04-frontend.md route table). */
+/**
+ * The admin area (04-frontend.md "Admin"): signed-in admins. proxy.ts sends a browser with no
+ * `fnh_session` to /login; the API enforces the `admin:*` permissions, and a host gets each
+ * screen's 403 as an "admins only" panel.
+ */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-5 py-8">
-      <AdminNav />
-      <AdminGuard>{children}</AdminGuard>
-    </main>
-  );
+  return <AdminShell>{children}</AdminShell>;
 }

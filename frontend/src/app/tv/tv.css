@@ -44,3 +44,39 @@
     opacity 400ms ease,
     box-shadow 400ms ease;
 }
+
+/*
+ * The slideshow (slideshow.tsx): a crossfade and a slow pan/zoom. Both exist only when motion is
+ * welcome; under prefers-reduced-motion photos simply cut and hold still.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .tv-slide {
+    transition: opacity 1200ms ease;
+  }
+
+  .tv-pan {
+    animation: tv-pan-a 14s ease-out both;
+  }
+
+  .tv-pan[data-pan="b"] {
+    animation-name: tv-pan-b;
+  }
+}
+
+@keyframes tv-pan-a {
+  from {
+    transform: scale(1) translate(0, 0);
+  }
+  to {
+    transform: scale(1.07) translate(-1.5%, -1%);
+  }
+}
+
+@keyframes tv-pan-b {
+  from {
+    transform: scale(1.07) translate(1.5%, 1%);
+  }
+  to {
+    transform: scale(1) translate(0, 0);
+  }
+}

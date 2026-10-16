@@ -14,7 +14,7 @@ export function proxy(request: NextRequest) {
   if (pathname === "/who" && !has(DEVICE_COOKIE)) {
     return NextResponse.redirect(new URL("/", request.url));
   }
-  if (pathname.startsWith("/host") && !has(SESSION_COOKIE)) {
+  if ((pathname.startsWith("/host") || pathname.startsWith("/admin")) && !has(SESSION_COOKIE)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   if (pathname === "/login" && has(SESSION_COOKIE)) {
@@ -23,4 +23,4 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/who", "/host/:path*", "/login"] };
+export const config = { matcher: ["/who", "/host/:path*", "/admin/:path*", "/login"] };

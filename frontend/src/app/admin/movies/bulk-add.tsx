@@ -73,7 +73,7 @@ export function BulkAdd() {
 
   return (
     <section aria-labelledby="bulk-heading" className="flex flex-col gap-4">
-      <h2 id="bulk-heading" className="font-heading text-2xl font-semibold">
+      <h2 id="bulk-heading" className="text-lg font-semibold">
         Add owned titles
       </h2>
       <form

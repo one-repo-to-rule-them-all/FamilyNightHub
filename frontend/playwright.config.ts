@@ -35,8 +35,9 @@ export default defineConfig({
     {
       name: "iphone",
       use: { ...devices["iPhone 13"], browserName: "chromium" },
-      // The acceptance journey opens its own iPhone and Pixel contexts; once per run is enough.
-      testIgnore: /acceptance\.spec\.ts/,
+      // The acceptance journey opens its own iPhone and Pixel contexts, and the admin spec its own
+      // laptop and phone contexts; once per run is enough.
+      testIgnore: /(acceptance|admin)\.spec\.ts/,
     },
   ],
   webServer: [

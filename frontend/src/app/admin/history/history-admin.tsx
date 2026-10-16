@@ -7,6 +7,7 @@ import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Button } from "@/components/ui/button";
 import { type Column, DataTable } from "@/components/ui/data-table";
 import { Label } from "@/components/ui/label";
+import { AdminQueryError } from "../admin-error";
 import { api, type ApiError, type Night, type NightSummary } from "@/lib/api";
 
 const dateFormat = new Intl.DateTimeFormat(undefined, {
@@ -37,12 +38,13 @@ export function HistoryAdmin() {
       </p>
     );
   }
-  if (nights.isError) return <ApiErrorNotice error={nights.error} />;
+  if (nights.isError) return <AdminQueryError error={nights.error} />;
 
   const columns: Column<NightSummary>[] = [
     {
       key: "date",
       header: "Night",
+      rowHeader: true,
       cell: (night) => {
         const when = new Date(night.revealed_at ?? night.created_at);
         return (
@@ -95,14 +97,15 @@ export function HistoryAdmin() {
           {notice}
         </p>
       ) : null}
-      <DataTable
-        caption="Past nights"
-        columns={columns}
-        rows={nights.data}
-        rowKey={(night) => night.id}
-        empty="No past nights yet."
-        data-testid="admin-history-table"
-      />
+      <div data-testid="admin-history-table">
+        <DataTable
+          caption="Past nights"
+          columns={columns}
+          rows={nights.data}
+          rowKey={(night) => night.id}
+          empty="No past nights yet."
+        />
+      </div>
       {editing ? (
         <CorrectWinner
           key={editing}
@@ -169,7 +172,7 @@ function CorrectWinner({
         if (ready) correct.mutate({ option_id: optionId, reason: reason.trim() });
       }}
     >
-      <h2 id={`correct-heading-${sessionId}`} className="font-heading text-xl font-semibold">
+      <h2 id={`correct-heading-${sessionId}`} className="text-lg font-semibold">
         Correct the winner{current ? ` (now ${current.title})` : ""}
       </h2>
       <fieldset className="flex flex-col gap-2">

@@ -12,12 +12,12 @@ Deployed as `fnh-web` on Fly. Read the repo's `AGENTS.md` note: Next 16 uses `pr
 | `(public)` | `/j/[slug]`, `/who`, `/s/[session]`, `/history`, `/albums/[session]` | devices | Phone-first, 56px+ tap targets, poster-led |
 | host | `/host`, `/host/[session]` | host/admin | Shortlist builder, open/close, proxy vote, approve claims |
 | tv | `/tv`, `/tv/[session]` | paired TV device | Large type, QR + night code, turnout tiles, reveal, slideshow |
-| admin | `/admin/*` | admin | People, devices, history, movies, photos, settings. Denser tables. `src/app/admin/layout.tsx` is a wider column with the admin nav and a guard (signed out → `/login`; a host sees "only a family admin…"; the API's `admin:*` checks are the real boundary). Tables use `src/components/ui/data-table.tsx` |
+| admin | `/admin/*` | admin | People, devices, history, movies, photos, settings. Denser tables |
 | auth | `/login`, `/auth/callback` | admins/hosts | Magic link |
 
 `src/proxy.ts` redirects pages based on cookie presence only. That is a UX convenience; the API is
 the security boundary. Today: `/who` without `fnh_device` → `/`; `/host/*` without `fnh_session` →
-`/login`; `/login` with `fnh_session` → `/host`. `/tv/*` is not redirected: an unpaired browser gets a
+`/login`; `/admin/*` without `fnh_session` → `/login`; `/login` with `fnh_session` → `/host`. `/tv/*` is not redirected: an unpaired browser gets a
 pairing explanation from the 401.
 
 **Built so far** (the rest of the table is still the plan):
@@ -34,10 +34,13 @@ pairing explanation from the 401.
 | `/auth/callback?token=` | `src/app/(auth)/auth/callback/` | `POST /api/v1/auth/verify` once (guarded against StrictMode's double effect), then `router.replace("/host")` so the spent token leaves history. `referrer: no-referrer` |
 | `/host` | `src/app/host/` | Start a night (the code is shown once, see below), nights in progress, pending person claims with approve/reject (polled every 10s), **Use this browser as the TV** (`POST /devices/enroll {as_tv:true}`, then `/tv/{night}`), sign out |
 | `/host/[session]` | `src/app/host/[session]/` | Draft: shortlist (up/down/remove, reducer in `src/lib/shortlist.ts`, whole order PUT, server order synced back), **Roll candidates** (see "Candidate generator" below), poster search (debounced, through `/api/v1/tmdb/search`, TMDB attribution line; a 503 says "type the title" and the typed-title form is always there), **Open voting** at 2–8 titles. Voting: who has voted (avatars only), proxy ballot, **Close voting**. Then the winner and **End the night**. Rotate code at any stage before `closed` |
+| `/admin/people` | `src/app/admin/people/` | People table (avatar, Family/Guest, added). **Add a person** (name, emoji avatar with one-tap suggestions, colour from the avatar palette, guest flag), **Edit** (rename / re-avatar / recolour in a dialog; only changed fields are PATCHed), **Make family member** for guests, **Merge duplicates** (pick the duplicate and the person to keep; a confirm dialog says ballots, ratings, photos, reactions and phone bindings move to the target, the source is hidden and never deleted, and collisions go the target's way), then the moved/dropped counts as one sentence. A 409 name clash is shown as-is |
+| `/admin/devices` | `src/app/admin/devices/` | Every device (live first, then revoked): label or "Unnamed phone", TV badge, bound people (pending marked), last seen, status. **Rename** (empty clears the label) and **Revoke** with a confirm that says it is final and the phone must rejoin with a night code as a new device |
+| `/admin/settings` | `src/app/admin/settings/` | **Join link**: the current `/j/{slug}` and **Rotate join link** behind a confirm warning that the printed fridge QR stops working at once; the new URL is shown after. **Defaults**: age cap (none, G…NC-17) and region (two letters). **Streaming services**: checkboxes from `GET /api/v1/tmdb/providers` for the household's region, at most 20, saved with `PATCH /admin/settings {streaming_providers}`; JustWatch attribution (the response's `attribution`) and the TMDB notice under the list; a 503 says the list can't load and keeps the saved ones |
 | `/tv` | `src/app/tv/` | Follows the newest draft/voting/revealed/tonight night; an unpaired browser gets "sign in as host, then Use this browser as the TV" |
 | `/admin/movies` | `src/app/admin/movies/` | Bulk add ("One title per line, optional (year)", parsed by `src/lib/bulk-titles.ts`, 100 lines max, duplicates dropped) → per-line results: matched / already owned / added as typed; **ambiguous** and **not found** lines become radio groups (TMDB candidates, "Add as typed", "Skip") sent together with **Confirm choices**. A TMDB-down notice when titles were added as typed. Below it the library `DataTable`: title search, a Show filter (all / owned / not owned / watchlist / blocked), Owned/Watchlist/Blocked checkboxes (`PATCH` each), 50 per page. TMDB attribution line |
 | `/admin/history` | `src/app/admin/history/` | Past nights (`GET /api/v1/sessions`) in a `DataTable` with **Correct winner**: an inline form loads the snapshot, offers the night's other options as radios, requires a reason, and posts `…/correct-winner`; the table and `/history` then show the new winner |
-| `/tv/[session]` | `src/app/tv/[session]/` | Lobby (night code, join instructions, people tiles) → turnout tiles light up as ballots arrive (`GET …/voters`, never ranks) → reveal spinner (`src/lib/reveal.ts`) landing on `result.winner_option_id`. Screen Wake Lock where supported; follows the next night once this one is `tonight`/`closed` |
+| `/tv/[session]` | `src/app/tv/[session]/` | Lobby (night code, join instructions, people tiles) → turnout tiles light up as ballots arrive (`GET …/voters`, never ranks) → reveal spinner (`src/lib/reveal.ts`) landing on `result.winner_option_id`. Screen Wake Lock where supported (released while the tab is hidden); once the night is `tonight`/`closed`, the photo slideshow (see "TV slideshow" below), and it follows the next night |
 
 ## Design system
 
@@ -109,6 +112,30 @@ screen. The panel goes away once voting opens.
 **TV type scale.** `src/app/tv/tv.css`: one root size that follows the viewport
 (`clamp(14px, 1.45vw, 48px)`) and `em`-based `tv-display` / `tv-title` / `tv-body` / `tv-code`, so
 a 1080p and a 4K TV read the same from the sofa.
+
+## Admin
+
+`/admin/*` (`src/app/admin/`) is for signed-in admins. `proxy.ts` sends a browser with no
+`fnh_session` to `/login`; the API is the boundary (`admin:people`, `admin:devices`,
+`admin:movies`, `admin:history`, `admin:settings`), and a host who opens an admin screen gets that screen's 403 as an "Admins only"
+panel (`admin-error.tsx`), not a raw error. `/host` links admins to `/admin`, which opens on People.
+
+- **Layout** (`admin-shell.tsx`): wider than the phone column (`max-w-5xl`), a People / Devices /
+  Movies / History / Settings nav (wraps on a narrow phone) with `aria-current`, a "Back to host" link; a 401 from `GET /auth/me` goes to
+  `/login`.
+- **Denser tables**: every admin list is a `DataTable` (`src/components/ui/data-table.tsx`), a real
+  `<table>` with a caption, column headers, a row-header cell, per-row `data-*` attributes and an
+  empty row; it scrolls sideways inside its own box on a narrow phone. Admin controls use the
+  `sm`/`lg` button sizes rather than the 56px phone tap size.
+- **Confirmations** use `ModalDialog` (`src/components/ui/modal-dialog.tsx`, a native modal
+  `<dialog>`, like the photo viewer). Merge, revoke and slug rotation each say what can't be undone.
+- **Pure logic** in `src/lib/admin.ts` (100% gate): the avatar colour palette (`PERSON_COLORS`;
+  data colours behind an emoji, separate from the one UI accent, plus the current colour when it
+  is off-palette), the API's name/emoji/colour rules checked before sending, the PATCH body of
+  changed fields, the merge sentence, device names, "last seen" phrasing, age caps, region codes
+  and the 20-service selection.
+- Query keys `["admin", "people" | "devices" | "settings"]` and `["tmdb", "providers"]`
+  (invalidated when the region changes).
 
 ## Phone state machine
 
@@ -217,7 +244,7 @@ attribute and never `image/heic`. See [ADR-0005](decisions/ADR-0005-photo-pipeli
 The album is a thumbnail grid with a full-screen viewer, the uploader's avatar, and emoji reactions.
 The TV slideshow uses the Screen Wake Lock API where supported.
 
-**Built** (phone side; the TV slideshow is not):
+**Built** (phone side, and the TV slideshow below):
 
 - **Processing** (`process.ts`), one file at a time: `exifr` reads `DateTimeOriginal` only (sent
   as `taken_on`, date only). `createImageBitmap(file, {imageOrientation: "from-image"})` decodes and
@@ -255,6 +282,39 @@ The TV slideshow uses the Screen Wake Lock API where supported.
   the album is left. A thumbnail that fails to load triggers a refetch, which covers a phone that
   slept past the TTL. Images are plain `<img>` with `referrerPolicy="no-referrer"`, never
   `next/image`, whose optimizer would proxy the bytes through the server.
+
+### TV slideshow
+
+**Built.** `/tv/[session]` on a `tonight` or `closed` night (`src/app/tv/[session]/slideshow.tsx`;
+the scheduling is `src/lib/slideshow.ts`, pure and gated at 100% in vitest with fake timers):
+
+- **Album.** Query key `["night", id, "slideshow"]`: under the night key, so every live hint
+  (`photo_added`, `status_changed`, a reconnect, a return to visible) refetches it with the
+  snapshot. It also refetches every 10 s while the stream is up (hiding publishes no event, so this
+  sweep is what drops a hidden photo) and every 5 s while it is down. Only `ready` photos play:
+  a photo the API stops listing (or lists as `hidden`) leaves the screen on that refetch, even
+  mid-slide.
+- **Order.** The loop starts on the newest photo and then walks the album chronologically, 8 s
+  per photo. A photo that wasn't there before jumps the queue once (several at once: newest first),
+  then the loop resumes where it was.
+- **Presigned URLs (ADR-0005).** URLs are reused through `keepFreshUrls` (album.ts) for at most
+  8 minutes, except a photo whose image failed. No load starts on a URL within 60 s of its
+  10-minute expiry; once any URL is past the reuse window the TV refetches. A broken or expired
+  image is skipped and triggers a refetch, and is retried only once it has a new URL. URLs exist
+  only in each `<img src>` (`referrerPolicy="no-referrer"`, never `next/image`), never in data
+  attributes or logs; the scheduler's state holds ids and mint times only.
+- **Rendering.** At most two images load at once: the photo on screen and the next one,
+  preloaded. The outgoing photo crossfades into the new one once it has loaded (1.2 s), and each
+  photo slowly pans and zooms (14 s); both exist only under `prefers-reduced-motion:
+  no-preference`. Caption: the uploader's avatar and name, non-zero reaction counts, and the photo
+  count. Alt text is "Photo from {name}, {date}" (`taken_on`, else the upload date), never a
+  filename; the preloaded and outgoing images are `aria-hidden`.
+- **Remote.** ← → step (← walks back through the loop), space / OK / play-pause pauses and resumes
+  with a visible "Paused" badge; stepping while paused stays paused, resuming gives the photo a
+  full slide.
+- **Idle.** Until a photo can be shown: "Drop your photos from your phone", the night code when
+  this tab knows it and the night is still `tonight`, and a count once photos arrive. The join QR
+  joins it once an endpoint exposes the household's join slug to the TV (see "TV" above).
 - **Bucket CORS**: phones PUT and GET the bucket cross-origin, so it needs a CORS rule for the web
   origin (PUT/GET, `content-type`). `frontend/e2e/setup_bucket.py` sets it on SeaweedFS for local
   runs and CI. The Tigris buckets for staging and prod need the same rule (a deploy step).
@@ -283,7 +343,7 @@ mutations never retry.
 | `npm run typecheck` | `tsc --noEmit` (TypeScript 7) |
 | `npm run lint:install`, then `npm run lint` | ESLint with `eslint-config-next`. ESLint, the Next config and the TypeScript 5 that typescript-eslint needs live in `tools/eslint/` (TypeScript 7 has no JS API for it), and `eslint.config.mjs` resolves its plugins from there. It also bans `waitForTimeout` / `setTimeout` in tests |
 | `npm run format:check` | Prettier + `prettier-plugin-tailwindcss` (class order) |
-| `npm test` | Vitest with v8 coverage, `src/**/*.test.ts`: API client CSRF and error handling, night-code input, the ballot reducer (100% gate on `src/lib/ballot.ts`), the photo pipeline (GPS strip on `e2e/fixtures/gps.jpg` through a real JPEG encoder, `@napi-rs/canvas`), the upload queue with fake timers (lines gated at 100%), the IndexedDB job store (`fake-indexeddb`), upload error sorting, album URL reuse (100% gate) and the rating helpers (100% gate on `src/lib/rating.ts`), the candidate mapping (100% gate on `src/lib/candidates.ts`: request body incl. omitted vs `null` cap, option source per candidate, badge text, shortlist limit), plus (from host/TV) shortlist reducer and bounds, proxy-ballot ranking, reveal sequencing, QR/join link, night-code hand-off |
+| `npm test` | Vitest with v8 coverage, `src/**/*.test.ts`: API client CSRF and error handling, night-code input, the ballot reducer (100% gate on `src/lib/ballot.ts`), the photo pipeline (GPS strip on `e2e/fixtures/gps.jpg` through a real JPEG encoder, `@napi-rs/canvas`), the upload queue with fake timers (lines gated at 100%), the IndexedDB job store (`fake-indexeddb`), upload error sorting, album URL reuse (100% gate) and the rating helpers (100% gate on `src/lib/rating.ts`), the admin helpers (100% gate on `src/lib/admin.ts`), the candidate mapping (100% gate on `src/lib/candidates.ts`: request body incl. omitted vs `null` cap, option source per candidate, badge text, shortlist limit), plus (from host/TV) shortlist reducer and bounds, proxy-ballot ranking, reveal sequencing, QR/join link, night-code hand-off |
 | `npm run test:e2e` | Playwright + axe against the real API; see [`07-cicd.md`](07-cicd.md#running-e2e-locally) |
 
 ## Where to add new code

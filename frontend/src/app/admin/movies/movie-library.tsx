@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { type Column, DataTable } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AdminQueryError } from "../admin-error";
 import { type AdminMovie, api, type ApiError, type MovieFlags, type MoviePage } from "@/lib/api";
 
 const PAGE_SIZE = 50;
@@ -64,6 +65,7 @@ export function MovieLibrary() {
     {
       key: "title",
       header: "Title",
+      rowHeader: true,
       cell: (movie) => (
         <span className="flex flex-col">
           <span className="font-medium" data-testid="library-title">
@@ -97,10 +99,7 @@ export function MovieLibrary() {
 
   const total = page.data?.total ?? 0;
   return (
-    <section aria-labelledby="library-heading" className="flex flex-col gap-4">
-      <h2 id="library-heading" className="font-heading text-2xl font-semibold">
-        Library
-      </h2>
+    <section aria-label="Library" className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex min-w-60 flex-1 flex-col gap-2">
           <Label htmlFor="library-search">Search titles</Label>
@@ -137,21 +136,22 @@ export function MovieLibrary() {
 
       <ApiErrorNotice error={update.error} />
       {page.isError ? (
-        <ApiErrorNotice error={page.error} />
+        <AdminQueryError error={page.error} />
       ) : page.isPending ? (
         <p role="status" className="text-muted-foreground">
           Loading the library…
         </p>
       ) : (
         <>
-          <DataTable
-            caption="Movie library"
-            columns={columns}
-            rows={page.data.items}
-            rowKey={(movie) => movie.id}
-            empty="No titles match."
-            data-testid="library-table"
-          />
+          <div data-testid="library-table">
+            <DataTable
+              caption={`Library (${total})`}
+              columns={columns}
+              rows={page.data.items}
+              rowKey={(movie) => movie.id}
+              empty="No titles match."
+            />
+          </div>
           <div className="flex items-center justify-between gap-4 text-muted-foreground">
             <span aria-live="polite">
               {total === 0

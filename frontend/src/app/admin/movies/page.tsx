@@ -10,12 +10,9 @@ export const metadata: Metadata = { title: "Movies" };
 export default function AdminMoviesPage() {
   return (
     <div className="flex flex-col gap-10">
-      <header className="flex flex-col gap-2">
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">Movies</h1>
-        <p className="text-lg text-muted-foreground">
-          Owned titles roll first in the candidate generator; blocked titles never roll.
-        </p>
-      </header>
+      <p className="text-muted-foreground">
+        Owned titles roll first in the candidate generator; blocked titles never roll.
+      </p>
       <BulkAdd />
       <MovieLibrary />
       <p className="text-xs text-muted-foreground" data-testid="tmdb-attribution">
