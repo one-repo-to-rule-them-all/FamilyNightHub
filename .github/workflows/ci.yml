@@ -279,6 +279,13 @@ jobs:
       E2E_WEB_PORT: "3000"
       # Rewrites are baked into the build, so `next build` needs it too.
       API_INTERNAL_URL: http://localhost:8000
+      # Photos (ADR-0005): SeaweedFS stands in for Tigris, started below with the dev-only keys
+      # from infra/seaweedfs/s3.json. Phones PUT/GET it directly, so the bucket gets a CORS rule.
+      STORAGE_ENDPOINT: http://localhost:8333
+      STORAGE_BUCKET: fnh-photos-e2e
+      STORAGE_ACCESS_KEY_ID: fnh-dev-access
+      STORAGE_SECRET_ACCESS_KEY: fnh-dev-secret
+      STORAGE_REGION: us-east-1
     services:
       db:
         image: postgres:16
@@ -317,6 +324,20 @@ jobs:
       - name: alembic upgrade head
         working-directory: backend
         run: uv run alembic upgrade head
+      # A step rather than a service container: services start before checkout, so they can't
+      # mount infra/seaweedfs/s3.json, and they can't take the `server -s3` command line.
+      - name: Start SeaweedFS (S3)
+        run: |
+          docker run -d --name s3 -p 8333:8333 -p 9333:9333 \
+            -v "$GITHUB_WORKSPACE/infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro" \
+            chrislusf/seaweedfs:3.97 \
+            server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+          # Same readiness probe as docker-compose.yml's healthcheck.
+          curl -fsS --retry 60 --retry-delay 1 --retry-all-errors -o /dev/null \
+            http://localhost:9333/cluster/status
+      - name: Photos bucket + CORS for the web origin
+        working-directory: backend
+        run: uv run python ../frontend/e2e/setup_bucket.py --origin "$FRONTEND_BASE_URL"
       - name: npm ci
         working-directory: frontend
         run: npm ci

@@ -1,10 +1,11 @@
 "use client";
 
-import { Camera, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 import Link from "next/link";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { PhoneScreen } from "@/components/phone-screen";
+import { PhotoAlbum } from "@/components/photos/photo-album";
 import { buttonVariants } from "@/components/ui/button";
 import { useLiveSession } from "@/hooks/use-live-session";
 import type { Night } from "@/lib/api";
@@ -80,17 +81,7 @@ function NightState({ night }: { night: Night }) {
       return (
         <PhoneScreen title="Tonight">
           <WinnerCard night={night} compact />
-          <section
-            aria-labelledby="photos-heading"
-            className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-foreground/20 p-6 text-center"
-            data-testid="photo-drop-placeholder"
-          >
-            <Camera aria-hidden className="size-8 text-muted-foreground" />
-            <h2 id="photos-heading" className="text-lg font-medium">
-              Photos from tonight
-            </h2>
-            <p className="text-muted-foreground">Adding photos is coming soon.</p>
-          </section>
+          <PhotoAlbum sessionId={night.id} />
         </PhoneScreen>
       );
     case "closed":
@@ -98,6 +89,7 @@ function NightState({ night }: { night: Night }) {
         <PhoneScreen title="That's a wrap" lede="Thanks for movie night.">
           <WinnerCard night={night} compact />
           <Results night={night} />
+          <PhotoAlbum sessionId={night.id} />
           <Link
             href="/history"
             className={cn(buttonVariants({ variant: "outline", size: "tap" }), "w-full")}
