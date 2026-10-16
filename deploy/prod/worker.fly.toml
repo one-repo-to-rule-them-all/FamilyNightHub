@@ -1,0 +1,37 @@
+# fnh-worker: ARQ worker (06-background-worker.md). Same image as fnh-api,
+# PRODUCTION: promoted by manual approval with the same image digest staging ran.
+# different process. CI deploys it with `--image` after the API (whose release command
+# migrates first). Layout from FieldPro deploy/ @ 0670961.
+
+app = "fnh-worker"
+primary_region = "dfw"
+
+[processes]
+  app = "python -m app.workers.main"
+
+# No release_command: the API's runs the migrations for the shared database.
+# Secrets: DATABASE_URL (fnh_app), REDIS_URL, SENTRY_DSN, STORAGE_*, EMAIL_API_KEY, and the
+# backup bucket's BACKUP_STORAGE_* - which exist ONLY on this app (06 "Gotchas").
+[env]
+  ENVIRONMENT = "production"
+  WORKER_HEALTH_PORT = "8081"
+
+# No [http_service], on purpose. Fly auto-start is driven by fly-proxy traffic, and nothing
+# ever sends the worker a request, so an auto-stopped worker would never wake and the
+# hourly crons would silently stop. It runs continuously instead (one machine:
+# `fly scale count 1`). See 02-environments.md.
+
+# Liveness only (the listener does not touch Postgres/Redis), probed by Fly like curl would.
+[checks]
+  [checks.health]
+    type = "http"
+    port = 8081
+    method = "get"
+    path = "/health"
+    grace_period = "20s"
+    interval = "30s"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

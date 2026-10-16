@@ -1,18 +1,22 @@
-"""Nights: create, night code, shortlist, open voting, snapshot (03-backend.md "Voting").
+"""Nights: create, night code, shortlist, open/close voting, close, history (03-backend.md).
 
-Every mutation is host-only (`sessions:run`) and CSRF-protected. The snapshot is readable
-by any device or account of the household. Another household's night is a 404.
+Every mutation is host-only (`sessions:run`) and CSRF-protected. The snapshot and history
+are readable by any device or account of the household. Another household's night is a
+404. The tie-break seed is `secrets.randbits(64)`; only when ENVIRONMENT=test may a
+caller pin it with the `X-FNH-Test-Seed` header (07-cicd.md), which is not in the contract.
 """
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from typing import Annotated, Any, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.tmdb import Tmdb
+from app.core.config import settings
 from app.core.dependencies import (
     AccountContext,
     AccountDb,
@@ -21,17 +25,23 @@ from app.core.dependencies import (
     ViewerDb,
     require_permission,
 )
+from app.domain.voting.base import MAX_SEED
 from app.schemas.sessions import (
     NightCodeOut,
+    NightSummaryOut,
     OptionIn,
     OptionOut,
+    PlacementOut,
     ReorderIn,
     SessionCreatedOut,
     SessionCreateIn,
     SessionOut,
+    SessionStatus,
+    VotingResultOut,
+    WinnerOut,
 )
 from app.services import session_service
-from app.services.errors import Conflict, NotFound, ServiceError, Unavailable
+from app.services.errors import Conflict, Forbidden, Invalid, NotFound, ServiceError, Unavailable
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -46,9 +56,13 @@ EDIT: dict[int | str, dict[str, Any]] = {
 }
 
 
-def _raise(err: ServiceError) -> NoReturn:
+def raise_http(err: ServiceError) -> NoReturn:
     if isinstance(err, NotFound):
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(err) or "Night not found") from None
+    if isinstance(err, Forbidden):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This phone can't vote as them") from None
+    if isinstance(err, Invalid):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, err.reason) from None
     if isinstance(err, Conflict):
         raise HTTPException(status.HTTP_409_CONFLICT, err.reason) from None
     if isinstance(err, Unavailable):
@@ -60,7 +74,7 @@ async def _out(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.UUID)
     try:
         snap = await session_service.snapshot(db, household_id, session_id)
     except NotFound as err:
-        _raise(err)
+        raise_http(err)
     return SessionOut(
         id=snap.id,
         title=snap.title,
@@ -83,7 +97,39 @@ async def _out(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.UUID)
         voting_opened_at=snap.voting_opened_at,
         revealed_at=snap.revealed_at,
         closed_at=snap.closed_at,
+        result=_result(snap.result),
     )
+
+
+def _result(result: session_service.VotingResult | None) -> VotingResultOut | None:
+    if result is None:
+        return None
+    return VotingResultOut(
+        winner_option_id=result.winner_option_id,
+        tie_seed=str(result.tie_seed),
+        tie_group=result.tie_group,
+        tiebreak=result.tiebreak,
+        ballot_count=result.ballot_count,
+        placements=[
+            PlacementOut(
+                option_id=p.option_id, place=p.place, score=p.score, first_places=p.first_places
+            )
+            for p in result.placements
+        ],
+    )
+
+
+def tie_seed(test_seed: str | None) -> int:
+    """`secrets.randbits(64)`, unless ENVIRONMENT=test and the caller pinned one."""
+    if test_seed is None or settings.ENVIRONMENT != "test":
+        return secrets.randbits(64)
+    try:
+        seed = int(test_seed)
+    except ValueError:
+        seed = -1
+    if not 0 <= seed <= MAX_SEED:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Bad test seed")
+    return seed
 
 
 @router.post(
@@ -102,9 +148,47 @@ async def create_session(
     return SessionCreatedOut(session_id=created.session_id, night_code=created.night_code)
 
 
+DEFAULT_HISTORY: list[SessionStatus] = ["revealed", "tonight", "closed"]
+
+
+@router.get("", response_model=list[NightSummaryOut])
+async def list_sessions(
+    viewer: CurrentViewer,
+    db: ViewerDb,
+    status_: Annotated[list[SessionStatus] | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[NightSummaryOut]:
+    """Nights newest first: winner, date and turnout. Defaults to revealed, tonight and
+    closed; `status` may repeat. A winner appears only once a night is revealed."""
+    nights = await session_service.history(
+        db, viewer.household_id, list(status_ or DEFAULT_HISTORY), limit
+    )
+    return [
+        NightSummaryOut(
+            id=n.id,
+            title=n.title,
+            status=n.status,
+            created_at=n.created_at,
+            revealed_at=n.revealed_at,
+            closed_at=n.closed_at,
+            winner=None
+            if n.winner is None
+            else WinnerOut(
+                option_id=n.winner.option_id,
+                movie_id=n.winner.movie_id,
+                title=n.winner.title,
+                year=n.winner.year,
+                poster_path=n.winner.poster_path,
+            ),
+            turnout=n.turnout,
+        )
+        for n in nights
+    ]
+
+
 @router.get("/{session_id}", response_model=SessionOut, responses=NOT_FOUND)
 async def get_session(session_id: uuid.UUID, viewer: CurrentViewer, db: ViewerDb) -> SessionOut:
-    """The night as every screen sees it. Never ballots or tallies."""
+    """The night as every screen sees it. Never ballots; `result` only from reveal on."""
     return await _out(db, viewer.household_id, session_id)
 
 
@@ -121,7 +205,7 @@ async def rotate_night_code(session_id: uuid.UUID, account: CanRun, db: AccountD
             db, account.household_id, account.account_id, session_id
         )
     except ServiceError as err:
-        _raise(err)
+        raise_http(err)
     return NightCodeOut(night_code=code)
 
 
@@ -143,7 +227,7 @@ async def add_option(
             db, account.household_id, account.account_id, session_id, choice, client
         )
     except ServiceError as err:
-        _raise(err)
+        raise_http(err)
     return await _out(db, account.household_id, session_id)
 
 
@@ -161,7 +245,7 @@ async def remove_option(
             db, account.household_id, account.account_id, session_id, option_id
         )
     except ServiceError as err:
-        _raise(err)
+        raise_http(err)
     return await _out(db, account.household_id, session_id)
 
 
@@ -180,7 +264,7 @@ async def reorder_options(
             db, account.household_id, account.account_id, session_id, body.option_ids
         )
     except ServiceError as err:
-        _raise(err)
+        raise_http(err)
     return await _out(db, account.household_id, session_id)
 
 
@@ -195,5 +279,47 @@ async def open_voting(session_id: uuid.UUID, account: CanRun, db: AccountDb) -> 
     try:
         await session_service.open_voting(db, account.household_id, account.account_id, session_id)
     except ServiceError as err:
-        _raise(err)
+        raise_http(err)
+    return await _out(db, account.household_id, session_id)
+
+
+@router.post(
+    "/{session_id}/close-voting",
+    response_model=SessionOut,
+    dependencies=[CsrfProtected],
+    responses=EDIT,
+)
+async def close_voting(
+    session_id: uuid.UUID,
+    account: CanRun,
+    db: AccountDb,
+    x_fnh_test_seed: Annotated[str | None, Header(include_in_schema=False)] = None,
+) -> SessionOut:
+    """voting -> revealed: tally, tie-break, store the ranking and winner. Idempotent: a
+    repeat returns the stored result unchanged."""
+    try:
+        await session_service.close_voting(
+            db,
+            account.household_id,
+            account.account_id,
+            session_id,
+            seed=tie_seed(x_fnh_test_seed),
+        )
+    except ServiceError as err:
+        raise_http(err)
+    return await _out(db, account.household_id, session_id)
+
+
+@router.post(
+    "/{session_id}/close",
+    response_model=SessionOut,
+    dependencies=[CsrfProtected],
+    responses=EDIT,
+)
+async def close_night(session_id: uuid.UUID, account: CanRun, db: AccountDb) -> SessionOut:
+    """tonight -> closed: the night code stops joining. Idempotent."""
+    try:
+        await session_service.close(db, account.household_id, account.account_id, session_id)
+    except ServiceError as err:
+        raise_http(err)
     return await _out(db, account.household_id, session_id)
