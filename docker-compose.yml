@@ -2,7 +2,7 @@
 # this one). Deployed images come from backend/Dockerfile and frontend/Dockerfile.
 # Shape copied from OrderUp docker-compose.yml @ 2f86cd8 (bind-mounted source, issue #81).
 #
-# Services still to land in later PRs: worker (ARQ), web, tmdb-fake.
+# Services still to land in later PRs: web, tmdb-fake.
 services:
   db:
     image: postgres:16
@@ -88,6 +88,39 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  # ARQ worker (06-background-worker.md): same image as api, different command. Redis DB 0
+  # like api, mirroring Upstash (DB 0 only; ARQ keys live under the `arq:` prefix).
+  worker:
+    build:
+      context: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PYTHONPATH: /app
+      DATABASE_URL: postgresql+asyncpg://fnh_app:fnh_app@db:5432/fnh_dev
+      REDIS_URL: redis://redis:6379/0
+      EMAIL_MODE: smtp
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/tests:/app/tests
+    command: ["python", "-m", "app.workers.main"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # The tables it reads exist only after `alembic upgrade head`, which runs in api.
+      api:
+        condition: service_started
 
 volumes:
   pgdata:

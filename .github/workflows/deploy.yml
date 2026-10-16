@@ -1,0 +1,249 @@
+# Deploy pipeline (docs/architecture/07-cicd.md "Deploy workflow").
+#
+#   CI green on a push to main
+#     -> build the backend image (fnh-api + fnh-worker) and the web image, push to GHCR
+#        tagged sha-<commit>
+#     -> staging: fnh-api-staging (release_command migrates), fnh-worker-staging,
+#        fnh-web-staging, then smoke GET https://fnh-web-staging.fly.dev/api/health
+#     -> production (GitHub environment `production`, owner approval): the SAME digests
+#
+# Inert until provisioned: each deploy job reads FLY_API_TOKEN from its GitHub environment
+# and, when it is empty, emits a notice and skips its steps instead of failing main. Builds
+# still run and push to GHCR (GITHUB_TOKEN only), so images exist from day one.
+#
+# BEFORE adding the production token: give the `production` environment a required
+# reviewer. GitHub creates a referenced environment on first use WITHOUT protection rules,
+# and an unprotected environment with a token would deploy prod with no approval.
+#
+# Triggered by CI's completion rather than by the push itself, so a main commit whose CI
+# failed is never deployed. Rollback: redeploy the previous sha-<commit> image (see
+# docs/runbooks/restore.md); migrations are expand/contract, so no down-migration.
+#
+# Shape from OrderUp .github/workflows/cd.yml @ 2f86cd8 (workflow_run gate, GHCR, flyctl
+# --image --local-only) and FieldPro deploy/ @ 0670961 (per-environment fly.toml folders).
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  # Re-run a deploy of main by hand (e.g. after provisioning).
+  workflow_dispatch:
+
+# One deploy at a time, and never cancel one mid-flight.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/fnh
+  # workflow_run builds the exact commit CI tested; a manual dispatch builds main's head.
+  DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.image }} image
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          # One image for fnh-api and fnh-worker (06-background-worker.md).
+          - image: backend
+            context: backend
+          - image: web
+            context: frontend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:sha-${{ env.DEPLOY_SHA }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+      - name: Record digest
+        # Matrix jobs cannot set distinct job outputs, so each digest travels as an artifact.
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          mkdir -p digests
+          printf '%s' "$DIGEST" > "digests/$IMAGE"
+          echo "::notice::$IMAGE_PREFIX-$IMAGE@$DIGEST"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.image }}
+          path: digests/${{ matrix.image }}
+          retention-days: 30
+
+  deploy-staging:
+    name: Deploy staging
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: staging
+      url: https://fnh-web-staging.fly.dev
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      deployed: ${{ steps.gate.outputs.enabled }}
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - name: Gate on FLY_API_TOKEN
+        id: gate
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::notice title=Staging deploy skipped::FLY_API_TOKEN is not set on the 'staging' environment. Provision Fly (docs/runbooks/restore.md) to enable deploys."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+      - uses: actions/download-artifact@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: digests
+      - uses: docker/login-action@v3
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: steps.gate.outputs.enabled == 'true'
+      - name: Pull images by digest
+        # --local-only below pushes from this runner's Docker daemon to Fly's registry, so
+        # Fly never needs GHCR credentials (OrderUp pattern).
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          for image in backend web; do
+            ref="$IMAGE_PREFIX-$image@$(cat "digests/$image")"
+            docker pull "$ref"
+            docker tag "$ref" "fnh-$image:sha-$DEPLOY_SHA"
+          done
+      - name: Deploy fnh-api-staging (release_command migrates first)
+        if: steps.gate.outputs.enabled == 'true'
+        run: >-
+          flyctl deploy --config deploy/staging/api.fly.toml
+          --image "fnh-backend:sha-$DEPLOY_SHA" --local-only --no-public-ips
+      - name: Deploy fnh-worker-staging
+        if: steps.gate.outputs.enabled == 'true'
+        run: >-
+          flyctl deploy --config deploy/staging/worker.fly.toml
+          --image "fnh-backend:sha-$DEPLOY_SHA" --local-only
+      - name: Deploy fnh-web-staging
+        if: steps.gate.outputs.enabled == 'true'
+        run: >-
+          flyctl deploy --config deploy/staging/web.fly.toml
+          --image "fnh-web:sha-$DEPLOY_SHA" --local-only
+      - name: Smoke test through the public web origin
+        # Exercises the whole chain: fly-proxy -> fnh-web -> Flycast -> fnh-api -> Postgres
+        # (RLS path) + Redis. Retries cover machine start-up, not flakiness in the check.
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors \
+            https://fnh-web-staging.fly.dev/api/health | tee health.json
+          jq -e '.status == "ok" and .environment == "staging"' health.json
+
+  deploy-production:
+    name: Deploy production (same digests)
+    needs: deploy-staging
+    if: needs.deploy-staging.outputs.deployed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Required reviewers on this environment are the approval gate (see header).
+    environment:
+      name: production
+      url: https://fnh-web.fly.dev
+    permissions:
+      contents: read
+      packages: read
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - name: Gate on FLY_API_TOKEN
+        id: gate
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::notice title=Production deploy skipped::FLY_API_TOKEN is not set on the 'production' environment."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+      - uses: actions/download-artifact@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: digests
+      - uses: docker/login-action@v3
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        if: steps.gate.outputs.enabled == 'true'
+      - name: Pull the digests staging ran
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          for image in backend web; do
+            ref="$IMAGE_PREFIX-$image@$(cat "digests/$image")"
+            docker pull "$ref"
+            docker tag "$ref" "fnh-$image:sha-$DEPLOY_SHA"
+          done
+      - name: Deploy fnh-api (release_command migrates first)
+        if: steps.gate.outputs.enabled == 'true'
+        run: >-
+          flyctl deploy --config deploy/prod/api.fly.toml
+          --image "fnh-backend:sha-$DEPLOY_SHA" --local-only --no-public-ips
+      - name: Deploy fnh-worker
+        if: steps.gate.outputs.enabled == 'true'
+        run: >-
+          flyctl deploy --config deploy/prod/worker.fly.toml
+          --image "fnh-backend:sha-$DEPLOY_SHA" --local-only
+      - name: Deploy fnh-web
+        if: steps.gate.outputs.enabled == 'true'
+        run: >-
+          flyctl deploy --config deploy/prod/web.fly.toml
+          --image "fnh-web:sha-$DEPLOY_SHA" --local-only
+      - name: Smoke test
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors \
+            https://fnh-web.fly.dev/api/health | tee health.json
+          jq -e '.status == "ok" and .environment == "production"' health.json

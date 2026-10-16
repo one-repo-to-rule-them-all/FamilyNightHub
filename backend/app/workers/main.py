@@ -22,6 +22,7 @@ or kwargs; the health listener is stdlib asyncio rather than aiohttp.
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 from zoneinfo import ZoneInfo
 
@@ -224,6 +225,9 @@ class WorkerSettings:
 
 def main() -> None:
     """Blocking. Installs SIGINT/SIGTERM handlers and drains in-flight jobs on shutdown."""
+    # ARQ logs through stdlib logging, which `run_worker` (unlike the arq CLI) leaves
+    # unconfigured. WARNING, not INFO: at INFO ARQ prints every job's args.
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
     run_worker(cast("WorkerSettingsType", WorkerSettings))
 
 
