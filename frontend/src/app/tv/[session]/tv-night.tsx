@@ -186,7 +186,7 @@ function Turnout({
 /**
  * The lobby's QR (guest-flow spec §5 TV, owner decision §10.1): `/j/{slug}` by default, with
  * tonight's code in it only when the admin turned that on and this TV holds the code (the server
- * never returns it, ADR-0002). Without the join-link route (G1) it falls back to the fridge QR.
+ * never returns it, ADR-0002). If the join link can't be read, it points at the fridge QR.
  */
 function JoinPanel({ sessionId }: { sessionId: string }) {
   const [code, setCode] = useState<string | null>(() => recallNightCode(sessionId));
@@ -205,7 +205,7 @@ function JoinPanel({ sessionId }: { sessionId: string }) {
     refetchInterval: JOIN_LINK_REFRESH_MS,
   });
   const slug = link.data?.join_slug ?? null;
-  const includeCode = link.data?.qr_includes_night_code === true;
+  const includeCode = link.data?.qr_includes_night_code ?? false;
   const url = slug ? tvJoinUrl(window.location.origin, slug, code, includeCode) : null;
   const codeInQr = url !== null && url.includes("?code=");
 

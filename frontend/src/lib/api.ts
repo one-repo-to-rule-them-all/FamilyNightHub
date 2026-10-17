@@ -49,16 +49,15 @@ export type PinReset = Schemas["PinResetOut"];
 export type Profile = Schemas["ProfileOut"];
 export type ProfileNight = Schemas["ProfileNightOut"];
 
-/**
- * Fields #39 (ADR-0014 gaps G2, G9) adds on top of the generated types. Optional until the
- * backend ships them, so every screen has a fallback when they are missing.
- */
-export type PinResetState = "open" | "approved_for_this_phone" | null;
-export type PersonTile = Person & { pin_reset?: PinResetState };
-export type QrSettings = { qr_includes_night_code?: boolean };
+/** A tile on the avatar grid; `pin_reset` says a PIN reset is open or approved here (G2). */
+export type PersonTile = Person;
+export type PinResetState = Person["pin_reset"];
 /** GET /devices/me/join-link (G1): what the TV needs to draw its QR. */
-export type JoinLink = { join_slug: string; qr_includes_night_code: boolean };
-/** GET /sessions/{id}/present (G8): who is here tonight. Avatars and a voted flag, never picks. */
+export type JoinLink = Schemas["JoinLinkOut"];
+/**
+ * GET /sessions/{id}/present (G8, not in #39 yet): who is here tonight. Avatars and a voted flag,
+ * never picks. Hand-written until the backend ships it; the strip falls back to voters on 404.
+ */
 export type PresentPerson = {
   person_id: string;
   avatar_emoji: string;
@@ -229,7 +228,7 @@ export const api = {
   /** History and stats. Ballots only for revealed nights (ADR-0014 "Profiles"). */
   profile: (personId: string) =>
     request<Profile>("GET", `/people/${encodeURIComponent(personId)}/profile`),
-  /** The TV's join door (G1). A 404 means the backend doesn't serve it yet. */
+  /** The TV's join door and the code-in-QR setting (G1; TV devices only). */
   joinLink: () => request<JoinLink>("GET", "/devices/me/join-link"),
   /** Username (or email) + password; sets the `fnh_session` cookie (ADR-0014). */
   login: (body: Schemas["LoginIn"]) => request<Account>("POST", "/auth/login", body),
@@ -371,9 +370,9 @@ export const api = {
   /** Final: there is no un-revoke; the phone rejoins with a night code as a new device. */
   revokeDevice: (deviceId: string) =>
     request<AdminDevice>("POST", `/admin/devices/${encodeURIComponent(deviceId)}/revoke`),
-  settings: () => request<HouseholdSettings & QrSettings>("GET", "/admin/settings"),
-  updateSettings: (body: Schemas["SettingsUpdateIn"] & QrSettings) =>
-    request<HouseholdSettings & QrSettings>("PATCH", "/admin/settings", body),
+  settings: () => request<HouseholdSettings>("GET", "/admin/settings"),
+  updateSettings: (body: Schemas["SettingsUpdateIn"]) =>
+    request<HouseholdSettings>("PATCH", "/admin/settings", body),
   /** `/j/{old}` stops resolving at once; the printed fridge QR needs reprinting. */
   rotateJoinSlug: () => request<Schemas["JoinSlugOut"]>("POST", "/admin/join-slug/rotate"),
   /** Streaming services in the household's region (JustWatch data: show `attribution`). */

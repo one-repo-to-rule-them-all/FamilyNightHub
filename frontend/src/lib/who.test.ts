@@ -28,6 +28,7 @@ function tile(overrides: Partial<PersonTile> = {}): PersonTile {
     locked: false,
     current: false,
     can_rename: true,
+    pin_reset: null,
     ...overrides,
   };
 }
@@ -169,14 +170,6 @@ describe("followWaiting", () => {
       kind: "pin",
       mode: "enter",
       notice: "other-phone",
-    });
-  });
-
-  it("S6 without G2: an unlocked person with no PIN means the reset went through", () => {
-    expect(followWaiting("reset", tile({ locked: true }))).toBeNull();
-    expect(followWaiting("reset", tile({ has_pin: false }))).toEqual({
-      kind: "pin",
-      mode: "create",
     });
   });
 });

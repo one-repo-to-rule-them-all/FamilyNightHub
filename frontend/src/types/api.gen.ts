@@ -565,6 +565,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/me/join-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Join Link
+         * @description The household's join slug and whether the QR should carry the night code, for the
+         *     TV (`is_tv` device) or a signed-in host (`sessions:run`). Phones get 403: the slug is on
+         *     the fridge anyway, but there is no reason to hand it out.
+         */
+        get: operations["join_link_api_v1_devices_me_join_link_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/me/people": {
         parameters: {
             query?: never;
@@ -1674,6 +1696,18 @@ export interface components {
             /** Slug */
             slug: string;
         };
+        /**
+         * JoinLinkOut
+         * @description What the TV needs to draw its join QR: `/j/{join_slug}`, plus `?code={code}` when
+         *     `qr_includes_night_code` is on. The night code is never here: the server only keeps its
+         *     hash (ADR-0002), and the TV already holds the plaintext from create/rotate.
+         */
+        JoinLinkOut: {
+            /** Join Slug */
+            join_slug: string;
+            /** Qr Includes Night Code */
+            qr_includes_night_code: boolean;
+        };
         /** JoinOut */
         JoinOut: {
             /**
@@ -1935,6 +1969,8 @@ export interface components {
             locked: boolean;
             /** Name */
             name: string;
+            /** Pin Reset */
+            pin_reset: ("open" | "approved_for_this_phone") | null;
         };
         /**
          * PersonUpdateIn
@@ -2414,6 +2450,8 @@ export interface components {
             default_voting_method: "top3" | "approval" | "pick_one";
             /** Join Slug */
             join_slug: string;
+            /** Qr Includes Night Code */
+            qr_includes_night_code: boolean;
             /** Region */
             region: string;
             /** Streaming Providers */
@@ -2433,6 +2471,8 @@ export interface components {
             default_age_cap?: ("G" | "PG" | "PG-13" | "R" | "NC-17") | null;
             /** Default Voting Method */
             default_voting_method?: ("top3" | "approval" | "pick_one") | null;
+            /** Qr Includes Night Code */
+            qr_includes_night_code?: boolean | null;
             /** Region */
             region?: string | null;
             /** Streaming Providers */
@@ -3567,6 +3607,33 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeviceOut"];
                 };
+            };
+        };
+    };
+    join_link_api_v1_devices_me_join_link_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinLinkOut"];
+                };
+            };
+            /** @description Only the TV or a host account reads the join link */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

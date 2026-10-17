@@ -119,7 +119,6 @@ export type FollowResult =
  *   `copy.s4.rejected`.
  * - S6 (`reset`): approved for this phone → choose a new PIN; dismissed → S5 with
  *   `copy.s6.dismissed`; reset from another phone → type the new PIN (`copy.s6.otherPhone`).
- *   Without G2's `pin_reset`, an unlocked person with no PIN is the only sign of an approval.
  */
 export function followWaiting(
   waiting: "pending" | "reset",
@@ -136,9 +135,6 @@ export function followWaiting(
   }
   if (person.pin_reset === "approved_for_this_phone") return { kind: "pin", mode: "create" };
   if (person.pin_reset === "open") return null;
-  if (person.pin_reset === undefined) {
-    return !person.locked && !person.has_pin ? { kind: "pin", mode: "create" } : null;
-  }
   if (person.locked) return { kind: "locked", notice: "dismissed" };
   if (!person.has_pin) return { kind: "pin", mode: "create" };
   return { kind: "pin", mode: "enter", notice: "other-phone" };

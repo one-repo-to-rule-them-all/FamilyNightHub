@@ -20,7 +20,6 @@ import {
 import {
   type ApiError,
   type HouseholdSettings,
-  type QrSettings,
   type Schemas,
   type VotingMethod,
   api,
@@ -170,18 +169,16 @@ function JoinLink({ slug }: { slug: string }) {
 /**
  * "Include tonight's code in the TV QR" (owner decision §10.1, gap G9), off by default. On: the
  * TV's QR is `/j/{slug}?code=…` and guests just tap Join. Off: they scan, then type the code.
- * The TV picks the change up on its next refetch. If the backend doesn't report the setting yet,
- * the switch says so instead of pretending.
+ * The TV picks the change up on its next refetch (≤ 10 s).
  */
-function QrCodeSetting({ settings }: { settings: HouseholdSettings & QrSettings }) {
+function QrCodeSetting({ settings }: { settings: HouseholdSettings }) {
   const id = useId();
   const queryClient = useQueryClient();
-  const supported = typeof settings.qr_includes_night_code === "boolean";
-  const save = useMutation<HouseholdSettings & QrSettings, ApiError, boolean>({
+  const save = useMutation<HouseholdSettings, ApiError, boolean>({
     mutationFn: (on) => api.updateSettings({ qr_includes_night_code: on }),
     onSuccess: (next) => queryClient.setQueryData(SETTINGS_KEY, next),
   });
-  const on = save.isPending ? save.variables : settings.qr_includes_night_code === true;
+  const on = save.isPending ? save.variables : settings.qr_includes_night_code;
 
   return (
     <Section title="TV QR code">
@@ -191,7 +188,7 @@ function QrCodeSetting({ settings }: { settings: HouseholdSettings & QrSettings 
           type="checkbox"
           role="switch"
           checked={on}
-          disabled={!supported || save.isPending}
+          disabled={save.isPending}
           aria-describedby={`${id}-help`}
           onChange={(event) => save.mutate(event.target.checked)}
           className="mt-1 size-5 shrink-0 accent-[var(--accent-cinema)]"
@@ -205,11 +202,6 @@ function QrCodeSetting({ settings }: { settings: HouseholdSettings & QrSettings 
           </span>
         </span>
       </label>
-      {!supported ? (
-        <p className="text-sm text-muted-foreground" data-testid="qr-code-unsupported">
-          Not available on this server yet. The TV QR leaves the code out.
-        </p>
-      ) : null}
       <ApiErrorNotice error={save.error} />
     </Section>
   );
