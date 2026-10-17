@@ -17,7 +17,7 @@ from app.core.config import settings
 from app.core.database import household_session
 from app.core.security import CSRF_HEADER
 from app.services import session_service
-from tests.integration.phones import Phone, add_account, phone
+from tests.integration.phones import TEST_PIN, Phone, add_account, phone
 from tests.integration.seed import SeededHousehold
 
 pytestmark = pytest.mark.integration
@@ -80,9 +80,11 @@ async def _person(h: SeededHousehold, name: str = "Sam", emoji: str = "🐙") ->
     return pid
 
 
-async def _phone_for(p: Phone, h: SeededHousehold, code: str, person: uuid.UUID) -> str:
+async def _phone_for(
+    p: Phone, h: SeededHousehold, code: str, person: uuid.UUID, pin: str | None = TEST_PIN
+) -> str:
     assert (await p.join(h.slug, code)).status_code == 200
-    resp = await p.bind(person)
+    resp = await p.bind(person, pin)
     assert resp.status_code == 200, resp.text
     status: str = resp.json()["status"]
     return status
@@ -161,12 +163,15 @@ async def test_a_phone_reads_back_only_its_own_peoples_ballots(two_households: P
         await _host(host, a)
         sid, code, (o1, o2, _o3) = await _night(host, 3)
         await _phone_for(shared, a, code, sam)
-        assert (await shared.bind(ana)).json()["status"] == "active"
-        await _phone_for(other, a, code, max_)
         assert (await _vote(shared, sid, sam, o1, o2)).status_code == 204
+        # ADR-0014: the shared phone switches to Ana (with her PIN); now it is Ana's turn.
+        assert (await shared.bind(ana)).json()["status"] == "active"
+        not_sams_turn = await _vote(shared, sid, sam, o2)
+        await _phone_for(other, a, code, max_)
         assert (await _vote(other, sid, max_, o2)).status_code == 204
         mine = (await shared.client.get(f"{BASE}/{sid}/ballots/mine")).json()
 
+    assert not_sams_turn.status_code == 403
     by_person = {b["person_id"]: b["ranks"] for b in mine}
     assert by_person == {
         str(sam): [{"option_id": o1, "rank": 1}, {"option_id": o2, "rank": 2}],
@@ -200,7 +205,8 @@ async def test_a_pending_claim_cannot_vote(two_households: Pair) -> None:
         await _host(host, a)
         sid, code, (o1, _o2) = await _night(host, 2)
         assert await _phone_for(first, a, code, sam) == "active"
-        assert await _phone_for(second, a, code, sam) == "pending"
+        # No PIN: the host-approval path (ADR-0014's admin override).
+        assert await _phone_for(second, a, code, sam, pin=None) == "pending"
         resp = await _vote(second, sid, sam, o1)
         mine = (await second.client.get(f"{BASE}/{sid}/ballots/mine")).json()
     assert resp.status_code == 403

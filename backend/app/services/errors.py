@@ -12,7 +12,11 @@ class NotFound(ServiceError):
 
 
 class Forbidden(ServiceError):
-    pass
+    """403. `reason`, when set, says why in words a phone can show (e.g. "set a PIN")."""
+
+    def __init__(self, reason: str | None = None) -> None:
+        super().__init__(reason or "")
+        self.reason = reason
 
 
 class InvalidJoin(ServiceError):
@@ -43,3 +47,23 @@ class Invalid(ServiceError):
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
         self.reason = reason
+
+
+class WrongPin(ServiceError):
+    """A PIN check failed and was counted (ADR-0014). The count is already written in the
+    request's transaction, so the router must *return* an error response, not raise: an
+    exception reaching the transaction dependency would roll the count back."""
+
+    def __init__(self, name: str, attempts_left: int) -> None:
+        super().__init__(name)
+        self.name = name
+        self.attempts_left = attempts_left
+
+
+class PinLocked(ServiceError):
+    """5 wrong PINs: every PIN check refuses until an admin approves a reset. 423. Like
+    WrongPin, it may carry a just-written lock that must commit."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        self.name = name

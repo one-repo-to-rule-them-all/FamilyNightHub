@@ -29,6 +29,7 @@ class HouseholdSettings:
     region: str
     streaming_providers: list[int]
     updated_at: datetime
+    qr_includes_night_code: bool
 
 
 async def _audit(
@@ -57,7 +58,7 @@ async def get(db: AsyncSession, household_id: uuid.UUID) -> HouseholdSettings:
         await db.execute(
             text(
                 "SELECT h.join_slug, s.default_voting_method, s.default_age_cap, s.region, "
-                "s.streaming_providers, s.updated_at "
+                "s.streaming_providers, s.updated_at, s.qr_includes_night_code "
                 "FROM households h JOIN settings s ON s.household_id = h.id WHERE h.id = :h"
             ),
             {"h": household_id},
@@ -70,7 +71,15 @@ async def get(db: AsyncSession, household_id: uuid.UUID) -> HouseholdSettings:
         row.region,
         list(row.streaming_providers or []),
         row.updated_at,
+        row.qr_includes_night_code,
     )
+
+
+async def is_tv(db: AsyncSession, device_id: uuid.UUID) -> bool:
+    found = await db.scalar(
+        text("SELECT is_tv FROM devices WHERE id = :d AND revoked_at IS NULL"), {"d": device_id}
+    )
+    return bool(found)
 
 
 async def update(
@@ -81,7 +90,13 @@ async def update(
 ) -> HouseholdSettings:
     """`changes` holds only the fields the caller sent (None clears `default_age_cap`).
     Column names come from this fixed allow-list, never from the request."""
-    allowed = ("default_voting_method", "default_age_cap", "region", "streaming_providers")
+    allowed = (
+        "default_voting_method",
+        "default_age_cap",
+        "region",
+        "streaming_providers",
+        "qr_includes_night_code",
+    )
     fields = {k: v for k, v in changes.items() if k in allowed}
     current = await get(db, household_id)
     if fields:

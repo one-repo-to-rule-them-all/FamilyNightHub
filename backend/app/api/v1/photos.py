@@ -76,7 +76,7 @@ def _raise(err: ServiceError) -> NoReturn:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Photo not found") from None
     if isinstance(err, Forbidden):
         raise HTTPException(
-            status.HTTP_403_FORBIDDEN, "This device can't act as that person"
+            status.HTTP_403_FORBIDDEN, err.reason or "This device can't act as that person"
         ) from None
     if isinstance(err, Conflict):
         raise HTTPException(status.HTTP_409_CONFLICT, err.reason) from None

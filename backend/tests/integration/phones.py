@@ -19,6 +19,10 @@ from app.core.database import household_session
 from app.core.security import ACCOUNT_COOKIE, CSRF_HEADER, hash_night_code, sign_account_session
 from app.main import app
 
+# Every person needs a PIN before a phone can act as them (ADR-0014). Helpers set and use
+# this one unless a test says otherwise.
+TEST_PIN = "246810"
+
 
 class Phone:
     def __init__(self, client: AsyncClient) -> None:
@@ -39,9 +43,13 @@ class Phone:
             headers={CSRF_HEADER: await self.csrf()},
         )
 
-    async def bind(self, person_id: uuid.UUID) -> Response:
+    async def bind(self, person_id: uuid.UUID, pin: str | None = TEST_PIN) -> Response:
+        """Claim (or switch to) a person. The default PIN sets it on a first claim and
+        matches it afterwards; `pin=None` sends no PIN (the host-approval path)."""
         return await self.client.put(
-            f"/api/v1/devices/me/people/{person_id}", headers={CSRF_HEADER: await self.csrf()}
+            f"/api/v1/devices/me/people/{person_id}",
+            json=None if pin is None else {"pin": pin},
+            headers={CSRF_HEADER: await self.csrf()},
         )
 
     async def post(self, path: str, body: dict[str, Any] | None = None) -> Response:

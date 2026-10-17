@@ -91,8 +91,12 @@ async def test_two_people_rate_on_a_shared_phone_and_can_change_it(two_household
         assert (await shared.bind(ana)).json()["status"] == "active"
         before = (await shared.client.get(f"{BASE}/{sid}/ratings/mine")).json()
 
+        # ADR-0014: the phone acts as one person at a time; switching takes their PIN.
+        assert (await _rate(shared, sid, sam, 5)).status_code == 403  # Ana's turn
+        assert (await shared.bind(sam)).json()["current"] is True
         assert (await _rate(shared, sid, sam, 5)).status_code == 204
         assert (await _rate(shared, sid, sam, 5)).status_code == 204  # idempotent
+        assert (await shared.bind(ana)).json()["current"] is True
         assert (await _rate(shared, sid, ana, 2)).status_code == 204
         assert (await _rate(shared, sid, ana, 3)).status_code == 204  # changed her mind
         mine = (await shared.client.get(f"{BASE}/{sid}/ratings/mine")).json()
@@ -129,7 +133,7 @@ async def test_a_pending_claim_cannot_rate(two_households: Pair) -> None:
         await _host(host, a)
         sid, code, _ = await _tonight(host, a)
         assert await _phone_for(first, a, code, sam) == "active"
-        assert await _phone_for(second, a, code, sam) == "pending"
+        assert await _phone_for(second, a, code, sam, pin=None) == "pending"
         resp = await _rate(second, sid, sam, 4)
         mine = (await second.client.get(f"{BASE}/{sid}/ratings/mine")).json()
     assert resp.status_code == 403

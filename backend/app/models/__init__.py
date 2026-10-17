@@ -9,6 +9,7 @@ from app.models.household import (
     HouseholdSettings,
     MagicLink,
     Person,
+    PinResetRequest,
 )
 from app.models.movie_night import BallotRank, Movie, Option, Rating, Session
 from app.models.ops import AuditEvent, BackupRun, FailedJob, TmdbCache
@@ -32,6 +33,7 @@ __all__ = [
     "Photo",
     "PhotoDeletion",
     "PhotoReaction",
+    "PinResetRequest",
     "Rating",
     "Session",
     "TmdbCache",

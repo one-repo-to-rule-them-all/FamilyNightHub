@@ -23,6 +23,7 @@ def _out(s: household_settings_service.HouseholdSettings) -> SettingsOut:
         region=s.region,
         streaming_providers=s.streaming_providers,
         updated_at=s.updated_at,
+        qr_includes_night_code=s.qr_includes_night_code,
     )
 
 
