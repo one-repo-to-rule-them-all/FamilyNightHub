@@ -989,6 +989,32 @@
         "title": "HealthOut",
         "type": "object"
       },
+      "HelpCountOut": {
+        "description": "The TV's \"waiting for the host\" nudge (G4): pending person claims only.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          }
+        },
+        "required": [
+          "count",
+          "first_name"
+        ],
+        "title": "HelpCountOut",
+        "type": "object"
+      },
       "JoinIn": {
         "properties": {
           "device_label": {
@@ -1979,6 +2005,20 @@
         "title": "PinErrorOut",
         "type": "object"
       },
+      "PinResetCountOut": {
+        "description": "The admin nav badge (G4).",
+        "properties": {
+          "open_count": {
+            "title": "Open Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "open_count"
+        ],
+        "title": "PinResetCountOut",
+        "type": "object"
+      },
       "PinResetOut": {
         "description": "A \"forgot PIN\" request. Approving clears the PIN; no PIN is ever shown or chosen.",
         "properties": {
@@ -2119,6 +2159,52 @@
           "first_places"
         ],
         "title": "PlacementOut",
+        "type": "object"
+      },
+      "PresenceOut": {
+        "description": "Who's here tonight (G8): people a phone set to them opened the night or voted for,\nplus anyone with a ballot. Family first, then guests.",
+        "properties": {
+          "present": {
+            "items": {
+              "$ref": "#/components/schemas/PresentOut"
+            },
+            "title": "Present",
+            "type": "array"
+          }
+        },
+        "required": [
+          "present"
+        ],
+        "title": "PresenceOut",
+        "type": "object"
+      },
+      "PresentOut": {
+        "properties": {
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "voted": {
+            "title": "Voted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "person_id",
+          "avatar_emoji",
+          "color",
+          "voted"
+        ],
+        "title": "PresentOut",
         "type": "object"
       },
       "ProfileAlbumOut": {
@@ -2765,6 +2851,27 @@
             ],
             "title": "Revealed At"
           },
+          "slideshow": {
+            "enum": [
+              "auto",
+              "playing",
+              "stopped"
+            ],
+            "title": "Slideshow",
+            "type": "string"
+          },
+          "slideshow_started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slideshow Started At"
+          },
           "status": {
             "enum": [
               "draft",
@@ -2821,7 +2928,9 @@
           "revealed_at",
           "closed_at",
           "result",
-          "rating"
+          "rating",
+          "slideshow",
+          "slideshow_started_at"
         ],
         "title": "SessionOut",
         "type": "object"
@@ -3012,6 +3121,20 @@
           }
         },
         "title": "SettingsUpdateIn",
+        "type": "object"
+      },
+      "SlideshowIn": {
+        "description": "Start (`true`) or stop (`false`) the paired TV's slideshow (issue #41).",
+        "properties": {
+          "playing": {
+            "title": "Playing",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "playing"
+        ],
+        "title": "SlideshowIn",
         "type": "object"
       },
       "SseTicketIn": {
@@ -3930,6 +4053,28 @@
         ]
       }
     },
+    "/api/v1/admin/people/pin-resets/count": {
+      "get": {
+        "description": "Open requests, for the admin nav badge.",
+        "operationId": "count_pin_resets_api_v1_admin_people_pin_resets_count_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinResetCountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Count Pin Resets",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/people/pin-resets/{request_id}/approve": {
       "post": {
         "description": "Clear the person's PIN, failure count and lock. No PIN is set or revealed: the person\nchooses a new one on their next claim.",
@@ -4562,6 +4707,31 @@
           }
         },
         "summary": "My Device",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/devices/me/help-count": {
+      "get": {
+        "description": "How many phones are waiting for a host to OK a person claim, and who the oldest one\nis for. The TV only. PIN resets are admin-only and never counted here.",
+        "operationId": "help_count_api_v1_devices_me_help_count_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HelpCountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Only the TV reads this"
+          }
+        },
+        "summary": "Help Count",
         "tags": [
           "people"
         ]
@@ -6440,6 +6610,53 @@
         ]
       }
     },
+    "/api/v1/sessions/{session_id}/present": {
+      "get": {
+        "description": "Who's here tonight, with whether they've voted. Never ranks or tallies (ADR-0006).",
+        "operationId": "present_api_v1_sessions__session_id__present_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresenceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Present",
+        "tags": [
+          "ballots"
+        ]
+      }
+    },
     "/api/v1/sessions/{session_id}/ratings": {
       "put": {
         "description": "Set or replace the score of a person bound to this phone.",
@@ -6600,6 +6817,66 @@
         "summary": "Rate Proxy",
         "tags": [
           "ratings"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/slideshow": {
+      "put": {
+        "description": "Start or stop the paired TV's slideshow on a `tonight`/`closed` night (409 before\nthen). Start restarts it from the newest photo each time; Stop is idempotent. The TV hears\n`status_changed` and switches without a reload.",
+        "operationId": "set_slideshow_api_v1_sessions__session_id__slideshow_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlideshowIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "Not allowed in the night's current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Slideshow",
+        "tags": [
+          "sessions"
         ]
       }
     },

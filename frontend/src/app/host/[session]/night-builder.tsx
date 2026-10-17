@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Trophy } from "lucide-react";
+import { ArrowLeft, Images, Square, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -14,6 +14,7 @@ import { type LiveState, nightKey, useLiveSession } from "@/hooks/use-live-sessi
 import { api, type ApiError, type Night } from "@/lib/api";
 import { forgetNightCode } from "@/lib/night-code-handoff";
 import { canOpenVoting, MAX_OPTIONS, MIN_OPTIONS } from "@/lib/shortlist";
+import { hostAction, hostStatus } from "@/lib/slideshow-control";
 
 import { NightCodeCard } from "../night-code-card";
 import { STATUS_LABEL } from "../status";
@@ -70,6 +71,9 @@ export function NightBuilder({ sessionId }: { sessionId: string }) {
       {data.status === "draft" ? <DraftStage night={data} /> : null}
       {data.status === "voting" ? <VotingStage night={data} live={live} /> : null}
       {data.result ? <WinnerStage night={data} /> : null}
+      {data.status === "tonight" || data.status === "closed" ? (
+        <SlideshowControl night={data} />
+      ) : null}
       {ratingsOpen && data.result ? <NightRatings night={data} live={live} /> : null}
 
       {data.status !== "closed" ? <NightCodeCard sessionId={data.id} status={data.status} /> : null}
@@ -228,6 +232,41 @@ function WinnerStage({ night }: { night: Night }) {
           </div>
         </ModalDialog>
       ) : null}
+    </section>
+  );
+}
+
+/**
+ * Start/Stop for the paired TV's slideshow (issue #41). The app can't know when the movie ends
+ * (it plays on Netflix or Plex), so the host says when. The TV hears `status_changed` and
+ * switches without a reload; never pressing it leaves the TV on `auto` (slideshow-control.ts).
+ */
+function SlideshowControl({ night }: { night: Night }) {
+  const action = hostAction(night.slideshow);
+  const set = useNightMutation<boolean>(night.id, (playing) => api.setSlideshow(night.id, playing));
+  return (
+    <section
+      aria-labelledby="tv-slideshow-heading"
+      className="flex flex-col gap-3"
+      data-testid="slideshow-control"
+      data-mode={night.slideshow}
+    >
+      <h2 id="tv-slideshow-heading" className="flex items-center gap-2 text-xl font-semibold">
+        <Images aria-hidden className="size-5" /> Photos on the TV
+      </h2>
+      <ApiErrorNotice error={set.error} />
+      <Button
+        size="tap"
+        variant={action.playing ? "default" : "outline"}
+        disabled={set.isPending}
+        onClick={() => set.mutate(action.playing)}
+      >
+        {action.playing ? null : <Square aria-hidden className="fill-current" />}
+        {set.isPending ? "Telling the TV…" : action.label}
+      </Button>
+      <p className="text-sm text-muted-foreground" role="status" data-testid="slideshow-status">
+        {hostStatus(night.slideshow)}
+      </p>
     </section>
   );
 }

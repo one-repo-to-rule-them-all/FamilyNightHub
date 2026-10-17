@@ -290,6 +290,21 @@ async def merge(
     ratings_moved = await count(
         "UPDATE ratings SET person_id = :dst WHERE person_id = :src RETURNING id"
     )
+    # Who was here (G8): one row per (night, person); the target's wins.
+    await db.execute(
+        text(
+            """
+            DELETE FROM session_attendance s WHERE s.person_id = :src AND EXISTS (
+                SELECT 1 FROM session_attendance t
+                WHERE t.person_id = :dst AND t.session_id = s.session_id
+            )
+            """
+        ),
+        params,
+    )
+    await db.execute(
+        text("UPDATE session_attendance SET person_id = :dst WHERE person_id = :src"), params
+    )
     photos_moved = await count(
         "UPDATE photos SET person_id = :dst WHERE person_id = :src RETURNING id"
     )
@@ -394,6 +409,18 @@ async def list_pin_resets(db: AsyncSession) -> list[PinReset]:
     """Open requests, oldest first (the admin portal's queue)."""
     rows = await db.execute(text(_RESET_SQL + " AND r.status = 'open' ORDER BY r.created_at"))
     return [_reset(r) for r in rows]
+
+
+async def open_pin_reset_count(db: AsyncSession) -> int:
+    """The admin nav badge (G4): open requests for unmerged people."""
+    count: int = await db.scalar(
+        text(
+            "SELECT count(*) FROM pin_reset_requests r JOIN people p "
+            "ON p.id = r.person_id AND p.household_id = r.household_id "
+            "WHERE r.status = 'open' AND p.merged_into_id IS NULL"
+        )
+    )
+    return count
 
 
 async def _resolve_reset(

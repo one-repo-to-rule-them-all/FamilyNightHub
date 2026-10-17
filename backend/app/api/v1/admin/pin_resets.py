@@ -8,7 +8,7 @@ from typing import Annotated, Any, NoReturn
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.dependencies import AccountContext, AccountDb, CsrfProtected, require_permission
-from app.schemas.admin import PinResetOut
+from app.schemas.admin import PinResetCountOut, PinResetOut
 from app.services import people_admin_service
 from app.services.errors import Conflict, NotFound, ServiceError
 
@@ -49,6 +49,12 @@ def _out(r: people_admin_service.PinReset) -> PinResetOut:
 async def list_pin_resets(account: CanManagePeople, db: AccountDb) -> list[PinResetOut]:
     """Open requests, oldest first."""
     return [_out(r) for r in await people_admin_service.list_pin_resets(db)]
+
+
+@router.get("/count", response_model=PinResetCountOut)
+async def count_pin_resets(account: CanManagePeople, db: AccountDb) -> PinResetCountOut:
+    """Open requests, for the admin nav badge."""
+    return PinResetCountOut(open_count=await people_admin_service.open_pin_reset_count(db))
 
 
 @router.post(

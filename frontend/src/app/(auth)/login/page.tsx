@@ -4,11 +4,11 @@ import { PhoneScreen } from "@/components/phone-screen";
 
 import { LoginForm } from "./login-form";
 
-export const metadata: Metadata = { title: "Host sign in" };
+export const metadata: Metadata = { title: "Sign in" };
 
 export default function LoginPage() {
   return (
-    <PhoneScreen title="Host sign in" lede="We'll email you a sign-in link. No password needed.">
+    <PhoneScreen title="Sign in" lede="For the family admin and hosts.">
       <LoginForm />
     </PhoneScreen>
   );

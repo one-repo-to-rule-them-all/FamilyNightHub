@@ -3,14 +3,17 @@ import { describe, expect, it } from "vitest";
 import {
   activeNav,
   ago,
+  badgeLabel,
   buildInbox,
   claimId,
   greeting,
   inboxIsUrgent,
   inboxPreview,
+  isAlreadyDone,
   isUnrated,
   navFor,
   parseHidden,
+  pastNights,
   peopleBadge,
   phoneTabs,
   type PastNightLike,
@@ -19,6 +22,7 @@ import {
   stats,
   toggleHidden,
   upNextState,
+  withoutResolved,
 } from "./portal";
 
 const NOW = Date.parse("2026-10-17T20:00:00Z");
@@ -240,5 +244,61 @@ describe("copy", () => {
     expect(ago(hoursAgo(3), NOW)).toBe("3 h ago");
     expect(ago(hoursAgo(24), NOW)).toBe("1 day ago");
     expect(ago(hoursAgo(72), NOW)).toBe("3 days ago");
+  });
+});
+
+describe("dashboard wiring", () => {
+  it("keeps only nights with a winner", () => {
+    const nights = [
+      night("d", "draft", hoursAgo(1)),
+      night("v", "voting", hoursAgo(2)),
+      night("r", "revealed", hoursAgo(3)),
+      night("t", "tonight", hoursAgo(4)),
+      night("c", "closed", hoursAgo(5)),
+    ];
+    expect(pastNights(nights).map((n) => n.id)).toEqual(["r", "t", "c"]);
+  });
+
+  it("treats 404 and 409 as already done", () => {
+    expect(isAlreadyDone({ status: 404 })).toBe(true);
+    expect(isAlreadyDone({ status: 409 })).toBe(true);
+    expect(isAlreadyDone({ status: 500 })).toBe(false);
+    expect(isAlreadyDone(null)).toBe(false);
+    expect(isAlreadyDone(undefined)).toBe(false);
+  });
+
+  it("drops rows resolved here", () => {
+    const items = buildInbox({
+      role: "host",
+      now: NOW,
+      claims: [
+        {
+          device_id: "d1",
+          device_label: null,
+          person_id: "p1",
+          person_name: "Ana",
+          avatar_emoji: "🦊",
+          requested_at: hoursAgo(1),
+        },
+        {
+          device_id: "d2",
+          device_label: null,
+          person_id: "p2",
+          person_name: "Ben",
+          avatar_emoji: "🐻",
+          requested_at: hoursAgo(2),
+        },
+      ],
+    });
+    expect(withoutResolved(items, new Set())).toBe(items);
+    expect(withoutResolved(items, new Set(["claim:d1:p1"])).map((i) => i.id)).toEqual([
+      "claim:d2:p2",
+    ]);
+  });
+
+  it("labels the badge", () => {
+    expect(badgeLabel(0)).toBeNull();
+    expect(badgeLabel(1)).toBe("1 thing needs you");
+    expect(badgeLabel(3)).toBe("3 things need you");
   });
 });

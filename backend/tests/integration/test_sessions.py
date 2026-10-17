@@ -38,6 +38,8 @@ SNAPSHOT_KEYS = {
     "closed_at",
     "result",
     "rating",  # the family average only, from tonight on
+    "slideshow",  # the host's TV slideshow control (issue #41)
+    "slideshow_started_at",
 }
 OPTION_KEYS = {"id", "movie_id", "title", "year", "poster_path", "source", "position"}
 

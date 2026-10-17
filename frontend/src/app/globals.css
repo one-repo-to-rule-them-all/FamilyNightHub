@@ -99,11 +99,45 @@
     0 0 24px 2px oklch(0.72 0.18 38 / 35%);
 }
 
+/* A refused PIN: the dots shake once, then clear (guest-flow spec §5 S3). */
+@keyframes pin-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25%,
+  75% {
+    transform: translateX(-8px);
+  }
+  50% {
+    transform: translateX(8px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * The phone's slideshow (phone-slideshow.tsx): each photo fades in. Under prefers-reduced-motion
+ * it simply cuts (no animation at all, not just a fast one).
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .phone-slide {
+    animation: phone-slide-in 600ms ease both;
+  }
+}
+
+@keyframes phone-slide-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
