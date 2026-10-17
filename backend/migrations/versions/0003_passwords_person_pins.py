@@ -5,6 +5,8 @@
 - device_people: is_current, at most one per device (partial unique index).
 - pin_reset_requests: new household table, FORCE RLS + household_isolation in this
   migration (05-data.md "Migrations"), composite FKs to people/devices/accounts.
+- settings.qr_includes_night_code (default false): the TV's join QR may carry the night
+  code. The code itself is still never stored in plaintext (ADR-0002); the TV adds it.
 - auth_resolve_account_by_username(text): the sixth ADR-0009 resolver, with a column grant
   on accounts.username. The resolver never sees password_hash.
 
@@ -58,6 +60,10 @@ def upgrade() -> None:
     op.add_column(
         "device_people",
         sa.Column("is_current", sa.Boolean(), server_default="false", nullable=False),
+    )
+    op.add_column(
+        "settings",
+        sa.Column("qr_includes_night_code", sa.Boolean(), server_default="false", nullable=False),
     )
     op.create_index(
         "uq_device_people_current",
@@ -166,6 +172,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_pin_reset_requests_person_id"), table_name="pin_reset_requests")
     op.drop_index(op.f("ix_pin_reset_requests_household_id"), table_name="pin_reset_requests")
     op.drop_table("pin_reset_requests")
+    op.drop_column("settings", "qr_includes_night_code")
     op.drop_index("uq_device_people_current", table_name="device_people")
     op.drop_column("device_people", "is_current")
     op.drop_column("people", "name_changed_at")

@@ -188,4 +188,6 @@ class HouseholdSettings(Base):
     default_age_cap: Mapped[str | None] = mapped_column(String(8))
     streaming_providers: Mapped[list[int]] = mapped_column(ARRAY(Integer), server_default="{}")
     region: Mapped[str] = mapped_column(String(2), server_default="US")
+    # ADR-0014 / owner: the TV's join QR may include the night code (the TV appends it).
+    qr_includes_night_code: Mapped[bool] = mapped_column(Boolean, server_default="false")
     updated_at: Mapped[datetime] = created_at()

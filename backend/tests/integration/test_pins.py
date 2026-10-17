@@ -90,6 +90,7 @@ async def test_first_claim_must_set_a_pin_and_it_is_stored_hashed(two_households
         "locked": False,
         "current": True,
         "can_rename": True,
+        "pin_reset": None,
     }
     row = await _row(a, "SELECT pin_hash, pin_set_at FROM people WHERE id = :p", p=mia)
     assert row.pin_hash.startswith("$argon2id$") and TEST_PIN not in row.pin_hash
@@ -549,3 +550,32 @@ async def test_every_new_route_is_404_for_another_households_person(two_househol
     assert str(reset_b) not in {r["id"] for r in queue}
     row = await _row(b, "SELECT status FROM pin_reset_requests WHERE id = :r", r=reset_b)
     assert row.status == "open"
+
+
+async def test_tiles_show_the_reset_state_across_reloads(two_households: Pair) -> None:
+    """G2: open while waiting; approved_for_this_phone only on the phone that asked, and
+    only until the new PIN is set."""
+    a, _ = two_households
+    await _night(a)
+    mia = await _person(a, "Mia")
+    async with phone() as owner, phone() as asker, phone() as admin:
+        await _joined(owner, a)
+        await _joined(asker, a)
+        admin.sign_in_as(a.ids["account"], a.household_id)
+        await owner.bind(mia)
+
+        async def state(p: Phone) -> str | None:
+            value: str | None = _grid(await p.client.get("/api/v1/people"))[str(mia)]["pin_reset"]
+            return value
+
+        before = (await state(owner), await state(asker))
+        rid = (await _send(asker, "POST", f"{ME}/{mia}/forgot-pin")).json()["id"]
+        waiting = (await state(owner), await state(asker))
+        await _send(admin, "POST", f"{RESETS}/{rid}/approve")
+        approved = (await state(owner), await state(asker))
+        await asker.bind(mia, pin="864200")
+        after = (await state(owner), await state(asker))
+    assert before == (None, None)
+    assert waiting == ("open", "open")
+    assert approved == (None, "approved_for_this_phone")
+    assert after == (None, None)

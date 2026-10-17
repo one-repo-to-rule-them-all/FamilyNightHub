@@ -9,9 +9,17 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.core.dependencies import CsrfProtected, CurrentDevice, DeviceDb, ViewerDb
+from app.core.dependencies import (
+    CsrfProtected,
+    CurrentDevice,
+    CurrentViewer,
+    DeviceDb,
+    ViewerDb,
+)
+from app.core.permissions import has_permission
 from app.core.rate_limit import Budget, retry_after, spend
 from app.domain import credentials
+from app.schemas.admin import JoinLinkOut
 from app.schemas.identity import (
     BindingOut,
     ClaimIn,
@@ -31,7 +39,7 @@ from app.schemas.profile import (
     ProfilePickOut,
     ProfileStatsOut,
 )
-from app.services import people_service, profile_service
+from app.services import household_settings_service, people_service, profile_service
 from app.services.errors import (
     Conflict,
     Forbidden,
@@ -78,6 +86,7 @@ def _tile(t: people_service.PersonTile) -> PersonOut:
         locked=t.locked,
         current=t.current,
         can_rename=t.can_rename,
+        pin_reset=t.pin_reset,
     )
 
 
@@ -144,6 +153,25 @@ async def my_device(device: CurrentDevice, db: DeviceDb) -> DeviceOut:
     tiles = await people_service.list_people(db, device.device_id)
     mine = [t for t in tiles if t.binding in ("mine", "pending")]
     return DeviceOut(id=device.device_id, people=_tiles(mine))
+
+
+@router.get(
+    "/devices/me/join-link",
+    response_model=JoinLinkOut,
+    responses={403: {"description": "Only the TV or a host account reads the join link"}},
+)
+async def join_link(viewer: CurrentViewer, db: ViewerDb) -> JoinLinkOut:
+    """The household's join slug and whether the QR should carry the night code, for the
+    TV (`is_tv` device) or a signed-in host (`sessions:run`). Phones get 403: the slug is on
+    the fridge anyway, but there is no reason to hand it out."""
+    if viewer.device is not None:
+        allowed = await household_settings_service.is_tv(db, viewer.device.device_id)
+    else:
+        allowed = has_permission(viewer.role or "", "sessions:run")
+    if not allowed:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the TV or a host can read this")
+    s = await household_settings_service.get(db, viewer.household_id)
+    return JoinLinkOut(join_slug=s.join_slug, qr_includes_night_code=s.qr_includes_night_code)
 
 
 @router.post(

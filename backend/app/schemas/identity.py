@@ -55,6 +55,9 @@ class PersonOut(BaseModel):
     current: bool
     # May still change their own name once (the current person only).
     can_rename: bool
+    # open: a forgot-PIN request awaits an admin. approved_for_this_phone: an admin approved
+    # the request this phone made, and this phone may set the new PIN on its next claim.
+    pin_reset: Literal["open", "approved_for_this_phone"] | None
 
 
 class DeviceOut(BaseModel):

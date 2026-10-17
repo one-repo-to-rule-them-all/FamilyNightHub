@@ -89,7 +89,14 @@ switching, not on every vote.
 - **The phone stays the everyday credential.** Ballots, ratings, photos and reactions check
   `require_can_act_as`: an *active* binding, that is *current* on this device, for a person
   who *has a PIN*. The PIN is not sent with each vote.
-- **Claiming or switching needs the PIN** (`PUT /devices/me/people/{id} {pin}`):
+- **How the current person is tracked:** `device_people.is_current`, set only by a
+  successful claim or switch with the PIN (or a host approving a pending claim, or setting a
+  PIN on this phone). Setting it clears the device's previous current person in the same
+  transaction. Ballots, ratings, photos and reactions act as that person only; host proxy
+  voting and rating are unaffected (they never go through a device binding).
+- **Claiming or switching needs the PIN, on every switch** (`PUT /devices/me/people/{id}
+  {pin}`). Being actively bound to this same phone is not enough to act as someone who isn't
+  current: switching back and forth on a shared phone takes the PIN each time.
   - Already current on this phone: no-op, no PIN.
   - The person has a PIN: the right PIN makes the binding active and current, even if
     another phone holds them too. **This replaces host approval** for people with a PIN.
@@ -119,10 +126,14 @@ switching, not on every vote.
   the household in one sitting.
 - **Forgot PIN.** `POST /devices/me/people/{id}/forgot-pin` records a `pin_reset_requests`
   row (household-scoped, FORCE RLS, `status open/approved/dismissed`, one open request per
-  person, idempotent while open). Admins (`admin:people`) list open requests, **approve**
+  person, idempotent while open, allowed on a locked person). **Only admins**
+  (`admin:people`) list open requests, **approve**
   (clears the hash, `pin_set_at`, the count and the lock, audits `person.pin_reset`) or
   **dismiss**. Approval never reveals or sets a PIN: the person sets a new one on their next
   claim, and the requesting phone may do so even if another phone still holds the person.
+  Hosts can neither list nor approve resets (owner decision). Tiles carry
+  `pin_reset: null | "open" | "approved_for_this_phone"`, so a phone shows the right step after
+  a reload.
 - **Self-create.** `POST /devices/me/people {name, avatar_emoji, color, pin}`: any household
   device (it got in with the night code) may add a profile. It is always `is_guest = true`,
   bound active and current to this phone, with its PIN set in the same request. Admins
@@ -134,6 +145,17 @@ switching, not on every vote.
   rename is unchanged and does not count.
 - **Kids.** Every person needs a PIN, so a kid's is set and typed by a parent. The kid's
   phone is then set to the kid and never asks again unless someone switches.
+
+### The TV's join QR
+
+`settings.qr_includes_night_code` (bool, default false; `PATCH /admin/settings`,
+`admin:settings`) lets the TV's QR carry the night code (`/j/{slug}?code={code}`), so a phone
+can join without typing it. The plaintext code is still **never stored or returned** by the
+server (ADR-0002 keeps only its hash): `GET /devices/me/join-link` gives the TV (an `is_tv`
+device) or a host account (`sessions:run`) `{join_slug, qr_includes_night_code}`, and the TV
+appends the code it already holds from create/rotate. Other phones get 403. With the setting
+on, the code is in a URL that reaches the web server, so request logs for `/j/*` should drop the
+query string and the page should send `Referrer-Policy: no-referrer` (frontend follow-up).
 
 ### Profiles
 

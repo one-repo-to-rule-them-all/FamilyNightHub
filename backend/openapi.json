@@ -1023,6 +1023,25 @@
         "title": "JoinIn",
         "type": "object"
       },
+      "JoinLinkOut": {
+        "description": "What the TV needs to draw its join QR: `/j/{join_slug}`, plus `?code={code}` when\n`qr_includes_night_code` is on. The night code is never here: the server only keeps its\nhash (ADR-0002), and the TV already holds the plaintext from create/rotate.",
+        "properties": {
+          "join_slug": {
+            "title": "Join Slug",
+            "type": "string"
+          },
+          "qr_includes_night_code": {
+            "title": "Qr Includes Night Code",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "join_slug",
+          "qr_includes_night_code"
+        ],
+        "title": "JoinLinkOut",
+        "type": "object"
+      },
       "JoinOut": {
         "properties": {
           "device_id": {
@@ -1683,6 +1702,21 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "pin_reset": {
+            "anyOf": [
+              {
+                "enum": [
+                  "open",
+                  "approved_for_this_phone"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin Reset"
           }
         },
         "required": [
@@ -1695,7 +1729,8 @@
           "has_pin",
           "locked",
           "current",
-          "can_rename"
+          "can_rename",
+          "pin_reset"
         ],
         "title": "PersonOut",
         "type": "object"
@@ -2867,6 +2902,10 @@
             "title": "Join Slug",
             "type": "string"
           },
+          "qr_includes_night_code": {
+            "title": "Qr Includes Night Code",
+            "type": "boolean"
+          },
           "region": {
             "title": "Region",
             "type": "string"
@@ -2890,7 +2929,8 @@
           "default_age_cap",
           "region",
           "streaming_providers",
-          "updated_at"
+          "updated_at",
+          "qr_includes_night_code"
         ],
         "title": "SettingsOut",
         "type": "object"
@@ -2931,6 +2971,17 @@
               }
             ],
             "title": "Default Voting Method"
+          },
+          "qr_includes_night_code": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qr Includes Night Code"
           },
           "region": {
             "anyOf": [
@@ -4511,6 +4562,31 @@
           }
         },
         "summary": "My Device",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/devices/me/join-link": {
+      "get": {
+        "description": "The household's join slug and whether the QR should carry the night code, for the\nTV (`is_tv` device) or a signed-in host (`sessions:run`). Phones get 403: the slug is on\nthe fridge anyway, but there is no reason to hand it out.",
+        "operationId": "join_link_api_v1_devices_me_join_link_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Only the TV or a host account reads the join link"
+          }
+        },
+        "summary": "Join Link",
         "tags": [
           "people"
         ]

@@ -26,6 +26,7 @@ backend/app/
 | Join | `GET /api/v1/csrf`, `POST /api/v1/join` | Issue the CSRF cookie; validate slug + night code, mint the device cookie (failure-budgeted) |
 | Auth | `/api/v1/auth/{login,password,magic-link,verify,me,logout}` | Password sign-in for admins and hosts, set/change password, forgot password (the magic link sets a new one), current account, logout ([ADR-0014](decisions/ADR-0014-passwords-and-person-pins.md)) |
 | People/devices | `/api/v1/people`, `/api/v1/devices/me`, `POST /api/v1/devices/me/people`, `PUT/PATCH/DELETE /api/v1/devices/me/people/{id}`, `POST …/{id}/pin`, `POST …/{id}/forgot-pin` | Avatar grid with each tile's binding and PIN state; self-create a guest; claim or switch with the PIN; rename once; set/change PIN; ask for a PIN reset; unbind. See "People and PINs" |
+| Join link | `GET /api/v1/devices/me/join-link` | The TV (`is_tv`) or a host account (`sessions:run`) reads `{join_slug, qr_includes_night_code}` to draw the join QR; other phones 403. The night code is never returned |
 | Profiles | `GET /api/v1/people/{id}/profile` | A person's revealed nights, picks, winners, ratings, albums and stats (any device or account of the household) |
 | Host devices | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}` | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it); review pending person claims (`devices:enroll` / `devices:approve`) |
 | Sessions | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET/PATCH /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}` | Host (`sessions:run`): create (code shown once; `voting_method` defaults to the household's), change the voting method while `draft`, rotate code, shortlist, open/close voting, close the night. Snapshot and history: any device or account of the household |
@@ -149,7 +150,9 @@ people but **acts as one at a time** (`device_people.is_current`, one per device
 person who has a PIN (403 "Set a PIN for them on this phone first" / "Switch to them on this phone
 first"). The PIN is typed to claim or switch, not per vote; a kid's is typed by a parent.
 
-- **Claim / switch** (`PUT /devices/me/people/{id} {pin?}`): already current → no-op. The person
+- **Claim / switch** (`PUT /devices/me/people/{id} {pin?}`). The PIN is needed on **every**
+  switch, even to a person already bound to this phone: `is_current` moves only on a
+  successful PIN check (or a host approval / set-PIN on this phone). Already current → no-op. The person
   has a PIN → the right one makes the binding active and current, even if another phone holds
   them (no host needed); no PIN from a phone that doesn't hold them → `pending` for host approval
   (the admin override); no PIN to switch on a phone that holds them → 422. The person has no PIN
@@ -172,8 +175,9 @@ first"). The PIN is typed to claim or switch, not per vote; a kid's is typed by 
 - **Rename once** (`PATCH /devices/me/people/{id} {name}`): the current person may change their
   own name once (`name_changed_at`), then 409; admin renames are unlimited and don't count.
   Audit `person.renamed_self`.
-- Tiles (`GET /people`, `GET /devices/me`) carry `has_pin`, `locked`, `current` and
-  `can_rename`. Another household's or a merged person is 404 on every route above.
+- Tiles (`GET /people`, `GET /devices/me`) carry `has_pin`, `locked`, `current`,
+  `can_rename` and `pin_reset` (`null`, `open`, or `approved_for_this_phone` while this phone
+  may set the new PIN). Another household's or a merged person is 404 on every route above.
 
 **Profiles** (`services/profile_service.py`, `GET /people/{id}/profile`, any device or account,
 404 across households or for a merged person). Only nights whose status is `revealed`, `tonight`
@@ -265,7 +269,8 @@ the CSRF header and writes an audit row.
 - **Settings** (`services/household_settings_service.py`, `admin:settings`). `GET` returns the
   join slug plus `default_voting_method`, `default_age_cap` and `region`; `PATCH` changes only
   the fields sent (`default_age_cap: null` clears the cap). `default_voting_method` is any of
-  `top3`, `approval`, `pick_one` (new nights start with it); age caps are `G`/`PG`/`PG-13`/`R`/`NC-17`; region is ISO 3166-1 alpha-2,
+  `top3`, `approval`, `pick_one` (new nights start with it); `qr_includes_night_code` (default
+  false) lets the TV's join QR carry the night code, which the TV appends itself (ADR-0014); age caps are `G`/`PG`/`PG-13`/`R`/`NC-17`; region is ISO 3166-1 alpha-2,
   stored uppercase. **Rotate join slug** issues a new `xxxx-xxxx-xxxx` slug from the night-code
   alphabet, lowercased (`domain/join_slug.py`, ~2^59 values; a unique-constraint clash retries
   in a savepoint). `/j/{old}` stops resolving immediately; devices already in keep working.

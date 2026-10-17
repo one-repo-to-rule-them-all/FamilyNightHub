@@ -45,6 +45,7 @@ from app.services.errors import (
 )
 
 BindingState = Literal["mine", "pending", "taken", "free"]
+PinResetState = Literal["open", "approved_for_this_phone"]
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,9 @@ class PersonTile:
     current: bool
     # They may still change their own name once (only meaningful when current).
     can_rename: bool
+    # A forgot-PIN request is waiting for an admin, or one this phone asked for was approved
+    # and this phone may now set the new PIN (survives a reload).
+    pin_reset: PinResetState | None
 
 
 @dataclass(frozen=True)
@@ -112,6 +116,11 @@ def _tile(r: Any) -> PersonTile:
     else:
         binding = "free"
     current = bool(r.my_current) and r.my_status == "active"
+    pin_reset: PinResetState | None = None
+    if r.pin_hash is None and r.reset_for_me:
+        pin_reset = "approved_for_this_phone"
+    elif r.reset_open:
+        pin_reset = "open"
     return PersonTile(
         id=r.id,
         name=r.name,
@@ -123,6 +132,7 @@ def _tile(r: Any) -> PersonTile:
         locked=r.pin_locked_at is not None,
         current=current,
         can_rename=current and r.pin_hash is not None and r.name_changed_at is None,
+        pin_reset=pin_reset,
     )
 
 
@@ -130,7 +140,11 @@ _TILE_COLUMNS = f"""
     p.id, p.name, p.avatar_emoji, p.color, p.is_guest, p.pin_hash, p.pin_locked_at,
     p.pin_failed_attempts, p.name_changed_at,
     mine.status AS my_status, mine.is_current AS my_current,
-    {_BOUND_ELSEWHERE} AS taken
+    {_BOUND_ELSEWHERE} AS taken,
+    {_RESET_FOR_ME} AS reset_for_me,
+    EXISTS (
+        SELECT 1 FROM pin_reset_requests ro WHERE ro.person_id = p.id AND ro.status = 'open'
+    ) AS reset_open
 """
 _TILE_FROM = """
     FROM people p
@@ -181,7 +195,7 @@ async def _lock_person(db: AsyncSession, device_id: uuid.UUID, person_id: uuid.U
     row = (
         await db.execute(
             text(
-                f"SELECT {_TILE_COLUMNS}, {_RESET_FOR_ME} AS reset_for_me {_TILE_FROM} "
+                f"SELECT {_TILE_COLUMNS} {_TILE_FROM} "
                 "WHERE p.id = :person AND p.merged_into_id IS NULL FOR UPDATE OF p"
             ),
             {"device": device_id, "person": person_id},
