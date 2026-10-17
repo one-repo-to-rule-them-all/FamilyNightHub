@@ -308,3 +308,37 @@ export function ago(iso: string, now: number): string {
   const days = Math.floor(hours / 24);
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Dashboard wiring (§5 P2, §6)
+
+/** Where the hidden-unrated night ids live on this browser. */
+export const HIDDEN_UNRATED_KEY = "fnh.portal.hiddenUnrated";
+
+/** Inbox sources poll at the claims cadence while the tab is visible. */
+export const INBOX_POLL_MS = 10_000;
+
+export const ALREADY_DONE = "Someone already took care of that.";
+
+/** Nights that have a winner: the stats and the unrated rows read only these. */
+export const PAST_STATUSES: readonly NightStatus[] = ["revealed", "tonight", "closed"];
+
+export function pastNights<T extends NightLike>(nights: T[]): T[] {
+  return nights.filter((n) => PAST_STATUSES.includes(n.status));
+}
+
+/** A 404 or 409 on a row action means someone else resolved it first (AC-P2.8). */
+export function isAlreadyDone(error: { status: number } | null | undefined): boolean {
+  return error?.status === 404 || error?.status === 409;
+}
+
+/** Drops rows resolved on this screen before their source query has refetched. */
+export function withoutResolved(items: InboxItem[], resolved: ReadonlySet<string>): InboxItem[] {
+  return resolved.size === 0 ? items : items.filter((item) => !resolved.has(item.id));
+}
+
+/** The nav badge's accessible name ("{n} things need you"); null when nothing is waiting. */
+export function badgeLabel(count: number): string | null {
+  if (count <= 0) return null;
+  return count === 1 ? "1 thing needs you" : `${count} things need you`;
+}

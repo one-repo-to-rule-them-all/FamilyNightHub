@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 
 import { DevicesAdmin } from "./devices-admin";
 
-export const metadata: Metadata = { title: "Devices" };
+export const metadata: Metadata = { title: "Phones and TVs" };
 
-/** Devices list, label, revoke (`admin:devices`; revocation is final, 03-backend.md). */
+/** Phones and TVs: list, label, revoke (`admin:devices`; revocation is final, 03-backend.md). */
 export default function AdminDevicesPage() {
   return <DevicesAdmin />;
 }

@@ -48,7 +48,7 @@ async def test_every_household_table_forces_rls_with_isolation_policy() -> None:
         """
     )
     scoped = [t for t in tables if t["scoped"] or t["table"] == "households"]
-    assert len(scoped) == 17, sorted(str(t["table"]) for t in scoped)
+    assert len(scoped) == 18, sorted(str(t["table"]) for t in scoped)
 
     unprotected = [t["table"] for t in scoped if not (t["enabled"] and t["forced"] and t["policy"])]
     assert unprotected == [], f"household tables missing FORCE RLS + policy: {unprotected}"

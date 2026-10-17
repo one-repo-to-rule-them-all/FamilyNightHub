@@ -21,7 +21,7 @@ from app.domain.voting import BALLOT_CHECKS
 from app.domain.voting.base import BallotError
 from app.realtime import events
 from app.realtime.publisher import publish_after_commit
-from app.services import people_service
+from app.services import attendance_service, people_service
 from app.services.errors import Conflict, Invalid, NotFound
 
 
@@ -130,6 +130,10 @@ async def cast(
         )
     # The hint says only "the turnout changed": phones and the TV refetch `voters`.
     publish_after_commit(db, session_id, events.BALLOT_COUNT)
+    if device_id is not None:
+        # Voting from a phone set to them: they're here (G8). Proxy voters show up in
+        # `present` through their ballot.
+        await attendance_service.mark_present(db, household_id, session_id, person_id)
 
 
 async def _exists(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.UUID) -> None:

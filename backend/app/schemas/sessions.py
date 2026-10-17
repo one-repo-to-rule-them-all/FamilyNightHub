@@ -33,6 +33,12 @@ class SessionUpdateIn(BaseModel):
     voting_method: VotingMethod
 
 
+class SlideshowIn(BaseModel):
+    """Start (`true`) or stop (`false`) the paired TV's slideshow (issue #41)."""
+
+    playing: bool
+
+
 class SessionCreatedOut(BaseModel):
     session_id: uuid.UUID
     # Shown once: only its hash is stored, so it cannot be fetched again. Rotate if lost.
@@ -100,6 +106,11 @@ class SessionOut(BaseModel):
     result: VotingResultOut | None
     # The family's average score; null until ratings open (`tonight`/`closed`).
     rating: RatingSummaryOut | None
+    # The host's slideshow control (issue #41). `auto`: the TV plays once the night is
+    # `tonight` (the default). `playing`: the host pressed Start at `slideshow_started_at`.
+    # `stopped`: the host pressed Stop; the TV holds on "drop your photos".
+    slideshow: Literal["auto", "playing", "stopped"]
+    slideshow_started_at: datetime | None
 
 
 class TmdbResultOut(BaseModel):
@@ -224,6 +235,21 @@ class VotersOut(BaseModel):
     """Who has voted, for the TV's avatar tiles. Never what they ranked."""
 
     voted: list[VoterOut]
+
+
+class PresentOut(BaseModel):
+    person_id: uuid.UUID
+    avatar_emoji: str
+    color: str
+    # Has a ballot in this night (the same fact as /voters). Never what they ranked.
+    voted: bool
+
+
+class PresenceOut(BaseModel):
+    """Who's here tonight (G8): people a phone set to them opened the night or voted for,
+    plus anyone with a ballot. Family first, then guests."""
+
+    present: list[PresentOut]
 
 
 class PlacementOut(BaseModel):

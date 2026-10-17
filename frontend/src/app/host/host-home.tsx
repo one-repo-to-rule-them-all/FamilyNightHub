@@ -1,42 +1,83 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Tv } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
-import { Avatar } from "@/components/night/avatar";
+import { Inbox, type InboxActions } from "@/components/portal/inbox";
+import { QuickStats } from "@/components/portal/stats";
+import { UpNextCard } from "@/components/portal/up-next-card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { ModalDialog } from "@/components/ui/modal-dialog";
 import {
-  api,
   type Account,
+  type AdminPerson,
+  api,
   type ApiError,
   type Claim,
   enrollDevice,
+  type Night,
   type NightSummary,
+  type PinReset,
 } from "@/lib/api";
-import { rememberNightCode } from "@/lib/night-code-handoff";
+import {
+  ACTIVE_STATUSES,
+  ALREADY_DONE,
+  buildInbox,
+  greeting,
+  HIDDEN_UNRATED_KEY,
+  INBOX_POLL_MS,
+  type InboxItem,
+  isAlreadyDone,
+  parseHidden,
+  pastNights,
+  splitActive,
+  stats,
+  toggleHidden,
+  withoutResolved,
+} from "@/lib/portal";
 
-import { NightCodeCard } from "./night-code-card";
+import { PIN_RESETS_KEY } from "@/app/admin/people/pin-requests";
+
 import { STATUS_LABEL } from "./status";
 
-const ACTIVE = ["draft", "voting", "revealed", "tonight"] as const;
-const CLAIMS_POLL_MS = 10_000;
+type ResetItem = Extract<InboxItem, { kind: "pin-reset" }>;
 
-type Created = { session_id: string; night_code: string };
+function readHidden(): string[] {
+  try {
+    return parseHidden(window.localStorage.getItem(HIDDEN_UNRATED_KEY));
+  } catch {
+    return [];
+  }
+}
 
+function writeHidden(ids: string[]) {
+  try {
+    window.localStorage.setItem(HIDDEN_UNRATED_KEY, JSON.stringify(ids));
+    // A same-tab write fires no storage event; the shell's Home badge listens for this one.
+    window.dispatchEvent(new StorageEvent("storage", { key: HIDDEN_UNRATED_KEY }));
+  } catch {
+    // Private mode or blocked storage: the row is hidden for this visit only.
+  }
+}
+
+/** Ticks every 30 s so "4 min ago" and the stale/unrated thresholds stay current. */
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return now;
+}
+
+/** Home (proposals/owner-portal.md §5 P1): Up next, Needs you, At a glance, Also running. */
 export function HostHome() {
   const router = useRouter();
   const me = useQuery<Account, ApiError>({ queryKey: ["me"], queryFn: api.me });
-  const logout = useMutation<void, ApiError>({
-    mutationFn: api.logout,
-    onSuccess: () => router.replace("/login"),
-  });
-  const [created, setCreated] = useState<Created | null>(null);
   const signedOut = me.error?.status === 401;
 
   useEffect(() => {
@@ -47,129 +88,298 @@ export function HostHome() {
     return <p className="text-lg text-muted-foreground">Loading…</p>;
   }
   if (me.isError) return <ApiErrorNotice error={me.error} />;
+  return <Dashboard me={me.data} />;
+}
+
+function Dashboard({ me }: { me: Account }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const admin = me.role === "admin";
+  const now = useNow();
+
+  // §6: existing keys are reused so People, the night page and the nav badge stay in sync.
+  const active = useQuery<NightSummary[], ApiError>({
+    queryKey: ["nights", "active"],
+    queryFn: () => api.nights({ status: [...ACTIVE_STATUSES] }),
+    refetchInterval: INBOX_POLL_MS,
+  });
+  const recent = useQuery<NightSummary[], ApiError>({
+    queryKey: ["nights", "recent"],
+    queryFn: () => api.nights({ limit: 8 }),
+  });
+  const claims = useQuery<Claim[], ApiError>({
+    queryKey: ["claims"],
+    queryFn: api.claims,
+    refetchInterval: INBOX_POLL_MS,
+  });
+  // Hosts never send the admin-only queries (AC-P2.2).
+  const pinResets = useQuery<PinReset[], ApiError>({
+    queryKey: PIN_RESETS_KEY,
+    queryFn: api.pinResets,
+    enabled: admin,
+    refetchInterval: INBOX_POLL_MS,
+  });
+  const people = useQuery<AdminPerson[], ApiError>({
+    queryKey: ["admin", "people"],
+    queryFn: api.adminPeople,
+    enabled: admin,
+  });
+
+  // Dashboard renders only after `["me"]` resolves, i.e. on the client, so storage is readable.
+  const [hidden, setHidden] = useState<string[]>(readHidden);
+  const [resolved, setResolved] = useState<ReadonlySet<string>>(new Set());
+  const [notice, setNotice] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState<ResetItem | null>(null);
+  const [confirmEnd, setConfirmEnd] = useState<string | null>(null);
+  const [confirmTv, setConfirmTv] = useState<string | null>(null);
+
+  const { current, others } = splitActive(active.data ?? []);
+  const past = pastNights(recent.data ?? []);
+  const items = withoutResolved(
+    buildInbox({
+      role: me.role,
+      now,
+      claims: claims.data,
+      pinResets: pinResets.data,
+      people: people.data,
+      activeNights: active.data,
+      pastNights: past,
+      hiddenUnrated: hidden,
+    }),
+    resolved,
+  );
+
+  const notices = [
+    notice,
+    claims.isError ? "Couldn't load phone requests." : null,
+    pinResets.isError ? "Couldn't load PIN requests." : null,
+    people.isError ? "Couldn't load locked profiles." : null,
+    active.isError || recent.isError ? "Couldn't load your nights." : null,
+  ].filter((line): line is string => line !== null);
+
+  /** Optimistically drops the row; on failure it comes back, unless someone else resolved it. */
+  const resolveRow = <T,>(id: string, run: () => Promise<T>, sources: readonly unknown[][]) => {
+    setNotice(null);
+    setResolved((set) => new Set(set).add(id));
+    run()
+      .catch((error: ApiError) => {
+        setNotice(isAlreadyDone(error) ? ALREADY_DONE : error.message);
+      })
+      .finally(() => {
+        void Promise.all(
+          sources.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+        ).then(() =>
+          setResolved((set) => {
+            const next = new Set(set);
+            next.delete(id);
+            return next;
+          }),
+        );
+      });
+  };
+
+  const decideClaim = (item: Extract<InboxItem, { kind: "claim" }>, approve: boolean) =>
+    resolveRow(
+      item.id,
+      () =>
+        approve
+          ? api.approveClaim(item.claim.device_id, item.claim.person_id)
+          : api.rejectClaim(item.claim.device_id, item.claim.person_id),
+      [["claims"]],
+    );
+
+  const actions: InboxActions = {
+    approveClaim: (item) => decideClaim(item, true),
+    rejectClaim: (item) => decideClaim(item, false),
+    resetPin: (item) => setConfirmReset(item),
+    dismissReset: (item) =>
+      resolveRow(item.id, () => api.dismissPinReset(item.reset.id), [
+        [...PIN_RESETS_KEY],
+        ["admin", "people"],
+      ]),
+    seeProfile: (personId) => router.push(`/admin/people#person-${personId}`),
+    endNight: (nightId) => setConfirmEnd(nightId),
+    openNight: (nightId) => router.push(`/host/${nightId}`),
+    hideUnrated: (nightId) => {
+      const next = toggleHidden(hidden, nightId);
+      setHidden(next);
+      writeHidden(next);
+    },
+  };
+
+  const close = useMutation<Night, ApiError, string>({
+    mutationFn: (nightId) => api.closeNight(nightId),
+    onSuccess: () => {
+      setConfirmEnd(null);
+      void queryClient.invalidateQueries({ queryKey: ["nights"] });
+    },
+    onError: (error) => {
+      if (!isAlreadyDone(error)) return;
+      setConfirmEnd(null);
+      setNotice(ALREADY_DONE);
+      void queryClient.invalidateQueries({ queryKey: ["nights"] });
+    },
+  });
+
+  // ADR-0002 "Use as TV": mints a TV device for this browser and clears the account session, so
+  // a TV left in the living room never holds host rights.
+  // TODO(piece D): use the shared confirm from components/portal/use-as-tv.tsx once it exists.
+  const enrollTv = useMutation<unknown, ApiError, string>({
+    mutationFn: () => enrollDevice({ as_tv: true, device_label: "Living-room TV" }),
+    onSuccess: (_, sessionId) => {
+      queryClient.clear();
+      router.replace(`/tv/${sessionId}`);
+    },
+  });
+
+  const lastNight = past[0] ?? null;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div data-screen="portal-home" className="flex flex-col gap-8">
       <p className="text-lg" data-testid="signed-in-as">
-        Signed in as <strong>{me.data.display_name}</strong> ({me.data.role}) for{" "}
-        {me.data.household_name}.
+        {greeting(me.display_name, new Date(now))}
+        <span className="text-muted-foreground"> · {me.household_name}</span>
       </p>
 
-      {created ? (
-        <div className="flex flex-col gap-3">
-          <NightCodeCard
-            sessionId={created.session_id}
-            status="draft"
-            initialCode={created.night_code}
-          />
-          <Link
-            href={`/host/${created.session_id}`}
-            className="flex h-14 items-center justify-center rounded-xl bg-primary px-6 text-lg font-medium text-primary-foreground outline-none hover:bg-primary/80 focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            Build the shortlist
-          </Link>
+      <div className="grid gap-8 xl:grid-cols-5">
+        <div className="xl:col-span-3">
+          {active.isPending ? (
+            <p className="text-muted-foreground">Loading…</p>
+          ) : (
+            <UpNextCard
+              current={current}
+              lastNight={lastNight}
+              onUseAsTv={(id) => {
+                enrollTv.reset();
+                setConfirmTv(id);
+              }}
+            />
+          )}
         </div>
-      ) : (
-        <StartNight onCreated={setCreated} />
-      )}
+        <div className="xl:col-span-2">
+          <Inbox items={items} actions={actions} now={now} notices={notices} />
+        </div>
+      </div>
 
-      <ActiveNights />
-      <PendingClaims />
-      <UseAsTv sessionId={created?.session_id ?? null} />
+      <QuickStats stats={stats(past, new Date(now))} lastHref={(id) => `/host/${id}`} />
 
-      {me.data.role === "admin" ? (
-        <Link
-          href="/admin"
-          className="flex min-h-14 items-center justify-between gap-3 rounded-xl bg-card px-4 py-3 text-lg ring-1 ring-foreground/10 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+      {others.length > 0 ? <AlsoRunning nights={others} /> : null}
+
+      {confirmReset ? (
+        <ModalDialog
+          title={
+            <>
+              Reset <strong>{confirmReset.reset.person_name}</strong>&apos;s PIN?
+            </>
+          }
+          onClose={() => setConfirmReset(null)}
+          testId="reset-pin-confirm"
         >
-          Admin: people, devices, settings
-          <ChevronRight aria-hidden className="size-5 text-muted-foreground" />
-        </Link>
+          <p className="text-sm">
+            Their old PIN stops working. They&apos;ll choose a new one on the phone that asked.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="lg"
+              className="px-4"
+              onClick={() => {
+                const item = confirmReset;
+                setConfirmReset(null);
+                resolveRow(item.id, () => api.approvePinReset(item.reset.id), [
+                  [...PIN_RESETS_KEY],
+                  ["admin", "people"],
+                ]);
+              }}
+            >
+              Reset PIN
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="px-4"
+              onClick={() => setConfirmReset(null)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </ModalDialog>
       ) : null}
 
-      <ApiErrorNotice error={logout.error} />
-      <Button
-        variant="outline"
-        size="tap"
-        disabled={logout.isPending}
-        onClick={() => logout.mutate()}
-      >
-        Sign out
-      </Button>
+      {confirmEnd ? (
+        <ModalDialog
+          title="End the night?"
+          onClose={() => setConfirmEnd(null)}
+          testId="end-night-confirm"
+        >
+          <p className="text-sm">
+            Phones stop joining with tonight&apos;s code. Photos and ratings stay open.
+          </p>
+          {isAlreadyDone(close.error) ? null : <ApiErrorNotice error={close.error} />}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="lg"
+              className="px-4"
+              disabled={close.isPending}
+              onClick={() => close.mutate(confirmEnd)}
+            >
+              {close.isPending ? "Ending…" : "End the night"}
+            </Button>
+            <Button variant="ghost" size="lg" className="px-4" onClick={() => setConfirmEnd(null)}>
+              Cancel
+            </Button>
+          </div>
+        </ModalDialog>
+      ) : null}
+
+      {confirmTv ? (
+        <ModalDialog
+          title="Show it on this TV?"
+          onClose={() => setConfirmTv(null)}
+          testId="use-as-tv-confirm"
+        >
+          <p className="text-sm">
+            This browser becomes the living-room TV and signs you out here. Sign in again on your
+            own phone or computer.
+          </p>
+          <ApiErrorNotice error={enrollTv.error} />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="lg"
+              className="px-4"
+              disabled={enrollTv.isPending}
+              onClick={() => enrollTv.mutate(confirmTv)}
+            >
+              {enrollTv.isPending ? "Pairing…" : "Yes, make it the TV"}
+            </Button>
+            <Button variant="ghost" size="lg" className="px-4" onClick={() => setConfirmTv(null)}>
+              Cancel
+            </Button>
+          </div>
+        </ModalDialog>
+      ) : null}
     </div>
   );
 }
 
-function StartNight({ onCreated }: { onCreated: (created: Created) => void }) {
-  const queryClient = useQueryClient();
-  const [title, setTitle] = useState("");
-  const create = useMutation<Created, ApiError, string>({
-    mutationFn: (value) => api.createNight({ title: value.trim() || null }),
-    onSuccess: (result) => {
-      rememberNightCode(result.session_id, result.night_code);
-      void queryClient.invalidateQueries({ queryKey: ["nights"] });
-      onCreated(result);
-    },
-  });
-
+/** §5 P1 item 5: the other active nights, when more than one is running. */
+function AlsoRunning({ nights }: { nights: NightSummary[] }) {
   return (
-    <form
-      aria-labelledby="start-night"
-      className="flex flex-col gap-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!create.isPending) create.mutate(title);
-      }}
-    >
-      <h2 id="start-night" className="text-xl font-semibold">
-        Start a night
+    <section aria-labelledby="also-running" className="flex flex-col gap-3">
+      <h2
+        id="also-running"
+        className="text-xs font-medium tracking-wider text-muted-foreground uppercase"
+      >
+        Also running
       </h2>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="night-title" className="text-base">
-          Name it (optional)
-        </Label>
-        <Input
-          id="night-title"
-          value={title}
-          maxLength={120}
-          placeholder="Friday movie night"
-          onChange={(event) => setTitle(event.target.value)}
-          className="h-14 text-lg md:text-lg"
-        />
-      </div>
-      <ApiErrorNotice error={create.error} />
-      <Button type="submit" size="tap" disabled={create.isPending}>
-        {create.isPending ? "Starting…" : "Start a night"}
-      </Button>
-    </form>
-  );
-}
-
-function ActiveNights() {
-  const nights = useQuery<NightSummary[], ApiError>({
-    queryKey: ["nights", "active"],
-    queryFn: () => api.nights({ status: [...ACTIVE] }),
-  });
-
-  return (
-    <section aria-labelledby="active-nights" className="flex flex-col gap-3">
-      <h2 id="active-nights" className="text-xl font-semibold">
-        Nights in progress
-      </h2>
-      <ApiErrorNotice error={nights.error} />
-      {nights.isPending ? <p className="text-muted-foreground">Loading…</p> : null}
-      {nights.data?.length === 0 ? (
-        <p className="text-muted-foreground">Nothing yet. Start a night above.</p>
-      ) : null}
       <ul className="flex flex-col gap-2">
-        {nights.data?.map((night) => (
+        {nights.map((night) => (
           <li key={night.id}>
             <Link
               href={`/host/${night.id}`}
-              className="flex min-h-14 items-center justify-between gap-3 rounded-xl bg-card px-4 py-3 ring-1 ring-foreground/10 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="flex min-h-12 items-center justify-between gap-3 rounded-xl bg-card px-4 py-2.5 ring-1 ring-foreground/10 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
             >
               <span className="flex flex-col">
-                <span className="text-lg font-medium">{night.title || "Movie night"}</span>
+                <span className="font-medium">{night.title || "Movie night"}</span>
                 <span className="text-sm text-muted-foreground">
                   {STATUS_LABEL[night.status]} · started{" "}
                   {new Date(night.created_at).toLocaleString([], {
@@ -184,127 +394,6 @@ function ActiveNights() {
           </li>
         ))}
       </ul>
-    </section>
-  );
-}
-
-function PendingClaims() {
-  const queryClient = useQueryClient();
-  const claims = useQuery<Claim[], ApiError>({
-    queryKey: ["claims"],
-    queryFn: api.claims,
-    refetchInterval: CLAIMS_POLL_MS,
-  });
-  const decide = useMutation<void, ApiError, { claim: Claim; approve: boolean }>({
-    mutationFn: ({ claim, approve }) =>
-      approve
-        ? api.approveClaim(claim.device_id, claim.person_id)
-        : api.rejectClaim(claim.device_id, claim.person_id),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["claims"] }),
-  });
-
-  return (
-    <section aria-labelledby="claims" className="flex flex-col gap-3">
-      <h2 id="claims" className="text-xl font-semibold">
-        Waiting for approval
-      </h2>
-      <ApiErrorNotice error={claims.error ?? decide.error} />
-      {claims.data?.length === 0 ? (
-        <p className="text-muted-foreground">No phones are waiting.</p>
-      ) : null}
-      <ul className="flex flex-col gap-2">
-        {claims.data?.map((claim) => {
-          const busy =
-            decide.isPending &&
-            decide.variables?.claim.device_id === claim.device_id &&
-            decide.variables.claim.person_id === claim.person_id;
-          return (
-            <li
-              key={`${claim.device_id}:${claim.person_id}`}
-              data-testid="claim"
-              className="flex flex-col gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10"
-            >
-              <p className="flex items-center gap-3 text-base">
-                <Avatar emoji={claim.avatar_emoji} color="#888888" className="size-10 text-2xl" />
-                <span>
-                  <strong>{claim.device_label || "A phone"}</strong> wants to be{" "}
-                  <strong>{claim.person_name}</strong>.
-                </span>
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="secondary"
-                  size="tap"
-                  disabled={busy}
-                  aria-label={`Approve ${claim.person_name}`}
-                  onClick={() => decide.mutate({ claim, approve: true })}
-                >
-                  Approve
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="tap"
-                  disabled={busy}
-                  aria-label={`Reject ${claim.person_name}`}
-                  onClick={() => decide.mutate({ claim, approve: false })}
-                >
-                  Reject
-                </Button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-/**
- * ADR-0002 "Use as TV": mints a TV device for this browser and clears the host session here, so
- * a TV left in the living room never holds host rights. The night code just created stays in this
- * tab's sessionStorage, which is how it reaches the TV screen.
- */
-function UseAsTv({ sessionId }: { sessionId: string | null }) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const [confirming, setConfirming] = useState(false);
-  const enroll = useMutation<unknown, ApiError>({
-    mutationFn: () => enrollDevice({ as_tv: true, device_label: "Living-room TV" }),
-    onSuccess: () => {
-      queryClient.clear();
-      router.replace(sessionId ? `/tv/${sessionId}` : "/tv");
-    },
-  });
-
-  return (
-    <section aria-labelledby="use-as-tv" className="flex flex-col gap-3">
-      <h2 id="use-as-tv" className="flex items-center gap-2 text-xl font-semibold">
-        <Tv aria-hidden className="size-5" /> The living-room TV
-      </h2>
-      <p className="text-muted-foreground">
-        Open this page on the TV&apos;s browser, start the night there, then turn it into the TV.
-        This signs you out on this browser.
-      </p>
-      <ApiErrorNotice error={enroll.error} />
-      {confirming ? (
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            variant="secondary"
-            size="tap"
-            disabled={enroll.isPending}
-            onClick={() => enroll.mutate()}
-          >
-            {enroll.isPending ? "Pairing…" : "Yes, make it the TV"}
-          </Button>
-          <Button variant="ghost" size="tap" onClick={() => setConfirming(false)}>
-            Cancel
-          </Button>
-        </div>
-      ) : (
-        <Button variant="outline" size="tap" onClick={() => setConfirming(true)}>
-          Use this browser as the TV
-        </Button>
-      )}
     </section>
   );
 }

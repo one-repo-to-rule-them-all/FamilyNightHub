@@ -165,7 +165,13 @@ export function CandidateRoller({ night }: { night: Night }) {
             Max minutes must be between {RUNTIME_MIN} and {RUNTIME_MAX}.
           </p>
         ) : null}
-        <Button type="submit" size="tap" className="col-span-2" disabled={!body || roll.isPending}>
+        <Button
+          type="submit"
+          variant="secondary"
+          size="tap"
+          className="col-span-2"
+          disabled={!body || roll.isPending}
+        >
           {result ? <RefreshCw aria-hidden /> : <Dices aria-hidden />}
           {roll.isPending ? "Rolling…" : result ? "Re-roll" : "Roll candidates"}
         </Button>

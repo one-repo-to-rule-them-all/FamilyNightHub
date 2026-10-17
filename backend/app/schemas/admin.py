@@ -196,6 +196,20 @@ class JoinSlugOut(BaseModel):
     join_slug: str
 
 
+class HelpCountOut(BaseModel):
+    """The TV's "waiting for the host" nudge (G4): pending person claims only."""
+
+    count: int
+    # First name of the person in the oldest waiting claim; null when count is 0.
+    first_name: str | None
+
+
+class PinResetCountOut(BaseModel):
+    """The admin nav badge (G4)."""
+
+    open_count: int
+
+
 class JoinLinkOut(BaseModel):
     """What the TV needs to draw its join QR: `/j/{join_slug}`, plus `?code={code}` when
     `qr_includes_night_code` is on. The night code is never here: the server only keeps its
