@@ -132,6 +132,63 @@ function joinAnd(parts: string[]): string {
   return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
 
+/** What the People table needs of a person (ADR-0014 adds `has_pin` / `locked`). */
+export type PersonStatusLike = { is_guest: boolean; has_pin: boolean; locked: boolean };
+
+/** The Status column (owner-portal spec §5 P3): a lock outranks having a PIN. */
+export type PersonStatus = "locked" | "no-pin" | "pin-set";
+
+export const PERSON_STATUS_LABEL: Record<PersonStatus, string> = {
+  locked: "Locked",
+  "no-pin": "No PIN yet",
+  "pin-set": "PIN set",
+};
+
+export function personStatus(person: PersonStatusLike): PersonStatus {
+  if (person.locked) return "locked";
+  return person.has_pin ? "pin-set" : "no-pin";
+}
+
+/** Locked out, or nobody has chosen a PIN yet: the "Needs attention" filter. */
+export function needsAttention(person: PersonStatusLike): boolean {
+  return personStatus(person) !== "pin-set";
+}
+
+export const PEOPLE_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "family", label: "Family" },
+  { key: "guests", label: "Guests" },
+  { key: "attention", label: "Needs attention" },
+] as const;
+
+export type PeopleFilter = (typeof PEOPLE_FILTERS)[number]["key"];
+
+export function filterPeople<T extends PersonStatusLike>(people: T[], filter: PeopleFilter): T[] {
+  switch (filter) {
+    case "family":
+      return people.filter((p) => !p.is_guest);
+    case "guests":
+      return people.filter((p) => p.is_guest);
+    case "attention":
+      return people.filter(needsAttention);
+    default:
+      return people;
+  }
+}
+
+/** "6 people · 5 family, 1 guest" under the People header. */
+export function peopleSummary(people: PersonStatusLike[]): string {
+  const guests = people.filter((p) => p.is_guest).length;
+  const family = people.length - guests;
+  return `${count(people.length, "person", "people")} · ${family} family, ${count(guests, "guest", "guests")}`;
+}
+
+/** `#person-{id}` (the inbox's "See profile" link) → the id, else null. */
+export function personIdFromHash(hash: string): string | null {
+  const match = /^#person-(.+)$/.exec(hash);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 /** The label, else what it is. */
 export function deviceName(device: { label: string | null; is_tv: boolean }): string {
   return device.label ?? (device.is_tv ? "Living-room TV" : "Unnamed phone");
