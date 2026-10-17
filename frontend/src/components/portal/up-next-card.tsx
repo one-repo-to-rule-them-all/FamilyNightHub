@@ -47,6 +47,11 @@ export function UpNextCard({
     createdId: created?.session_id,
     optionCount: snapshot.data?.options.length ?? null,
   });
+  // The code is shown once: as soon as that night moves past draft, the card forgets it
+  // (adjusted while rendering, React's pattern for state derived from props).
+  if (created && current?.id === created.session_id && current.status !== "draft") {
+    setCreated(null);
+  }
 
   const tvButton = (id: string) =>
     onUseAsTv ? (
@@ -62,9 +67,9 @@ export function UpNextCard({
       aria-labelledby="up-next-title"
       className="flex flex-col gap-4 rounded-2xl bg-card p-5 ring-1 ring-foreground/10"
     >
-      {state.kind === "none" ? (
+      {state.kind === "none" && !created ? (
         <StartNight lastNight={lastNight} onCreated={setCreated} />
-      ) : state.kind === "created" && created ? (
+      ) : created && (state.kind === "created" || state.kind === "none") ? (
         <>
           <Eyebrow>Up next</Eyebrow>
           <h2 id="up-next-title" className="text-xl font-semibold">
