@@ -26,11 +26,15 @@ export async function openNight(page: Page, sessionId: string) {
   await expect(page.getByRole("heading", { name: "Photos from tonight" })).toBeVisible();
 }
 
-/** Picks files on the phone's photo input and waits until every upload row is `done`. */
+/**
+ * Picks files on the phone's photo input and waits until every upload row is `done`. Finished rows
+ * from an earlier pick stay listed, so the new ones are counted on top of them.
+ */
 export async function addPhotos(page: Page, files: string[]) {
-  await page.getByTestId("photo-input").setInputFiles(files);
   const rows = page.getByTestId("upload-list").getByRole("listitem");
-  await expect(rows).toHaveCount(files.length);
+  const before = await rows.count();
+  await page.getByTestId("photo-input").setInputFiles(files);
+  await expect(rows).toHaveCount(before + files.length);
   for (const row of await rows.all()) {
     await expect(row).toHaveAttribute("data-state", "done", { timeout: UPLOAD_TIMEOUT });
   }

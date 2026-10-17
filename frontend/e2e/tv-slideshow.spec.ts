@@ -1,6 +1,6 @@
 import { type Browser, type Page } from "@playwright/test";
 
-import { expectNoAxeViolations, signInAsHost } from "./support/host";
+import { expectNoAxeViolations, pairAsTv, signInAsHost } from "./support/host";
 import { apiFromPhone, joinAs, newPhone } from "./support/phones";
 import { addPhotos, type AlbumPhoto, JPEG_FIXTURE, openNight, PRESIGNED } from "./support/photos";
 import { expect, type SeededNight, seedNight, test } from "./support/seed";
@@ -25,9 +25,7 @@ async function pairedTv(browser: Browser, night: SeededNight, origin: string): P
   });
   await signInAsHost(context, night, origin);
   const tv = await context.newPage();
-  await tv.goto("/host");
-  await tv.getByRole("button", { name: "Use this browser as the TV" }).click();
-  await tv.getByRole("button", { name: "Yes, make it the TV" }).click();
+  await pairAsTv(tv);
   await expect(tv).toHaveURL(new RegExp(`/tv/${night.sessionId}$`));
   await expect(tv.locator("[data-live]").first()).toHaveAttribute("data-live", "ready");
   return tv;

@@ -1,7 +1,7 @@
 import { type Browser, type Page } from "@playwright/test";
 
 import { expectNoAxeViolations, signInAsHost } from "./support/host";
-import { hostClosesVoting, joinAs, newPhone } from "./support/phones";
+import { hostClosesVoting, joinAs, newPhone, switchTo } from "./support/phones";
 import { expect, type SeededNight, seedNight, test } from "./support/seed";
 
 /**
@@ -45,11 +45,9 @@ async function tvShowsTheResult(browser: Browser, baseURL: string, night: Seeded
   return tv;
 }
 
-/** Open the ballot. A phone holding several people asks "Who's voting?" first. */
-async function startVoting(page: Page, night: SeededNight, name: string, shared = false) {
-  await page.getByRole("link", { name: "Vote now" }).click();
+/** The phone lands on the ballot as its current person (the last one picked, ADR-0014). */
+async function startVoting(page: Page, night: SeededNight, name: string) {
   await expect(page).toHaveURL(new RegExp(`/s/${night.sessionId}$`));
-  if (shared) await page.getByRole("button", { name: new RegExp(`^${name}`) }).click();
   await expect(page.getByTestId("voting-as")).toHaveText(name);
 }
 
@@ -64,8 +62,8 @@ test.describe("voting methods", () => {
     const [paddington, spirited, ironGiant] = night.movies;
     await hostOpensVotingWith(browser, baseURL!, night, "Pick one");
 
-    await joinAs(page, night, ["Ava", "Mia"]);
-    await startVoting(page, night, "Ava", true);
+    await joinAs(page, night, ["Mia", "Ava"]);
+    await startVoting(page, night, "Ava");
     await expect(page.getByRole("heading", { name: "Pick one" })).toBeVisible();
     const done = page.getByRole("button", { name: "Done" });
     await expect(done).toBeDisabled();
@@ -82,8 +80,7 @@ test.describe("voting methods", () => {
       `Picked${spirited}`,
     ]);
 
-    await page.getByRole("button", { name: "Pass to next person" }).click();
-    await page.getByRole("button", { name: /^Mia/ }).click();
+    await switchTo(page, "Mia", { via: "pass" });
     await card(page, paddington).click();
     await page.getByRole("button", { name: "Done" }).click();
     await expect(page.getByRole("heading", { name: "Thanks, Mia!" })).toBeVisible();

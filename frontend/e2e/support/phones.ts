@@ -45,21 +45,82 @@ export async function newPhoneLike(
   return { context, page: await context.newPage() };
 }
 
-/** Join with the night code, then claim each person on /who (server-confirmed). */
+/**
+ * Each seeded person's test PIN (ADR-0014: every person has a 6-digit PIN). Stable per name, so a
+ * second phone claiming the same person types the same PIN.
+ */
+export const PINS: Record<string, string> = {
+  Ava: "135790",
+  Leo: "246813",
+  Mia: "975310",
+  // admin.spec merges Nana into Grandma: one PIN, whichever of the two ends up holding it.
+  Nana: "864209",
+  Grandma: "864209",
+};
+export const pinFor = (name: string) => PINS[name] ?? "112358";
+
+/** Types a PIN on the open PIN sheet's keypad input (the hidden numeric input the keypad drives). */
+export async function typePin(page: Page, pin: string) {
+  await page.getByTestId("pin-input").fill(pin);
+}
+
+/**
+ * Taps `name` on /who and gets through the PIN sheet: a first claim chooses the PIN (S3c, typed
+ * twice), a later one types it (S3e). Ends once the phone has left /who for the night.
+ */
+export async function pickPerson(page: Page, name: string, pin = pinFor(name)) {
+  await expect(page).toHaveURL(/\/who$/);
+  await page.getByRole("button", { name: new RegExp(`^${name}`) }).click();
+  const sheet = page.getByTestId("pin-sheet");
+  await expect(sheet).toBeVisible();
+  if ((await sheet.locator("[data-screen]").first().getAttribute("data-screen")) === "pin-create") {
+    await typePin(page, pin);
+    await expect(sheet).toContainText("Type it again");
+  }
+  await typePin(page, pin);
+  await expect(page).not.toHaveURL(/\/who$/);
+}
+
+/** Types the night code on /j/{slug}; the form joins by itself once the code is complete. */
+export async function joinNight(page: Page, night: Pick<SeededNight, "slug" | "nightCode">) {
+  await page.goto(`/j/${night.slug}`);
+  await page.getByLabel("Night code").fill(night.nightCode);
+  await expect(page).toHaveURL(/\/who$/);
+}
+
+/**
+ * Join with the night code, then claim each person through /who with their PIN. The last name is
+ * the phone's current person (ADR-0014: one current person per phone).
+ */
 export async function joinAs(
   page: Page,
   night: Pick<SeededNight, "slug" | "nightCode">,
   names: string[],
 ) {
-  await page.goto(`/j/${night.slug}`);
-  await page.getByLabel("Night code").fill(night.nightCode);
-  await page.getByRole("button", { name: "Join" }).click();
-  await expect(page).toHaveURL(/\/who$/);
-  for (const name of names) {
-    const tile = page.getByRole("button", { name: new RegExp(`^${name}`) });
-    await tile.click();
-    await expect(tile).toHaveAttribute("data-binding", "mine");
+  await joinNight(page, night);
+  for (const [i, name] of names.entries()) {
+    if (i > 0) await page.goto("/who");
+    await pickPerson(page, name);
   }
+}
+
+/**
+ * The shared-phone switch (guest-flow "Switch sheet"): the chip's Switch (or S11's "Pass to next
+ * person") → their tile → their PIN. ADR-0014: every switch needs that person's PIN.
+ */
+export async function switchTo(
+  page: Page,
+  name: string,
+  { pin = pinFor(name), via = "chip" }: { pin?: string; via?: "chip" | "pass" } = {},
+) {
+  if (via === "chip") await page.getByTestId("current-chip").click();
+  else await page.getByRole("button", { name: "Pass to next person" }).click();
+  const sheet = page.getByTestId("switch-sheet");
+  await sheet.getByRole("button", { name: new RegExp(`^${name}`) }).click();
+  await expect(page.getByTestId("pin-sheet")).toBeVisible();
+  await typePin(page, pin);
+  await expect(page.getByTestId("pin-sheet")).toHaveCount(0);
+  await expect(page.getByTestId("voting-as").first()).toHaveText(name);
 }
 
 /**

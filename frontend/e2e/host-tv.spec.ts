@@ -6,7 +6,8 @@ import {
   pinTieBreakSeed,
   signInAsHost,
 } from "./support/host";
-import { expect, test } from "./support/seed";
+import { joinAs } from "./support/phones";
+import { expect, seedHousehold, test } from "./support/seed";
 
 /** The tie-break seed the host's close pins (honoured only with ENVIRONMENT=test, 07-cicd.md). */
 const TEST_SEED = "424242";
@@ -17,11 +18,12 @@ test.describe("host and TV", () => {
   test("a night end to end: pair the TV, shortlist, phone + proxy votes, close, reveal", async ({
     browser,
     page,
-    night,
     baseURL,
   }) => {
     test.slow(); // three browsers and a few poll cycles
     const origin = baseURL as string;
+    // No night yet: Home's Up-next card offers "Start movie night" (owner portal §5 P1a).
+    const night = seedHousehold();
 
     // --- The TV's browser: the host signs in there, starts the night, pairs it as the TV.
     const tvContext = await browser.newContext({
@@ -32,15 +34,19 @@ test.describe("host and TV", () => {
     const tv = await tvContext.newPage();
     await tv.goto("/host");
     await expect(tv.getByTestId("signed-in-as")).toContainText(night.householdName);
+    await expect(tv.getByTestId("up-next")).toHaveAttribute("data-up-next", "none");
     await tv.getByLabel("Name it (optional)").fill("E2E Friday");
-    await tv.getByRole("button", { name: "Start a night" }).click();
+    await tv.getByRole("button", { name: "Start movie night" }).click();
 
     const codeText = tv.getByTestId("night-code");
     await expect(codeText).toHaveText(/^[2-9A-HJKMNP-Z]{6}$/);
     const code = (await codeText.textContent())!.trim();
 
-    await tv.getByRole("button", { name: "Use this browser as the TV" }).click();
-    await tv.getByRole("button", { name: "Yes, make it the TV" }).click();
+    await tv.getByRole("button", { name: "Show it on this TV" }).click();
+    await tv
+      .getByTestId("use-as-tv-confirm")
+      .getByRole("button", { name: "Yes, make it the TV" })
+      .click();
     await expect(tv).toHaveURL(/\/tv\/[0-9a-f-]{36}$/);
     const sessionId = tv.url().split("/").at(-1)!;
 
@@ -55,7 +61,8 @@ test.describe("host and TV", () => {
     // --- The host's phone: build the shortlist.
     await signInAsHost(page.context(), night, origin);
     await page.goto("/host");
-    await page.getByRole("link", { name: /E2E Friday/ }).click();
+    await expect(page.getByTestId("up-next")).toContainText("E2E Friday");
+    await page.getByTestId("up-next").getByTestId("primary-action").click();
     await expect(page).toHaveURL(new RegExp(`/host/${sessionId}$`));
     await expect(page.getByTestId("night-status")).toHaveText("Building the shortlist");
     // Another browser: it never saw the code, so it offers a rotate instead of showing one.
@@ -108,15 +115,7 @@ test.describe("host and TV", () => {
     // --- A phone joins with the code on the TV and votes.
     const phoneContext = await browser.newContext({ ...devices["Pixel 7"], baseURL: origin });
     const phone = await phoneContext.newPage();
-    await phone.goto(`/j/${night.slug}`);
-    await phone.getByLabel("Night code").fill(code);
-    await phone.getByRole("button", { name: "Join" }).click();
-    await expect(phone).toHaveURL(/\/who$/);
-    await phone.getByRole("button", { name: /^Ava/ }).click();
-    await expect(phone.getByRole("button", { name: /^Ava/ })).toHaveAttribute(
-      "data-binding",
-      "mine",
-    );
+    await joinAs(phone, { slug: night.slug, nightCode: code }, ["Ava"]);
     expect(await castPhoneBallot(phone, sessionId, "Ava", ["Paddington"])).toBe(204);
 
     const avaTile = tv.getByTestId("tv-tile").and(tv.locator('[data-person="Ava"]'));
@@ -166,8 +165,11 @@ test.describe("host and TV", () => {
     const tv = await context.newPage();
     await tv.goto("/host");
     // Pair without starting a night here: /tv follows the seeded night, whose code it never saw.
-    await tv.getByRole("button", { name: "Use this browser as the TV" }).click();
-    await tv.getByRole("button", { name: "Yes, make it the TV" }).click();
+    await tv.getByRole("button", { name: "Show it on this TV" }).click();
+    await tv
+      .getByTestId("use-as-tv-confirm")
+      .getByRole("button", { name: "Yes, make it the TV" })
+      .click();
     await expect(tv).toHaveURL(/\/tv\/[0-9a-f-]{36}$/);
 
     await expect(tv.getByTestId("tv-night-code")).toHaveCount(0);

@@ -5,6 +5,8 @@ import {
   joinAs,
   newPhone,
   poster,
+  switchTo,
+  typePin,
   vote,
 } from "./support/phones";
 import { signInAsHost } from "./support/host";
@@ -25,19 +27,18 @@ test.describe("phone voting", () => {
     const night = seedNight({ movies: 4, openVoting: true });
     const [paddington, spirited, ironGiant, coco] = night.movies;
 
-    // Phone A is shared by Ava and Mia; phone B is Leo's.
-    await joinAs(page, night, ["Ava", "Mia"]);
+    // Phone A is shared by Mia and Ava (Ava is current: the last one picked); phone B is Leo's.
+    await joinAs(page, night, ["Mia", "Ava"]);
     const phoneB = await newPhone(browser);
     await joinAs(phoneB, night, ["Leo"]);
 
-    await page.getByRole("link", { name: "Vote now" }).click();
+    // A phone with a current person lands straight on the night (guest-flow AC-2.3).
     await expect(page).toHaveURL(new RegExp(`/s/${night.sessionId}$`));
     await expect(page.getByTestId("night-screen")).toHaveAttribute("data-live", "ready");
-    await expect(page.getByRole("heading", { name: "Who's voting?" })).toBeVisible();
+    await expect(page.getByTestId("voting-as")).toHaveText("Ava");
     await expectNoAxeViolations(page);
 
     // Tap-to-rank: 1, 2, 3; a second tap clears and the next tap takes the freed rank.
-    await page.getByRole("button", { name: /^Ava/ }).click();
     const done = page.getByRole("button", { name: "Done" });
     await expect(done).toBeDisabled();
     await poster(page, spirited).click();
@@ -56,10 +57,8 @@ test.describe("phone voting", () => {
       `Pick 2${coco}`,
     ]);
 
-    // Pass the phone: back to the grid, where Ava now shows as voted (from the server).
-    await page.getByRole("button", { name: "Pass to next person" }).click();
-    await expect(page.getByRole("button", { name: /^Ava/ })).toHaveAttribute("data-voted", "true");
-    await page.getByRole("button", { name: /^Mia/ }).click();
+    // Pass the phone: Mia needs her own PIN (ADR-0014: every switch).
+    await switchTo(page, "Mia", { via: "pass" });
     // A full ballot ignores a 4th tap.
     await poster(page, spirited).click();
     await poster(page, paddington).click();
@@ -73,9 +72,19 @@ test.describe("phone voting", () => {
       `Pick 2${paddington}`,
       `Pick 3${coco}`,
     ]);
+    // Everyone on this phone has voted: no one to pass to, and the switch sheet says Ava voted.
+    await expect(page.getByRole("button", { name: "Pass to next person" })).toHaveCount(0);
+    await page.getByTestId("current-chip").click();
+    await expect(
+      page.getByTestId("switch-sheet").getByRole("button", { name: /^Ava/ }),
+    ).toContainText("Voted ✓");
+    await page
+      .getByTestId("switch-sheet")
+      .getByRole("button", { name: "Back to Mia" })
+      .last()
+      .click();
 
     // One person on the phone: straight to the ballot, and nobody to pass to.
-    await phoneB.getByRole("link", { name: "Vote now" }).click();
     await expect(phoneB.getByRole("heading", { name: "Rank your favourites" })).toBeVisible();
     await vote(phoneB, "Leo", [paddington]);
     await expect(phoneB.getByRole("button", { name: "Pass to next person" })).toHaveCount(0);
@@ -117,41 +126,29 @@ test.describe("phone voting", () => {
     }[];
     const ava = people.find((p) => p.name === "Ava")!;
 
-    // Phone B asks for Ava too: that is only a pending claim, so the ballot never offers her.
+    // Phone B is Leo's. Without Ava's PIN it can't act as her: forcing a ballot is refused.
     const phoneB = await newPhone(browser);
-    await phoneB.goto(`/j/${night.slug}`);
-    await phoneB.getByLabel("Night code").fill(night.nightCode);
-    await phoneB.getByRole("button", { name: "Join" }).click();
-    const avaOnB = phoneB.getByRole("button", { name: /^Ava/ });
-    await avaOnB.click();
-    await expect(avaOnB).toHaveAttribute("data-binding", "pending");
-    await phoneB.goto(`/s/${night.sessionId}`);
-    await expect(phoneB.getByRole("link", { name: "Pick who you are" })).toBeVisible();
-
-    // Forcing it through the API is refused by the server, whatever the UI shows.
+    await joinAs(phoneB, night, ["Leo"]);
     const forced = await apiFromPhone(phoneB, "PUT", `/sessions/${night.sessionId}/ballots`, {
       person_id: ava.id,
       ranks: [{ option_id: "00000000-0000-0000-0000-000000000000", rank: 1 }],
     });
     expect(forced.status).toBe(403);
-    expect(forced.body).toMatchObject({ error: { message: "This phone can't vote as them" } });
 
     // A stale ballot screen shows the server's own message: Ava is released from phone A
     // after its ballot loaded, then Done is refused.
-    await page.goto(`/s/${night.sessionId}`);
     await expect(page.getByTestId("voting-as")).toHaveText("Ava");
     const released = await apiFromPhone(page, "DELETE", `/devices/me/people/${ava.id}`);
     expect(released.status).toBe(204);
     await poster(page, first).click();
     await page.getByRole("button", { name: "Done" }).click();
-    await expect(page.getByTestId("api-error-message")).toHaveText("This phone can't vote as them");
-    // The refusal refreshes who this phone is, so it now asks to pick again.
-    await expect(page.getByRole("link", { name: "Pick who you are" })).toBeVisible();
+    // The refusal refreshes who this phone is: with nobody current it is back on "Who's watching?".
+    await expect(page.locator('[data-screen="who"]')).toBeVisible();
 
     await phoneB.context().close();
   });
 
-  test("a pending claim flips to mine on /who once the host approves, with no reload", async ({
+  test("a held person without the PIN goes to the host, whose Home inbox approves it", async ({
     page,
     browser,
     baseURL,
@@ -159,26 +156,33 @@ test.describe("phone voting", () => {
     const night = seedNight({ movies: 2, openVoting: true });
     await joinAs(page, night, ["Ava"]);
 
-    // Phone B asks for Ava, who is on the first phone: it waits on /who for the host.
+    // Phone B asks for Ava, who is on the first phone. Two wrong PINs offer "Ask the host"
+    // (ADR-0014's host override), and the phone waits for them.
     const phoneB = await newPhone(browser);
     await joinAs(phoneB, night, ["Leo"]);
-    const avaOnB = phoneB.getByRole("button", { name: /^Ava/ });
-    await avaOnB.click();
-    await expect(avaOnB).toHaveAttribute("data-binding", "pending");
+    await phoneB.goto("/who");
+    await phoneB.getByRole("button", { name: /^Ava/ }).click();
+    await expect(phoneB.locator('[data-screen="pin-enter"]')).toBeVisible();
+    for (const _ of [1, 2]) {
+      await typePin(phoneB, "000000");
+      await expect(phoneB.getByTestId("pin-message")).toContainText("tries left");
+    }
+    await phoneB.getByRole("button", { name: /Ask the host/ }).click();
+    await expect(phoneB.locator('[data-screen="pending"]')).toBeVisible();
 
-    // The host approves from /host in their own browser.
+    // The host approves from the Home inbox in their own browser.
     const hostContext = await browser.newContext({ baseURL: baseURL as string });
     await signInAsHost(hostContext, night, baseURL as string);
     const host = await hostContext.newPage();
     await host.goto("/host");
-    await host.getByRole("button", { name: "Approve Ava" }).click(POLL);
-    await expect(host.getByText("No phones are waiting.")).toBeVisible();
+    const row = host.locator('[data-inbox-kind="claim"]');
+    await expect(row).toContainText("Ava", POLL);
+    await row.getByRole("button", { name: /^Approve/ }).click();
+    await expect(host.getByTestId("inbox-empty")).toBeVisible(POLL);
 
-    // /who polls while a claim is pending, so the tile flips to mine on its own.
-    await expect(avaOnB).toHaveAttribute("data-binding", "mine", POLL);
-    await expect(phoneB.getByTestId("who-status")).toHaveText(
-      "You're in as Ava & Leo. Voting opens on the TV.",
-    );
+    // The waiting screen polls, so phone B moves on to the night as Ava by itself.
+    await expect(phoneB).toHaveURL(new RegExp(`/s/${night.sessionId}$`), POLL);
+    await expect(phoneB.getByTestId("voting-as")).toHaveText("Ava");
 
     await hostContext.close();
     await phoneB.context().close();
@@ -187,8 +191,6 @@ test.describe("phone voting", () => {
   test("a night still being set up says so", async ({ page }) => {
     const night = seedNight();
     await joinAs(page, night, ["Mia"]);
-    // A draft night isn't live, so /who offers no link to it yet.
-    await expect(page.getByTestId("go-to-night")).toHaveCount(0);
     await page.goto(`/s/${night.sessionId}`);
     await expect(page.getByRole("heading", { name: "Almost ready" })).toBeVisible();
     await expect(page.getByTestId("night-screen")).toHaveAttribute("data-status", "draft");

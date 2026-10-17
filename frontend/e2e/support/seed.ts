@@ -9,6 +9,11 @@ export type SeededHousehold = {
   slug: string;
   householdName: string;
   adminEmail: string;
+  /** ADR-0014 password login: `host-{slug}` and the seed's test password (seed_night.py). */
+  adminUsername: string;
+  password: string;
+  /** Every person's PIN when seeded with `pins`, else null (nobody has a PIN yet). */
+  pin: string | null;
   people: string[];
   /** A signed `fnh_session` value for the household's admin (see seed_night.py). */
   hostCookie: string;
@@ -36,6 +41,8 @@ export type SeedOptions = {
   owned?: number;
   /** The household's streaming services (TMDB provider ids, e.g. 337 = Disney Plus). */
   providers?: number[];
+  /** Give every seeded person the test PIN (`pin` in the result). */
+  pins?: boolean;
 };
 
 const BACKEND = path.resolve(__dirname, "../../../backend");
@@ -49,12 +56,18 @@ export function seedNight(options: SeedOptions = {}): SeededNight {
   if (options.hostAccount) args.push("--host-account");
   if (options.owned) args.push("--owned", String(options.owned));
   if (options.providers?.length) args.push("--providers", options.providers.join(","));
+  if (options.pins) args.push("--pins");
   return runSeed(args) as SeededNight;
 }
 
 /** A fresh household with its people and no night: the host starts one through the UI. */
-export function seedHousehold(): SeededHousehold {
-  return runSeed(["--no-night"]);
+export function seedHousehold(
+  options: { pins?: boolean; hostAccount?: boolean } = {},
+): SeededHousehold {
+  const args = ["--no-night"];
+  if (options.pins) args.push("--pins");
+  if (options.hostAccount) args.push("--host-account");
+  return runSeed(args);
 }
 
 function runSeed(extra: string[]): SeededHousehold {
