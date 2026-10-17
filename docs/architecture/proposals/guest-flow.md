@@ -172,7 +172,7 @@ flowchart TD
    transition instead. Such a screen has no primary button. It carries
    `data-testid="waiting"`, an `aria-live="polite"` status line saying what it waits for, and a
    live progress fact (for example "5 of 7 voted").
-2. **At most two secondary actions**, as outline or ghost buttons and text links. One is always
+2. **At most two secondary actions**, as `secondary` or ghost buttons and text links (rule 9). One is always
    the way out: *Not you? Switch*, *Pick someone else*, or *Back*.
 3. **No dead end.** Every screen, error states included, has a primary action or an announced
    automatic transition, and also a way out. "Scan the QR again" is never the only thing on a
@@ -190,6 +190,13 @@ flowchart TD
    notice on the new screen. It never leaves an error on a screen that no longer applies.
 8. Every screen root carries `data-screen="<id>"` (the ids below) so a Playwright spec can assert
    where the phone is.
+9. **Enabled must look enabled.** On the dark theme the `outline` button variant reads as
+   disabled (found on the tonight screen, 2026-10-17). Standalone secondary actions use the
+   `secondary` variant (solid neutral fill, full-contrast text). `outline` is kept for inline
+   controls inside a card (Retry, Change my picks) and never for the only other action on a
+   screen. Muted text (`text-muted-foreground`) is never placed directly above a button as if it
+   were its label, and no plain sentence starts with a verb that names an action ("Rate later",
+   "Add…") unless it is the control itself.
 
 ---
 
@@ -346,8 +353,35 @@ action** and there is no OK button. A close ✕ returns to S2.
 - **Secondary:** **See all results** (expands).
 
 ### S13 — Tonight (`tonight`)
-- **Primary:** **Add photos** (the existing photo drop). Secondary: **Rate it now** (folded, as
-  built).
+Owner feedback from the first phone test (2026-10-17): the line "Rate later: we'll ask how it was
+after the movie" sat above an **outline** "Rate it now" button. On a dark phone screen the outline
+button looked greyed out, the sentence read like a missing button, and the owner was surprised
+rating was allowed. The hierarchy, top to bottom, is now fixed:
+
+| # | Element | Style | Notes |
+|---|---|---|---|
+| 1 | Winner card (compact) | info only | As built; the one place the cinema accent glows. |
+| 2 | **Add photos** | **primary** (filled, `default` variant, `tap` size) | The `PhotoDrop` label. On an empty album this becomes the empty-state tile (below), so there is still exactly one primary. |
+| 3 | Upload list, then album grid | content | Album refreshes every 10 s (`ALBUM_REFRESH_MS`) and on focus, so other phones' photos appear without a reload. |
+| 4 | **Already watched? Rate it** | **secondary** (`secondary` variant: solid neutral fill, full-contrast text, `tap` size) | Unfolds `RatingPanel` in place (as built). No sentence above it. |
+
+- **Removed:** the "Rate later: we'll ask how it was after the movie" sentence and the card around
+  it. What it explained (we ask again after the movie) is already true through the home card, and
+  a sentence above a button reads as a label for a control that isn't there.
+- **Empty album** (`photos.length === 0`): instead of the passive "No photos yet." line plus a
+  separate button, the drop **is** the empty state: a large tile (min 160px tall, dashed border,
+  camera icon) carrying `copy.s13.emptyTitle` and `copy.s13.emptyBody`, and the whole tile is the
+  `Add photos` file picker label (`data-testid="primary-action"`). The standalone Add photos
+  button is not rendered while the album is empty. Once the first photo lands (this phone's upload
+  or the 10 s refresh), the tile collapses to the normal button above the grid.
+- **No "Pick who you are to add photos" link.** Under the resolver a phone on S13 always has a
+  current person, so the outline link in `PhotoAlbum` (today's `mine.length === 0` branch) can't
+  appear here. It stays only for `/albums/[session]` opened directly by a phone with nobody set,
+  where it routes through the resolver.
+- **Shared phone:** the "Sharing as" chips stay, but default to the current person (ADR-0014),
+  not `mine[0]`.
+- The same rules apply to S14 and the `closed` screen: one filled primary, and every other
+  enabled action uses the `secondary` variant (§4 rule 9).
 
 ### S14 — How was it? (`closed`, rating owed)
 - **Primary:** the star row (a tap saves, as built). After rating → **Past movie nights**
@@ -464,6 +498,9 @@ waiting screens.
 | `copy.s11.change` | Change my picks |
 | `copy.s12.body` | Get the snacks! Photos open in a moment. |
 | `copy.s13.primary` | Add photos |
+| `copy.s13.emptyTitle` | No photos yet |
+| `copy.s13.emptyBody` | Tap here to add the first one: snacks, the couch crew, the screen! |
+| `copy.s13.rate` | Already watched? Rate it |
 | `copy.s14.title` | How was **{movie}**? |
 | `copy.live.reconnecting` | Reconnecting… |
 | `copy.stale.closed` | That changed while you were away. Here's where things are now. |
@@ -512,6 +549,7 @@ S3c.
 | D8 | The TV says "Scan the fridge QR to join" (no slug). | QR to `/j/{slug}#c={code}` (G1). |
 | D9 | No PIN, lock, reset, self-create, rename or profile screens. | S3 to S7, the switch sheet, the profile. |
 | D10 | `/host` lists pending claims only. | Claims plus PIN resets in one badge-counted queue, plus the "Vote as …" card. |
+| D12 | `tonight`: "Rate later: we'll ask…" sentence above an **outline** "Rate it now" (read as disabled on a phone); empty album is a passive "No photos yet." line. | S13 hierarchy: **Add photos** primary, empty album becomes the Add photos tile, **Already watched? Rate it** as a `secondary` button with no sentence above it (§4 rule 9). |
 | D11 | Live-night discovery on `/who` covers `voting/revealed/tonight` (PR #35). | The resolver also includes `draft` (S9), so a phone that joins early sits on "Almost ready" and slides into the ballot. |
 
 ---
@@ -622,6 +660,15 @@ Conventions: `screen(x)` means `[data-screen="x"]` is visible. `primary` is
   `screen(winner)` with `copy.s10.closed`.
 - AC-9.5 (revealed → tonight): `screen(winner)` → `screen(tonight)` within REVEAL_SETTLE + 7 s with
   no interaction. The primary is **Add photos**.
+- AC-9.5a (tonight hierarchy): on `screen(tonight)` with photos, exactly one `primary-action` (the
+  Add photos label) and it is the first control after the winner card. `getByRole("button",
+  { name: "Already watched? Rate it" })` is enabled, has the `secondary` variant
+  (`data-variant="secondary"`), and its computed text colour has ≥ 4.5:1 contrast against its own
+  background. No element with text matching `/rate later/i` exists. Tapping it shows the star rows.
+- AC-9.5b (empty album): with no photos, `getByTestId("album-empty")` is the Add photos tile and is
+  the screen's only `primary-action`; its box is ≥ 160px tall and contains `copy.s13.emptyTitle`.
+  Setting a file on its input starts an upload, and once a photo exists (own upload, or another
+  phone's within 12 s) the tile is gone and the grid plus a normal Add photos button show.
 - AC-9.6 (closed): with a rating owed → `screen(rate)` with stars as the primary; after a star
   tap → the primary is **Past movie nights**.
 
