@@ -99,6 +99,21 @@
     0 0 24px 2px oklch(0.72 0.18 38 / 35%);
 }
 
+/* A refused PIN: the dots shake once, then clear (guest-flow spec §5 S3). */
+@keyframes pin-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25%,
+  75% {
+    transform: translateX(-8px);
+  }
+  50% {
+    transform: translateX(8px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

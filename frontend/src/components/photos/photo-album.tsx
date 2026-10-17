@@ -23,7 +23,16 @@ type ReactionChange = { photoId: string; emoji: ReactionEmoji; mine: boolean; pe
  * phone holds, then the album as a thumbnail grid that opens a full-screen viewer with reactions.
  * Used on /s/[session] (tonight, closed) and /albums/[session].
  */
-export function PhotoAlbum({ sessionId, canAdd = true }: { sessionId: string; canAdd?: boolean }) {
+export function PhotoAlbum({
+  sessionId,
+  canAdd = true,
+  actorId,
+}: {
+  sessionId: string;
+  canAdd?: boolean;
+  /** This phone's current person (ADR-0014): the default "Sharing as". */
+  actorId?: string;
+}) {
   const queryClient = useQueryClient();
   const album = useAlbum(sessionId);
   const people = useQuery<Person[], ApiError>({ queryKey: PEOPLE, queryFn: api.people });
@@ -39,8 +48,11 @@ export function PhotoAlbum({ sessionId, canAdd = true }: { sessionId: string; ca
   });
 
   const mine = (people.data ?? []).filter((p) => p.binding === "mine");
-  const actor = mine.find((p) => p.id === chosen) ?? mine[0] ?? null;
+  const actor =
+    mine.find((p) => p.id === chosen) ?? mine.find((p) => p.id === actorId) ?? mine[0] ?? null;
   const photos = album.data ?? [];
+  // On an empty album the drop is the empty state, so there is still one primary (spec S13).
+  const emptyDrop = canAdd && actor !== null && album.isSuccess && photos.length === 0;
   const index = photos.findIndex((p) => p.id === open);
   const current = index >= 0 ? photos[index] : null;
 
@@ -54,7 +66,7 @@ export function PhotoAlbum({ sessionId, canAdd = true }: { sessionId: string; ca
         people.isPending ? null : mine.length === 0 ? (
           <Link
             href="/who"
-            className={cn(buttonVariants({ variant: "outline", size: "tap" }), "w-full")}
+            className={cn(buttonVariants({ variant: "secondary", size: "tap" }), "w-full")}
           >
             Pick who you are to add photos
           </Link>
@@ -84,7 +96,9 @@ export function PhotoAlbum({ sessionId, canAdd = true }: { sessionId: string; ca
                 </div>
               </div>
             ) : null}
-            {actor ? <PhotoDrop sessionId={sessionId} personId={actor.id} /> : null}
+            {actor ? (
+              <PhotoDrop sessionId={sessionId} personId={actor.id} empty={emptyDrop} />
+            ) : null}
           </>
         )
       ) : null}
@@ -103,10 +117,12 @@ export function PhotoAlbum({ sessionId, canAdd = true }: { sessionId: string; ca
           ))}
         </div>
       ) : photos.length === 0 ? (
-        <p className="flex items-center gap-2 text-muted-foreground" data-testid="album-empty">
-          <Camera aria-hidden className="size-5" />
-          No photos yet.
-        </p>
+        emptyDrop ? null : (
+          <p className="flex items-center gap-2 text-muted-foreground" data-testid="album-empty">
+            <Camera aria-hidden className="size-5" />
+            No photos yet.
+          </p>
+        )
       ) : (
         <ul className="grid grid-cols-3 gap-2" data-testid="album-grid">
           {photos.map((photo) => (

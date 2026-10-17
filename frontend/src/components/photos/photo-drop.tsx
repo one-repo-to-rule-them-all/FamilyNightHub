@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CircleAlert, ImagePlus, LoaderCircle, RotateCw, X } from "lucide-react";
+import { Camera, Check, CircleAlert, ImagePlus, LoaderCircle, RotateCw, X } from "lucide-react";
 import { useId } from "react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -19,9 +19,18 @@ const STATE_TEXT: Record<JobStatus["state"], string> = {
 
 /**
  * "Add photos": a plain multi-file picker (no `capture`, never `image/heic` in `accept`, so iOS
- * offers the library and the camera both), then one progress row per file.
+ * offers the library and the camera both), then one progress row per file. On an empty album the
+ * picker **is** the empty state (guest-flow spec §5 S13): one large tile, still the only primary.
  */
-export function PhotoDrop({ sessionId, personId }: { sessionId: string; personId: string }) {
+export function PhotoDrop({
+  sessionId,
+  personId,
+  empty = false,
+}: {
+  sessionId: string;
+  personId: string;
+  empty?: boolean;
+}) {
   const inputId = useId();
   const { rows, add, retry, dismiss } = usePhotoUploads(sessionId);
 
@@ -29,13 +38,29 @@ export function PhotoDrop({ sessionId, personId }: { sessionId: string; personId
     <div className="flex flex-col gap-3">
       <label
         htmlFor={inputId}
+        data-testid={empty ? "album-empty" : "primary-action"}
         className={cn(
-          buttonVariants({ size: "tap" }),
-          "w-full cursor-pointer has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
+          empty
+            ? "flex min-h-40 w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-foreground/25 p-5 text-center"
+            : cn(buttonVariants({ size: "tap" }), "w-full"),
+          "cursor-pointer has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
         )}
       >
-        <ImagePlus aria-hidden />
-        Add photos
+        {empty ? (
+          <span data-testid="primary-action" className="flex flex-col items-center gap-2">
+            <Camera aria-hidden className="size-10 text-cinema" />
+            <span className="text-xl font-medium">No photos yet</span>
+            <span className="text-muted-foreground">
+              Tap here to add the first one: snacks, the couch crew, the screen!
+            </span>
+            <span className="sr-only">Add photos</span>
+          </span>
+        ) : (
+          <>
+            <ImagePlus aria-hidden />
+            Add photos
+          </>
+        )}
         <input
           id={inputId}
           type="file"
