@@ -5,6 +5,7 @@ import { POLL_MS } from "./live";
 import {
   cleanGuestName,
   colorFor,
+  actingPeople,
   currentPerson,
   canFollow,
   followWaiting,
@@ -126,6 +127,22 @@ describe("new guest", () => {
     expect(cleanGuestName("  Tío   Beto ")).toBe("Tío Beto");
     expect(cleanGuestName("   ")).toBeNull();
     expect(cleanGuestName("x".repeat(41))).toBeNull();
+  });
+});
+
+describe("actingPeople", () => {
+  // E2E 2026-10-17: a shared phone's rating panel and "Sharing as" offered everyone it holds,
+  // and the API refused all but the current person.
+  it("is only the current person, never others held by the phone", () => {
+    const ava = tile({ id: "a", name: "Ava", binding: "mine", current: true });
+    const leo = tile({ id: "l", name: "Leo", binding: "mine" });
+    expect(actingPeople([leo, ava])).toEqual([ava]);
+  });
+
+  it("is nobody without a current person with a PIN", () => {
+    expect(actingPeople([tile({ binding: "mine" })])).toEqual([]);
+    expect(actingPeople([tile({ binding: "mine", current: true, has_pin: false })])).toEqual([]);
+    expect(actingPeople(undefined)).toEqual([]);
   });
 });
 

@@ -36,6 +36,15 @@ export function currentPerson(people: readonly PersonTile[] | undefined): Person
   return people?.find((p) => p.current && p.binding === "mine" && p.has_pin) ?? null;
 }
 
+/**
+ * Who a rating, photo or reaction can be from on this phone: the current person only (ADR-0014;
+ * the API answers 403 "Switch to them on this phone first" for anyone else it holds).
+ */
+export function actingPeople<T extends PersonTile>(people: readonly T[] | undefined): T[] {
+  const current = currentPerson(people);
+  return current ? [current as T] : [];
+}
+
 /** Family first, then guests, each in the server's order (spec §5 S2). */
 export function orderTiles<T extends Pick<PersonTile, "is_guest">>(people: readonly T[]): T[] {
   return [...people.filter((p) => !p.is_guest), ...people.filter((p) => p.is_guest)];
