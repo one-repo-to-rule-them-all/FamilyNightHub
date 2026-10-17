@@ -40,7 +40,9 @@ RATE: dict[int | str, dict[str, Any]] = {
 
 def _raise(err: ServiceError) -> NoReturn:
     if isinstance(err, Forbidden):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "This phone can't rate as them") from None
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, err.reason or "This phone can't rate as them"
+        ) from None
     raise_http(err)
 
 

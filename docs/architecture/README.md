@@ -38,6 +38,7 @@ The numbered docs go **broad → narrow**.
 | Pre-auth lookups (device, magic link, slug) via narrow definer functions | [`ADR-0009`](decisions/ADR-0009-pre-auth-lookups-via-definer-functions.md) |
 | Approval and pick-one voting: ballots, storage, faithful tie-break (extends ADR-0006) | [`ADR-0010`](decisions/ADR-0010-approval-and-pick-one-voting.md) |
 | Hosting cost correction: self-operated Postgres, staging scaled to zero | [`ADR-0013`](decisions/ADR-0013-hosting-cost-correction.md) |
+| Passwords for accounts, a required 6-digit PIN per person, admin-approved PIN resets (supersedes parts of ADR-0002) | [`ADR-0014`](decisions/ADR-0014-passwords-and-person-pins.md) |
 
 ## The 30-second mental model
 
