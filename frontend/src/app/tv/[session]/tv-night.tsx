@@ -21,11 +21,12 @@ import {
   rememberNightCode,
 } from "@/lib/night-code-handoff";
 import { cleanNightCodeInput, completeNightCode } from "@/lib/night-code";
+import { runKey, tvPlays } from "@/lib/slideshow-control";
 import { cn } from "@/lib/utils";
 
 import { useCurrentNight } from "../tv-home";
 import { Reveal } from "./reveal";
-import { TvSlideshow } from "./slideshow";
+import { DropPrompt, TvSlideshow } from "./slideshow";
 
 /**
  * No endpoint exposes the household's join slug to a device (or to a host) yet, so the TV can't
@@ -105,7 +106,13 @@ export function TvNight({ sessionId }: { sessionId: string }) {
       ) : null}
 
       {data.status === "tonight" || data.status === "closed" ? (
-        <TvSlideshow night={data} live={live} />
+        tvPlays(data.slideshow) ? (
+          // Each Start from the host is a new key: the slideshow restarts from the newest photo.
+          <TvSlideshow key={runKey(data)} night={data} live={live} />
+        ) : (
+          // The host pressed Stop: hold on the drop prompt (no album fetch, no URLs) until Start.
+          <DropPrompt night={data} count={0} held />
+        )
       ) : data.result ? (
         <Reveal night={data} animate={data.status === "revealed"} />
       ) : null}

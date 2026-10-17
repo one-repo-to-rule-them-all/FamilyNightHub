@@ -9,7 +9,7 @@ import { PhoneScreen } from "@/components/phone-screen";
 import { RatingPanel } from "@/components/night/rating-panel";
 import { PhotoAlbum } from "@/components/photos/photo-album";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { useLiveSession } from "@/hooks/use-live-session";
+import { type LiveState, useLiveSession } from "@/hooks/use-live-session";
 import type { Night } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -58,13 +58,13 @@ export function NightScreen({ sessionId }: { sessionId: string }) {
           )}
         </PhoneScreen>
       ) : (
-        <NightState night={night.data} />
+        <NightState night={night.data} live={night.live} />
       )}
     </div>
   );
 }
 
-function NightState({ night }: { night: Night }) {
+function NightState({ night, live }: { night: Night; live: LiveState }) {
   switch (night.status) {
     case "draft":
       return (
@@ -88,7 +88,7 @@ function NightState({ night }: { night: Night }) {
       return (
         <PhoneScreen title="Tonight">
           <WinnerCard night={night} compact />
-          <PhotoAlbum sessionId={night.id} />
+          <PhotoAlbum sessionId={night.id} live={live} />
           <RateLater night={night} />
         </PhoneScreen>
       );
@@ -98,7 +98,7 @@ function NightState({ night }: { night: Night }) {
           <WinnerCard night={night} compact />
           <RatingPanel night={night} />
           <Results night={night} />
-          <PhotoAlbum sessionId={night.id} />
+          <PhotoAlbum sessionId={night.id} live={live} />
           <Link
             href="/history"
             className={cn(buttonVariants({ variant: "outline", size: "tap" }), "w-full")}
