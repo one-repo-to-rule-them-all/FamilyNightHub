@@ -24,8 +24,16 @@ from app.core.dependencies import (
     ViewerDb,
     require_permission,
 )
-from app.schemas.sessions import BallotIn, OwnBallotOut, RankOut, VoterOut, VotersOut
-from app.services import ballot_service
+from app.schemas.sessions import (
+    BallotIn,
+    OwnBallotOut,
+    PresenceOut,
+    PresentOut,
+    RankOut,
+    VoterOut,
+    VotersOut,
+)
+from app.services import attendance_service, ballot_service
 from app.services.errors import ServiceError
 
 router = APIRouter(prefix="/sessions/{session_id}", tags=["ballots"])
@@ -128,5 +136,26 @@ async def voters(session_id: uuid.UUID, viewer: CurrentViewer, db: ViewerDb) -> 
         voted=[
             VoterOut(person_id=v.person_id, avatar_emoji=v.avatar_emoji, color=v.color)
             for v in voted
+        ]
+    )
+
+
+@router.get(
+    "/present",
+    response_model=PresenceOut,
+    responses={404: {"description": "No such night in this household"}},
+)
+async def present(session_id: uuid.UUID, viewer: CurrentViewer, db: ViewerDb) -> PresenceOut:
+    """Who's here tonight, with whether they've voted. Never ranks or tallies (ADR-0006)."""
+    try:
+        people = await attendance_service.present(db, viewer.household_id, session_id)
+    except ServiceError as err:
+        raise_http(err)
+    return PresenceOut(
+        present=[
+            PresentOut(
+                person_id=p.person_id, avatar_emoji=p.avatar_emoji, color=p.color, voted=p.voted
+            )
+            for p in people
         ]
     )

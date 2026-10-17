@@ -146,6 +146,13 @@ async def seed_household(tag: str) -> SeededHousehold:
             person_id=ids["person"],
             requested_by_device_id=ids["device"],
         )
+        ids["session_attendance"] = await _insert(
+            s,
+            "session_attendance",
+            household_id=hid,
+            session_id=ids["session"],
+            person_id=ids["person"],
+        )
         ids["audit_event"] = await _insert(
             s, "audit_events", household_id=hid, action="seed", target_type="household"
         )

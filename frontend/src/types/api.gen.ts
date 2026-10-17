@@ -250,6 +250,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/people/pin-resets/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Count Pin Resets
+         * @description Open requests, for the admin nav badge.
+         */
+        get: operations["count_pin_resets_api_v1_admin_people_pin_resets_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/people/pin-resets/{request_id}/approve": {
         parameters: {
             query?: never;
@@ -557,6 +577,27 @@ export interface paths {
         };
         /** My Device */
         get: operations["my_device_api_v1_devices_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/me/help-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Help Count
+         * @description How many phones are waiting for a host to OK a person claim, and who the oldest one
+         *     is for. The TV only. PIN resets are admin-only and never counted here.
+         */
+        get: operations["help_count_api_v1_devices_me_help_count_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1162,6 +1203,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}/present": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Present
+         * @description Who's here tonight, with whether they've voted. Never ranks or tallies (ADR-0006).
+         */
+        get: operations["present_api_v1_sessions__session_id__present_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/ratings": {
         parameters: {
             query?: never;
@@ -1687,6 +1748,16 @@ export interface components {
              */
             status: "ok" | "error";
         };
+        /**
+         * HelpCountOut
+         * @description The TV's "waiting for the host" nudge (G4): pending person claims only.
+         */
+        HelpCountOut: {
+            /** Count */
+            count: number;
+            /** First Name */
+            first_name: string | null;
+        };
         /** JoinIn */
         JoinIn: {
             /** Device Label */
@@ -2091,6 +2162,14 @@ export interface components {
             error: components["schemas"]["PinErrorBody"];
         };
         /**
+         * PinResetCountOut
+         * @description The admin nav badge (G4).
+         */
+        PinResetCountOut: {
+            /** Open Count */
+            open_count: number;
+        };
+        /**
          * PinResetOut
          * @description A "forgot PIN" request. Approving clears the PIN; no PIN is ever shown or chosen.
          */
@@ -2162,6 +2241,29 @@ export interface components {
             place: number;
             /** Score */
             score: number;
+        };
+        /**
+         * PresenceOut
+         * @description Who's here tonight (G8): people a phone set to them opened the night or voted for,
+         *     plus anyone with a ballot. Family first, then guests.
+         */
+        PresenceOut: {
+            /** Present */
+            present: components["schemas"]["PresentOut"][];
+        };
+        /** PresentOut */
+        PresentOut: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Voted */
+            voted: boolean;
         };
         /** ProfileAlbumOut */
         ProfileAlbumOut: {
@@ -3032,6 +3134,26 @@ export interface operations {
             };
         };
     };
+    count_pin_resets_api_v1_admin_people_pin_resets_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinResetCountOut"];
+                };
+            };
+        };
+    };
     approve_pin_reset_api_v1_admin_people_pin_resets__request_id__approve_post: {
         parameters: {
             query?: never;
@@ -3607,6 +3729,33 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeviceOut"];
                 };
+            };
+        };
+    };
+    help_count_api_v1_devices_me_help_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HelpCountOut"];
+                };
+            };
+            /** @description Only the TV reads this */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -5150,6 +5299,44 @@ export interface operations {
             };
             /** @description The photo hasn't finished uploading */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    present_api_v1_sessions__session_id__present_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresenceOut"];
+                };
+            };
+            /** @description No such night in this household */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
