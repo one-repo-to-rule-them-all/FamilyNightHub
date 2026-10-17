@@ -15,9 +15,9 @@ export const nightKey = (sessionId: string) => ["night", sessionId] as const;
  *
  * Mints an SSE ticket and opens the night's stream (`LiveConnection`). Every event, and every
  * (re)open, invalidates `["night", id]`, which by prefix also refreshes anything keyed under it
- * (the voters list). The snapshot is the only source of truth: events are never read. While the
- * stream is down (or the night is `revealed`) the snapshot polls every 5s, and it refetches
- * when the tab becomes visible.
+ * (the voters list; Here tonight's `/present`, which the `presence` event is for). The snapshot
+ * is the only source of truth: events are never read. While the stream is down (or the night is
+ * `revealed`) the snapshot polls every 5s, and it refetches when the tab becomes visible.
  * `live` is `ready` while the stream is open, else `reconnecting`; screens render it as
  * `data-live`, which the e2e specs wait on.
  */

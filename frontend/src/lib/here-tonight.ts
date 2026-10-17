@@ -3,7 +3,7 @@
  * and, while voting, who has voted. Never how anyone voted (ADR-0006): the inputs carry ids,
  * avatars and a voted flag only.
  */
-import type { NightStatus, PresentPerson, Voter } from "@/lib/api";
+import type { NightStatus, PresentPerson } from "@/lib/api";
 
 export type HereItem = {
   personId: string;
@@ -17,18 +17,15 @@ export type HereItem = {
 type Named = { id: string; name: string; is_guest: boolean };
 
 /**
- * One row per person, family first then guests, in the server's order. `present` is G8's
- * attendance list; without it (the backend doesn't serve it yet) the voters stand in, all voted.
+ * One row per person, family first then guests, in the server's order (G8's attendance list).
  * Names come from the people list the phone already holds.
  */
 export function hereTonight(
-  present: readonly PresentPerson[] | null,
-  voters: readonly Voter[],
+  present: readonly PresentPerson[],
   people: readonly Named[],
 ): HereItem[] {
   const byId = new Map(people.map((p) => [p.id, p]));
-  const rows: readonly PresentPerson[] = present ?? voters.map((v) => ({ ...v, voted: true }));
-  const items = rows.map((row) => {
+  const items = present.map((row) => {
     const person = byId.get(row.person_id);
     return {
       personId: row.person_id,
@@ -47,21 +44,11 @@ export function showHereStrip(items: readonly HereItem[], selfId: string | null)
   return items.some((i) => i.personId !== selfId);
 }
 
-/**
- * The strip's label and count line: `copy.here.countVoting` while voting, `copy.here.count`
- * otherwise. Without attendance data (voters only) the label is `copy.here.votedOnly`, so it
- * never claims to know who is in the room.
- */
-export function hereSummary(
-  items: readonly HereItem[],
-  status: NightStatus,
-  hasAttendance: boolean,
-): { label: string; count: string } {
+/** The strip's count line: `copy.here.countVoting` while voting, `copy.here.count` otherwise. */
+export function hereCount(items: readonly HereItem[], status: NightStatus): string {
+  if (status !== "voting") return `${items.length} here`;
   const voted = items.filter((i) => i.voted).length;
-  if (!hasAttendance) return { label: "Voted so far", count: `${voted} voted` };
-  const count =
-    status === "voting" ? `${items.length} here · ${voted} voted` : `${items.length} here`;
-  return { label: "Here tonight", count };
+  return `${items.length} here · ${voted} voted`;
 }
 
 /** Avatars that fit before the rest collapse into `+N`. */

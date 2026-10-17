@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useLiveSession } from "@/hooks/use-live-session";
 import { useVoters } from "@/hooks/use-voters";
 import { useWakeLock } from "@/hooks/use-wake-lock";
-import { api, ApiError, type JoinLink, type Night, type Person } from "@/lib/api";
+import { api, ApiError, type JoinLink, type Night, type Person, type Schemas } from "@/lib/api";
 import { qrShape, tvJoinUrl } from "@/lib/join-link";
 import {
   forgetNightCode,
@@ -22,6 +22,7 @@ import {
 } from "@/lib/night-code-handoff";
 import { cleanNightCodeInput, completeNightCode } from "@/lib/night-code";
 import { runKey, tvPlays } from "@/lib/slideshow-control";
+import { TV_HELP_POLL_MS, tvHelpName } from "@/lib/tv-help";
 import { cn } from "@/lib/utils";
 
 import { useCurrentNight } from "../tv-home";
@@ -98,6 +99,7 @@ export function TvNight({ sessionId }: { sessionId: string }) {
               voting={data.status === "voting"}
             />
           </div>
+          <HelpNudge />
         </div>
       ) : null}
 
@@ -136,6 +138,34 @@ function Headline({ night, voted, total }: { night: Night; voted: number; total:
         {voted} of {total} voted
       </p>
     </div>
+  );
+}
+
+/**
+ * The lobby's corner line while a phone's person claim waits for the host (spec §5 TV, G4).
+ * Pending claims only: PIN resets are admin-only and never reach the TV. A 403 (this device
+ * isn't the household's TV) stops the polling and shows nothing.
+ */
+function HelpNudge() {
+  const help = useQuery<Schemas["HelpCountOut"], ApiError>({
+    queryKey: ["devices", "me", "help-count"],
+    queryFn: api.helpCount,
+    refetchInterval: (query) => (query.state.error?.status === 403 ? false : TV_HELP_POLL_MS),
+    retry: false,
+  });
+  const name = tvHelpName(help.data);
+  return (
+    <p
+      role="status"
+      className="tv-body fixed right-[1.5em] bottom-[1.5em] max-w-[24em] rounded-2xl bg-card px-[1em] py-[0.6em] ring-1 ring-foreground/10 empty:hidden"
+      data-testid="tv-help"
+    >
+      {name ? (
+        <>
+          <strong>{name}</strong> is waiting for the host. Check your phone.
+        </>
+      ) : null}
+    </p>
   );
 }
 

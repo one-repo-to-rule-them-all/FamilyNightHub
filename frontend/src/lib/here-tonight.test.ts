@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hereSummary, hereTonight, overflow, showHereStrip } from "./here-tonight";
+import { hereCount, hereTonight, overflow, showHereStrip } from "./here-tonight";
 
 const people = [
   { id: "g", name: "Tío", is_guest: true },
@@ -10,24 +10,24 @@ const people = [
 const avatar = { avatar_emoji: "🦊", color: "#3b82f6" };
 
 describe("hereTonight", () => {
-  it("uses attendance when the backend serves it, family first", () => {
+  it("puts family first, then guests, keeping the server's order", () => {
     const items = hereTonight(
       [
         { person_id: "g", ...avatar, voted: false },
+        { person_id: "b", ...avatar, voted: false },
         { person_id: "a", ...avatar, voted: true },
       ],
-      [],
       people,
     );
     expect(items.map((i) => [i.personId, i.name, i.voted])).toEqual([
+      ["b", "Beto", false],
       ["a", "Ana", true],
       ["g", "Tío", false],
     ]);
   });
 
-  it("falls back to voters (all voted) without attendance", () => {
-    const items = hereTonight(null, [{ person_id: "b", ...avatar }], people);
-    expect(items).toEqual([
+  it("maps a row to a tile", () => {
+    expect(hereTonight([{ person_id: "b", ...avatar, voted: true }], people)).toEqual([
       {
         personId: "b",
         name: "Beto",
@@ -39,7 +39,7 @@ describe("hereTonight", () => {
   });
 
   it("keeps someone the phone can't name, as a guest without a name", () => {
-    const [item] = hereTonight(null, [{ person_id: "zz", ...avatar }], people);
+    const [item] = hereTonight([{ person_id: "zz", ...avatar, voted: false }], people);
     expect(item).toMatchObject({ name: null, isGuest: true });
   });
 });
@@ -50,7 +50,6 @@ describe("strip", () => {
       { person_id: "a", ...avatar, voted: true },
       { person_id: "b", ...avatar, voted: false },
     ],
-    [],
     people,
   );
 
@@ -59,16 +58,9 @@ describe("strip", () => {
     expect(showHereStrip(items, "a")).toBe(true);
   });
 
-  it("counts here and voted, but never claims presence from voters alone", () => {
-    expect(hereSummary(items, "voting", true)).toEqual({
-      label: "Here tonight",
-      count: "2 here · 1 voted",
-    });
-    expect(hereSummary(items, "tonight", true)).toEqual({ label: "Here tonight", count: "2 here" });
-    expect(hereSummary(items, "voting", false)).toEqual({
-      label: "Voted so far",
-      count: "1 voted",
-    });
+  it("counts here, and voted only while voting", () => {
+    expect(hereCount(items, "voting")).toBe("2 here · 1 voted");
+    expect(hereCount(items, "tonight")).toBe("2 here");
   });
 
   it("collapses the rest into +N", () => {

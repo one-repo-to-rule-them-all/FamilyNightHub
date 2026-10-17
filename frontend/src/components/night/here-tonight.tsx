@@ -5,9 +5,8 @@ import { Check } from "lucide-react";
 
 import { Avatar } from "@/components/night/avatar";
 import { nightKey } from "@/hooks/use-live-session";
-import { useVoters } from "@/hooks/use-voters";
-import { api, ApiError, type Night, type PersonTile, type PresentPerson } from "@/lib/api";
-import { hereSummary, hereTonight, overflow, showHereStrip } from "@/lib/here-tonight";
+import { api, type Night, type PersonTile } from "@/lib/api";
+import { hereCount, hereTonight, overflow, showHereStrip } from "@/lib/here-tonight";
 import { type LiveState, pollWhileDown } from "@/lib/live";
 import { cn } from "@/lib/utils";
 
@@ -32,26 +31,16 @@ export function HereTonight({
   selfId: string | null;
   compact?: boolean;
 }) {
-  const present = useQuery<PresentPerson[] | null, ApiError>({
+  const present = useQuery({
     queryKey: presentKey(night.id),
-    queryFn: async () => {
-      try {
-        return (await api.present(night.id)).present;
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 404) return null;
-        throw error;
-      }
-    },
-    retry: false,
+    queryFn: async () => (await api.present(night.id)).present,
     refetchInterval: pollWhileDown(live),
   });
-  const fallback = present.isSuccess && present.data === null;
-  const voters = useVoters(night.id, fallback, live);
 
   if (!present.isSuccess) return null;
-  const items = hereTonight(present.data, voters.data ?? [], people);
+  const items = hereTonight(present.data, people);
   if (!showHereStrip(items, selfId)) return null;
-  const { label, count } = hereSummary(items, night.status, !fallback);
+  const count = hereCount(items, night.status);
   const voting = night.status === "voting";
   const { shown, more } = overflow(items, compact ? 6 : 10);
 
@@ -94,7 +83,7 @@ export function HereTonight({
         ) : null}
       </ul>
       <p className="text-sm text-muted-foreground">
-        {compact ? null : <span className="font-medium text-foreground">{label} · </span>}
+        {compact ? null : <span className="font-medium text-foreground">Here tonight · </span>}
         <span aria-live="polite">{count}</span>
       </p>
     </section>
