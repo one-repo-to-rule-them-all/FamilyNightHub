@@ -14,6 +14,7 @@ import { type AdminPerson, type ApiError, type MergeResult, api } from "@/lib/ap
 
 import { AdminQueryError } from "../admin-error";
 import { PersonForm } from "./person-form";
+import { PinRequests } from "./pin-requests";
 
 const PEOPLE_KEY = ["admin", "people"] as const;
 
@@ -35,6 +36,7 @@ export function PeopleAdmin() {
       <p aria-live="polite" data-testid="people-notice" className="empty:hidden">
         {notice}
       </p>
+      <PinRequests onNotice={setNotice} />
       <AddPerson onAdded={(p) => setNotice(`Added ${p.name}.`)} />
       {people.isPending ? (
         <p role="status" className="text-muted-foreground">

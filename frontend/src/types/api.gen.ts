@@ -1283,6 +1283,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}/slideshow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Slideshow
+         * @description Start or stop the paired TV's slideshow on a `tonight`/`closed` night (409 before
+         *     then). Start restarts it from the newest photo each time; Stop is idempotent. The TV hears
+         *     `status_changed` and switches without a reload.
+         */
+        put: operations["set_slideshow_api_v1_sessions__session_id__slideshow_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/stream": {
         parameters: {
             query?: never;
@@ -2509,6 +2531,13 @@ export interface components {
             /** Revealed At */
             revealed_at: string | null;
             /**
+             * Slideshow
+             * @enum {string}
+             */
+            slideshow: "auto" | "playing" | "stopped";
+            /** Slideshow Started At */
+            slideshow_started_at: string | null;
+            /**
              * Status
              * @enum {string}
              */
@@ -2579,6 +2608,14 @@ export interface components {
             region?: string | null;
             /** Streaming Providers */
             streaming_providers?: number[] | null;
+        };
+        /**
+         * SlideshowIn
+         * @description Start (`true`) or stop (`false`) the paired TV's slideshow (issue #41).
+         */
+        SlideshowIn: {
+            /** Playing */
+            playing: boolean;
         };
         /** SseTicketIn */
         SseTicketIn: {
@@ -5482,6 +5519,55 @@ export interface operations {
                 content?: never;
             };
             /** @description Ratings are not open yet */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_slideshow_api_v1_sessions__session_id__slideshow_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SlideshowIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not allowed in the night's current state */
             409: {
                 headers: {
                     [name: string]: unknown;

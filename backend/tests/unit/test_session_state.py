@@ -211,3 +211,21 @@ def test_ratings_closed_before_the_pick(status: str) -> None:
     with pytest.raises(SessionRuleError, match="Ratings open"):
         ss.check_can_rate(status)
     assert not ss.shows_rating(status)
+
+
+@pytest.mark.parametrize("status", ["tonight", "closed"])
+def test_the_slideshow_is_controllable_once_the_album_opens(status: str) -> None:
+    ss.check_can_control_slideshow(status)
+
+
+@pytest.mark.parametrize("status", ["draft", "voting", "revealed", "nonsense"])
+def test_the_slideshow_waits_for_the_pick(status: str) -> None:
+    with pytest.raises(SessionRuleError, match="slideshow starts"):
+        ss.check_can_control_slideshow(status)
+
+
+def test_slideshow_mode() -> None:
+    at = datetime(2026, 10, 17, 21, 0, tzinfo=UTC)
+    assert ss.slideshow_mode(None, None) == "auto"
+    assert ss.slideshow_mode(at, None) == "playing"
+    assert ss.slideshow_mode(None, at) == "stopped"

@@ -1,17 +1,19 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera } from "lucide-react";
+import { Camera, Play } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { PersonAvatar } from "@/components/photos/person-avatar";
+import { PhoneSlideshow } from "@/components/photos/phone-slideshow";
 import { PhotoDrop } from "@/components/photos/photo-drop";
 import { PhotoViewer } from "@/components/photos/photo-viewer";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { albumKey, useAlbum } from "@/hooks/use-album";
 import { api, type ApiError, type Person, type ReactionEmoji } from "@/lib/api";
+import { type LiveState } from "@/lib/live";
 import { cn } from "@/lib/utils";
 
 const PEOPLE = ["people"] as const;
@@ -21,14 +23,27 @@ type ReactionChange = { photoId: string; emoji: ReactionEmoji; mine: boolean; pe
 /**
  * The night's photos on a phone (04-frontend.md "Photo drop"): "Add photos" for the people this
  * phone holds, then the album as a thumbnail grid that opens a full-screen viewer with reactions.
- * Used on /s/[session] (tonight, closed) and /albums/[session].
+ * Used on /s/[session] (tonight, closed) and /albums/[session]. "Play slideshow" opens the TV's
+ * slideshow full screen on this phone; `live` is the screen's own useLiveSession state.
  */
-export function PhotoAlbum({ sessionId, canAdd = true }: { sessionId: string; canAdd?: boolean }) {
+export function PhotoAlbum({
+  sessionId,
+  live,
+  canAdd = true,
+  actorId,
+}: {
+  sessionId: string;
+  live: LiveState;
+  canAdd?: boolean;
+  /** This phone's current person (ADR-0014): the default "Sharing as". */
+  actorId?: string;
+}) {
   const queryClient = useQueryClient();
   const album = useAlbum(sessionId);
   const people = useQuery<Person[], ApiError>({ queryKey: PEOPLE, queryFn: api.people });
   const [chosen, setChosen] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
 
   const react = useMutation<void, ApiError, ReactionChange>({
     mutationFn: ({ photoId, emoji, mine, personId }) =>
@@ -39,8 +54,11 @@ export function PhotoAlbum({ sessionId, canAdd = true }: { sessionId: string; ca
   });
 
   const mine = (people.data ?? []).filter((p) => p.binding === "mine");
-  const actor = mine.find((p) => p.id === chosen) ?? mine[0] ?? null;
+  const actor =
+    mine.find((p) => p.id === chosen) ?? mine.find((p) => p.id === actorId) ?? mine[0] ?? null;
   const photos = album.data ?? [];
+  // On an empty album the drop is the empty state, so there is still one primary (spec S13).
+  const emptyDrop = canAdd && actor !== null && album.isSuccess && photos.length === 0;
   const index = photos.findIndex((p) => p.id === open);
   const current = index >= 0 ? photos[index] : null;
 
@@ -54,7 +72,7 @@ export function PhotoAlbum({ sessionId, canAdd = true }: { sessionId: string; ca
         people.isPending ? null : mine.length === 0 ? (
           <Link
             href="/who"
-            className={cn(buttonVariants({ variant: "outline", size: "tap" }), "w-full")}
+            className={cn(buttonVariants({ variant: "secondary", size: "tap" }), "w-full")}
           >
             Pick who you are to add photos
           </Link>
@@ -84,7 +102,9 @@ export function PhotoAlbum({ sessionId, canAdd = true }: { sessionId: string; ca
                 </div>
               </div>
             ) : null}
-            {actor ? <PhotoDrop sessionId={sessionId} personId={actor.id} /> : null}
+            {actor ? (
+              <PhotoDrop sessionId={sessionId} personId={actor.id} empty={emptyDrop} />
+            ) : null}
           </>
         )
       ) : null}
@@ -103,39 +123,59 @@ export function PhotoAlbum({ sessionId, canAdd = true }: { sessionId: string; ca
           ))}
         </div>
       ) : photos.length === 0 ? (
-        <p className="flex items-center gap-2 text-muted-foreground" data-testid="album-empty">
-          <Camera aria-hidden className="size-5" />
-          No photos yet.
-        </p>
+        emptyDrop ? null : (
+          <p className="flex items-center gap-2 text-muted-foreground" data-testid="album-empty">
+            <Camera aria-hidden className="size-5" />
+            No photos yet.
+          </p>
+        )
       ) : (
-        <ul className="grid grid-cols-3 gap-2" data-testid="album-grid">
-          {photos.map((photo) => (
-            <li key={photo.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  react.reset();
-                  setOpen(photo.id);
-                }}
-                aria-label={`Open photo by ${photo.person_name}`}
-                className="block aspect-square w-full overflow-hidden rounded-lg bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring"
-              >
-                {/* Presigned GET from the private bucket (ADR-0005), never via Next's optimizer. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photo.thumb_url}
-                  alt=""
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                  // An expired URL (a phone asleep past the TTL): fetch fresh ones.
-                  onError={() => void album.refetch()}
-                  className="size-full object-cover"
-                />
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          {photos.some((p) => p.status === "ready") ? (
+            <Button
+              variant="secondary"
+              size="tap"
+              className="w-full"
+              onClick={() => setPlaying(true)}
+              data-testid="play-slideshow"
+            >
+              <Play aria-hidden className="fill-current" />
+              Play slideshow
+            </Button>
+          ) : null}
+          <ul className="grid grid-cols-3 gap-2" data-testid="album-grid">
+            {photos.map((photo) => (
+              <li key={photo.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    react.reset();
+                    setOpen(photo.id);
+                  }}
+                  aria-label={`Open photo by ${photo.person_name}`}
+                  className="block aspect-square w-full overflow-hidden rounded-lg bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring"
+                >
+                  {/* Presigned GET from the private bucket (ADR-0005), never via Next's optimizer. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.thumb_url}
+                    alt=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    // An expired URL (a phone asleep past the TTL): fetch fresh ones.
+                    onError={() => void album.refetch()}
+                    className="size-full object-cover"
+                  />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
+
+      {playing ? (
+        <PhoneSlideshow sessionId={sessionId} live={live} onClose={() => setPlaying(false)} />
+      ) : null}
 
       {current ? (
         <PhotoViewer

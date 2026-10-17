@@ -72,6 +72,11 @@ class Session(Base):
         CheckConstraint("voting_method IN ('top3', 'approval', 'pick_one')", name="voting_method"),
         # 1..8 since ADR-0010: approval may hold the whole shortlist.
         CheckConstraint("ballot_size BETWEEN 1 AND 8", name="ballot_size"),
+        # The host's slideshow control: started, stopped, or neither (auto). Never both.
+        CheckConstraint(
+            "num_nonnulls(slideshow_started_at, slideshow_stopped_at) <= 1",
+            name="slideshow_one_state",
+        ),
         scoped_fk("host_account_id", "accounts"),
         # The winner must be one of this session's own options (05-data.md).
         ForeignKeyConstraint(
@@ -107,6 +112,9 @@ class Session(Base):
     voting_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revealed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Host's Start/Stop for the TV slideshow (issue #41); both null = auto.
+    slideshow_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    slideshow_stopped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Option(Base):
