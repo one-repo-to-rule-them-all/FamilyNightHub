@@ -1,4 +1,5 @@
-"""Magic-link sign-in, the fnh_session cookie and CurrentAccount (ADR-0002)."""
+"""Magic-link (now forgot-password, ADR-0014) sign-in, the fnh_session cookie and
+CurrentAccount (ADR-0002). Password login is in test_password_login.py."""
 
 from __future__ import annotations
 
@@ -58,8 +59,12 @@ async def request_link(p: Phone, email: str) -> Response:
     return await _post(p, "/api/v1/auth/magic-link", {"email": email})
 
 
-async def verify(p: Phone, token: str) -> Response:
-    return await _post(p, "/api/v1/auth/verify", {"token": token})
+# ADR-0014: the link is "forgot password", so verifying it always sets a new one.
+NEW_PASSWORD = "correct horse battery staple"
+
+
+async def verify(p: Phone, token: str, new_password: str = NEW_PASSWORD) -> Response:
+    return await _post(p, "/api/v1/auth/verify", {"token": token, "new_password": new_password})
 
 
 async def sign_in(p: Phone, outbox: Outbox, email: str) -> None:

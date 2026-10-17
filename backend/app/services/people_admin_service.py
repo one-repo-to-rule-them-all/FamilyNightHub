@@ -31,6 +31,24 @@ class Person:
     color: str
     is_guest: bool
     created_at: datetime
+    has_pin: bool = False
+    locked: bool = False
+
+
+@dataclass(frozen=True)
+class PinReset:
+    """A "forgot PIN" request as the admin sees it. Never carries a PIN or its hash."""
+
+    id: uuid.UUID
+    person_id: uuid.UUID
+    person_name: str
+    avatar_emoji: str
+    person_locked: bool
+    requested_by_device_id: uuid.UUID
+    device_label: str | None
+    status: str
+    requested_at: datetime
+    resolved_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -48,11 +66,16 @@ class MergeResult:
     bindings_dropped: int
 
 
-_COLUMNS = "id, name, avatar_emoji, color, is_guest, created_at"
+_COLUMNS = (
+    "id, name, avatar_emoji, color, is_guest, created_at, "
+    "pin_hash IS NOT NULL AS has_pin, pin_locked_at IS NOT NULL AS locked"
+)
 
 
 def _person(r: Any) -> Person:
-    return Person(r.id, r.name, r.avatar_emoji, r.color, r.is_guest, r.created_at)
+    return Person(
+        r.id, r.name, r.avatar_emoji, r.color, r.is_guest, r.created_at, r.has_pin, r.locked
+    )
 
 
 async def _audit(
@@ -78,7 +101,7 @@ async def _audit(
     )
 
 
-async def _lock_names(db: AsyncSession, household_id: uuid.UUID) -> None:
+async def lock_names(db: AsyncSession, household_id: uuid.UUID) -> None:
     """Serialize name-uniqueness checks per household until the transaction ends."""
     await db.execute(
         text("SELECT pg_advisory_xact_lock(hashtextextended('people:' || :h, 0))"),
@@ -86,7 +109,7 @@ async def _lock_names(db: AsyncSession, household_id: uuid.UUID) -> None:
     )
 
 
-async def _require_unique_name(
+async def require_unique_name(
     db: AsyncSession, name: str, except_id: uuid.UUID | None = None
 ) -> None:
     taken: str | None = await db.scalar(
@@ -136,8 +159,8 @@ async def create(
     color: str,
     is_guest: bool,
 ) -> Person:
-    await _lock_names(db, household_id)
-    await _require_unique_name(db, name)
+    await lock_names(db, household_id)
+    await require_unique_name(db, name)
     row = (
         await db.execute(
             text(
@@ -164,10 +187,10 @@ async def update(
 ) -> Person:
     """Rename / re-avatar / recolour; fields left None are unchanged. Merged → 404."""
     if name is not None:
-        await _lock_names(db, household_id)
+        await lock_names(db, household_id)
     current = await _get_live(db, person_id, lock=True)
     if name is not None and name.lower() != current.name.lower():
-        await _require_unique_name(db, name, except_id=person_id)
+        await require_unique_name(db, name, except_id=person_id)
     row = (
         await db.execute(
             text(
@@ -337,3 +360,104 @@ async def merge(
         },
     )
     return result
+
+
+# --- PIN resets (ADR-0014) ---------------------------------------------------------
+
+_RESET_SQL = """
+    SELECT r.id, r.person_id, p.name AS person_name, p.avatar_emoji,
+           p.pin_locked_at IS NOT NULL AS person_locked, r.requested_by_device_id,
+           d.label AS device_label, r.status, r.created_at AS requested_at, r.resolved_at
+    FROM pin_reset_requests r
+    JOIN people p ON p.id = r.person_id AND p.household_id = r.household_id
+    JOIN devices d ON d.id = r.requested_by_device_id AND d.household_id = r.household_id
+    WHERE p.merged_into_id IS NULL
+"""
+
+
+def _reset(r: Any) -> PinReset:
+    return PinReset(
+        r.id,
+        r.person_id,
+        r.person_name,
+        r.avatar_emoji,
+        r.person_locked,
+        r.requested_by_device_id,
+        r.device_label,
+        r.status,
+        r.requested_at,
+        r.resolved_at,
+    )
+
+
+async def list_pin_resets(db: AsyncSession) -> list[PinReset]:
+    """Open requests, oldest first (the admin portal's queue)."""
+    rows = await db.execute(text(_RESET_SQL + " AND r.status = 'open' ORDER BY r.created_at"))
+    return [_reset(r) for r in rows]
+
+
+async def _resolve_reset(
+    db: AsyncSession, account_id: uuid.UUID, request_id: uuid.UUID, status: str
+) -> uuid.UUID:
+    """Close an open request; the person's id. Unknown/other household 404, closed 409."""
+    row = (
+        await db.execute(
+            text(
+                "SELECT r.status, r.person_id FROM pin_reset_requests r JOIN people p "
+                "ON p.id = r.person_id AND p.household_id = r.household_id "
+                "WHERE r.id = :r AND p.merged_into_id IS NULL FOR UPDATE OF r"
+            ),
+            {"r": request_id},
+        )
+    ).first()
+    if row is None:
+        raise NotFound("PIN reset request not found")
+    if row.status != "open":
+        raise Conflict("This request was already handled")
+    await db.execute(
+        text(
+            "UPDATE pin_reset_requests SET status = :s, resolved_at = now(), "
+            "resolved_by_account_id = :a WHERE id = :r"
+        ),
+        {"s": status, "a": account_id, "r": request_id},
+    )
+    person_id: uuid.UUID = row.person_id
+    return person_id
+
+
+async def _get_reset(db: AsyncSession, request_id: uuid.UUID) -> PinReset:
+    return _reset((await db.execute(text(_RESET_SQL + " AND r.id = :r"), {"r": request_id})).one())
+
+
+async def approve_pin_reset(
+    db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, request_id: uuid.UUID
+) -> PinReset:
+    """Clear the PIN, the failure count and the lock. The admin never sees or picks a PIN:
+    the person sets a new one on their next claim (people_service)."""
+    person_id = await _resolve_reset(db, account_id, request_id, "approved")
+    await db.execute(
+        text(
+            "UPDATE people SET pin_hash = NULL, pin_set_at = NULL, pin_failed_attempts = 0, "
+            "pin_locked_at = NULL WHERE id = :p"
+        ),
+        {"p": person_id},
+    )
+    await _audit(
+        db, household_id, account_id, "person.pin_reset", person_id, {"request": str(request_id)}
+    )
+    return await _get_reset(db, request_id)
+
+
+async def dismiss_pin_reset(
+    db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, request_id: uuid.UUID
+) -> PinReset:
+    person_id = await _resolve_reset(db, account_id, request_id, "dismissed")
+    await _audit(
+        db,
+        household_id,
+        account_id,
+        "person.pin_reset_dismissed",
+        person_id,
+        {"request": str(request_id)},
+    )
+    return await _get_reset(db, request_id)
