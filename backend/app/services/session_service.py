@@ -91,6 +91,9 @@ class Snapshot:
     result: VotingResult | None
     # The family average; None until ratings open (`tonight`/`closed`).
     rating: RatingAverage | None
+    # The host's slideshow control (issue #41): auto until Start or Stop.
+    slideshow: session_state.SlideshowMode
+    slideshow_started_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -600,6 +603,47 @@ async def correct_winner(
     publish_after_commit(db, session_id, events.WINNER_CORRECTED)
 
 
+async def set_slideshow(
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    account_id: uuid.UUID,
+    session_id: uuid.UUID,
+    *,
+    playing: bool,
+) -> None:
+    """The host's Start/Stop for the TV slideshow (issue #41), on a `tonight`/`closed` night.
+    Start always stamps a new `slideshow_started_at`, so pressing it again restarts the TV from
+    the newest photo. Stop is idempotent: a repeat writes, audits and publishes nothing. Either
+    way the TV hears `status_changed` after commit and refetches the snapshot."""
+    status = await _lock(db, household_id, account_id, session_id)
+    _rule(session_state.check_can_control_slideshow, status)
+    if playing:
+        await db.execute(
+            text(
+                "UPDATE sessions SET slideshow_started_at = now(), slideshow_stopped_at = NULL "
+                "WHERE id = :s"
+            ),
+            {"s": session_id},
+        )
+        action = "session.slideshow_started"
+    else:
+        stopped = await db.scalar(
+            text("SELECT slideshow_stopped_at FROM sessions WHERE id = :s"), {"s": session_id}
+        )
+        if stopped is not None:
+            return
+        await db.execute(
+            text(
+                "UPDATE sessions SET slideshow_stopped_at = now(), slideshow_started_at = NULL "
+                "WHERE id = :s"
+            ),
+            {"s": session_id},
+        )
+        action = "session.slideshow_stopped"
+    await _audit(db, household_id, account_id, action, session_id, {"status": status})
+    publish_after_commit(db, session_id, events.STATUS_CHANGED)
+
+
 def _result(row: Any) -> VotingResult | None:
     """The stored outcome, but only once the night is revealed (ADR-0006)."""
     if not session_state.shows_result(row.status) or row.ranking is None:
@@ -624,7 +668,8 @@ async def snapshot(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.U
             text(
                 "SELECT id, title, status, voting_method, ballot_size, created_at, "
                 "voting_opened_at, revealed_at, closed_at, ranking, tie_seed, "
-                "winner_option_id FROM sessions WHERE id = :s AND household_id = :h"
+                "winner_option_id, slideshow_started_at, slideshow_stopped_at "
+                "FROM sessions WHERE id = :s AND household_id = :h"
             ),
             {"s": session_id, "h": household_id},
         )
@@ -664,6 +709,8 @@ async def snapshot(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.U
         closed_at=row.closed_at,
         result=_result(row),
         rating=rating,
+        slideshow=session_state.slideshow_mode(row.slideshow_started_at, row.slideshow_stopped_at),
+        slideshow_started_at=row.slideshow_started_at,
     )
 
 

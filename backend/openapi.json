@@ -2104,6 +2104,27 @@
             ],
             "title": "Revealed At"
           },
+          "slideshow": {
+            "enum": [
+              "auto",
+              "playing",
+              "stopped"
+            ],
+            "title": "Slideshow",
+            "type": "string"
+          },
+          "slideshow_started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slideshow Started At"
+          },
           "status": {
             "enum": [
               "draft",
@@ -2160,7 +2181,9 @@
           "revealed_at",
           "closed_at",
           "result",
-          "rating"
+          "rating",
+          "slideshow",
+          "slideshow_started_at"
         ],
         "title": "SessionOut",
         "type": "object"
@@ -2311,6 +2334,20 @@
           }
         },
         "title": "SettingsUpdateIn",
+        "type": "object"
+      },
+      "SlideshowIn": {
+        "description": "Start (`true`) or stop (`false`) the paired TV's slideshow (issue #41).",
+        "properties": {
+          "playing": {
+            "title": "Playing",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "playing"
+        ],
+        "title": "SlideshowIn",
         "type": "object"
       },
       "SseTicketIn": {
@@ -5364,6 +5401,66 @@
         "summary": "Rate Proxy",
         "tags": [
           "ratings"
+        ]
+      }
+    },
+    "/api/v1/sessions/{session_id}/slideshow": {
+      "put": {
+        "description": "Start or stop the paired TV's slideshow on a `tonight`/`closed` night (409 before\nthen). Start restarts it from the newest photo each time; Stop is idempotent. The TV hears\n`status_changed` and switches without a reload.",
+        "operationId": "set_slideshow_api_v1_sessions__session_id__slideshow_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SlideshowIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "Not allowed in the night's current state"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Slideshow",
+        "tags": [
+          "sessions"
         ]
       }
     },

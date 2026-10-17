@@ -43,6 +43,7 @@ from app.schemas.sessions import (
     SessionOut,
     SessionStatus,
     SessionUpdateIn,
+    SlideshowIn,
     VotingResultOut,
     WinnerOut,
 )
@@ -106,6 +107,8 @@ async def _out(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.UUID)
         closed_at=snap.closed_at,
         result=_result(snap.result),
         rating=rating_out(snap.rating),
+        slideshow=snap.slideshow,
+        slideshow_started_at=snap.slideshow_started_at,
     )
 
 
@@ -418,6 +421,27 @@ async def close_night(session_id: uuid.UUID, account: CanRun, db: AccountDb) -> 
     """tonight -> closed: the night code stops joining. Idempotent."""
     try:
         await session_service.close(db, account.household_id, account.account_id, session_id)
+    except ServiceError as err:
+        raise_http(err)
+    return await _out(db, account.household_id, session_id)
+
+
+@router.put(
+    "/{session_id}/slideshow",
+    response_model=SessionOut,
+    dependencies=[CsrfProtected],
+    responses=EDIT,
+)
+async def set_slideshow(
+    session_id: uuid.UUID, body: SlideshowIn, account: CanRun, db: AccountDb
+) -> SessionOut:
+    """Start or stop the paired TV's slideshow on a `tonight`/`closed` night (409 before
+    then). Start restarts it from the newest photo each time; Stop is idempotent. The TV hears
+    `status_changed` and switches without a reload."""
+    try:
+        await session_service.set_slideshow(
+            db, account.household_id, account.account_id, session_id, playing=body.playing
+        )
     except ServiceError as err:
         raise_http(err)
     return await _out(db, account.household_id, session_id)
