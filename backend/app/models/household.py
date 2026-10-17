@@ -35,13 +35,16 @@ class Household(Base):
 
 
 class Account(Base):
-    """Admin/host logins (magic link). Email is unique across households so login is unambiguous."""
+    """Admin/host logins: username or email + password (ADR-0014); the magic link only resets
+    the password. Email and username are unique across households so login is unambiguous."""
 
     __tablename__ = "accounts"
     __table_args__ = (
         UniqueConstraint("id", "household_id"),
         CheckConstraint("role IN ('admin', 'host')", name="role"),
+        CheckConstraint("username ~ '^[a-z0-9._-]{3,32}$'", name="username"),
         Index("uq_accounts_email_lower", text("lower(email)"), unique=True),
+        Index("uq_accounts_username_lower", text("lower(username)"), unique=True),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -49,6 +52,10 @@ class Account(Base):
     email: Mapped[str] = mapped_column(String(320))
     display_name: Mapped[str] = mapped_column(String(80))
     role: Mapped[str] = mapped_column(String(16))
+    username: Mapped[str | None] = mapped_column(String(32))
+    # argon2id (ADR-0014). NULL until the account sets a password.
+    password_hash: Mapped[str | None] = mapped_column(String(255))
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created_at()
 
@@ -82,6 +89,14 @@ class Person(Base):
     color: Mapped[str] = mapped_column(String(16))
     is_guest: Mapped[bool] = mapped_column(Boolean, server_default="false")
     merged_into_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # ADR-0014: argon2id over the peppered PIN. NULL until set (or after an admin reset).
+    pin_hash: Mapped[str | None] = mapped_column(String(255))
+    pin_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pin_failed_attempts: Mapped[int] = mapped_column(Integer, server_default="0")
+    # Set at the 5th wrong PIN; only an admin-approved reset clears it.
+    pin_locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Rename-once from the person's own phone; admin renames don't set it.
+    name_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created_at()
 
 
@@ -102,8 +117,9 @@ class Device(Base):
 
 
 class DevicePerson(Base):
-    """Which people a device may act as. `pending` = claimed a person bound elsewhere,
-    awaiting host approval (ADR-0002)."""
+    """Which people a device may act as. `pending` = awaiting host approval (ADR-0002, now
+    the override for claims without a PIN, ADR-0014). `is_current` = the one person this
+    device is acting as right now; switching needs that person's PIN."""
 
     __tablename__ = "device_people"
     __table_args__ = (
@@ -111,6 +127,12 @@ class DevicePerson(Base):
         CheckConstraint("status IN ('active', 'pending')", name="status"),
         scoped_fk("device_id", "devices", ondelete="CASCADE"),
         scoped_fk("person_id", "people"),
+        Index(
+            "uq_device_people_current",
+            "device_id",
+            unique=True,
+            postgresql_where=text("is_current"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -118,7 +140,37 @@ class DevicePerson(Base):
     device_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     person_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
     status: Mapped[str] = mapped_column(String(16), server_default="active")
+    is_current: Mapped[bool] = mapped_column(Boolean, server_default="false")
     created_at: Mapped[datetime] = created_at()
+
+
+class PinResetRequest(Base):
+    """Forgot-PIN requests (ADR-0014): one open request per person; an admin approves (clears the
+    PIN and the lock) or dismisses it. Never holds a PIN."""
+
+    __tablename__ = "pin_reset_requests"
+    __table_args__ = (
+        CheckConstraint("status IN ('open', 'approved', 'dismissed')", name="status"),
+        CheckConstraint("(status = 'open') = (resolved_at IS NULL)", name="resolved_when_closed"),
+        scoped_fk("person_id", "people"),
+        scoped_fk("requested_by_device_id", "devices"),
+        scoped_fk("resolved_by_account_id", "accounts"),
+        Index(
+            "uq_pin_reset_requests_open",
+            "person_id",
+            unique=True,
+            postgresql_where=text("status = 'open'"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    household_id: Mapped[uuid.UUID] = household_fk()
+    person_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    requested_by_device_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    status: Mapped[str] = mapped_column(String(16), server_default="open")
+    created_at: Mapped[datetime] = created_at()
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_by_account_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
 
 class HouseholdSettings(Base):

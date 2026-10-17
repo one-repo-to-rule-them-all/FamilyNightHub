@@ -139,6 +139,13 @@ async def seed_household(tag: str) -> SeededHousehold:
             object_key="gone.jpg",
             thumb_key="gone_thumb.jpg",
         )
+        ids["pin_reset_request"] = await _insert(
+            s,
+            "pin_reset_requests",
+            household_id=hid,
+            person_id=ids["person"],
+            requested_by_device_id=ids["device"],
+        )
         ids["audit_event"] = await _insert(
             s, "audit_events", household_id=hid, action="seed", target_type="household"
         )

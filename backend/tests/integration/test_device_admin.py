@@ -122,7 +122,7 @@ async def _pending_claim(a: SeededHousehold) -> tuple[uuid.UUID, uuid.UUID]:
         await p1.join(a.slug, CODE)
         assert (await p1.bind(kid)).json()["status"] == "active"
         device2 = uuid.UUID((await p2.join(a.slug, CODE)).json()["device_id"])
-        assert (await p2.bind(kid)).json()["status"] == "pending"
+        assert (await p2.bind(kid, pin=None)).json()["status"] == "pending"
     return device2, kid
 
 

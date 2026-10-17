@@ -22,6 +22,7 @@ RESOLVER_FUNCTIONS = {
     "auth_resolve_device",
     "auth_resolve_magic_link",
     "auth_resolve_account_by_email",
+    "auth_resolve_account_by_username",  # ADR-0014
     "auth_resolve_household_by_slug",
     "worker_list_household_ids",
 }
@@ -47,7 +48,7 @@ async def test_every_household_table_forces_rls_with_isolation_policy() -> None:
         """
     )
     scoped = [t for t in tables if t["scoped"] or t["table"] == "households"]
-    assert len(scoped) == 16, sorted(str(t["table"]) for t in scoped)
+    assert len(scoped) == 17, sorted(str(t["table"]) for t in scoped)
 
     unprotected = [t["table"] for t in scoped if not (t["enabled"] and t["forced"] and t["policy"])]
     assert unprotected == [], f"household tables missing FORCE RLS + policy: {unprotected}"
@@ -115,7 +116,22 @@ async def test_resolver_column_grants_are_narrow() -> None:
         SELECT has_column_privilege('fnh_resolver', 'devices', 'token_hash', 'SELECT') AS hash,
                has_column_privilege('fnh_resolver', 'devices', 'label', 'SELECT') AS label,
                has_column_privilege('fnh_resolver', 'accounts', 'display_name', 'SELECT') AS name,
-               has_table_privilege('fnh_resolver', 'photos', 'SELECT') AS photos
+               has_column_privilege('fnh_resolver', 'accounts', 'username', 'SELECT') AS login,
+               has_column_privilege('fnh_resolver', 'accounts', 'password_hash', 'SELECT')
+                 AS password,
+               has_column_privilege('fnh_resolver', 'people', 'pin_hash', 'SELECT') AS pin,
+               has_table_privilege('fnh_resolver', 'photos', 'SELECT') AS photos,
+               has_table_privilege('fnh_resolver', 'pin_reset_requests', 'SELECT') AS resets
         """
     )
-    assert row == {"hash": True, "label": False, "name": False, "photos": False}
+    # ADR-0014: the username is readable for login lookup; password and PIN hashes never.
+    assert row == {
+        "hash": True,
+        "label": False,
+        "name": False,
+        "login": True,
+        "password": False,
+        "pin": False,
+        "photos": False,
+        "resets": False,
+    }

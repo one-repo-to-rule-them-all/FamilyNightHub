@@ -78,6 +78,24 @@ class AdminPersonOut(BaseModel):
     color: str
     is_guest: bool
     created_at: datetime
+    # ADR-0014: whether they have set a PIN, and whether 5 wrong PINs locked them.
+    has_pin: bool
+    locked: bool
+
+
+class PinResetOut(BaseModel):
+    """A "forgot PIN" request. Approving clears the PIN; no PIN is ever shown or chosen."""
+
+    id: uuid.UUID
+    person_id: uuid.UUID
+    person_name: str
+    avatar_emoji: str
+    person_locked: bool
+    requested_by_device_id: uuid.UUID
+    device_label: str | None
+    status: Literal["open", "approved", "dismissed"]
+    requested_at: datetime
+    resolved_at: datetime | None
 
 
 class MergeOut(BaseModel):

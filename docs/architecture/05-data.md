@@ -7,11 +7,12 @@ PostgreSQL 16 on Fly, SQLAlchemy 2 async, Alembic. Object storage on Tigris (S3 
 | Table | Household-scoped? | Purpose |
 |---|---|---|
 | `households` | root (RLS on `id`) | Name, `join_slug` (rotatable). Slug lookup before auth goes through ADR-0009 |
-| `accounts` | yes | Admin/host logins (email unique case-insensitively across households, role `admin`/`host`, `disabled_at`) |
+| `accounts` | yes | Admin/host logins (email and `username` each unique case-insensitively across households, argon2id `password_hash` + `password_changed_at`, role `admin`/`host`, `disabled_at`) |
 | `magic_links` | yes | Hashed single-use tokens, 15-min expiry |
-| `people` | yes | Name, `avatar_emoji`, `color`, `is_guest`, `merged_into_id` |
+| `people` | yes | Name, `avatar_emoji`, `color`, `is_guest`, `merged_into_id`; ADR-0014: `pin_hash` (argon2id of the peppered PIN), `pin_set_at`, `pin_failed_attempts`, `pin_locked_at`, `name_changed_at` (rename once) |
 | `devices` | yes | `token_hash`, label, `last_seen_at`, `revoked_at`, `is_tv` |
-| `device_people` | yes | Which people a device may act as (unique per pair); `status` `active`/`pending` (pending = awaiting host approval) |
+| `device_people` | yes | Which people a device may act as (unique per pair); `status` `active`/`pending` (pending = awaiting host approval); `is_current` (the one person the device is acting as; partial unique index, one per device) |
+| `pin_reset_requests` | yes | Forgot-PIN requests: `person_id`, `requested_by_device_id`, `status` `open`/`approved`/`dismissed`, `resolved_at`, `resolved_by_account_id`; one open request per person (partial unique index). Never holds a PIN |
 | `movies` | yes | `tmdb_id`, title, year, poster_path, genres, runtime, `us_cert`, `owned`, `watchlist`, `blocked` |
 | `tmdb_cache` | no (global) | Cached TMDB responses keyed by request, `fetched_at` (refresh at 30 days or less) |
 | `sessions` | yes | `status`, `voting_method`, `ballot_size`, `night_code_hash` (unique per household among non-closed nights), `age_cap`, `ranking jsonb`, `tie_seed numeric(20)`, `winner_option_id`, `host_account_id`, `voting_opened_at`/`revealed_at`/`closed_at` |
@@ -70,10 +71,13 @@ has ended, Postgres reports `''` rather than NULL on that connection, and a bare
 cast would error instead of failing closed. The app connects as `fnh_app` (no `BYPASSRLS`,
 not the owner); unset GUC means no rows.
 
-**Pre-auth lookups** (device token, magic link, account email, join slug, the worker's
-household list) go through five `SECURITY DEFINER` functions owned by the `NOLOGIN` role
+**Pre-auth lookups** (device token, magic link, account email or username, join slug, the
+worker's household list) go through six `SECURITY DEFINER` functions owned by the `NOLOGIN` role
 `fnh_resolver`, which has column-level `SELECT` on four tables and nothing else
-([ADR-0009](decisions/ADR-0009-pre-auth-lookups-via-definer-functions.md)).
+([ADR-0009](decisions/ADR-0009-pre-auth-lookups-via-definer-functions.md);
+`auth_resolve_account_by_username` and its `accounts.username` grant came with migration
+`0003_passwords_person_pins`, [ADR-0014](decisions/ADR-0014-passwords-and-person-pins.md)). The
+resolver can never read `password_hash` or `pin_hash`.
 `tests/integration/test_rls_coverage.py` pins the table set, the global-table allowlist and
 the resolver surface. The worker sets the GUC per
 household it processes. See [ADR-0003](decisions/ADR-0003-household-scoping-app-plus-rls.md).

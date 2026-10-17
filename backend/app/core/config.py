@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # Sliding expiry: re-issue the cookie and stamp last_seen_at at most this often.
     DEVICE_TOUCH_INTERVAL_SECONDS: int = 3600
 
-    # --- Accounts (ADR-0002: hosts and admins sign in by magic link) ---
+    # --- Accounts (ADR-0014: username/email + password; the magic link resets it) ---
     MAGIC_LINK_TTL_MINUTES: int = 15
     # Signed, stateless session cookie (03-backend.md "Account sessions").
     ACCOUNT_SESSION_MAX_AGE_DAYS: int = 30
@@ -66,6 +66,18 @@ class Settings(BaseSettings):
     # brute-force reach; a host-approved join still works if someone burns the budget.
     JOIN_FAILURE_LIMIT: int = 30
     JOIN_FAILURE_WINDOW_SECONDS: int = 900
+    # Password-login failures (ADR-0014), per normalized identifier (known or not, so the
+    # limiter reveals nothing) and per account (so its email and username share a budget).
+    LOGIN_FAILURE_LIMIT: int = 10
+    LOGIN_ACCOUNT_FAILURE_LIMIT: int = 20
+    LOGIN_FAILURE_WINDOW_SECONDS: int = 900
+    # Wrong PINs per device, on top of the 5-strike lock per profile: one phone cannot
+    # lock the whole household out in one sitting.
+    PIN_FAILURE_LIMIT: int = 10
+    PIN_FAILURE_WINDOW_SECONDS: int = 900
+    # Self-created guest profiles per device (every request counts).
+    SELF_CREATE_LIMIT: int = 5
+    SELF_CREATE_WINDOW_SECONDS: int = 3600
 
     # --- TMDB (03-backend.md "Candidates") ---
     # Server-only. Unset token = TMDB off: search answers 503 and the shortlist takes typed
