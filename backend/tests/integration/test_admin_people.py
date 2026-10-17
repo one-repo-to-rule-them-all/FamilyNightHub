@@ -178,6 +178,8 @@ async def test_admin_renames_and_restyles(two_households: Pair) -> None:
             "color": "#abcdef",
             "is_guest": False,
             "created_at": None,
+            "has_pin": False,
+            "locked": False,
         }
         assert (await p.patch(f"{PEOPLE}/{pid}", {"color": "blue"})).status_code == 422
     audit = await _sql(

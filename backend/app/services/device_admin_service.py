@@ -121,17 +121,27 @@ async def approve_claim(
     device_id: uuid.UUID,
     person_id: uuid.UUID,
 ) -> None:
-    """Pending -> active. The person stays bound to their other phone too (a parent's phone
-    and a kid's tablet can both act as the kid)."""
-    updated = await db.execute(
+    """Pending -> active, and current on that phone (it asked to act as them). The person
+    stays bound to their other phone too (a parent's phone and a kid's tablet can both act
+    as the kid). This is the admin override of the PIN (ADR-0014): it works for a person
+    without a PIN, who then sets one on that phone before acting as them."""
+    pending = await db.scalar(
         text(
-            "UPDATE device_people SET status = 'active' WHERE device_id = :d AND person_id = :p "
-            "AND status = 'pending' RETURNING id"
+            "SELECT id FROM device_people WHERE device_id = :d AND person_id = :p "
+            "AND status = 'pending' FOR UPDATE"
         ),
         {"d": device_id, "p": person_id},
     )
-    if updated.first() is None:
+    if pending is None:
         raise NotFound
+    await db.execute(
+        text("UPDATE device_people SET is_current = false WHERE device_id = :d AND is_current"),
+        {"d": device_id},
+    )
+    await db.execute(
+        text("UPDATE device_people SET status = 'active', is_current = true WHERE id = :id"),
+        {"id": pending},
+    )
     await _audit(db, household_id, account_id, "claim.approved", "person", person_id)
 
 

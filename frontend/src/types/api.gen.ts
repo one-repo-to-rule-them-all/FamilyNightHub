@@ -230,6 +230,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/people/pin-resets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Pin Resets
+         * @description Open requests, oldest first.
+         */
+        get: operations["list_pin_resets_api_v1_admin_people_pin_resets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/people/pin-resets/{request_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Pin Reset
+         * @description Clear the person's PIN, failure count and lock. No PIN is set or revealed: the person
+         *     chooses a new one on their next claim.
+         */
+        post: operations["approve_pin_reset_api_v1_admin_people_pin_resets__request_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/people/pin-resets/{request_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Pin Reset */
+        post: operations["dismiss_pin_reset_api_v1_admin_people_pin_resets__request_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/people/{person_id}": {
         parameters: {
             query?: never;
@@ -314,6 +372,27 @@ export interface paths {
         patch: operations["update_settings_api_v1_admin_settings_patch"];
         trace?: never;
     };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login
+         * @description Sets the `fnh_session` cookie. Every failure looks the same: no user enumeration.
+         *     A spent budget is refused before the password is checked.
+         */
+        post: operations["login_api_v1_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -342,8 +421,8 @@ export interface paths {
         put?: never;
         /**
          * Request Magic Link
-         * @description Same answer, and the same work before answering, whether or not the account exists:
-         *     the email goes out in a background task after the response.
+         * @description Forgot password. Same answer, and the same work before answering, whether or not the
+         *     account exists: the email goes out in a background task after the response.
          */
         post: operations["request_magic_link_api_v1_auth_magic_link_post"];
         delete?: never;
@@ -369,6 +448,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Password
+         * @description Set a first password, or change it (the current one is required then). Other signed-in
+         *     browsers stay signed in (stateless sessions, 03-backend.md).
+         */
+        post: operations["set_password_api_v1_auth_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/verify": {
         parameters: {
             query?: never;
@@ -378,7 +478,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Verify */
+        /**
+         * Verify
+         * @description Consume a reset link: sets `new_password` and signs in.
+         */
         post: operations["verify_api_v1_auth_verify_post"];
         delete?: never;
         options?: never;
@@ -462,6 +565,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/me/join-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Join Link
+         * @description The household's join slug and whether the QR should carry the night code, for the
+         *     TV (`is_tv` device) or a signed-in host (`sessions:run`). Phones get 403: the slug is on
+         *     the fridge anyway, but there is no reason to hand it out.
+         */
+        get: operations["join_link_api_v1_devices_me_join_link_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/me/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Self
+         * @description Make a new profile for whoever holds this phone: always a guest (an admin converts
+         *     or merges it later), current on this phone, with its PIN set in the same request.
+         */
+        post: operations["create_self_api_v1_devices_me_people_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/devices/me/people/{person_id}": {
         parameters: {
             query?: never;
@@ -470,11 +616,62 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Bind Person */
+        /**
+         * Bind Person
+         * @description Claim a person for this phone, or switch to one it already holds (ADR-0014). With
+         *     their PIN (or a new one on a first claim) the binding is active and current; without
+         *     one, a person this phone doesn't hold yet waits for a host (`pending`).
+         */
         put: operations["bind_person_api_v1_devices_me_people__person_id__put"];
         post?: never;
         /** Unbind Person */
         delete: operations["unbind_person_api_v1_devices_me_people__person_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename Self
+         * @description Change your own display name, once. After that only an admin can rename you.
+         */
+        patch: operations["rename_self_api_v1_devices_me_people__person_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/devices/me/people/{person_id}/forgot-pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Forgot Pin
+         * @description Ask an admin to reset this person's PIN. Repeating it while a request is open returns
+         *     that request.
+         */
+        post: operations["forgot_pin_api_v1_devices_me_people__person_id__forgot_pin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/me/people/{person_id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Pin
+         * @description Set a first PIN for someone this phone holds (people from before PINs, or after an
+         *     admin reset), or change it with `current_pin`. Makes them current on this phone.
+         */
+        post: operations["set_pin_api_v1_devices_me_people__person_id__pin_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -540,6 +737,27 @@ export interface paths {
         };
         /** List People */
         get: operations["list_people_api_v1_people_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/people/{person_id}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Person Profile
+         * @description Any device or account of the household. Revealed nights only: no ballot is readable
+         *     before the reveal (ADR-0006).
+         */
+        get: operations["person_profile_api_v1_people__person_id__profile_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1110,6 +1328,8 @@ export interface components {
             display_name: string;
             /** Email */
             email: string;
+            /** Has Password */
+            has_password: boolean;
             /** Household Name */
             household_name: string;
             /**
@@ -1122,6 +1342,8 @@ export interface components {
              * @enum {string}
              */
             role: "admin" | "host";
+            /** Username */
+            username: string | null;
         };
         /** AdminDeviceOut */
         AdminDeviceOut: {
@@ -1184,6 +1406,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Has Pin */
+            has_pin: boolean;
             /**
              * Id
              * Format: uuid
@@ -1191,6 +1415,8 @@ export interface components {
             id: string;
             /** Is Guest */
             is_guest: boolean;
+            /** Locked */
+            locked: boolean;
             /** Name */
             name: string;
         };
@@ -1219,6 +1445,8 @@ export interface components {
         };
         /** BindingOut */
         BindingOut: {
+            /** Current */
+            current: boolean;
             /**
              * Person Id
              * Format: uuid
@@ -1305,6 +1533,15 @@ export interface components {
             us_cert: string | null;
             /** Year */
             year: number | null;
+        };
+        /**
+         * ClaimIn
+         * @description Claim a person for this phone or switch to them (ADR-0014). `pin` is their PIN, or
+         *     the new one on a first claim. Leave it out to ask a host to approve instead.
+         */
+        ClaimIn: {
+            /** Pin */
+            pin?: string | null;
         };
         /** ClaimOut */
         ClaimOut: {
@@ -1459,6 +1696,18 @@ export interface components {
             /** Slug */
             slug: string;
         };
+        /**
+         * JoinLinkOut
+         * @description What the TV needs to draw its join QR: `/j/{join_slug}`, plus `?code={code}` when
+         *     `qr_includes_night_code` is on. The night code is never here: the server only keeps its
+         *     hash (ADR-0002), and the TV already holds the plaintext from create/rotate.
+         */
+        JoinLinkOut: {
+            /** Join Slug */
+            join_slug: string;
+            /** Qr Includes Night Code */
+            qr_includes_night_code: boolean;
+        };
         /** JoinOut */
         JoinOut: {
             /**
@@ -1478,6 +1727,13 @@ export interface components {
         JoinSlugOut: {
             /** Join Slug */
             join_slug: string;
+        };
+        /** LoginIn */
+        LoginIn: {
+            /** Password */
+            password: string;
+            /** Username Or Email */
+            username_or_email: string;
         };
         /** MagicLinkIn */
         MagicLinkIn: {
@@ -1661,6 +1917,16 @@ export interface components {
             /** Score */
             score: number | null;
         };
+        /**
+         * PasswordIn
+         * @description Required when the account already has a password.
+         */
+        PasswordIn: {
+            /** Current Password */
+            current_password?: string | null;
+            /** New Password */
+            new_password: string;
+        };
         /** PersonCreateIn */
         PersonCreateIn: {
             /** Avatar Emoji */
@@ -1684,8 +1950,14 @@ export interface components {
              * @enum {string}
              */
             binding: "mine" | "pending" | "taken" | "free";
+            /** Can Rename */
+            can_rename: boolean;
             /** Color */
             color: string;
+            /** Current */
+            current: boolean;
+            /** Has Pin */
+            has_pin: boolean;
             /**
              * Id
              * Format: uuid
@@ -1693,8 +1965,12 @@ export interface components {
             id: string;
             /** Is Guest */
             is_guest: boolean;
+            /** Locked */
+            locked: boolean;
             /** Name */
             name: string;
+            /** Pin Reset */
+            pin_reset: ("open" | "approved_for_this_phone") | null;
         };
         /**
          * PersonUpdateIn
@@ -1793,6 +2069,86 @@ export interface components {
              */
             url: string;
         };
+        /** PinErrorBody */
+        PinErrorBody: {
+            /** Attempts Left */
+            attempts_left: number;
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "wrong_pin" | "pin_locked";
+            /** Message */
+            message: string;
+            /** Request Id */
+            request_id: string | null;
+        };
+        /**
+         * PinErrorOut
+         * @description 403 wrong PIN (counted), 423 locked. Same envelope as every error, plus attempts_left.
+         */
+        PinErrorOut: {
+            error: components["schemas"]["PinErrorBody"];
+        };
+        /**
+         * PinResetOut
+         * @description A "forgot PIN" request. Approving clears the PIN; no PIN is ever shown or chosen.
+         */
+        PinResetOut: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Device Label */
+            device_label: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Person Locked */
+            person_locked: boolean;
+            /** Person Name */
+            person_name: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /**
+             * Requested By Device Id
+             * Format: uuid
+             */
+            requested_by_device_id: string;
+            /** Resolved At */
+            resolved_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "approved" | "dismissed";
+        };
+        /** PinResetRequestOut */
+        PinResetRequestOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "approved" | "dismissed";
+        };
         /** PlacementOut */
         PlacementOut: {
             /** First Places */
@@ -1806,6 +2162,120 @@ export interface components {
             place: number;
             /** Score */
             score: number;
+        };
+        /** ProfileAlbumOut */
+        ProfileAlbumOut: {
+            /** Photo Count */
+            photo_count: number;
+            /** Photos Url */
+            photos_url: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /** Title */
+            title: string | null;
+        };
+        /** ProfileMovieOut */
+        ProfileMovieOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Poster Path */
+            poster_path: string | null;
+            /** Title */
+            title: string;
+            /** Year */
+            year: number | null;
+        };
+        /** ProfileNightOut */
+        ProfileNightOut: {
+            /**
+             * Date
+             * Format: date-time
+             */
+            date: string;
+            /** Photo Count */
+            photo_count: number;
+            /** Picked Winner */
+            picked_winner: boolean;
+            /** Picks */
+            picks: components["schemas"]["ProfilePickOut"][];
+            /** Rating */
+            rating: number | null;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "revealed" | "tonight" | "closed";
+            /** Title */
+            title: string | null;
+            /**
+             * Voting Method
+             * @enum {string}
+             */
+            voting_method: "top3" | "approval" | "pick_one";
+            winner: components["schemas"]["ProfileMovieOut"] | null;
+        };
+        /** ProfileOut */
+        ProfileOut: {
+            /** Albums */
+            albums: components["schemas"]["ProfileAlbumOut"][];
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Guest */
+            is_guest: boolean;
+            /** Name */
+            name: string;
+            /** Nights */
+            nights: components["schemas"]["ProfileNightOut"][];
+            stats: components["schemas"]["ProfileStatsOut"];
+        };
+        /** ProfilePickOut */
+        ProfilePickOut: {
+            movie: components["schemas"]["ProfileMovieOut"];
+            /**
+             * Option Id
+             * Format: uuid
+             */
+            option_id: string;
+            /** Rank */
+            rank: number;
+        };
+        /** ProfileStatsOut */
+        ProfileStatsOut: {
+            /** Average Rating Given */
+            average_rating_given: number | null;
+            /** Ballots Cast */
+            ballots_cast: number;
+            /** Nights Joined */
+            nights_joined: number;
+            /** Photos Uploaded */
+            photos_uploaded: number;
+            /** Ratings Given */
+            ratings_given: number;
+            /** Winners Picked */
+            winners_picked: number;
         };
         /** ProviderOut */
         ProviderOut: {
@@ -1873,10 +2343,29 @@ export interface components {
             /** Emoji */
             emoji: string;
         };
+        /** RenameSelfIn */
+        RenameSelfIn: {
+            /** Name */
+            name: string;
+        };
         /** ReorderIn */
         ReorderIn: {
             /** Option Ids */
             option_ids: string[];
+        };
+        /**
+         * SelfCreateIn
+         * @description A new guest profile for whoever holds this phone; the PIN is set in the same call.
+         */
+        SelfCreateIn: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /** Name */
+            name: string;
+            /** Pin */
+            pin: string;
         };
         /** SessionCreateIn */
         SessionCreateIn: {
@@ -1943,6 +2432,13 @@ export interface components {
              */
             voting_method: "top3" | "approval" | "pick_one";
         };
+        /** SetPinIn */
+        SetPinIn: {
+            /** Current Pin */
+            current_pin?: string | null;
+            /** New Pin */
+            new_pin: string;
+        };
         /** SettingsOut */
         SettingsOut: {
             /** Default Age Cap */
@@ -1954,6 +2450,8 @@ export interface components {
             default_voting_method: "top3" | "approval" | "pick_one";
             /** Join Slug */
             join_slug: string;
+            /** Qr Includes Night Code */
+            qr_includes_night_code: boolean;
             /** Region */
             region: string;
             /** Streaming Providers */
@@ -1973,6 +2471,8 @@ export interface components {
             default_age_cap?: ("G" | "PG" | "PG-13" | "R" | "NC-17") | null;
             /** Default Voting Method */
             default_voting_method?: ("top3" | "approval" | "pick_one") | null;
+            /** Qr Includes Night Code */
+            qr_includes_night_code?: boolean | null;
             /** Region */
             region?: string | null;
             /** Streaming Providers */
@@ -2024,8 +2524,13 @@ export interface components {
             /** Error Type */
             type: string;
         };
-        /** VerifyIn */
+        /**
+         * VerifyIn
+         * @description Forgot password (ADR-0014): the emailed link sets a new password and signs in.
+         */
         VerifyIn: {
+            /** New Password */
+            new_password: string;
             /** Token */
             token: string;
         };
@@ -2507,6 +3012,116 @@ export interface operations {
             };
         };
     };
+    list_pin_resets_api_v1_admin_people_pin_resets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinResetOut"][];
+                };
+            };
+        };
+    };
+    approve_pin_reset_api_v1_admin_people_pin_resets__request_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinResetOut"];
+                };
+            };
+            /** @description No such request in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Already approved or dismissed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_pin_reset_api_v1_admin_people_pin_resets__request_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinResetOut"];
+                };
+            };
+            /** @description No such request in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Already approved or dismissed */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_person_api_v1_admin_people__person_id__patch: {
         parameters: {
             query?: never;
@@ -2696,6 +3311,53 @@ export interface operations {
             };
         };
     };
+    login_api_v1_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOut"];
+                };
+            };
+            /** @description Wrong username, email or password (one answer for all) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many failed sign-ins for this identifier or account */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     logout_api_v1_auth_logout_post: {
         parameters: {
             query?: never;
@@ -2774,6 +3436,49 @@ export interface operations {
             };
         };
     };
+    set_password_api_v1_auth_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Current password missing or wrong */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description New password breaks the rules */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many failed password checks for this account */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     verify_api_v1_auth_verify_post: {
         parameters: {
             query?: never;
@@ -2803,14 +3508,12 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description New password breaks the rules (the link is not used up) */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
+                content?: never;
             };
         };
     };
@@ -2907,13 +3610,11 @@ export interface operations {
             };
         };
     };
-    bind_person_api_v1_devices_me_people__person_id__put: {
+    join_link_api_v1_devices_me_join_link_get: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                person_id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -2924,11 +3625,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BindingOut"];
+                    "application/json": components["schemas"]["JoinLinkOut"];
                 };
             };
-            /** @description No such person in this household */
-            404: {
+            /** @description Only the TV or a host account reads the join link */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_self_api_v1_devices_me_people_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SelfCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonOut"];
+                };
+            };
+            /** @description Name already taken */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2942,6 +3674,78 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Too many new profiles from this phone */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bind_person_api_v1_devices_me_people__person_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ClaimIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BindingOut"];
+                };
+            };
+            /** @description Wrong PIN (counted; `attempts_left` remain) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinErrorOut"];
+                };
+            };
+            /** @description No such person */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A PIN is needed (first claim: choose one; switch: enter it) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Locked after 5 wrong PINs until an admin resets */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinErrorOut"];
+                };
+            };
+            /** @description Too many wrong PINs from this phone; try again later */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2971,6 +3775,163 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    rename_self_api_v1_devices_me_people__person_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameSelfIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonOut"];
+                };
+            };
+            /** @description This phone isn't currently acting as them */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such person */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Already renamed once, or the name is taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forgot_pin_api_v1_devices_me_people__person_id__forgot_pin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinResetRequestOut"];
+                };
+            };
+            /** @description No such person */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_pin_api_v1_devices_me_people__person_id__pin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BindingOut"];
+                };
+            };
+            /** @description Not held by this phone, or wrong PIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such person */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A PIN is needed (first claim: choose one; switch: enter it) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Locked after 5 wrong PINs until an admin resets */
+            423: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinErrorOut"];
+                };
+            };
+            /** @description Too many wrong PINs from this phone; try again later */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -3111,6 +4072,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PersonOut"][];
+                };
+            };
+        };
+    };
+    person_profile_api_v1_people__person_id__profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"];
+                };
+            };
+            /** @description No such person */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

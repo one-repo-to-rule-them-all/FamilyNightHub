@@ -53,6 +53,8 @@ def _out(p: people_admin_service.Person) -> AdminPersonOut:
         color=p.color,
         is_guest=p.is_guest,
         created_at=p.created_at,
+        has_pin=p.has_pin,
+        locked=p.locked,
     )
 
 

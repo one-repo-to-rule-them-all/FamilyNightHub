@@ -11,6 +11,10 @@
             "title": "Email",
             "type": "string"
           },
+          "has_password": {
+            "title": "Has Password",
+            "type": "boolean"
+          },
           "household_name": {
             "title": "Household Name",
             "type": "string"
@@ -27,11 +31,24 @@
             ],
             "title": "Role",
             "type": "string"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
           }
         },
         "required": [
           "id",
           "email",
+          "username",
+          "has_password",
           "display_name",
           "role",
           "household_name"
@@ -201,6 +218,10 @@
             "title": "Created At",
             "type": "string"
           },
+          "has_pin": {
+            "title": "Has Pin",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -208,6 +229,10 @@
           },
           "is_guest": {
             "title": "Is Guest",
+            "type": "boolean"
+          },
+          "locked": {
+            "title": "Locked",
             "type": "boolean"
           },
           "name": {
@@ -221,7 +246,9 @@
           "avatar_emoji",
           "color",
           "is_guest",
-          "created_at"
+          "created_at",
+          "has_pin",
+          "locked"
         ],
         "title": "AdminPersonOut",
         "type": "object"
@@ -278,6 +305,10 @@
       },
       "BindingOut": {
         "properties": {
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
           "person_id": {
             "format": "uuid",
             "title": "Person Id",
@@ -294,7 +325,8 @@
         },
         "required": [
           "person_id",
-          "status"
+          "status",
+          "current"
         ],
         "title": "BindingOut",
         "type": "object"
@@ -564,6 +596,24 @@
           "providers"
         ],
         "title": "CandidateOut",
+        "type": "object"
+      },
+      "ClaimIn": {
+        "description": "Claim a person for this phone or switch to them (ADR-0014). `pin` is their PIN, or\nthe new one on a first claim. Leave it out to ask a host to approve instead.",
+        "properties": {
+          "pin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin"
+          }
+        },
+        "title": "ClaimIn",
         "type": "object"
       },
       "ClaimOut": {
@@ -973,6 +1023,25 @@
         "title": "JoinIn",
         "type": "object"
       },
+      "JoinLinkOut": {
+        "description": "What the TV needs to draw its join QR: `/j/{join_slug}`, plus `?code={code}` when\n`qr_includes_night_code` is on. The night code is never here: the server only keeps its\nhash (ADR-0002), and the TV already holds the plaintext from create/rotate.",
+        "properties": {
+          "join_slug": {
+            "title": "Join Slug",
+            "type": "string"
+          },
+          "qr_includes_night_code": {
+            "title": "Qr Includes Night Code",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "join_slug",
+          "qr_includes_night_code"
+        ],
+        "title": "JoinLinkOut",
+        "type": "object"
+      },
       "JoinOut": {
         "properties": {
           "device_id": {
@@ -1009,6 +1078,28 @@
           "join_slug"
         ],
         "title": "JoinSlugOut",
+        "type": "object"
+      },
+      "LoginIn": {
+        "properties": {
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "username_or_email": {
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "Username Or Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username_or_email",
+          "password"
+        ],
+        "title": "LoginIn",
         "type": "object"
       },
       "MagicLinkIn": {
@@ -1508,6 +1599,33 @@
         "title": "OwnRatingOut",
         "type": "object"
       },
+      "PasswordIn": {
+        "description": "Required when the account already has a password.",
+        "properties": {
+          "current_password": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Password"
+          },
+          "new_password": {
+            "title": "New Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "new_password"
+        ],
+        "title": "PasswordIn",
+        "type": "object"
+      },
       "PersonCreateIn": {
         "properties": {
           "avatar_emoji": {
@@ -1552,9 +1670,21 @@
             "title": "Binding",
             "type": "string"
           },
+          "can_rename": {
+            "title": "Can Rename",
+            "type": "boolean"
+          },
           "color": {
             "title": "Color",
             "type": "string"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "has_pin": {
+            "title": "Has Pin",
+            "type": "boolean"
           },
           "id": {
             "format": "uuid",
@@ -1565,9 +1695,28 @@
             "title": "Is Guest",
             "type": "boolean"
           },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "pin_reset": {
+            "anyOf": [
+              {
+                "enum": [
+                  "open",
+                  "approved_for_this_phone"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin Reset"
           }
         },
         "required": [
@@ -1576,7 +1725,12 @@
           "avatar_emoji",
           "color",
           "is_guest",
-          "binding"
+          "binding",
+          "has_pin",
+          "locked",
+          "current",
+          "can_rename",
+          "pin_reset"
         ],
         "title": "PersonOut",
         "type": "object"
@@ -1773,6 +1927,171 @@
         "title": "PhotoOut",
         "type": "object"
       },
+      "PinErrorBody": {
+        "properties": {
+          "attempts_left": {
+            "title": "Attempts Left",
+            "type": "integer"
+          },
+          "code": {
+            "enum": [
+              "wrong_pin",
+              "pin_locked"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "request_id",
+          "attempts_left"
+        ],
+        "title": "PinErrorBody",
+        "type": "object"
+      },
+      "PinErrorOut": {
+        "description": "403 wrong PIN (counted), 423 locked. Same envelope as every error, plus attempts_left.",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/PinErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "PinErrorOut",
+        "type": "object"
+      },
+      "PinResetOut": {
+        "description": "A \"forgot PIN\" request. Approving clears the PIN; no PIN is ever shown or chosen.",
+        "properties": {
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "device_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Label"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "person_locked": {
+            "title": "Person Locked",
+            "type": "boolean"
+          },
+          "person_name": {
+            "title": "Person Name",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "requested_by_device_id": {
+            "format": "uuid",
+            "title": "Requested By Device Id",
+            "type": "string"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "approved",
+              "dismissed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "person_id",
+          "person_name",
+          "avatar_emoji",
+          "person_locked",
+          "requested_by_device_id",
+          "device_label",
+          "status",
+          "requested_at",
+          "resolved_at"
+        ],
+        "title": "PinResetOut",
+        "type": "object"
+      },
+      "PinResetRequestOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "approved",
+              "dismissed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "requested_at"
+        ],
+        "title": "PinResetRequestOut",
+        "type": "object"
+      },
       "PlacementOut": {
         "properties": {
           "first_places": {
@@ -1800,6 +2119,306 @@
           "first_places"
         ],
         "title": "PlacementOut",
+        "type": "object"
+      },
+      "ProfileAlbumOut": {
+        "properties": {
+          "photo_count": {
+            "title": "Photo Count",
+            "type": "integer"
+          },
+          "photos_url": {
+            "title": "Photos Url",
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "session_id",
+          "title",
+          "photo_count",
+          "photos_url"
+        ],
+        "title": "ProfileAlbumOut",
+        "type": "object"
+      },
+      "ProfileMovieOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "poster_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Poster Path"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "year",
+          "poster_path"
+        ],
+        "title": "ProfileMovieOut",
+        "type": "object"
+      },
+      "ProfileNightOut": {
+        "properties": {
+          "date": {
+            "format": "date-time",
+            "title": "Date",
+            "type": "string"
+          },
+          "photo_count": {
+            "title": "Photo Count",
+            "type": "integer"
+          },
+          "picked_winner": {
+            "title": "Picked Winner",
+            "type": "boolean"
+          },
+          "picks": {
+            "items": {
+              "$ref": "#/components/schemas/ProfilePickOut"
+            },
+            "title": "Picks",
+            "type": "array"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          },
+          "session_id": {
+            "format": "uuid",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "revealed",
+              "tonight",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "voting_method": {
+            "enum": [
+              "top3",
+              "approval",
+              "pick_one"
+            ],
+            "title": "Voting Method",
+            "type": "string"
+          },
+          "winner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProfileMovieOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "session_id",
+          "title",
+          "status",
+          "voting_method",
+          "date",
+          "winner",
+          "picks",
+          "picked_winner",
+          "rating",
+          "photo_count"
+        ],
+        "title": "ProfileNightOut",
+        "type": "object"
+      },
+      "ProfileOut": {
+        "properties": {
+          "albums": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileAlbumOut"
+            },
+            "title": "Albums",
+            "type": "array"
+          },
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_guest": {
+            "title": "Is Guest",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "nights": {
+            "items": {
+              "$ref": "#/components/schemas/ProfileNightOut"
+            },
+            "title": "Nights",
+            "type": "array"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/ProfileStatsOut"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "avatar_emoji",
+          "color",
+          "is_guest",
+          "created_at",
+          "stats",
+          "nights",
+          "albums"
+        ],
+        "title": "ProfileOut",
+        "type": "object"
+      },
+      "ProfilePickOut": {
+        "properties": {
+          "movie": {
+            "$ref": "#/components/schemas/ProfileMovieOut"
+          },
+          "option_id": {
+            "format": "uuid",
+            "title": "Option Id",
+            "type": "string"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "option_id",
+          "rank",
+          "movie"
+        ],
+        "title": "ProfilePickOut",
+        "type": "object"
+      },
+      "ProfileStatsOut": {
+        "properties": {
+          "average_rating_given": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Rating Given"
+          },
+          "ballots_cast": {
+            "title": "Ballots Cast",
+            "type": "integer"
+          },
+          "nights_joined": {
+            "title": "Nights Joined",
+            "type": "integer"
+          },
+          "photos_uploaded": {
+            "title": "Photos Uploaded",
+            "type": "integer"
+          },
+          "ratings_given": {
+            "title": "Ratings Given",
+            "type": "integer"
+          },
+          "winners_picked": {
+            "title": "Winners Picked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "nights_joined",
+          "ballots_cast",
+          "winners_picked",
+          "ratings_given",
+          "average_rating_given",
+          "photos_uploaded"
+        ],
+        "title": "ProfileStatsOut",
         "type": "object"
       },
       "ProviderOut": {
@@ -1959,6 +2578,19 @@
         "title": "ReactionCountOut",
         "type": "object"
       },
+      "RenameSelfIn": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "RenameSelfIn",
+        "type": "object"
+      },
       "ReorderIn": {
         "properties": {
           "option_ids": {
@@ -1975,6 +2607,35 @@
           "option_ids"
         ],
         "title": "ReorderIn",
+        "type": "object"
+      },
+      "SelfCreateIn": {
+        "description": "A new guest profile for whoever holds this phone; the PIN is set in the same call.",
+        "properties": {
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "avatar_emoji",
+          "color",
+          "pin"
+        ],
+        "title": "SelfCreateIn",
         "type": "object"
       },
       "SessionCreateIn": {
@@ -2184,6 +2845,30 @@
         "title": "SessionUpdateIn",
         "type": "object"
       },
+      "SetPinIn": {
+        "properties": {
+          "current_pin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Pin"
+          },
+          "new_pin": {
+            "title": "New Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "new_pin"
+        ],
+        "title": "SetPinIn",
+        "type": "object"
+      },
       "SettingsOut": {
         "properties": {
           "default_age_cap": {
@@ -2217,6 +2902,10 @@
             "title": "Join Slug",
             "type": "string"
           },
+          "qr_includes_night_code": {
+            "title": "Qr Includes Night Code",
+            "type": "boolean"
+          },
           "region": {
             "title": "Region",
             "type": "string"
@@ -2240,7 +2929,8 @@
           "default_age_cap",
           "region",
           "streaming_providers",
-          "updated_at"
+          "updated_at",
+          "qr_includes_night_code"
         ],
         "title": "SettingsOut",
         "type": "object"
@@ -2281,6 +2971,17 @@
               }
             ],
             "title": "Default Voting Method"
+          },
+          "qr_includes_night_code": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qr Includes Night Code"
           },
           "region": {
             "anyOf": [
@@ -2455,7 +3156,12 @@
         "type": "object"
       },
       "VerifyIn": {
+        "description": "Forgot password (ADR-0014): the emailed link sets a new password and signs in.",
         "properties": {
+          "new_password": {
+            "title": "New Password",
+            "type": "string"
+          },
           "token": {
             "maxLength": 128,
             "minLength": 20,
@@ -2464,7 +3170,8 @@
           }
         },
         "required": [
-          "token"
+          "token",
+          "new_password"
         ],
         "title": "VerifyIn",
         "type": "object"
@@ -3197,6 +3904,131 @@
         ]
       }
     },
+    "/api/v1/admin/people/pin-resets": {
+      "get": {
+        "description": "Open requests, oldest first.",
+        "operationId": "list_pin_resets_api_v1_admin_people_pin_resets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PinResetOut"
+                  },
+                  "title": "Response List Pin Resets Api V1 Admin People Pin Resets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Pin Resets",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/people/pin-resets/{request_id}/approve": {
+      "post": {
+        "description": "Clear the person's PIN, failure count and lock. No PIN is set or revealed: the person\nchooses a new one on their next claim.",
+        "operationId": "approve_pin_reset_api_v1_admin_people_pin_resets__request_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinResetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such request in this household"
+          },
+          "409": {
+            "description": "Already approved or dismissed"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Pin Reset",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/people/pin-resets/{request_id}/dismiss": {
+      "post": {
+        "operationId": "dismiss_pin_reset_api_v1_admin_people_pin_resets__request_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinResetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such request in this household"
+          },
+          "409": {
+            "description": "Already approved or dismissed"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss Pin Reset",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/people/{person_id}": {
       "patch": {
         "description": "Rename / re-avatar / recolour; fields left out are unchanged.",
@@ -3425,6 +4257,54 @@
         ]
       }
     },
+    "/api/v1/auth/login": {
+      "post": {
+        "description": "Sets the `fnh_session` cookie. Every failure looks the same: no user enumeration.\nA spent budget is refused before the password is checked.",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Wrong username, email or password (one answer for all)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many failed sign-ins for this identifier or account"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/logout": {
       "post": {
         "operationId": "logout_api_v1_auth_logout_post",
@@ -3441,7 +4321,7 @@
     },
     "/api/v1/auth/magic-link": {
       "post": {
-        "description": "Same answer, and the same work before answering, whether or not the account exists:\nthe email goes out in a background task after the response.",
+        "description": "Forgot password. Same answer, and the same work before answering, whether or not the\naccount exists: the email goes out in a background task after the response.",
         "operationId": "request_magic_link_api_v1_auth_magic_link_post",
         "requestBody": {
           "content": {
@@ -3505,8 +4385,43 @@
         ]
       }
     },
+    "/api/v1/auth/password": {
+      "post": {
+        "description": "Set a first password, or change it (the current one is required then). Other signed-in\nbrowsers stay signed in (stateless sessions, 03-backend.md).",
+        "operationId": "set_password_api_v1_auth_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Current password missing or wrong"
+          },
+          "422": {
+            "description": "New password breaks the rules"
+          },
+          "429": {
+            "description": "Too many failed password checks for this account"
+          }
+        },
+        "summary": "Set Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/verify": {
       "post": {
+        "description": "Consume a reset link: sets `new_password` and signs in.",
         "operationId": "verify_api_v1_auth_verify_post",
         "requestBody": {
           "content": {
@@ -3533,14 +4448,7 @@
             "description": "Link invalid, expired or already used"
           },
           "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
+            "description": "New password breaks the rules (the link is not used up)"
           }
         },
         "summary": "Verify",
@@ -3659,6 +4567,79 @@
         ]
       }
     },
+    "/api/v1/devices/me/join-link": {
+      "get": {
+        "description": "The household's join slug and whether the QR should carry the night code, for the\nTV (`is_tv` device) or a signed-in host (`sessions:run`). Phones get 403: the slug is on\nthe fridge anyway, but there is no reason to hand it out.",
+        "operationId": "join_link_api_v1_devices_me_join_link_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Only the TV or a host account reads the join link"
+          }
+        },
+        "summary": "Join Link",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/devices/me/people": {
+      "post": {
+        "description": "Make a new profile for whoever holds this phone: always a guest (an admin converts\nor merges it later), current on this phone, with its PIN set in the same request.",
+        "operationId": "create_self_api_v1_devices_me_people_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelfCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Name already taken"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many new profiles from this phone"
+          }
+        },
+        "summary": "Create Self",
+        "tags": [
+          "people"
+        ]
+      }
+    },
     "/api/v1/devices/me/people/{person_id}": {
       "delete": {
         "operationId": "unbind_person_api_v1_devices_me_people__person_id__delete",
@@ -3694,7 +4675,69 @@
           "people"
         ]
       },
+      "patch": {
+        "description": "Change your own display name, once. After that only an admin can rename you.",
+        "operationId": "rename_self_api_v1_devices_me_people__person_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameSelfIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't currently acting as them"
+          },
+          "404": {
+            "description": "No such person"
+          },
+          "409": {
+            "description": "Already renamed once, or the name is taken"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Self",
+        "tags": [
+          "people"
+        ]
+      },
       "put": {
+        "description": "Claim a person for this phone, or switch to one it already holds (ADR-0014). With\ntheir PIN (or a new one on a first claim) the binding is active and current; without\none, a person this phone doesn't hold yet waits for a host (`pending`).",
         "operationId": "bind_person_api_v1_devices_me_people__person_id__put",
         "parameters": [
           {
@@ -3708,6 +4751,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ClaimIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -3719,8 +4779,71 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinErrorOut"
+                }
+              }
+            },
+            "description": "Wrong PIN (counted; `attempts_left` remain)"
+          },
           "404": {
-            "description": "No such person in this household"
+            "description": "No such person"
+          },
+          "422": {
+            "description": "A PIN is needed (first claim: choose one; switch: enter it)"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinErrorOut"
+                }
+              }
+            },
+            "description": "Locked after 5 wrong PINs until an admin resets"
+          },
+          "429": {
+            "description": "Too many wrong PINs from this phone; try again later"
+          }
+        },
+        "summary": "Bind Person",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/devices/me/people/{person_id}/forgot-pin": {
+      "post": {
+        "description": "Ask an admin to reset this person's PIN. Repeating it while a request is open returns\nthat request.",
+        "operationId": "forgot_pin_api_v1_devices_me_people__person_id__forgot_pin_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinResetRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such person"
           },
           "422": {
             "content": {
@@ -3733,7 +4856,73 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Bind Person",
+        "summary": "Forgot Pin",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/devices/me/people/{person_id}/pin": {
+      "post": {
+        "description": "Set a first PIN for someone this phone holds (people from before PINs, or after an\nadmin reset), or change it with `current_pin`. Makes them current on this phone.",
+        "operationId": "set_pin_api_v1_devices_me_people__person_id__pin_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BindingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Not held by this phone, or wrong PIN"
+          },
+          "404": {
+            "description": "No such person"
+          },
+          "422": {
+            "description": "A PIN is needed (first claim: choose one; switch: enter it)"
+          },
+          "423": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PinErrorOut"
+                }
+              }
+            },
+            "description": "Locked after 5 wrong PINs until an admin resets"
+          },
+          "429": {
+            "description": "Too many wrong PINs from this phone; try again later"
+          }
+        },
+        "summary": "Set Pin",
         "tags": [
           "people"
         ]
@@ -3904,6 +5093,53 @@
           }
         },
         "summary": "List People",
+        "tags": [
+          "people"
+        ]
+      }
+    },
+    "/api/v1/people/{person_id}/profile": {
+      "get": {
+        "description": "Any device or account of the household. Revealed nights only: no ballot is readable\nbefore the reveal (ADR-0006).",
+        "operationId": "person_profile_api_v1_people__person_id__profile_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such person"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Person Profile",
         "tags": [
           "people"
         ]
