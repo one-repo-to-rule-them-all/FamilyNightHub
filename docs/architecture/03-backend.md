@@ -26,6 +26,8 @@ backend/app/
 | Join | `GET /api/v1/csrf`, `POST /api/v1/join` | Issue the CSRF cookie; validate slug + night code, mint the device cookie (failure-budgeted) |
 | Auth | `/api/v1/auth/{login,password,magic-link,verify,me,logout}` | Password sign-in for admins and hosts, set/change password, forgot password (the magic link sets a new one), current account, logout ([ADR-0014](decisions/ADR-0014-passwords-and-person-pins.md)) |
 | People/devices | `/api/v1/people`, `/api/v1/devices/me`, `POST /api/v1/devices/me/people`, `PUT/PATCH/DELETE /api/v1/devices/me/people/{id}`, `POST …/{id}/pin`, `POST …/{id}/forgot-pin` | Avatar grid with each tile's binding and PIN state; self-create a guest; claim or switch with the PIN; rename once; set/change PIN; ask for a PIN reset; unbind. See "People and PINs" |
+| Here tonight | `GET /api/v1/sessions/{id}/present` | Who's here (attendance plus anyone with a ballot), each with `voted`; avatars only, never ranks (any device or account). See "Here tonight" |
+| TV help count | `GET /api/v1/devices/me/help-count` | The TV (`is_tv`) only: `{count, first_name}` of pending person claims (never PIN resets); other phones 403 |
 | Join link | `GET /api/v1/devices/me/join-link` | The TV (`is_tv`) or a host account (`sessions:run`) reads `{join_slug, qr_includes_night_code}` to draw the join QR; other phones 403. The night code is never returned |
 | Profiles | `GET /api/v1/people/{id}/profile` | A person's revealed nights, picks, winners, ratings, albums and stats (any device or account of the household) |
 | Host devices | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}` | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it); review pending person claims (`devices:enroll` / `devices:approve`) |
@@ -179,6 +181,16 @@ first"). The PIN is typed to claim or switch, not per vote; a kid's is typed by 
   `can_rename` and `pin_reset` (`null`, `open`, or `approved_for_this_phone` while this phone
   may set the new PIN). Another household's or a merged person is 404 on every route above.
 
+**Here tonight** (`services/attendance_service.py`, guest-flow spec G8). A person is *here* once
+a phone that is currently acting as them (active, current, PIN set) mints an SSE ticket for a
+live night (`draft`/`voting`/`revealed`/`tonight`) or casts a ballot as them; that writes one
+`session_attendance` row per (night, person) and, only when the row is new, publishes
+`presence` after commit (re-ticketing is silent). A closed night records nobody. Proxy voters are
+here through their ballot. `GET /sessions/{id}/present` returns `{present: [{person_id,
+avatar_emoji, color, voted}]}`, family first then guests, with no ranks, options or scores
+(ADR-0006); another household's night is 404. Merging people merges their attendance (the
+target's row wins).
+
 **Profiles** (`services/profile_service.py`, `GET /people/{id}/profile`, any device or account,
 404 across households or for a merged person). Only nights whose status is `revealed`, `tonight`
 or `closed` are included, so no ballot is readable before the reveal
@@ -281,6 +293,8 @@ the CSRF header and writes an audit row.
   shows or sets a PIN (the person picks a new one on their next claim, and the requesting phone
   may do so even if another phone still holds them). **Dismiss** changes nothing else. A handled
   request is 409; another household's is 404. Admin people rows carry `has_pin` and `locked`.
+  `GET /admin/people/pin-resets/count` → `{open_count}` for the nav badge. Hosts get 403 on
+  every reset route.
 
 Audit actions: `person.created`, `person.updated` (`data.fields`), `person.converted_to_member`,
 `person.merged` (`target_id` = the target), `person.pin_reset`, `person.pin_reset_dismissed`,
@@ -514,6 +528,7 @@ snapshot version. Every event is a hint: clients refetch `GET /sessions/{id}` (o
 | `photo_added` | a photo upload completes (`pending → ready`) |
 | `rating_count` | a rating set or replaced (phone or proxy) |
 | `winner_corrected` | an admin corrected the night's winner |
+| `presence` | someone is newly here tonight (a `session_attendance` row was created); refetch `GET …/present` |
 | `degraded` | the stream itself, never published |
 
 The lazy `revealed → tonight` settle publishes nothing: readers already see `tonight`. The

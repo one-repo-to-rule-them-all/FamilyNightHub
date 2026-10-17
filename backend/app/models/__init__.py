@@ -11,7 +11,14 @@ from app.models.household import (
     Person,
     PinResetRequest,
 )
-from app.models.movie_night import BallotRank, Movie, Option, Rating, Session
+from app.models.movie_night import (
+    BallotRank,
+    Movie,
+    Option,
+    Rating,
+    Session,
+    SessionAttendance,
+)
 from app.models.ops import AuditEvent, BackupRun, FailedJob, TmdbCache
 from app.models.photos import Photo, PhotoDeletion, PhotoReaction
 
@@ -36,5 +43,6 @@ __all__ = [
     "PinResetRequest",
     "Rating",
     "Session",
+    "SessionAttendance",
     "TmdbCache",
 ]

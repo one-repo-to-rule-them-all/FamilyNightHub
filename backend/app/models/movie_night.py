@@ -189,3 +189,21 @@ class Rating(Base):
     person_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
     score: Mapped[int] = mapped_column(SmallInteger)
     created_at: Mapped[datetime] = created_at()
+
+
+class SessionAttendance(Base):
+    """Who is here tonight (guest-flow G8): first time a phone acting as the person opened
+    the night or voted. Read with the ballots by GET /sessions/{id}/present."""
+
+    __tablename__ = "session_attendance"
+    __table_args__ = (
+        UniqueConstraint("session_id", "person_id"),
+        scoped_fk("session_id", "sessions", ondelete="CASCADE"),
+        scoped_fk("person_id", "people"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    household_id: Mapped[uuid.UUID] = household_fk()
+    session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    person_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    first_seen_at: Mapped[datetime] = created_at()

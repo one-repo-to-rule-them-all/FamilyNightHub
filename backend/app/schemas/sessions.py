@@ -237,6 +237,21 @@ class VotersOut(BaseModel):
     voted: list[VoterOut]
 
 
+class PresentOut(BaseModel):
+    person_id: uuid.UUID
+    avatar_emoji: str
+    color: str
+    # Has a ballot in this night (the same fact as /voters). Never what they ranked.
+    voted: bool
+
+
+class PresenceOut(BaseModel):
+    """Who's here tonight (G8): people a phone set to them opened the night or voted for,
+    plus anyone with a ballot. Family first, then guests."""
+
+    present: list[PresentOut]
+
+
 class PlacementOut(BaseModel):
     option_id: uuid.UUID
     place: int

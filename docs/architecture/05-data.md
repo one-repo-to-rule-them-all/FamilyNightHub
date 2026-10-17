@@ -23,6 +23,7 @@ PostgreSQL 16 on Fly, SQLAlchemy 2 async, Alembic. Object storage on Tigris (S3 
 | `photo_reactions` | yes | `photo_id`, `person_id`, `emoji` (unique triple) |
 | `photo_deletions` | yes | Tombstone written with each hard delete (`photo_id`, keys, `backup_purged_at`) so the worker can purge backup copies |
 | `settings` | yes | `default_voting_method`, `default_age_cap`, `streaming_providers int[]`, `region`, `qr_includes_night_code` (default false; the TV's QR may carry the code, never stored) |
+| `session_attendance` | yes | Who is here tonight (G8): `session_id`, `person_id`, `first_seen_at`, unique per (night, person). Written when a phone set to the person opens a live night or votes; read with the ballots by `GET …/present` |
 | `audit_events` | yes | Who did what (session transitions, winner corrections, merges, revokes, deletes) |
 | `failed_jobs` | no (global) | ARQ dead letters: job name/id/try and a truncated error. Never job args |
 | `backup_runs` | no (global) | One row per backup run (`kind` photos/pg_dump, counts, errors) |
