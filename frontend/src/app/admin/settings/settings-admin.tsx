@@ -51,6 +51,7 @@ export function SettingsAdmin() {
   return (
     <div className="flex flex-col gap-8">
       <JoinLink slug={settings.data.join_slug} />
+      <QrCodeSetting settings={settings.data} />
       <Defaults settings={settings.data} />
       <StreamingServices saved={settings.data.streaming_providers} region={settings.data.region} />
     </div>
@@ -161,6 +162,47 @@ function JoinLink({ slug }: { slug: string }) {
           </div>
         </ModalDialog>
       ) : null}
+    </Section>
+  );
+}
+
+/**
+ * "Include tonight's code in the TV QR" (owner decision §10.1, gap G9), off by default. On: the
+ * TV's QR is `/j/{slug}?code=…` and guests just tap Join. Off: they scan, then type the code.
+ * The TV picks the change up on its next refetch (≤ 10 s).
+ */
+function QrCodeSetting({ settings }: { settings: HouseholdSettings }) {
+  const id = useId();
+  const queryClient = useQueryClient();
+  const save = useMutation<HouseholdSettings, ApiError, boolean>({
+    mutationFn: (on) => api.updateSettings({ qr_includes_night_code: on }),
+    onSuccess: (next) => queryClient.setQueryData(SETTINGS_KEY, next),
+  });
+  const on = save.isPending ? save.variables : settings.qr_includes_night_code;
+
+  return (
+    <Section title="TV QR code">
+      <label htmlFor={id} className="flex cursor-pointer items-start gap-3">
+        <input
+          id={id}
+          type="checkbox"
+          role="switch"
+          checked={on}
+          disabled={save.isPending}
+          aria-describedby={`${id}-help`}
+          onChange={(event) => save.mutate(event.target.checked)}
+          className="mt-1 size-5 shrink-0 accent-[var(--accent-cinema)]"
+          data-testid="qr-code-setting"
+        />
+        <span className="flex flex-col gap-1">
+          <span className="font-medium">Include tonight&apos;s code in the TV QR</span>
+          <span id={`${id}-help`} className="text-sm text-muted-foreground">
+            Guests who scan the TV just tap Join. Anyone who sees the TV, or a photo of it, can join
+            until the night ends. Off: they scan, then type the code.
+          </span>
+        </span>
+      </label>
+      <ApiErrorNotice error={save.error} />
     </Section>
   );
 }

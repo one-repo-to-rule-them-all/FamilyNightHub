@@ -30,10 +30,13 @@ export function PhotoAlbum({
   sessionId,
   live,
   canAdd = true,
+  actorId,
 }: {
   sessionId: string;
   live: LiveState;
   canAdd?: boolean;
+  /** This phone's current person (ADR-0014): the default "Sharing as". */
+  actorId?: string;
 }) {
   const queryClient = useQueryClient();
   const album = useAlbum(sessionId);
@@ -51,8 +54,11 @@ export function PhotoAlbum({
   });
 
   const mine = (people.data ?? []).filter((p) => p.binding === "mine");
-  const actor = mine.find((p) => p.id === chosen) ?? mine[0] ?? null;
+  const actor =
+    mine.find((p) => p.id === chosen) ?? mine.find((p) => p.id === actorId) ?? mine[0] ?? null;
   const photos = album.data ?? [];
+  // On an empty album the drop is the empty state, so there is still one primary (spec S13).
+  const emptyDrop = canAdd && actor !== null && album.isSuccess && photos.length === 0;
   const index = photos.findIndex((p) => p.id === open);
   const current = index >= 0 ? photos[index] : null;
 
@@ -66,7 +72,7 @@ export function PhotoAlbum({
         people.isPending ? null : mine.length === 0 ? (
           <Link
             href="/who"
-            className={cn(buttonVariants({ variant: "outline", size: "tap" }), "w-full")}
+            className={cn(buttonVariants({ variant: "secondary", size: "tap" }), "w-full")}
           >
             Pick who you are to add photos
           </Link>
@@ -96,7 +102,9 @@ export function PhotoAlbum({
                 </div>
               </div>
             ) : null}
-            {actor ? <PhotoDrop sessionId={sessionId} personId={actor.id} /> : null}
+            {actor ? (
+              <PhotoDrop sessionId={sessionId} personId={actor.id} empty={emptyDrop} />
+            ) : null}
           </>
         )
       ) : null}
@@ -115,10 +123,12 @@ export function PhotoAlbum({
           ))}
         </div>
       ) : photos.length === 0 ? (
-        <p className="flex items-center gap-2 text-muted-foreground" data-testid="album-empty">
-          <Camera aria-hidden className="size-5" />
-          No photos yet.
-        </p>
+        emptyDrop ? null : (
+          <p className="flex items-center gap-2 text-muted-foreground" data-testid="album-empty">
+            <Camera aria-hidden className="size-5" />
+            No photos yet.
+          </p>
+        )
       ) : (
         <>
           {photos.some((p) => p.status === "ready") ? (

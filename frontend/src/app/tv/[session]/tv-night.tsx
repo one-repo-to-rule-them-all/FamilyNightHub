@@ -12,8 +12,8 @@ import { Label } from "@/components/ui/label";
 import { useLiveSession } from "@/hooks/use-live-session";
 import { useVoters } from "@/hooks/use-voters";
 import { useWakeLock } from "@/hooks/use-wake-lock";
-import { api, type ApiError, type Night, type Person } from "@/lib/api";
-import { joinUrl, qrShape } from "@/lib/join-link";
+import { api, ApiError, type JoinLink, type Night, type Person } from "@/lib/api";
+import { qrShape, tvJoinUrl } from "@/lib/join-link";
 import {
   forgetNightCode,
   nightCodeIsLive,
@@ -28,12 +28,8 @@ import { useCurrentNight } from "../tv-home";
 import { Reveal } from "./reveal";
 import { DropPrompt, TvSlideshow } from "./slideshow";
 
-/**
- * No endpoint exposes the household's join slug to a device (or to a host) yet, so the TV can't
- * build the /j/{slug} QR itself; it points people at the fridge QR instead. See the PR notes and
- * 04-frontend.md "TV".
- */
-const JOIN_SLUG: string | null = null;
+/** The TV re-reads the join link and the code-in-QR setting this often (spec §5 TV: ≤ 10 s). */
+const JOIN_LINK_REFRESH_MS = 10_000;
 
 /** /tv/[session]: lobby → turnout → reveal → photo slideshow, pushed live (polling only while the stream is down). */
 export function TvNight({ sessionId }: { sessionId: string }) {
@@ -194,8 +190,31 @@ function Turnout({
   );
 }
 
+/**
+ * The lobby's QR (guest-flow spec §5 TV, owner decision §10.1): `/j/{slug}` by default, with
+ * tonight's code in it only when the admin turned that on and this TV holds the code (the server
+ * never returns it, ADR-0002). If the join link can't be read, it points at the fridge QR.
+ */
 function JoinPanel({ sessionId }: { sessionId: string }) {
   const [code, setCode] = useState<string | null>(() => recallNightCode(sessionId));
+  const link = useQuery<JoinLink | null, ApiError>({
+    queryKey: ["devices", "me", "join-link"],
+    queryFn: async () => {
+      try {
+        return await api.joinLink();
+      } catch (error) {
+        if (error instanceof ApiError && (error.status === 404 || error.status === 403))
+          return null;
+        throw error;
+      }
+    },
+    retry: false,
+    refetchInterval: JOIN_LINK_REFRESH_MS,
+  });
+  const slug = link.data?.join_slug ?? null;
+  const includeCode = link.data?.qr_includes_night_code ?? false;
+  const url = slug ? tvJoinUrl(window.location.origin, slug, code, includeCode) : null;
+  const codeInQr = url !== null && url.includes("?code=");
 
   return (
     <section
@@ -203,12 +222,16 @@ function JoinPanel({ sessionId }: { sessionId: string }) {
       className="flex flex-col items-center justify-center gap-[1.2em] rounded-3xl bg-card p-[1.5em] text-center ring-1 ring-foreground/10"
     >
       <h2 id="tv-join" className="tv-body text-muted-foreground">
-        {JOIN_SLUG ? "Scan to join" : "Scan the fridge QR to join"}
+        {!url
+          ? "Scan the fridge QR to join"
+          : codeInQr
+            ? "Scan to join"
+            : "Scan, then type the code"}
       </h2>
-      {JOIN_SLUG ? <JoinQr url={joinUrl(window.location.origin, JOIN_SLUG)} /> : null}
+      {url ? <JoinQr url={url} /> : null}
       {code ? (
         <>
-          <p className="tv-body text-muted-foreground">then enter</p>
+          <p className="tv-body text-muted-foreground">{codeInQr ? "or type" : "then enter"}</p>
           <p className="tv-code font-mono" data-testid="tv-night-code">
             {code}
           </p>

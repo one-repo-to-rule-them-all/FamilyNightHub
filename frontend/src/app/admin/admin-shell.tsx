@@ -8,6 +8,8 @@ import { useEffect } from "react";
 import { type Account, type ApiError, api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
+import { usePinResets } from "./people/pin-requests";
+
 const NAV = [
   { href: "/admin/people", label: "People" },
   { href: "/admin/devices", label: "Devices" },
@@ -22,6 +24,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const me = useQuery<Account, ApiError>({ queryKey: ["me"], queryFn: api.me });
   const signedOut = me.error?.status === 401;
+  // Open "Forgot PIN" requests badge the People tab (admins only; a host's 403 shows none).
+  const resets = usePinResets();
+  const openResets = resets.data?.length ?? 0;
 
   useEffect(() => {
     if (signedOut) router.replace("/login");
@@ -61,6 +66,15 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                     )}
                   >
                     {item.label}
+                    {item.href === "/admin/people" && openResets > 0 ? (
+                      <span
+                        className="ml-1.5 rounded-full bg-primary px-1.5 text-xs text-primary-foreground"
+                        data-testid="pin-requests-badge"
+                      >
+                        <span className="sr-only">, PIN requests: </span>
+                        {openResets}
+                      </span>
+                    ) : null}
                   </Link>
                 </li>
               );
