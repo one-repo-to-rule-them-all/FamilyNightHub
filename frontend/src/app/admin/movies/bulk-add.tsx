@@ -105,6 +105,7 @@ export function BulkAdd() {
           type="submit"
           size="tap"
           className="self-start"
+          data-testid="primary-action"
           disabled={parsed.titles.length === 0 || add.isPending}
         >
           {add.isPending ? "Looking them up…" : "Add to library"}
@@ -144,6 +145,7 @@ export function BulkAdd() {
           </ul>
           {open.length > 0 ? (
             <Button
+              variant="secondary"
               size="tap"
               className="self-start"
               disabled={confirm.isPending}

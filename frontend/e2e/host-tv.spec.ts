@@ -124,7 +124,7 @@ test.describe("host and TV", () => {
     await expect(page.getByTestId("voted-count")).toHaveText("1 so far", POLL);
 
     // --- Proxy vote for Mia (no phone). Listing people needs this browser to be a device too.
-    await page.getByRole("button", { name: "Add this browser as a device" }).click();
+    await page.getByRole("button", { name: "Add this browser to the family" }).click();
     await page.getByRole("button", { name: "Mia" }).click();
     await page.getByRole("button", { name: "Paddington" }).click();
     await expect(page.getByRole("button", { name: "Paddington, rank 1" })).toBeVisible();
