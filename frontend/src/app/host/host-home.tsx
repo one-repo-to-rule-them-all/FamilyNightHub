@@ -57,6 +57,8 @@ function readHidden(): string[] {
 function writeHidden(ids: string[]) {
   try {
     window.localStorage.setItem(HIDDEN_UNRATED_KEY, JSON.stringify(ids));
+    // A same-tab write fires no storage event; the shell's Home badge listens for this one.
+    window.dispatchEvent(new StorageEvent("storage", { key: HIDDEN_UNRATED_KEY }));
   } catch {
     // Private mode or blocked storage: the row is hidden for this visit only.
   }
