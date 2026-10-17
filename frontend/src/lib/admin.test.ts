@@ -2,16 +2,23 @@ import { describe, expect, it } from "vitest";
 
 import {
   AGE_CAPS,
+  PEOPLE_FILTERS,
+  PERSON_STATUS_LABEL,
   MAX_STREAMING_PROVIDERS,
   PERSON_COLORS,
   ageCapFromSelect,
   cleanName,
   colorChoices,
   describeMerge,
+  filterPeople,
   deviceName,
   lastSeen,
+  needsAttention,
   normalizeRegion,
+  peopleSummary,
   personChanges,
+  personIdFromHash,
+  personStatus,
   sameIds,
   toggleProvider,
   validatePerson,
@@ -193,5 +200,60 @@ describe("sameIds", () => {
     expect(sameIds([1, 2], [2, 1])).toBe(true);
     expect(sameIds([1, 2], [1, 3])).toBe(false);
     expect(sameIds([1], [1, 2])).toBe(false);
+  });
+});
+
+const person = (over: Partial<{ is_guest: boolean; has_pin: boolean; locked: boolean }> = {}) => ({
+  is_guest: false,
+  has_pin: true,
+  locked: false,
+  ...over,
+});
+
+describe("personStatus", () => {
+  it("puts a lock first, then whether a PIN is set", () => {
+    expect(personStatus(person({ locked: true }))).toBe("locked");
+    expect(personStatus(person({ locked: true, has_pin: false }))).toBe("locked");
+    expect(personStatus(person({ has_pin: false }))).toBe("no-pin");
+    expect(personStatus(person())).toBe("pin-set");
+    expect(PERSON_STATUS_LABEL[personStatus(person({ has_pin: false }))]).toBe("No PIN yet");
+  });
+
+  it("needs attention when locked or without a PIN", () => {
+    expect(needsAttention(person({ locked: true }))).toBe(true);
+    expect(needsAttention(person({ has_pin: false }))).toBe(true);
+    expect(needsAttention(person())).toBe(false);
+  });
+});
+
+describe("filterPeople", () => {
+  const family = { id: "f", ...person() };
+  const guest = { id: "g", ...person({ is_guest: true, has_pin: false }) };
+  const locked = { id: "l", ...person({ locked: true }) };
+  const all = [family, guest, locked];
+
+  it("filters by kind and by attention", () => {
+    expect(filterPeople(all, "all")).toEqual(all);
+    expect(filterPeople(all, "family")).toEqual([family, locked]);
+    expect(filterPeople(all, "guests")).toEqual([guest]);
+    expect(filterPeople(all, "attention")).toEqual([guest, locked]);
+    expect(PEOPLE_FILTERS.map((f) => f.key)).toEqual(["all", "family", "guests", "attention"]);
+  });
+});
+
+describe("peopleSummary", () => {
+  it("counts people, family and guests", () => {
+    expect(peopleSummary([person(), person(), person({ is_guest: true })])).toBe(
+      "3 people · 2 family, 1 guest",
+    );
+    expect(peopleSummary([person()])).toBe("1 person · 1 family, 0 guests");
+  });
+});
+
+describe("personIdFromHash", () => {
+  it("reads #person-{id}", () => {
+    expect(personIdFromHash("#person-abc-123")).toBe("abc-123");
+    expect(personIdFromHash("#pin-requests")).toBe(null);
+    expect(personIdFromHash("")).toBe(null);
   });
 });
