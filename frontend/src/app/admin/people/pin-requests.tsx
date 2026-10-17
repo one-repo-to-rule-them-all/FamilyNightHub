@@ -31,9 +31,9 @@ export function usePinResets() {
  * only admins reset PINs). **Reset PIN** clears the PIN and the lock without showing or choosing
  * one; the phone that asked then picks a new PIN by itself. **Dismiss** leaves the lock.
  *
- * Owner-portal spec §5 P3: the section collapses to nothing while nobody is waiting (Home's inbox
- * already says "all clear"), and its actions are row-level (`outline` / `ghost`), never the
- * page's filled primary.
+ * Owner-portal spec §5 P3 (amended 2026-10-17): the section stays on screen with a one-line empty
+ * state while nobody is waiting, so the owner always knows where a request would land (no dead
+ * ends, rule 3). Its actions are row-level (`outline` / `ghost`), never the page's filled primary.
  */
 export function PinRequests({ onNotice }: { onNotice: (notice: string) => void }) {
   const queryClient = useQueryClient();
@@ -65,8 +65,6 @@ export function PinRequests({ onNotice }: { onNotice: (notice: string) => void }
     return requests.error.status === 403 ? null : <ApiErrorNotice error={requests.error} />;
   }
   const open = requests.data ?? [];
-  // Keep a running confirm on screen even if a poll has just emptied the list.
-  if (open.length === 0 && !confirming) return null;
   const now = new Date();
 
   return (
@@ -80,11 +78,24 @@ export function PinRequests({ onNotice }: { onNotice: (notice: string) => void }
         className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
       >
         PIN requests
-        <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground normal-case">
-          {open.length}
-        </span>
+        {open.length > 0 ? (
+          <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground normal-case">
+            {open.length}
+          </span>
+        ) : null}
       </h2>
-      <ul className="flex flex-col divide-y divide-border" data-testid="pin-requests">
+      {open.length === 0 ? (
+        <p className="text-sm text-muted-foreground" data-testid="pin-requests-empty">
+          {requests.isPending
+            ? "Loading PIN requests…"
+            : "No PIN requests. When someone taps Forgot PIN on their phone, it shows up here and on Home."}
+        </p>
+      ) : null}
+      <ul
+        hidden={open.length === 0}
+        className="flex flex-col divide-y divide-border"
+        data-testid="pin-requests"
+      >
         {open.map((request) => (
           <li
             key={request.id}

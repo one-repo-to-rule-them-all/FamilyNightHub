@@ -15,6 +15,7 @@ import {
   PERSON_STATUS_LABEL,
   type PeopleFilter,
   type PersonDraft,
+  attentionLine,
   describeMerge,
   filterPeople,
   needsAttention,
@@ -298,6 +299,11 @@ function PeopleTable({
           );
         })}
       </div>
+      {attention > 0 ? (
+        <p className="text-sm text-muted-foreground" data-testid="attention-line">
+          {attentionLine(people)}
+        </p>
+      ) : null}
       <ApiErrorNotice error={convert.error} />
       <DataTable
         caption={`People (${shown.length})`}
