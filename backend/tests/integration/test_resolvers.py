@@ -75,6 +75,29 @@ async def test_resolve_account_by_email_is_case_insensitive(two_households: Pair
     assert rows == [{"account_id": a.ids["account"], "household_id": a.household_id}]
 
 
+async def test_resolve_account_by_username_is_case_insensitive_and_live_only(
+    two_households: Pair,
+) -> None:
+    """ADR-0014's sixth resolver: ids only, unknown and disabled accounts resolve to nothing."""
+    a, b = two_households
+    login = f"host.{a.slug[-12:]}"
+    async with household_session(a.household_id) as s:
+        await s.execute(
+            text("UPDATE accounts SET username = :u WHERE id = :a"),
+            {"u": login, "a": a.ids["account"]},
+        )
+    sql = "SELECT * FROM auth_resolve_account_by_username(:u)"
+    assert await _call(sql, u=login.upper()) == [
+        {"account_id": a.ids["account"], "household_id": a.household_id}
+    ]
+    assert await _call(sql, u="nobody-here") == []
+    async with household_session(a.household_id) as s:
+        await s.execute(
+            text("UPDATE accounts SET disabled_at = now() WHERE id = :a"), {"a": a.ids["account"]}
+        )
+    assert await _call(sql, u=login) == []
+
+
 async def test_resolve_household_by_slug(two_households: Pair) -> None:
     a, _ = two_households
     rows = await _call("SELECT auth_resolve_household_by_slug(:s) AS id", s=a.slug)

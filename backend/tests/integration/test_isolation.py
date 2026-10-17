@@ -33,6 +33,7 @@ SCOPED_TABLES = (
     "photo_deletions",
     "settings",
     "audit_events",
+    "pin_reset_requests",
 )
 Pair = tuple[SeededHousehold, SeededHousehold]
 
