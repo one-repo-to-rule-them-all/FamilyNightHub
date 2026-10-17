@@ -27,19 +27,6 @@ export function usePinResets() {
 }
 
 /**
- * The nav badge's open-request count (G4): a cheap count, not the list. Under `PIN_RESETS_KEY`, so
- * approving or dismissing a request refreshes it too. A host's 403 stops the polling.
- */
-export function usePinResetCount() {
-  return useQuery<number, ApiError>({
-    queryKey: [...PIN_RESETS_KEY, "count"],
-    queryFn: async () => (await api.pinResetCount()).open_count,
-    refetchInterval: (query) => (query.state.error?.status === 403 ? false : PIN_RESETS_POLL_MS),
-    retry: false,
-  });
-}
-
-/**
  * "PIN requests" at the top of /admin/people (guest-flow spec §5 "Admin", owner decision §10.2:
  * only admins reset PINs). **Reset PIN** clears the PIN and the lock without showing or choosing
  * one; the phone that asked then picks a new PIN by itself. **Dismiss** leaves the lock.
