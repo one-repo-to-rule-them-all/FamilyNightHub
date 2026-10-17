@@ -116,7 +116,7 @@ async def test_binding_a_free_person_is_active_and_idempotent(two_households: Pa
         await _joined(p, a)
         first = await p.bind(mia)
         again = await p.bind(mia)
-        assert first.json() == {"person_id": str(mia), "status": "active"}
+        assert first.json() == {"person_id": str(mia), "status": "active", "current": True}
         assert again.json()["status"] == "active"
         me = (await p.client.get("/api/v1/devices/me")).json()
         assert [(x["id"], x["binding"]) for x in me["people"]] == [(str(mia), "mine")]
@@ -134,7 +134,8 @@ async def test_shared_phone_can_hold_several_people(two_households: Pair) -> Non
 
 
 async def test_claiming_someone_bound_elsewhere_is_pending(two_households: Pair) -> None:
-    """ADR-0002: picking a person already bound to another device needs host approval."""
+    """ADR-0002, kept by ADR-0014 as the admin override: a claim without the PIN on a person
+    another device holds waits for a host."""
     a, _ = two_households
     await open_night(a.household_id, a.ids["session"], CODE)
     mia = await _add_person(a, "Mia")
@@ -142,7 +143,7 @@ async def test_claiming_someone_bound_elsewhere_is_pending(two_households: Pair)
         await _joined(phone_a, a)
         device_b = await _joined(phone_b, a)
         assert (await phone_a.bind(mia)).json()["status"] == "active"
-        assert (await phone_b.bind(mia)).json()["status"] == "pending"
+        assert (await phone_b.bind(mia, pin=None)).json()["status"] == "pending"
 
         grid_b = {
             x["id"]: x["binding"] for x in (await phone_b.client.get("/api/v1/people")).json()

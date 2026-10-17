@@ -68,7 +68,9 @@ def raise_http(err: ServiceError) -> NoReturn:
     if isinstance(err, NotFound):
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(err) or "Night not found") from None
     if isinstance(err, Forbidden):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "This phone can't vote as them") from None
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, err.reason or "This phone can't vote as them"
+        ) from None
     if isinstance(err, Invalid):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, err.reason) from None
     if isinstance(err, Conflict):

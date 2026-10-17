@@ -24,8 +24,10 @@ backend/app/
 | Area | Path prefix | Notes |
 |---|---|---|
 | Join | `GET /api/v1/csrf`, `POST /api/v1/join` | Issue the CSRF cookie; validate slug + night code, mint the device cookie (failure-budgeted) |
-| Auth | `/api/v1/auth/{magic-link,verify,me,logout}` | Magic-link request/verify for admins and hosts, current account, logout |
-| People/devices | `/api/v1/people`, `/api/v1/devices/me`, `PUT/DELETE /api/v1/devices/me/people/{id}` | Avatar grid with each tile's binding state, bind or unbind a person to this device |
+| Auth | `/api/v1/auth/{login,password,magic-link,verify,me,logout}` | Password sign-in for admins and hosts, set/change password, forgot password (the magic link sets a new one), current account, logout ([ADR-0014](decisions/ADR-0014-passwords-and-person-pins.md)) |
+| People/devices | `/api/v1/people`, `/api/v1/devices/me`, `POST /api/v1/devices/me/people`, `PUT/PATCH/DELETE /api/v1/devices/me/people/{id}`, `POST …/{id}/pin`, `POST …/{id}/forgot-pin` | Avatar grid with each tile's binding and PIN state; self-create a guest; claim or switch with the PIN; rename once; set/change PIN; ask for a PIN reset; unbind. See "People and PINs" |
+| Join link | `GET /api/v1/devices/me/join-link` | The TV (`is_tv`) or a host account (`sessions:run`) reads `{join_slug, qr_includes_night_code}` to draw the join QR; other phones 403. The night code is never returned |
+| Profiles | `GET /api/v1/people/{id}/profile` | A person's revealed nights, picks, winners, ratings, albums and stats (any device or account of the household) |
 | Host devices | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}` | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it); review pending person claims (`devices:enroll` / `devices:approve`) |
 | Sessions | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET/PATCH /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}`, `PUT /sessions/{id}/slideshow` | Host (`sessions:run`): create (code shown once; `voting_method` defaults to the household's), change the voting method while `draft`, rotate code, shortlist, open/close voting, close the night, start/stop the TV slideshow. Snapshot and history: any device or account of the household |
 | Ballots | `PUT /api/v1/sessions/{id}/ballots`, `PUT …/ballots/proxy`, `GET …/ballots/mine`, `GET …/voters` | Phone casts/replaces a bound person's ballot; host proxy ballot (`ballots:proxy`); a phone reads back its own people's ballots; who has voted (avatars only) |
@@ -33,7 +35,7 @@ backend/app/
 | Photos | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}` | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below |
 | Ratings | `PUT /api/v1/sessions/{id}/ratings`, `PUT …/ratings/proxy`, `GET …/ratings/mine` | 1–5 per person, once the night is `tonight`/`closed`: a phone rates as its bound people, a host proxy-rates (`ballots:proxy`), a phone reads back its own people's scores. See "Ratings" |
 | Movies | `GET /api/v1/tmdb/search?q=` | TMDB search proxy for hosts (503 when TMDB is off or down). The library itself is admin-only (next rows) |
-| Admin people | `GET/POST /api/v1/admin/people`, `PATCH /admin/people/{id}`, `POST /admin/people/{id}/convert-to-member`, `POST /admin/people/merge` | Add, rename/re-avatar/recolour, guest → member, merge (`admin:people`; hosts may add guests). See "People and devices admin" |
+| Admin people | `GET/POST /api/v1/admin/people`, `PATCH /admin/people/{id}`, `POST /admin/people/{id}/convert-to-member`, `POST /admin/people/merge`, `GET /admin/people/pin-resets`, `POST /admin/people/pin-resets/{id}/{approve,dismiss}` | Add, rename/re-avatar/recolour, guest → member, merge, the forgot-PIN queue (`admin:people`; hosts may add guests). See "People and devices admin" |
 | Admin devices | `GET /api/v1/admin/devices`, `PATCH /admin/devices/{id}`, `POST /admin/devices/{id}/revoke` | The "Devices" list with each device's people, label, revoke (`admin:devices`) |
 | Admin settings | `GET/PATCH /api/v1/admin/settings`, `POST /admin/join-slug/rotate` | Household defaults and the fridge-QR slug (`admin:settings`) |
 | Admin movies | `GET /api/v1/admin/movies?q=&owned=&watchlist=&blocked=&limit=&offset=`, `PATCH /admin/movies/{id}`, `POST /admin/movies/bulk`, `POST /admin/movies/bulk/confirm` | Library search/filter/paginate, flags, bulk add of owned titles through TMDB search (`admin:movies`). See "Library and history admin" |
@@ -50,7 +52,8 @@ A ballot submit goes through these steps:
 3. `DeviceDb` (`core/dependencies.py`) opens the request's one transaction and sets the household
    GUC with `set_config(..., true)`; it also slides the cookie and `last_seen_at` at most hourly.
 4. `BallotService` checks the session is `voting`, that the person is bound to the device
-   (`people_service.require_can_act_as`: an **active** binding; pending claims don't count) or the caller is a host, and that the ranks are valid for `k`. It then replaces the ballot rows.
+   (`people_service.require_can_act_as`: an **active**, **current** binding to a person who has a
+   PIN; pending claims don't count) or the caller is a host, and that the ranks are valid for `k`. It then replaces the ballot rows.
 5. It queues a `ballot_count` hint for `session:{id}` (count changed, nothing else).
 6. Commit, then the hint is published (see "Live updates"), then 204.
 
@@ -67,17 +70,40 @@ per transaction, and queries also filter explicitly. Cross-household requests ge
 | Principal | Credential | Where checked |
 |---|---|---|
 | Device | `fnh_device` httpOnly cookie (hashed with pepper in `devices.token_hash`) | `CurrentDevice` |
-| Admin/host | `fnh_session` httpOnly cookie after magic link (15-min single-use link) | `CurrentAccount` |
+| Person on a device | the device, plus the person's 6-digit PIN to claim or switch to them | `people_service.claim`, `require_can_act_as` |
+| Admin/host | `fnh_session` httpOnly cookie after username/email + password (the magic link only resets the password) | `CurrentAccount` |
 
 Both credentials are resolved to `(id, household_id)` by the ADR-0009 definer functions before
 any household transaction opens; everything after runs under RLS.
 
-**Account sessions.** `POST /auth/magic-link` always answers 202 with the same body; the email
+**Password sign-in** ([ADR-0014](decisions/ADR-0014-passwords-and-person-pins.md)).
+`POST /auth/login {username_or_email, password}` resolves the identifier before any GUC
+(`@` → `auth_resolve_account_by_email`, else `auth_resolve_account_by_username`), then reads and
+verifies `accounts.password_hash` as `fnh_app` under RLS. Unknown identifier, disabled account,
+no password yet and wrong password all answer the same 401 ("Wrong username, email or password.")
+after one argon2id verification each (a dummy hash when there is no real one), so neither status,
+body nor timing enumerates accounts. Failures are budgeted per normalized identifier
+(`LOGIN_FAILURE_LIMIT`, default 10 per 15 min, unknown identifiers included) and per account
+(`LOGIN_ACCOUNT_FAILURE_LIMIT`, default 20, shared by its email and username); a spent budget is
+429 with `Retry-After` before the password is checked. `POST /auth/password {current_password?,
+new_password}` sets a first password or changes one (the current one required; a wrong one spends
+the account budget, 403). Usernames are 3–32 of `[a-z0-9._-]`, stored lowercase, unique across
+households. Passwords are 12–256 characters, not one repeated character, not the account's own
+username or email, not on a short denylist (`domain/credentials.py`); no composition rules.
+Hashes are argon2id, `m = 19 MiB, t = 2, p = 1`, computed in a worker thread (`core/hashing.py`).
+`python -m app.cli set-password --email … [--username …]` reads the password from stdin or a
+hidden prompt, never argv; `bootstrap` takes an optional `--username`.
+
+**Forgot password.** `POST /auth/magic-link` always answers 202 with the same body; the email
 (a 256-bit, hash-stored, 15-minute, single-use link to `FRONTEND_BASE_URL/auth/callback`) goes out
 in a background task after the response, so known and unknown addresses look alike. Requests
 are budgeted per address (`MAGIC_LINK_REQUEST_LIMIT`, default 5 per 15 min), counting every
-request. `POST /auth/verify` consumes the link with `UPDATE ... WHERE used_at IS NULL
-RETURNING`, so two tabs racing one link sign in once. The session is a **signed, stateless**
+request. `POST /auth/verify {token, new_password}` (the password is required) consumes the link
+with `UPDATE ... WHERE used_at IS NULL RETURNING`, so two tabs racing one link sign in once, and
+sets the new password in the same transaction: a password the rules refuse is 422 and leaves the
+link usable.
+
+**Account sessions.** The session is a **signed, stateless**
 `fnh_session` cookie (`{account}.{household}.{issued_at}` + HMAC-SHA256 under
 `SESSION_SECRET`, 30 days, `HttpOnly; Secure; SameSite=Lax`). `CurrentAccount` re-reads the
 account on every request, so disabling an account or changing its role takes effect
@@ -101,7 +127,8 @@ which slugs exist. A phone that already holds a live token for the household reu
 The other way in is a signed-in host: `POST /devices/enroll` mints a device for that browser
 (reusing one it already holds for the household). With `as_tv: true` the device is marked
 `is_tv` and the host's `fnh_session` is cleared, so the living-room TV never carries host rights.
-Approving a pending claim leaves the person bound to their other phone as well.
+Approving a pending claim leaves the person bound to their other phone as well, and makes them
+current on the approved phone.
 The device cookie is `fnh_device`: 256-bit token, `HttpOnly; Secure; SameSite=Lax`, 365-day
 sliding `Max-Age`.
 
@@ -110,7 +137,56 @@ sliding `Max-Age`.
 NAT address, and forwarded headers are spoofable (uvicorn does not trust them). Once a slug's
 budget is spent, joins get 429 with `Retry-After`, even with the right code, until the window
 ends; successful joins cost nothing. A host-approved join is the fallback if someone burns the
-budget on purpose. If Redis is down the limiter fails open and logs.
+budget on purpose. If Redis is down the limiter fails open and logs. The same limiter budgets
+login failures (above), wrong PINs per device (`PIN_FAILURE_LIMIT`, default 10 per 15 min) and
+self-created profiles per device (`SELF_CREATE_LIMIT`, default 5 per hour).
+
+## People and PINs
+
+`services/people_service.py`, `api/v1/people.py` ([ADR-0014](decisions/ADR-0014-passwords-and-person-pins.md)).
+Every person has a 6-digit PIN. The phone stays the everyday credential: a device holds several
+people but **acts as one at a time** (`device_people.is_current`, one per device), and
+`require_can_act_as` (ballots, ratings, photos, reactions) needs an active, current binding to a
+person who has a PIN (403 "Set a PIN for them on this phone first" / "Switch to them on this phone
+first"). The PIN is typed to claim or switch, not per vote; a kid's is typed by a parent.
+
+- **Claim / switch** (`PUT /devices/me/people/{id} {pin?}`). The PIN is needed on **every**
+  switch, even to a person already bound to this phone: `is_current` moves only on a
+  successful PIN check (or a host approval / set-PIN on this phone). Already current → no-op. The person
+  has a PIN → the right one makes the binding active and current, even if another phone holds
+  them (no host needed); no PIN from a phone that doesn't hold them → `pending` for host approval
+  (the admin override); no PIN to switch on a phone that holds them → 422. The person has no PIN
+  → the first claim must set it (422 without one), but only if nobody else holds them, this phone
+  already does, or an admin approved a reset that this phone asked for; otherwise `pending`.
+- **Wrong PIN**: counted in the request's transaction with the person row `FOR UPDATE`; the router
+  *returns* the error (403 `{"error": {"code": "wrong_pin", …, "attempts_left": n}}`) rather than
+  raising, so the count commits. At **5** the profile locks (`pin_locked_at`, 423 `pin_locked`)
+  and every PIN check refuses, the right PIN included, until an admin resets it. The right PIN
+  resets the count. A lock does not stop phones already current on the person. Audit:
+  `person.pin_failed`, `person.pin_locked`.
+- **Set / change** (`POST …/{id}/pin {new_pin, current_pin?}`): for a person this phone holds
+  (people bound before PINs existed, or after a reset); changing needs the current PIN. Makes them
+  current. Audit `person.pin_set` / `person.pin_changed`.
+- **Forgot PIN** (`POST …/{id}/forgot-pin`, any household device): a `pin_reset_requests` row,
+  202; repeating it while one is open returns that one. Audit `person.pin_reset_requested`.
+- **Self-create** (`POST /devices/me/people {name, avatar_emoji, color, pin}`): any joined device;
+  always a guest, current on this phone, PIN set in the same transaction; admin name rules apply
+  (409 on a clash). Audit `person.self_created` (actor = the device).
+- **Rename once** (`PATCH /devices/me/people/{id} {name}`): the current person may change their
+  own name once (`name_changed_at`), then 409; admin renames are unlimited and don't count.
+  Audit `person.renamed_self`.
+- Tiles (`GET /people`, `GET /devices/me`) carry `has_pin`, `locked`, `current`,
+  `can_rename` and `pin_reset` (`null`, `open`, or `approved_for_this_phone` while this phone
+  may set the new PIN). Another household's or a merged person is 404 on every route above.
+
+**Profiles** (`services/profile_service.py`, `GET /people/{id}/profile`, any device or account,
+404 across households or for a merged person). Only nights whose status is `revealed`, `tonight`
+or `closed` are included, so no ballot is readable before the reveal
+([ADR-0006](decisions/ADR-0006-voting-rules-and-tie-break.md)) and the profile doesn't leak who has
+voted in a live night. Per night: winner, the person's picks, `picked_winner` (top3/pick_one:
+their rank 1 won; approval: they approved the winner), their rating and photo count. Plus albums
+(`photos_url` is the album endpoint; image URLs are minted there) and stats (nights joined,
+ballots cast, winners picked, ratings given and their average, photos uploaded).
 
 ## Nights and the shortlist
 
@@ -193,13 +269,22 @@ the CSRF header and writes an audit row.
 - **Settings** (`services/household_settings_service.py`, `admin:settings`). `GET` returns the
   join slug plus `default_voting_method`, `default_age_cap` and `region`; `PATCH` changes only
   the fields sent (`default_age_cap: null` clears the cap). `default_voting_method` is any of
-  `top3`, `approval`, `pick_one` (new nights start with it); age caps are `G`/`PG`/`PG-13`/`R`/`NC-17`; region is ISO 3166-1 alpha-2,
+  `top3`, `approval`, `pick_one` (new nights start with it); `qr_includes_night_code` (default
+  false) lets the TV's join QR carry the night code, which the TV appends itself (ADR-0014); age caps are `G`/`PG`/`PG-13`/`R`/`NC-17`; region is ISO 3166-1 alpha-2,
   stored uppercase. **Rotate join slug** issues a new `xxxx-xxxx-xxxx` slug from the night-code
   alphabet, lowercased (`domain/join_slug.py`, ~2^59 values; a unique-constraint clash retries
   in a savepoint). `/j/{old}` stops resolving immediately; devices already in keep working.
 
+- **PIN resets** (`admin:people`). `GET /admin/people/pin-resets` lists open forgot-PIN requests
+  oldest first (person, whether they are locked, the requesting device). **Approve** clears the
+  PIN hash, `pin_set_at`, the failure count and the lock, and audits `person.pin_reset`; it never
+  shows or sets a PIN (the person picks a new one on their next claim, and the requesting phone
+  may do so even if another phone still holds them). **Dismiss** changes nothing else. A handled
+  request is 409; another household's is 404. Admin people rows carry `has_pin` and `locked`.
+
 Audit actions: `person.created`, `person.updated` (`data.fields`), `person.converted_to_member`,
-`person.merged` (`target_id` = the target), `device.relabeled`, `device.revoked`,
+`person.merged` (`target_id` = the target), `person.pin_reset`, `person.pin_reset_dismissed`,
+`device.relabeled`, `device.revoked`,
 `settings.updated` (`data` = from/to of the fields sent), `household.join_slug_rotated` (no
 slug values).
 
@@ -294,7 +379,8 @@ session row is read `FOR SHARE`, so a ballot and `close_voting` (`FOR UPDATE`) s
 either lands before the tally or sees `revealed` and gets 409. `GET …/voters` (any device or
 account) lists who has voted as person id, avatar emoji and colour; `GET …/ballots/mine` returns
 the ballots of the people actively bound to the calling phone. Nothing returns anyone else's
-ranks.
+ranks before the reveal; afterwards a person's profile shows their picks to the household
+(ADR-0014, "People and PINs").
 
 **Close and reveal.** `POST …/close-voting` (`sessions:run`) locks the row, and on `voting`
 tallies, stores ranking/seed/winner, sets `revealed` and `revealed_at`, and audits. On
@@ -343,8 +429,8 @@ The table (`ratings`, unique (session, person), `check(score between 1 and 5)`) 
 - **Reads.** `GET …/ratings/mine` returns `{person_id, score|null}` for each person actively bound
   to the calling phone. The snapshot and each history row carry `rating: {average, count}` (the
   family average, `average` null while `count` is 0), and only once the night is
-  `tonight`/`closed` (`session_state.shows_rating`); before that `rating` is null. No endpoint
-  returns another person's score.
+  `tonight`/`closed` (`session_state.shows_rating`); before that `rating` is null. The only
+  endpoint that returns another person's score is their profile (ADR-0014, family history).
 - **Live.** Every rating publishes `rating_count` after commit, and screens refetch the snapshot.
 - **For the generator.** `rating_service.average_ratings(db, movie_ids, since=None)` returns, in
   one query, the family's `RatingAverage(average, count)` for each library movie over the nights
