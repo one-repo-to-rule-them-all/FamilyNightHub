@@ -9,6 +9,7 @@ import { RatePromptCard } from "@/components/night/rate-prompt-card";
 import { buttonVariants } from "@/components/ui/button";
 import { api, type ApiError, type Binding, type NightSummary, type Person } from "@/lib/api";
 import { pendingPollInterval } from "@/lib/live";
+import { LIVE_NIGHT_POLL_MS, statusHint } from "@/lib/who";
 import { cn } from "@/lib/utils";
 
 const PEOPLE = ["people"] as const;
@@ -39,9 +40,13 @@ export function WhoGrid() {
     onSettled: () => queryClient.invalidateQueries({ queryKey: PEOPLE }),
   });
   // The household's current night, if any, so a picked phone can go straight to it.
+  // Keep this fresh: a phone often lands here before the host opens voting, and must not be
+  // left without the "Vote now" button once it opens (staging bug, 2026-10-17).
   const live = useQuery<NightSummary[], ApiError>({
     queryKey: ["nights", "live"],
     queryFn: () => api.nights({ status: ["voting", "revealed", "tonight"], limit: 1 }),
+    refetchInterval: LIVE_NIGHT_POLL_MS,
+    refetchOnWindowFocus: true,
   });
 
   if (people.isPending) {
@@ -84,8 +89,8 @@ export function WhoGrid() {
       <div aria-live="polite" className="flex flex-col gap-3 empty:hidden">
         {mine.length > 0 ? (
           <p className="rounded-xl bg-cinema-muted p-4 text-base" data-testid="who-status">
-            You&apos;re in as <strong>{mine.map((p) => p.name).join(" & ")}</strong>. Voting opens
-            on the TV.
+            You&apos;re in as <strong>{mine.map((p) => p.name).join(" & ")}</strong>.{" "}
+            {statusHint(current?.status)}
           </p>
         ) : null}
         {pending.length > 0 ? (
