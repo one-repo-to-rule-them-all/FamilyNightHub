@@ -17,6 +17,13 @@ import { AdminQueryError } from "../admin-error";
 
 const DEVICES_KEY = ["admin", "devices"] as const;
 
+// owner-portal.md §7 (copy.phones.*). "Device" never appears in the UI (guest-flow §7).
+const COPY = {
+  title: "Phones and TVs",
+  lede: "Phones join with the night code on the TV. Rename or remove them here.",
+  empty: "No phones yet. They show up here after someone joins.",
+} as const;
+
 export function DevicesAdmin() {
   const devices = useQuery<AdminDevice[], ApiError>({
     queryKey: DEVICES_KEY,
@@ -26,12 +33,20 @@ export function DevicesAdmin() {
   const [revoking, setRevoking] = useState<AdminDevice | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  if (devices.isError) return <AdminQueryError error={devices.error} />;
+  if (devices.isError) {
+    return (
+      <PhonesScreen>
+        <AdminQueryError error={devices.error} />
+      </PhonesScreen>
+    );
+  }
   if (devices.isPending) {
     return (
-      <p role="status" className="text-muted-foreground">
-        Loading devices…
-      </p>
+      <PhonesScreen>
+        <p role="status" className="text-muted-foreground">
+          Loading phones…
+        </p>
+      </PhonesScreen>
     );
   }
 
@@ -39,7 +54,7 @@ export function DevicesAdmin() {
   const columns: Column<AdminDevice>[] = [
     {
       key: "device",
-      header: "Device",
+      header: "Phone",
       rowHeader: true,
       cell: (d) => (
         <span className="flex flex-wrap items-center gap-2">
@@ -127,16 +142,12 @@ export function DevicesAdmin() {
   ];
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">
-        Every phone and TV that has joined, most recently seen first. Revoke one that is lost or no
-        longer used.
-      </p>
+    <PhonesScreen>
       <p aria-live="polite" data-testid="devices-notice" className="empty:hidden">
         {notice}
       </p>
       <DataTable
-        caption={`Devices (${devices.data.length})`}
+        caption={`Most recently seen first (${devices.data.length})`}
         columns={columns}
         rows={devices.data}
         rowKey={(d) => d.id}
@@ -145,7 +156,7 @@ export function DevicesAdmin() {
           "data-revoked": String(d.revoked_at !== null),
           className: d.revoked_at ? "text-muted-foreground" : undefined,
         })}
-        empty="No phone has joined yet."
+        empty={COPY.empty}
       />
       {labelling ? (
         <LabelDevice
@@ -165,6 +176,19 @@ export function DevicesAdmin() {
           }}
         />
       ) : null}
+    </PhonesScreen>
+  );
+}
+
+/** P4 (owner-portal.md): no primary here, since phones join with the night code, not from this page. */
+function PhonesScreen({ children }: { children: React.ReactNode }) {
+  return (
+    <div data-screen="portal-phones" className="flex flex-col gap-6">
+      <header className="flex flex-col gap-1">
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">{COPY.title}</h1>
+        <p className="text-muted-foreground">{COPY.lede}</p>
+      </header>
+      <div className="flex flex-col gap-4">{children}</div>
     </div>
   );
 }
@@ -249,7 +273,7 @@ function RevokeDevice({
         </p>
         <p>
           To use it again, the phone has to rejoin with a night code (or a host lets it in), and it
-          comes back as a new device.
+          comes back as a new phone.
         </p>
         {people.length > 0 ? (
           <p className="text-muted-foreground">

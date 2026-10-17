@@ -15,7 +15,7 @@ PostgreSQL 16 on Fly, SQLAlchemy 2 async, Alembic. Object storage on Tigris (S3 
 | `pin_reset_requests` | yes | Forgot-PIN requests: `person_id`, `requested_by_device_id`, `status` `open`/`approved`/`dismissed`, `resolved_at`, `resolved_by_account_id`; one open request per person (partial unique index). Never holds a PIN |
 | `movies` | yes | `tmdb_id`, title, year, poster_path, genres, runtime, `us_cert`, `owned`, `watchlist`, `blocked` |
 | `tmdb_cache` | no (global) | Cached TMDB responses keyed by request, `fetched_at` (refresh at 30 days or less) |
-| `sessions` | yes | `status`, `voting_method`, `ballot_size`, `night_code_hash` (unique per household among non-closed nights), `age_cap`, `ranking jsonb`, `tie_seed numeric(20)`, `winner_option_id`, `host_account_id`, `voting_opened_at`/`revealed_at`/`closed_at` |
+| `sessions` | yes | `status`, `voting_method`, `ballot_size`, `night_code_hash` (unique per household among non-closed nights), `age_cap`, `ranking jsonb`, `tie_seed numeric(20)`, `winner_option_id`, `host_account_id`, `voting_opened_at`/`revealed_at`/`closed_at`, `slideshow_started_at`/`slideshow_stopped_at` (the host's TV slideshow Start/Stop, at most one set, both null = auto; migration `0004_slideshow_control`) |
 | `options` | yes | Shortlisted movie per session, `source` (`manual`/`owned`/`streaming`/`tmdb`) |
 | `ballot_ranks` | yes | `session_id`, `person_id`, `option_id`, `rank`, `cast_by_device_id` or `cast_by_account_id` (one required), `is_proxy` |
 | `ratings` | yes | `session_id`, `person_id`, `score 1–5` (unique per pair). Table ships in Phase 1, UI in Phase 2 |
@@ -23,6 +23,7 @@ PostgreSQL 16 on Fly, SQLAlchemy 2 async, Alembic. Object storage on Tigris (S3 
 | `photo_reactions` | yes | `photo_id`, `person_id`, `emoji` (unique triple) |
 | `photo_deletions` | yes | Tombstone written with each hard delete (`photo_id`, keys, `backup_purged_at`) so the worker can purge backup copies |
 | `settings` | yes | `default_voting_method`, `default_age_cap`, `streaming_providers int[]`, `region`, `qr_includes_night_code` (default false; the TV's QR may carry the code, never stored) |
+| `session_attendance` | yes | Who is here tonight (G8): `session_id`, `person_id`, `first_seen_at`, unique per (night, person). Written when a phone set to the person opens a live night or votes; read with the ballots by `GET …/present` |
 | `audit_events` | yes | Who did what (session transitions, winner corrections, merges, revokes, deletes) |
 | `failed_jobs` | no (global) | ARQ dead letters: job name/id/try and a truncated error. Never job args |
 | `backup_runs` | no (global) | One row per backup run (`kind` photos/pg_dump, counts, errors) |

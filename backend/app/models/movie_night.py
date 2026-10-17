@@ -72,6 +72,11 @@ class Session(Base):
         CheckConstraint("voting_method IN ('top3', 'approval', 'pick_one')", name="voting_method"),
         # 1..8 since ADR-0010: approval may hold the whole shortlist.
         CheckConstraint("ballot_size BETWEEN 1 AND 8", name="ballot_size"),
+        # The host's slideshow control: started, stopped, or neither (auto). Never both.
+        CheckConstraint(
+            "num_nonnulls(slideshow_started_at, slideshow_stopped_at) <= 1",
+            name="slideshow_one_state",
+        ),
         scoped_fk("host_account_id", "accounts"),
         # The winner must be one of this session's own options (05-data.md).
         ForeignKeyConstraint(
@@ -107,6 +112,9 @@ class Session(Base):
     voting_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revealed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Host's Start/Stop for the TV slideshow (issue #41); both null = auto.
+    slideshow_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    slideshow_stopped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Option(Base):
@@ -181,3 +189,21 @@ class Rating(Base):
     person_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
     score: Mapped[int] = mapped_column(SmallInteger)
     created_at: Mapped[datetime] = created_at()
+
+
+class SessionAttendance(Base):
+    """Who is here tonight (guest-flow G8): first time a phone acting as the person opened
+    the night or voted. Read with the ballots by GET /sessions/{id}/present."""
+
+    __tablename__ = "session_attendance"
+    __table_args__ = (
+        UniqueConstraint("session_id", "person_id"),
+        scoped_fk("session_id", "sessions", ondelete="CASCADE"),
+        scoped_fk("person_id", "people"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    household_id: Mapped[uuid.UUID] = household_fk()
+    session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    person_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    first_seen_at: Mapped[datetime] = created_at()

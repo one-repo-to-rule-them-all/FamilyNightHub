@@ -5,6 +5,7 @@ import {
   describeAverage,
   dismissRatePrompt,
   isRatePromptDismissed,
+  ratingProgress,
   unratedPeople,
 } from "./rating";
 
@@ -107,5 +108,21 @@ describe("the home card's Not now", () => {
     vi.stubGlobal("window", { localStorage: broken });
     expect(() => dismissRatePrompt("night-1")).not.toThrow();
     expect(isRatePromptDismissed("night-1")).toBe(false);
+  });
+});
+
+describe("ratingProgress", () => {
+  it("counts ratings against the night's turnout", () => {
+    expect(ratingProgress({ average: 4, count: 2 }, 4)).toEqual({ rated: 2, of: 4, done: false });
+    expect(ratingProgress({ average: 4.5, count: 4 }, 4)).toEqual({ rated: 4, of: 4, done: true });
+  });
+
+  it("treats a missing summary as nobody rated yet", () => {
+    expect(ratingProgress(null, 3)).toEqual({ rated: 0, of: 3, done: false });
+    expect(ratingProgress(undefined, 0)).toEqual({ rated: 0, of: 0, done: false });
+  });
+
+  it("never reports more ratings than people", () => {
+    expect(ratingProgress({ average: 3, count: 3 }, 2)).toEqual({ rated: 3, of: 3, done: true });
   });
 });

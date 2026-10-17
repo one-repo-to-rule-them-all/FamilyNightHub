@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { type Column, DataTable } from "@/components/ui/data-table";
 import { Label } from "@/components/ui/label";
 import { AdminQueryError } from "../admin-error";
-import { api, type ApiError, type Night, type NightSummary } from "@/lib/api";
+import { type Account, api, type ApiError, type Night, type NightSummary } from "@/lib/api";
 
 const dateFormat = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -26,19 +27,36 @@ const STATUS_LABEL: Record<string, string> = {
 export function HistoryAdmin() {
   const [editing, setEditing] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const me = useQuery<Account, ApiError>({ queryKey: ["me"], queryFn: api.me });
   const nights = useQuery<NightSummary[], ApiError>({
     queryKey: ["nights", "history"],
     queryFn: () => api.nights({ limit: 100 }),
   });
+  // Correcting a winner is `admin:history`: hide it until the role says admin, so a host never
+  // sees a control the API would refuse (owner-portal.md §3.1).
+  const canCorrect = me.data?.role === "admin";
+  const lede = me.data
+    ? canCorrect
+      ? "Past nights. Watched something other than the winner? Correct it here; the vote itself is kept."
+      : "Past nights and what the family watched."
+    : "Past nights.";
 
   if (nights.isPending) {
     return (
-      <p role="status" className="text-muted-foreground">
-        Loading past nights…
-      </p>
+      <HistoryScreen lede={lede}>
+        <p role="status" className="text-muted-foreground">
+          Loading past nights…
+        </p>
+      </HistoryScreen>
     );
   }
-  if (nights.isError) return <AdminQueryError error={nights.error} />;
+  if (nights.isError) {
+    return (
+      <HistoryScreen lede={lede}>
+        <AdminQueryError error={nights.error} />
+      </HistoryScreen>
+    );
+  }
 
   const columns: Column<NightSummary>[] = [
     {
@@ -48,10 +66,13 @@ export function HistoryAdmin() {
       cell: (night) => {
         const when = new Date(night.revealed_at ?? night.created_at);
         return (
-          <span className="flex flex-col">
+          <Link
+            href={`/host/${night.id}`}
+            className="flex flex-col rounded-md underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
             <time dateTime={when.toISOString()}>{dateFormat.format(when)}</time>
             {night.title ? <span className="text-muted-foreground">{night.title}</span> : null}
-          </span>
+          </Link>
         );
       },
     },
@@ -69,13 +90,15 @@ export function HistoryAdmin() {
         </span>
       ),
     },
-    {
+  ];
+  if (canCorrect) {
+    columns.push({
       key: "action",
       header: <span className="sr-only">Actions</span>,
       className: "w-44 text-right",
       cell: (night) => (
         <Button
-          variant="outline"
+          variant="secondary"
           size="lg"
           aria-expanded={editing === night.id}
           aria-controls={editing === night.id ? `correct-${night.id}` : undefined}
@@ -87,11 +110,11 @@ export function HistoryAdmin() {
           Correct winner
         </Button>
       ),
-    },
-  ];
+    });
+  }
 
   return (
-    <div className="flex flex-col gap-4">
+    <HistoryScreen lede={lede}>
       {notice ? (
         <p role="status" className="rounded-xl bg-card p-4" data-testid="correction-notice">
           {notice}
@@ -103,10 +126,10 @@ export function HistoryAdmin() {
           columns={columns}
           rows={nights.data}
           rowKey={(night) => night.id}
-          empty="No past nights yet."
+          empty="No past nights yet. A night shows up here once its winner is revealed."
         />
       </div>
-      {editing ? (
+      {editing && canCorrect ? (
         <CorrectWinner
           key={editing}
           sessionId={editing}
@@ -117,6 +140,18 @@ export function HistoryAdmin() {
           onCancel={() => setEditing(null)}
         />
       ) : null}
+    </HistoryScreen>
+  );
+}
+
+function HistoryScreen({ lede, children }: { lede: string; children: React.ReactNode }) {
+  return (
+    <div data-screen="portal-history" className="flex flex-col gap-6">
+      <header className="flex flex-col gap-1">
+        <h1 className="font-heading text-2xl font-semibold tracking-tight">History</h1>
+        <p className="text-muted-foreground">{lede}</p>
+      </header>
+      <div className="flex flex-col gap-4">{children}</div>
     </div>
   );
 }
@@ -208,7 +243,12 @@ function CorrectWinner({
       </div>
       <ApiErrorNotice error={correct.error} />
       <div className="flex gap-3">
-        <Button type="submit" size="tap" disabled={!ready || correct.isPending}>
+        <Button
+          type="submit"
+          size="tap"
+          data-testid="primary-action"
+          disabled={!ready || correct.isPending}
+        >
           Confirm correction
         </Button>
         <Button type="button" variant="ghost" size="tap" onClick={onCancel}>

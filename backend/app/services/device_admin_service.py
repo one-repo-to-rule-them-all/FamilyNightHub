@@ -114,6 +114,21 @@ async def pending_claims(db: AsyncSession) -> list[PendingClaim]:
     ]
 
 
+@dataclass(frozen=True)
+class HelpCount:
+    count: int
+    # First name of the person in the oldest waiting claim, for "{name} is waiting".
+    first_name: str | None
+
+
+async def help_count(db: AsyncSession) -> HelpCount:
+    """Pending person claims on live devices (guest-flow G4: the TV's nudge). PIN resets are
+    never counted here: they are admin-only."""
+    claims = await pending_claims(db)
+    first = claims[0].person_name.split()[0] if claims else None
+    return HelpCount(len(claims), first)
+
+
 async def approve_claim(
     db: AsyncSession,
     household_id: uuid.UUID,

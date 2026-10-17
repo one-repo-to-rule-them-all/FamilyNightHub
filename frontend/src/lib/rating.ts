@@ -28,6 +28,20 @@ export function describeAverage(rating: Summary | null | undefined): string | nu
   return `${rating.average.toFixed(1)} from ${rating.count} ${noun}`;
 }
 
+/**
+ * How far the family is through rating a night, for the night page's Ratings panel and the
+ * portal inbox's `unrated` row ("2 of 4 rated"). `turnout` is the night's ballot count; someone
+ * who rated without voting still counts, so `of` never drops below `rated`.
+ */
+export function ratingProgress(
+  rating: Summary | null | undefined,
+  turnout: number,
+): { rated: number; of: number; done: boolean } {
+  const rated = rating?.count ?? 0;
+  const of = Math.max(turnout, rated);
+  return { rated, of, done: of > 0 && rated >= of };
+}
+
 const PREFIX = "fnh.ratePromptDismissed.";
 
 function storage(): Storage | null {

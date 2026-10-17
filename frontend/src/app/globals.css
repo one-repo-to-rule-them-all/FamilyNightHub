@@ -122,3 +122,22 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * The phone's slideshow (phone-slideshow.tsx): each photo fades in. Under prefers-reduced-motion
+ * it simply cuts (no animation at all, not just a fast one).
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .phone-slide {
+    animation: phone-slide-in 600ms ease both;
+  }
+}
+
+@keyframes phone-slide-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

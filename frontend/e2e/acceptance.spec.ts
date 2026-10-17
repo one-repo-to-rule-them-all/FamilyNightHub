@@ -223,7 +223,7 @@ test.describe("Phase 1 acceptance", () => {
     // The host proxy-votes for Pip, who has no phone.
     await host.goto(`/host/${sessionId}`);
     await expect(host.getByTestId("night-status")).toHaveText("Voting");
-    await host.getByRole("button", { name: "Add this browser as a device" }).click();
+    await host.getByRole("button", { name: "Add this browser to the family" }).click();
     await host.getByRole("button", { name: "Pip", exact: true }).click();
     for (const title of BALLOTS.Pip!) await host.getByRole("button", { name: title }).click();
     await expect(host.getByRole("button", { name: `${IRON_GIANT}, rank 1` })).toBeVisible();

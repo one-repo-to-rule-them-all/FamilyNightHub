@@ -112,17 +112,15 @@ function ProxyBallot({
 
       {people.error?.status === 401 ? (
         <div className="flex flex-col gap-2 rounded-xl bg-muted p-4">
-          <p>
-            To list your family here, this browser needs to be one of the household&apos;s devices.
-          </p>
+          <p>To list your family here, add this browser to the family first.</p>
           <ApiErrorNotice error={enroll.error} />
           <Button
-            variant="outline"
+            variant="secondary"
             size="tap"
             disabled={enroll.isPending}
             onClick={() => enroll.mutate()}
           >
-            {enroll.isPending ? "Adding…" : "Add this browser as a device"}
+            {enroll.isPending ? "Adding…" : "Add this browser to the family"}
           </Button>
         </div>
       ) : (
