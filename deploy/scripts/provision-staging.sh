@@ -136,11 +136,13 @@ psql_super -d fnh -c '\du fnh*'
 kill "$PROXY_PID" 2>/dev/null || true
 trap - EXIT
 
-VOL_ID="$(fly volumes list -a "$DB" 2>/dev/null | awk '/^vol_/{print $1; exit}')"
-if [[ -n "$VOL_ID" ]]; then
-  fly volumes update "$VOL_ID" -a "$DB" --snapshot-retention 7 >/dev/null 2>&1 \
-    && note "Snapshot retention on $VOL_ID: 7 days" \
-    || note "Couldn't set snapshot retention; set it by hand (runbook step 3)."
+# JSON, not the table: the table rows start with a box-drawing character, so matching
+# /^vol_/ found nothing and retention was skipped silently (restore rehearsal, 2026-10-17).
+VOL_ID="$(fly volumes list -a "$DB" --json 2>/dev/null | grep -oE '"id": *"vol_[a-z0-9]+"' | head -1 | grep -oE 'vol_[a-z0-9]+' || true)"
+if [[ -n "$VOL_ID" ]] && fly volumes update "$VOL_ID" -a "$DB" --snapshot-retention 7 >/dev/null 2>&1; then
+  note "Snapshot retention on $VOL_ID: 7 days"
+else
+  note "WARNING: couldn't set snapshot retention to 7 days; set it by hand (runbook step 3)."
 fi
 
 DATABASE_URL="postgresql+asyncpg://fnh_app:${APP_PW}@${DB}.flycast:5432/fnh"
