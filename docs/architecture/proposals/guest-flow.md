@@ -8,7 +8,9 @@ and join), [ADR-0004](../decisions/ADR-0004-sse-live-updates.md) (live updates),
 ADR-0014 (passwords and required person PINs), which is being written in a parallel session as
 this proposal is drafted. ADR-0014 was read as a working draft from that session's worktree, and
 its routes were not written yet. Re-check §8 against the merged ADR before building.
-**Consumer:** the frontend session that builds ADR-0014's screens.
+**Consumer:** the frontend screens in issue #40, built against this branch as the source of truth.
+**Related issues:** #39 (ADR-0014 backend; it closes the gaps in §8), #40 (frontend screens, §5 and
+§11), #42 (staging finalization and owner verification, including the timing check AC-12.1).
 
 ---
 
@@ -219,7 +221,7 @@ flowchart TD
 
 ## 5. Screen-by-screen spec
 
-Copy is in §7, keyed by the `copy.*` ids used here.
+Copy is in §7, keyed by the `copy.*` ids used here. Built in issue #40.
 
 ### S0 — Landing, no device and slug unknown (`/`)
 - **When:** no device cookie, and this browser has never opened a join link.
@@ -627,7 +629,8 @@ waiting screens.
 ## 8. Backend gaps against ADR-0014
 
 ADR-0014's routes were not written when this was drafted. These items close the gap between the
-service layer in the draft and what this spec needs. P0 means needed to meet the spec. P1 means
+service layer in the draft and what this spec needs. They belong to **issue #39** (backend). #40
+can ship each screen's fallback, noted per row, if a gap lands later. P0 means needed to meet the spec. P1 means
 the spec works around it.
 
 | # | Gap | Why the spec needs it | Proposal | Priority |
@@ -851,7 +854,7 @@ Conventions: `screen(x)` means `[data-screen="x"]` is visible. `primary` is
 - AC-11.4: With a pending person claim open, the TV shows `copy.tv.help` within 10 s. With only a
   PIN reset open, it shows nothing.
 
-**The 30-second target (manual on staging, then automated as a timing probe)**
+**The 30-second target (manual on staging in issue #42, then automated as a timing probe)**
 - AC-12.1: On a real phone, the TV QR → ballot saved in **≤ 30 s** for a first-time guest with
   the setting **on** (median of 3 runs), and recorded (target ≤ 36 s) with it off. A returning
   phone in **≤ 15 s**.
