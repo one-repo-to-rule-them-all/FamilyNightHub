@@ -1,0 +1,220 @@
+<title>Family Night Owner Portal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500&display=swap">
+<style>
+/* Layout: mockup toolbar on top, then a framed app (desktop sidebar or 360px phone with bottom tabs). App is dark-only, like FNH. */
+:root{
+  --bg:oklch(0.135 0.004 70); --fg:oklch(0.97 0.004 85); --card:oklch(0.175 0.005 70);
+  --muted:oklch(0.22 0.005 70); --mfg:oklch(0.72 0.01 80); --line:oklch(1 0 0 / 9%);
+  --cinema:oklch(0.72 0.18 38); --cinema-ink:oklch(0.16 0.02 40); --warn:oklch(0.8 0.14 85); --ok:oklch(0.75 0.13 155);
+  --sans:"Geist",ui-sans-serif,system-ui,sans-serif; --mono:"Geist Mono",ui-monospace,monospace;
+  --r:14px; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid oklch(0.72 0.18 38 / 60%);outline-offset:2px}
+.toolbar{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;max-width:1240px;margin:0 auto 16px}
+.toolbar h1{font-size:15px;font-weight:600;margin:0;margin-right:auto}
+.seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+.seg button{border:0;background:none;padding:6px 10px;border-radius:7px;color:var(--mfg);font-size:13px}
+.seg button[aria-pressed=true]{background:var(--muted);color:var(--fg)}
+.lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mfg);margin-right:6px}
+.stage{display:flex;justify-content:center}
+.app{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--bg);display:grid;width:100%;max-width:1240px;height:760px}
+.app.desk{grid-template-columns:232px minmax(0,1fr)}
+.app.phone{width:360px;max-width:100%;height:720px;grid-template-rows:auto minmax(0,1fr) auto}
+.side{background:oklch(0.155 0.004 70);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 12px;gap:4px}
+.brand{padding:4px 10px 18px}.brand b{display:block;font-size:15px}.brand span{color:var(--mfg);font-size:12px}
+.nav a{display:flex;align-items:center;gap:10px;height:40px;padding:0 10px;border-radius:9px;color:var(--mfg);text-decoration:none}
+.nav a:hover{background:var(--muted);color:var(--fg)}
+.nav a[aria-current=page]{background:var(--muted);color:var(--fg);font-weight:500}
+.nav svg{width:18px;height:18px;flex:none}
+.badge{margin-left:auto;min-width:20px;height:20px;border-radius:10px;padding:0 6px;font-size:11px;font-weight:600;display:grid;place-items:center;background:var(--muted);border:1px solid var(--line)}
+.badge.hot{background:var(--cinema);color:var(--cinema-ink);border-color:transparent}
+.foot{margin-top:auto;border-top:1px solid var(--line);padding:12px 10px 0;display:flex;flex-direction:column;gap:8px}
+.foot small{color:var(--mfg)}
+.main{overflow:auto;padding:28px 32px 40px;min-width:0}
+.phone .main{padding:16px 16px 24px}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+.topbar b{font-size:15px}
+.tabs{display:flex;border-top:1px solid var(--line);background:oklch(0.155 0.004 70)}
+.tabs a{flex:1;height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;color:var(--mfg);text-decoration:none;position:relative}
+.tabs a[aria-current=page]{color:var(--fg)}
+.tabs svg{width:20px;height:20px}
+.tabs .badge{position:absolute;top:6px;left:calc(50% + 4px);margin:0;min-width:17px;height:17px;font-size:10px}
+h2{font-size:24px;font-weight:600;letter-spacing:-.01em;margin:0;text-wrap:balance}
+h3{font-size:15px;font-weight:600;margin:0}
+.sub{color:var(--mfg);margin:4px 0 0}
+.grid{display:grid;gap:20px;margin-top:22px}
+.desk .grid.home{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;min-width:0}
+.eyebrow{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--mfg);margin:0 0 10px}
+.btn{border:0;border-radius:10px;height:40px;padding:0 16px;font-weight:500;background:var(--muted);color:var(--fg)}
+.btn:hover{filter:brightness(1.15)}
+.btn.primary{background:var(--cinema);color:var(--cinema-ink);height:48px;padding:0 20px;font-weight:600;font-size:15px}
+.phone .btn.primary{height:56px;width:100%}
+.btn.ghost{background:none;color:var(--mfg)}
+.btn.sm{height:34px;padding:0 12px;font-size:13px}
+.btn[disabled]{opacity:.45;cursor:not-allowed;filter:none}
+.up{display:flex;gap:18px;align-items:flex-start}
+.poster{width:84px;aspect-ratio:2/3;border-radius:8px;flex:none;background:linear-gradient(160deg,oklch(0.45 0.12 250),oklch(0.25 0.08 300));display:grid;place-items:end start;padding:6px;font-size:10px;font-weight:600;max-width:100%}
+.up-body{display:flex;flex-direction:column;gap:12px;min-width:0;flex:1}
+.up-title{font-size:20px;font-weight:600;margin:0}
+.fact{color:var(--mfg);margin:0}
+.fact strong{color:var(--fg)}
+.code{font-family:var(--mono);font-size:30px;letter-spacing:.18em;background:var(--muted);border-radius:10px;padding:10px 14px;width:fit-content}
+.row-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.link{background:none;border:0;color:var(--fg);text-decoration:underline;text-underline-offset:4px;padding:0}
+.input{height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:0 12px;font:inherit;width:100%}
+.avs{display:flex}.avs span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:14px;margin-right:-6px;border:2px solid var(--card)}
+.inbox{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.inbox li{display:flex;gap:12px;padding:14px 0;border-top:1px solid var(--line);align-items:flex-start}
+.inbox li:first-child{border-top:0;padding-top:4px}
+.av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:18px;flex:none}
+.ib{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1}
+.ib p{margin:0;line-height:1.4}
+.ib small{color:var(--mfg)}
+.chip{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;font-size:11px;font-weight:500;background:var(--muted);border:1px solid var(--line);color:var(--mfg);vertical-align:1px;margin-left:6px}
+.chip.lock{color:var(--warn);border-color:oklch(0.8 0.14 85 / 35%)}
+.chip.ok{color:var(--ok);border-color:oklch(0.75 0.13 155 / 30%)}
+.clear{display:flex;gap:10px;align-items:center;color:var(--mfg);padding:6px 0}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.phone .stats{grid-template-columns:1fr 1fr}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.stat .big{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat small{color:var(--mfg)}
+.bars{display:flex;align-items:flex-end;gap:5px;height:40px}
+.bars i{flex:1;background:oklch(0.97 0.004 85 / 28%);border-radius:3px 3px 0 0}
+.bars i:last-child{background:oklch(0.97 0.004 85 / 75%)}
+.tblwrap{overflow-x:auto;margin-top:18px;border:1px solid var(--line);border-radius:var(--r)}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+th,td{text-align:left;padding:11px 14px;border-top:1px solid var(--line);white-space:nowrap}
+thead th{border-top:0;color:var(--mfg);font-weight:500;font-size:12px;background:var(--card)}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-top:18px}
+.filters button{border:1px solid var(--line);background:none;color:var(--mfg);height:32px;padding:0 12px;border-radius:16px;font-size:13px}
+.filters button[aria-pressed=true]{background:var(--muted);color:var(--fg)}
+.head{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+.sets{display:grid;gap:24px;margin-top:20px}
+.desk .sets{grid-template-columns:180px minmax(0,1fr)}
+.subnav{display:flex;flex-direction:column;gap:2px;position:sticky;top:0;align-self:start}
+.phone .subnav{flex-direction:row;overflow-x:auto;gap:6px;position:static}
+.subnav a{padding:8px 10px;border-radius:8px;color:var(--mfg);text-decoration:none;white-space:nowrap}
+.phone .subnav a{border:1px solid var(--line);border-radius:16px;padding:6px 12px;font-size:13px}
+.subnav a.on{background:var(--muted);color:var(--fg)}
+.group{display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:500}
+.field small{color:var(--mfg)}
+.switch{display:flex;gap:12px;align-items:flex-start}
+.switch input{width:38px;height:22px;accent-color:var(--cinema);flex:none;margin-top:2px}
+.gfoot{display:flex;gap:12px;align-items:center;justify-content:flex-end;border-top:1px solid var(--line);padding-top:14px}
+.gfoot small{color:var(--mfg);margin-right:auto}
+.sheet{position:absolute;inset:auto 0 0 0;background:var(--card);border-top:1px solid var(--line);border-radius:18px 18px 0 0;padding:14px 16px 20px;display:flex;flex-direction:column;gap:2px}
+.sheet a{height:52px;display:flex;align-items:center;gap:12px;color:var(--fg);text-decoration:none;border-radius:10px;padding:0 8px}
+.phonewrap{position:relative}
+.note{max-width:1240px;margin:14px auto 0;color:var(--mfg);font-size:12.5px;line-height:1.5}
+.toast{color:var(--ok);font-size:13px}
+@media (max-width:700px){.app.desk{grid-template-columns:1fr}.app.desk .side{display:none}.desk .grid.home,.desk .sets{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:no-preference){.inbox li{transition:opacity .2s}}
+</style>
+
+<div class="toolbar">
+  <h1>Owner portal mockups · issue #44</h1>
+  <span><span class="lbl">View</span><span class="seg" id="vw"><button aria-pressed="true" data-v="desk">Desktop</button><button aria-pressed="false" data-v="phone">Phone 360</button></span></span>
+  <span><span class="lbl">Signed in as</span><span class="seg" id="rl"><button aria-pressed="true" data-v="admin">Admin</button><button aria-pressed="false" data-v="host">Host</button></span></span>
+  <span><span class="lbl">Up next</span><span class="seg" id="st"><button data-v="none">No night</button><button data-v="created">Created</button><button data-v="draft">Draft</button><button aria-pressed="true" data-v="voting">Voting</button><button data-v="tonight">Tonight</button></span></span>
+</div>
+<div class="stage"><div id="app"></div></div>
+<p class="note">Static mockup with sample data for The Baez Family. Click the nav, inbox actions and the toggles above. Only the Up-next card uses the filled accent button; inbox rows use neutral buttons so they never compete with it. Spec: docs/architecture/proposals/owner-portal.md.</p>
+
+<script>
+const I={
+home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+people:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3.3-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M16.5 14.6c2.6.2 4.4 2 5 5.4"/>',
+phone:'<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18h2"/>',
+lib:'<rect x="3" y="8" width="18" height="13" rx="2"/><path d="m3 8 3.5-5 4 1-3.5 5M10.5 4l4 1-3.5 5M14.5 5l4 1-2 3"/>',
+hist:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
+set:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 1.2 14H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 7a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 1.2V1a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 22.8 10h.2a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" transform="scale(.83) translate(2.4 2.4)"/>',
+more:'<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
+check:'<path d="M20 6 9 17l-5-5"/>'};
+const svg=n=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
+const S={view:'desk',role:'admin',up:'voting',screen:'home',sheet:false,showAll:false,setDirty:null,saved:null,
+inbox:[
+ {id:'r1',kind:'pin-reset',admin:true,av:'🦖',c:'oklch(0.55 0.13 150)',html:'<b>Mateo</b> forgot their PIN<span class="chip lock">Locked</span>',meta:'Asked 4 min ago from Mateo’s iPad',acts:['Reset PIN','Dismiss']},
+ {id:'c1',kind:'claim',av:'🐶',c:'oklch(0.55 0.12 60)',html:'<b>Pixel 8</b> wants to be <b>RooDog</b>',meta:'2 min ago',acts:['Approve','Reject']},
+ {id:'l1',kind:'locked',admin:true,av:'🦄',c:'oklch(0.55 0.14 330)',html:'<b>Abuela</b> is locked out after 5 wrong PINs',meta:'They can tap “Ask the family admin” on their phone, then reset it here.',acts:['See profile']},
+ {id:'u1',kind:'unrated',av:'⭐',c:'var(--muted)',html:'<b>3 of 6</b> rated <b>Moana 2</b>',meta:'Last Friday',acts:['Open','Hide']}]};
+const people=[['🐻','Rodolfo','Family','ok','PIN set'],['🦄','Abuela','Family','lock','Locked'],['🦖','Mateo','Family','lock','Locked · asked for reset'],['🐶','RooDog','Family','ok','PIN set'],['🐱','Sofi','Family','ok','PIN set'],['🦊','Tío Beto','Guest','','No PIN yet']];
+const nav=()=>S.role==='admin'
+ ?[['home','Home','home'],['people','People','people'],['phones','Phones','phone'],['library','Library','lib'],['history','History','hist'],['settings','Settings','set']]
+ :[['home','Home','home'],['history','History','hist'],['settings','Settings','set']];
+const visibleInbox=()=>S.inbox.filter(x=>S.role==='admin'||!x.admin);
+function badge(k){const ib=visibleInbox();
+ if(k==='home'){const n=ib.filter(x=>x.kind!=='unrated').length+ib.filter(x=>x.kind==='unrated').length;if(!n)return'';const hot=ib.some(x=>x.kind==='pin-reset'||x.kind==='claim');return`<span class="badge ${hot?'hot':''}" aria-label="${n} things need you">${n}</span>`}
+ if(k==='people'&&S.role==='admin'){const n=ib.filter(x=>x.kind==='pin-reset'||x.kind==='locked').length;return n?`<span class="badge">${n}</span>`:''}
+ return''}
+function upNext(){
+ const tv=`<button class="link" data-act="tv">Show it on this TV</button>`;
+ switch(S.up){
+ case'none':return`<p class="eyebrow">Up next</p><div class="up-body"><p class="up-title">No movie night yet</p><p class="fact">Last one: <strong>Moana 2</strong> on Friday</p><div class="field"><label for="nm">Name it (optional)</label><input id="nm" class="input" placeholder="Friday movie night"></div><div class="row-actions"><button class="btn primary" data-testid="primary-action" data-act="start">Start movie night</button></div></div>`;
+ case'created':return`<p class="eyebrow">Up next</p><div class="up-body"><p class="up-title">Movie night is on. Here’s the code.</p><div class="code">K7Q 4M2</div><p class="fact">Shown once. Put it on the TV, or read it out.</p><div class="row-actions"><button class="btn primary" data-testid="primary-action">Build the shortlist</button>${tv}</div></div>`;
+ case'draft':return`<p class="eyebrow">Up next · building</p><div class="up-body"><p class="up-title">Tonight’s shortlist</p><p class="fact"><strong>4 titles</strong> · Top 3 voting</p><div class="row-actions"><button class="btn primary" data-testid="primary-action">Open voting</button>${tv}</div></div>`;
+ case'voting':return`<p class="eyebrow">Up next · voting</p><div class="up"><div class="poster">4 titles</div><div class="up-body"><p class="up-title">Voting is open</p><p class="fact"><strong>5 of 7</strong> have voted</p><div class="avs"><span style="background:oklch(0.55 0.12 60)">🐶</span><span style="background:oklch(0.5 0.1 250)">🐻</span><span style="background:oklch(0.55 0.13 150)">🐱</span><span style="background:oklch(0.55 0.14 330)">🦄</span><span style="background:oklch(0.5 0.12 30)">🦊</span></div><div class="row-actions"><button class="btn primary" data-testid="primary-action">See votes</button></div></div></div>`;
+ case'tonight':return`<p class="eyebrow">Up next · watching tonight</p><div class="up"><div class="poster" style="background:linear-gradient(160deg,oklch(0.6 0.15 200),oklch(0.3 0.1 230))">WINNER</div><div class="up-body"><p class="up-title">The Wild Robot</p><p class="fact">Picked by <strong>6</strong> · photos are open</p><div class="row-actions"><button class="btn primary" data-testid="primary-action" data-act="end">End the night</button><button class="link">Open the night</button></div></div></div>`;}}
+function inboxHtml(){const ib=visibleInbox();
+ if(!ib.length)return`<div class="clear">${svg('check').replace('aria-hidden','style="width:18px;height:18px;color:var(--ok)" aria-hidden')}All clear. Nothing needs you right now.</div>`;
+ const list=S.showAll?ib:ib.slice(0,5);
+ return`<ul class="inbox">${list.map(x=>`<li data-inbox-kind="${x.kind}"><span class="av" style="background:${x.c}">${x.av}</span><div class="ib"><p>${x.html}</p><small>${x.meta}</small><div class="row-actions">${x.acts.map((a,i)=>`<button class="btn sm ${i?'ghost':''}" data-row="${x.id}" data-a="${a}">${a}</button>`).join('')}</div></div></li>`).join('')}</ul>`}
+function home(){const g=S.role==='admin'?'Rodolfo':'Ana';
+ return`<div data-screen="portal-home"><h2>Good evening, ${g}</h2><p class="sub">The Baez Family</p>
+ <div class="grid home"><section class="panel" data-testid="up-next">${upNext()}</section>
+ <section class="panel" data-testid="inbox"><p class="eyebrow">Needs you</p>${inboxHtml()}</section></div>
+ <p class="eyebrow" style="margin-top:28px">At a glance</p>
+ <div class="stats"><a class="stat" style="text-decoration:none;color:inherit" href="#"><small>Last night</small><b>Moana 2</b><small>Fri · ★ 4.3 from 3</small></a>
+ <div class="stat"><small>This month</small><span class="big">3</span><small>nights</small></div>
+ <div class="stat"><small>Turnout</small><span class="big">6</span><div class="bars" role="img" aria-label="Turnout over the last 8 nights: 4, 5, 3, 6, 7, 5, 6, 6"><i style="height:57%"></i><i style="height:71%"></i><i style="height:43%"></i><i style="height:86%"></i><i style="height:100%"></i><i style="height:71%"></i><i style="height:86%"></i><i style="height:86%"></i></div></div></div>
+ <p class="sub" style="font-size:12px;margin-top:10px">A Photos tile joins these once the API returns photo counts (gap O1).</p></div>`}
+function peopleScr(){
+ if(S.role!=='admin')return forbidden();
+ const resets=S.inbox.find(x=>x.id==='r1');
+ return`<div data-screen="portal-people"><div class="head"><div><h2>People</h2><p class="sub">6 people · 5 family, 1 guest</p></div><button class="btn primary" data-testid="primary-action">Add a person</button></div>
+ ${resets?`<section class="panel" style="margin-top:18px" id="pin-requests"><p class="eyebrow">PIN requests</p><ul class="inbox"><li><span class="av" style="background:${resets.c}">🦖</span><div class="ib"><p>${resets.html}</p><small>${resets.meta}</small><div class="row-actions"><button class="btn sm" data-row="r1" data-a="Reset PIN">Reset PIN</button><button class="btn sm ghost" data-row="r1" data-a="Dismiss">Dismiss</button></div></div></li></ul></section>`:''}
+ <div class="filters"><button aria-pressed="true">All</button><button aria-pressed="false">Family</button><button aria-pressed="false">Guests</button><button aria-pressed="false">Needs attention · 3</button></div>
+ <div class="tblwrap"><table><thead><tr><th>Person</th><th>Type</th><th>PIN</th><th></th></tr></thead><tbody>${people.map(p=>`<tr><th scope="row" style="font-weight:500">${p[0]} ${p[1]}</th><td>${p[2]}</td><td><span class="chip ${p[3]}" style="margin:0">${p[4]}</span></td><td style="text-align:right"><button class="btn sm ghost">Edit</button></td></tr>`).join('')}</tbody></table></div></div>`}
+function forbidden(){return`<div class="panel" data-testid="admin-forbidden" style="margin-top:8px"><h3>Admins only</h3><p class="sub">Your account can run nights but can’t change the household’s people, phones, movies or settings.</p><p><button class="link" data-go="home">Go to Home</button></p></div>`}
+function settingsScr(){const admin=S.role==='admin';
+ const groups=admin?[['joining','Joining'],['nights','Movie nights'],['streaming','Streaming'],['account','Your account'],['browser','This browser']]:[['account','Your account'],['browser','This browser']];
+ const foot=g=>`<div class="gfoot"><small>${S.saved===g?'<span class="toast">Saved</span>':S.setDirty===g?'Unsaved changes':''}</small><button class="btn ${S.setDirty===g?'primary':''}" ${S.setDirty===g?'data-testid="primary-action"':'disabled'} data-save="${g}" style="${S.setDirty===g?'':'height:40px'}">Save</button></div>`;
+ const sec={
+ joining:`<section class="panel group" id="joining"><h3>Joining</h3><div class="field"><label>Join link (the fridge QR)</label><code style="font-family:var(--mono);word-break:break-all">https://fnh-web-staging.fly.dev/j/baez</code><div><button class="btn sm">Rotate join link…</button></div></div><div class="switch"><input type="checkbox" id="qr" data-dirty="joining"><div class="field"><label for="qr">Include tonight’s code in the TV QR</label><small>Phones that scan the TV skip typing the code. Off keeps the code something you have to see on the TV.</small></div></div>${foot('joining')}</section>`,
+ nights:`<section class="panel group" id="nights"><h3>Movie nights</h3><div class="field"><label for="vm">How we vote, by default</label><select id="vm" class="input" data-dirty="nights"><option>Top 3</option><option>Approval</option><option>Pick one</option></select><small>Everyone ranks their top three. New nights start with this.</small></div><div class="field"><label for="ac">Age cap</label><select id="ac" class="input" data-dirty="nights"><option>PG-13</option><option>None</option><option>PG</option></select></div>${foot('nights')}</section>`,
+ streaming:`<section class="panel group" id="streaming"><h3>Streaming</h3><div class="field"><label for="rg">Region</label><input id="rg" class="input" value="US" style="width:90px" data-dirty="streaming"></div><div class="field"><label>Services you have</label><small>Netflix, Disney Plus, Max · <button class="link">Change</button></small></div>${foot('streaming')}</section>`,
+ account:`<section class="panel group" id="account"><h3>Your account</h3><div class="field"><label>Signed in as</label><small>${admin?'Rodolfo · rodolfo · admin':'Ana · ana · host'}</small></div><div class="field"><label for="pw">New password</label><input id="pw" type="password" class="input" placeholder="12 characters or more" data-dirty="account"></div>${foot('account')}</section>`,
+ browser:`<section class="panel group" id="browser"><h3>This browser</h3><div class="field"><label>Use this browser as the TV</label><small>Turns this browser into the living-room TV and signs you out here.</small><div><button class="btn sm">Use as the TV…</button></div></div><div><button class="btn sm ghost">Sign out</button></div></section>`};
+ return`<div data-screen="portal-settings"><h2>Settings</h2><div class="sets"><nav class="subnav" aria-label="Settings sections">${groups.map((g,i)=>`<a href="#${g[0]}" class="${i?'':'on'}">${g[1]}</a>`).join('')}</nav><div style="display:flex;flex-direction:column;gap:18px;min-width:0">${groups.map(g=>sec[g[0]]).join('')}</div></div></div>`}
+function simple(t,lede){return`<div><h2>${t}</h2><p class="sub">${lede}</p><div class="panel" style="margin-top:18px;color:var(--mfg)">Unchanged from today, now inside the portal shell.</div></div>`}
+function screen(){switch(S.screen){case'home':return home();case'people':return peopleScr();case'settings':return settingsScr();
+ case'phones':return S.role==='admin'?simple('Phones and TVs','Phones join with the night code on the TV. Rename or remove them here.'):forbidden();
+ case'library':return S.role==='admin'?simple('Library','Owned titles, watchlist and blocked movies.'):forbidden();
+ case'history':return simple('History',S.role==='admin'?'Past nights. Correct a winner if the vote went wrong.':'Past nights (read-only for hosts).');}}
+function render(){const a=document.getElementById('app');const n=nav();
+ const links=n.map(([k,l,ic])=>`<a href="#" data-go="${k}" ${S.screen===k?'aria-current="page"':''}>${svg(ic)}<span>${l}</span>${badge(k)}</a>`).join('');
+ if(S.view==='desk'){a.className='app desk';a.innerHTML=`<aside class="side"><div class="brand"><b>Family Night</b><span>The Baez Family</span></div><nav class="nav" aria-label="Portal">${links}</nav><div class="foot"><small>${S.role==='admin'?'Rodolfo · admin':'Ana · host'}</small><button class="btn sm ghost" style="justify-content:flex-start;padding:0">Sign out</button></div></aside><main class="main">${screen()}</main>`}
+ else{const tabs=S.role==='admin'?[['home','Home','home'],['people','People','people'],['library','Library','lib'],['history','History','hist'],['more','More','more']]:[['home','Home','home'],['history','History','hist'],['more','More','more']];
+  const moreOn=['phones','settings'].includes(S.screen);
+  a.className='app phone phonewrap';a.innerHTML=`<header class="topbar"><b>The Baez Family</b><small style="color:var(--mfg)">${S.role==='admin'?'Rodolfo':'Ana'}</small></header><main class="main">${screen()}</main><nav class="tabs" aria-label="Portal">${tabs.map(([k,l,ic])=>`<a href="#" data-go="${k}" ${(S.screen===k||(k==='more'&&moreOn))?'aria-current="page"':''}>${badge(k)}${svg(ic)}${l}</a>`).join('')}</nav>${S.sheet?`<div class="sheet" role="dialog" aria-label="More">${S.role==='admin'?`<a href="#" data-go="phones">${svg('phone')}Phones</a>`:''}<a href="#" data-go="settings">${svg('set')}Settings</a><a href="#" data-go="close" style="color:var(--mfg)">Sign out</a></div>`:''}`}}
+document.addEventListener('click',e=>{const t=e.target.closest('button,a');if(!t)return;
+ const seg=t.closest('.seg');if(seg){e.preventDefault();seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b===t));const v=t.dataset.v;
+  if(seg.id==='vw')S.view=v;if(seg.id==='rl'){S.role=v;S.screen='home'}if(seg.id==='st'){S.up=v;S.screen='home'}S.sheet=false;render();return}
+ if(t.dataset.go){e.preventDefault();const g=t.dataset.go;if(g==='more'){S.sheet=!S.sheet}else if(g==='close'){S.sheet=false}else{S.screen=g;S.sheet=false;S.saved=null;S.setDirty=null}render();return}
+ if(t.dataset.row){const a=t.dataset.a;if(a==='See profile'){S.screen='people';render();return}if(a==='Open'){return}
+  S.inbox=S.inbox.filter(x=>x.id!==t.dataset.row);render();return}
+ if(t.dataset.act==='start'){S.up='created';sync();render()}
+ if(t.dataset.act==='end'){S.up='none';sync();render()}
+ if(t.dataset.save){S.saved=t.dataset.save;S.setDirty=null;render()}
+ if(t.tagName==='A'&&t.getAttribute('href')==='#')e.preventDefault();});
+document.addEventListener('input',e=>{const g=e.target.dataset&&e.target.dataset.dirty;if(g&&S.setDirty!==g){S.setDirty=g;S.saved=null;render();const el=document.getElementById(e.target.id);if(el){el.focus()}}});
+function sync(){document.querySelectorAll('#st button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===S.up))}
+render();
+</script>
