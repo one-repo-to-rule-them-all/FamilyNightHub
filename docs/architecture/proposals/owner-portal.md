@@ -1,6 +1,6 @@
 # Proposal: the owner portal (one place to run nights and look after the family)
 
-**Status:** Proposal (2026-10-17). Nothing here is built yet.
+**Status:** Approved by the owner from the mockups (2026-10-17). Build in progress (split across sessions, see §9).
 **Issue:** #44. Rolls up into #42 (staging deploy and owner sign-off).
 **Builds on:** [ADR-0002](../decisions/ADR-0002-device-identity-and-join-flow.md) (accounts, claims,
 "Use as TV"), [ADR-0008](../decisions/ADR-0008-ctrl-alt-defeat-design-tokens.md) (tokens, one
