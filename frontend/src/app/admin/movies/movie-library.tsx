@@ -145,11 +145,15 @@ export function MovieLibrary() {
         <>
           <div data-testid="library-table">
             <DataTable
-              caption={`Library (${total})`}
+              caption={`Titles (${total})`}
               columns={columns}
               rows={page.data.items}
               rowKey={(movie) => movie.id}
-              empty="No titles match."
+              empty={
+                search || filter !== "all"
+                  ? "No titles match. Try another search or show all titles."
+                  : "No titles yet. Add the movies you own and they show up here."
+              }
             />
           </div>
           <div className="flex items-center justify-between gap-4 text-muted-foreground">
@@ -160,7 +164,7 @@ export function MovieLibrary() {
             </span>
             <span className="flex gap-2">
               <Button
-                variant="outline"
+                variant="secondary"
                 size="lg"
                 disabled={offset === 0}
                 onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
@@ -168,7 +172,7 @@ export function MovieLibrary() {
                 Previous
               </Button>
               <Button
-                variant="outline"
+                variant="secondary"
                 size="lg"
                 disabled={offset + PAGE_SIZE >= total}
                 onClick={() => setOffset(offset + PAGE_SIZE)}

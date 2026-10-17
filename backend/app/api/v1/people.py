@@ -19,7 +19,7 @@ from app.core.dependencies import (
 from app.core.permissions import has_permission
 from app.core.rate_limit import Budget, retry_after, spend
 from app.domain import credentials
-from app.schemas.admin import JoinLinkOut
+from app.schemas.admin import HelpCountOut, JoinLinkOut
 from app.schemas.identity import (
     BindingOut,
     ClaimIn,
@@ -39,7 +39,12 @@ from app.schemas.profile import (
     ProfilePickOut,
     ProfileStatsOut,
 )
-from app.services import household_settings_service, people_service, profile_service
+from app.services import (
+    device_admin_service,
+    household_settings_service,
+    people_service,
+    profile_service,
+)
 from app.services.errors import (
     Conflict,
     Forbidden,
@@ -172,6 +177,20 @@ async def join_link(viewer: CurrentViewer, db: ViewerDb) -> JoinLinkOut:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the TV or a host can read this")
     s = await household_settings_service.get(db, viewer.household_id)
     return JoinLinkOut(join_slug=s.join_slug, qr_includes_night_code=s.qr_includes_night_code)
+
+
+@router.get(
+    "/devices/me/help-count",
+    response_model=HelpCountOut,
+    responses={403: {"description": "Only the TV reads this"}},
+)
+async def help_count(device: CurrentDevice, db: DeviceDb) -> HelpCountOut:
+    """How many phones are waiting for a host to OK a person claim, and who the oldest one
+    is for. The TV only. PIN resets are admin-only and never counted here."""
+    if not await household_settings_service.is_tv(db, device.device_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the TV can read this")
+    help = await device_admin_service.help_count(db)
+    return HelpCountOut(count=help.count, first_name=help.first_name)
 
 
 @router.post(

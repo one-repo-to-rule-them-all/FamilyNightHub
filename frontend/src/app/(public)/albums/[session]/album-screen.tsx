@@ -59,7 +59,7 @@ export function AlbumScreen({ sessionId }: { sessionId: string }) {
     >
       <PhoneScreen title="Photos" lede={winner ? winner.title : night.data.title}>
         {ALBUM_OPEN.has(night.data.status) ? (
-          <PhotoAlbum sessionId={sessionId} />
+          <PhotoAlbum sessionId={sessionId} live={night.live} />
         ) : (
           <p className="text-lg text-muted-foreground">
             Photos open once tonight&apos;s movie is picked.

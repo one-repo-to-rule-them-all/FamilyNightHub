@@ -179,3 +179,26 @@ def close_night(status: str) -> Status | None:
     if status == "closed":
         return None
     return transition(status, "close")
+
+
+SlideshowMode = Literal["auto", "playing", "stopped"]
+SLIDESHOW_STATUSES: frozenset[str] = PHOTO_STATUSES
+
+
+def check_can_control_slideshow(effective: str) -> None:
+    """The host may start or stop the TV slideshow once the album is open (`tonight`, and
+    `closed`, which the TV keeps showing until the next night). Pass the *effective* status."""
+    if effective not in SLIDESHOW_STATUSES:
+        raise SessionRuleError("The slideshow starts once tonight's movie is picked")
+
+
+def slideshow_mode(started_at: datetime | None, stopped_at: datetime | None) -> SlideshowMode:
+    """What the TV does with the album (04-frontend.md "TV slideshow"). `auto` until the host
+    touches it: the TV plays as soon as the night is `tonight`. Start makes it `playing` (from the
+    newest photo, now), Stop makes it `stopped` (the TV holds on "drop your photos"). A check
+    constraint keeps at most one of the two set."""
+    if started_at is not None:
+        return "playing"
+    if stopped_at is not None:
+        return "stopped"
+    return "auto"

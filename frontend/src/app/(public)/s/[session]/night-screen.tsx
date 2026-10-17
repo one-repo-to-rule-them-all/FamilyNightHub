@@ -141,7 +141,7 @@ function NightState({
           <div data-screen="tonight" className="flex flex-col gap-6">
             <WinnerCard night={night} compact />
             {here()}
-            <PhotoAlbum sessionId={night.id} actorId={current.id} />
+            <PhotoAlbum sessionId={night.id} live={live} actorId={current.id} />
             <RateIt night={night} />
           </div>
         </PhoneScreen>
@@ -154,7 +154,7 @@ function NightState({
             <WinnerCard night={night} compact />
             <RatingPanel night={night} />
             <Results night={night} />
-            <PhotoAlbum sessionId={night.id} actorId={current.id} />
+            <PhotoAlbum sessionId={night.id} live={live} actorId={current.id} />
             <Link
               href="/history"
               className={cn(buttonVariants({ variant: "secondary", size: "tap" }), "w-full")}

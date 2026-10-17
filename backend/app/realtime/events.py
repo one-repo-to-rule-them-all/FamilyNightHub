@@ -7,8 +7,8 @@ frames are *unnamed* SSE `data:` frames whose JSON carries `type`, so a browser'
 guards the publish side: an unknown type is a programming error and raises.
 
 Every event is a hint: `{type, session_id, version}` and nothing else. Clients refetch the
-snapshot (`GET /sessions/{id}`) or `GET …/voters`; events never carry ballots, ranks or
-tallies (ADR-0004/0006).
+snapshot (`GET /sessions/{id}`), `GET …/voters` or `GET …/present`; events never carry
+ballots, ranks or tallies (ADR-0004/0006).
 """
 
 from __future__ import annotations
@@ -16,13 +16,14 @@ from __future__ import annotations
 # Wire channel is `session:{session_id}`; this is the prefix.
 SESSION = "session"
 
-STATUS_CHANGED = "status_changed"  # open-voting, close (tonight -> closed)
+STATUS_CHANGED = "status_changed"  # open-voting, close (tonight -> closed), slideshow start/stop
 SHORTLIST_CHANGED = "shortlist_changed"  # option added/removed/reordered; method changed
 BALLOT_COUNT = "ballot_count"  # someone's ballot landed; refetch who has voted
 REVEALED = "revealed"  # close-voting tallied the night
 PHOTO_ADDED = "photo_added"  # photos PR (#10) publishes this once an upload completes
 RATING_COUNT = "rating_count"  # someone rated the night; refetch the family average
 WINNER_CORRECTED = "winner_corrected"  # an admin corrected the night's winner (ADR-0006)
+PRESENCE = "presence"  # someone new is here tonight; refetch GET …/present (G8)
 
 PUBLISHED_EVENTS: frozenset[str] = frozenset(
     {
@@ -33,6 +34,7 @@ PUBLISHED_EVENTS: frozenset[str] = frozenset(
         PHOTO_ADDED,
         RATING_COUNT,
         WINNER_CORRECTED,
+        PRESENCE,
     }
 )
 

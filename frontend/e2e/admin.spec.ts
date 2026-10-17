@@ -146,9 +146,13 @@ test("an admin manages people, devices and settings", async ({ browser, baseURL 
   await joinAs(phone, { slug: newSlug, nightCode: night.nightCode }, ["Grandma"]);
 
   // Defaults and streaming services (from tmdb-fake, JustWatch + TMDB attribution shown).
-  await admin.getByLabel("Age cap").selectOption("PG");
-  await admin.getByRole("button", { name: "Save defaults" }).click();
-  await expect(admin.getByTestId("defaults-saved")).toBeVisible();
+  // Each settings group saves on its own; the edited group's Save is the one primary (#44).
+  const nights = admin.locator("#nights");
+  await nights.getByLabel("Age cap").selectOption("PG");
+  await expect(admin.getByTestId("primary-action")).toHaveCount(1);
+  await nights.getByTestId("primary-action").click();
+  await expect(nights.getByTestId("save-status")).toHaveText("Saved");
+  await expect(admin.getByTestId("primary-action")).toHaveCount(0);
   await expect(admin.getByTestId("justwatch-attribution")).toHaveText(
     "Streaming availability data provided by JustWatch.",
   );
@@ -159,8 +163,9 @@ test("an admin manages people, devices and settings", async ({ browser, baseURL 
   await admin.getByRole("checkbox", { name: "Netflix" }).check();
   await admin.getByRole("checkbox", { name: "Disney Plus" }).check();
   await expect(admin.getByTestId("providers-count")).toHaveText("2 of 20 picked");
-  await admin.getByRole("button", { name: "Save services" }).click();
-  await expect(admin.getByTestId("providers-saved")).toHaveText("Saved 2 services.");
+  const streaming = admin.locator("#streaming");
+  await streaming.getByTestId("primary-action").click();
+  await expect(streaming.getByTestId("save-status")).toHaveText("Saved");
   await expectNoAxeViolations(admin);
 
   // What the server holds survives a reload.

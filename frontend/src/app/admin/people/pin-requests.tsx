@@ -30,6 +30,10 @@ export function usePinResets() {
  * "PIN requests" at the top of /admin/people (guest-flow spec §5 "Admin", owner decision §10.2:
  * only admins reset PINs). **Reset PIN** clears the PIN and the lock without showing or choosing
  * one; the phone that asked then picks a new PIN by itself. **Dismiss** leaves the lock.
+ *
+ * Owner-portal spec §5 P3: the section collapses to nothing while nobody is waiting (Home's inbox
+ * already says "all clear"), and its actions are row-level (`outline` / `ghost`), never the
+ * page's filled primary.
  */
 export function PinRequests({ onNotice }: { onNotice: (notice: string) => void }) {
   const queryClient = useQueryClient();
@@ -61,74 +65,68 @@ export function PinRequests({ onNotice }: { onNotice: (notice: string) => void }
     return requests.error.status === 403 ? null : <ApiErrorNotice error={requests.error} />;
   }
   const open = requests.data ?? [];
+  // Keep a running confirm on screen even if a poll has just emptied the list.
+  if (open.length === 0 && !confirming) return null;
   const now = new Date();
 
   return (
-    <section id="pin-requests" aria-labelledby="pin-requests-title" className="flex flex-col gap-3">
-      <h2 id="pin-requests-title" className="text-lg font-semibold">
+    <section
+      id="pin-requests"
+      aria-labelledby="pin-requests-title"
+      className="flex flex-col gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10"
+    >
+      <h2
+        id="pin-requests-title"
+        className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+      >
         PIN requests
-        {open.length > 0 ? (
-          <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-sm text-primary-foreground">
-            {open.length}
-          </span>
-        ) : null}
+        <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground normal-case">
+          {open.length}
+        </span>
       </h2>
-      {requests.isPending ? (
-        <p role="status" className="text-muted-foreground">
-          Loading requests…
-        </p>
-      ) : open.length === 0 ? (
-        <p className="text-muted-foreground" data-testid="pin-requests-empty">
-          Nobody is waiting for a PIN reset.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-2" data-testid="pin-requests">
-          {open.map((request) => (
-            <li
-              key={request.id}
-              className="flex flex-wrap items-center gap-3 rounded-xl bg-card p-3 ring-1 ring-foreground/10"
-            >
-              <Avatar emoji={request.avatar_emoji} color="#64748b" className="size-10 text-2xl" />
-              <div className="min-w-40 flex-1">
-                <p className="font-medium">
-                  {request.person_name}
-                  {request.person_locked ? (
-                    <span className="ml-2 inline-flex items-center gap-1 text-sm text-muted-foreground">
-                      <Lock aria-hidden className="size-3.5" />
-                      Locked
-                    </span>
-                  ) : null}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  asked {lastSeen(request.requested_at, now).toLowerCase()} from{" "}
-                  {request.device_label ?? "an unnamed phone"}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  size="lg"
-                  className="px-4"
-                  onClick={() => {
-                    approve.reset();
-                    setConfirming(request);
-                  }}
-                >
-                  Reset PIN
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  className="px-4"
-                  disabled={dismiss.isPending}
-                  onClick={() => dismiss.mutate(request)}
-                >
-                  Dismiss
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className="flex flex-col divide-y divide-border" data-testid="pin-requests">
+        {open.map((request) => (
+          <li
+            key={request.id}
+            className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0"
+          >
+            <Avatar emoji={request.avatar_emoji} color="#64748b" className="size-10 text-2xl" />
+            <div className="min-w-40 flex-1">
+              <p className="font-medium">
+                {request.person_name}
+                {request.person_locked ? (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-normal">
+                    <Lock aria-hidden className="size-3" />
+                    Locked
+                  </span>
+                ) : null}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                asked {lastSeen(request.requested_at, now).toLowerCase()} from{" "}
+                {request.device_label ?? "an unnamed phone"}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  approve.reset();
+                  setConfirming(request);
+                }}
+              >
+                Reset PIN
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={dismiss.isPending}
+                onClick={() => dismiss.mutate(request)}
+              >
+                Dismiss
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
       <ApiErrorNotice error={dismiss.error} />
       {confirming ? (
         <ModalDialog

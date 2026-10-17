@@ -295,6 +295,9 @@ export const api = {
     request<Night>("POST", `/sessions/${encodeURIComponent(sessionId)}/close-voting`),
   closeNight: (sessionId: string) =>
     request<Night>("POST", `/sessions/${encodeURIComponent(sessionId)}/close`),
+  /** The host's Start (`true`) / Stop (`false`) for the paired TV's slideshow (issue #41). */
+  setSlideshow: (sessionId: string, playing: boolean) =>
+    request<Night>("PUT", `/sessions/${encodeURIComponent(sessionId)}/slideshow`, { playing }),
   voters: (sessionId: string) =>
     request<Schemas["VotersOut"]>("GET", `/sessions/${encodeURIComponent(sessionId)}/voters`),
   /** Who is here tonight (G8). A 404 means the backend doesn't serve it yet: use `voters`. */

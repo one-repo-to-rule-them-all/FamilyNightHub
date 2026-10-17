@@ -33,7 +33,7 @@ pairing explanation from the 401.
 | `/auth/callback?token=` | `src/app/(auth)/auth/callback/` | `POST /api/v1/auth/verify` once (guarded against StrictMode's double effect), then `router.replace("/host")` so the spent token leaves history. `referrer: no-referrer` |
 | `/host` | `src/app/host/` | **Home** (owner-portal §5 P1): the Up-next card (start a night, the code shown once, then the night's next step), the **Needs you** inbox (phone claims, PIN requests, locked profiles, stale and unrated nights; polled every 10s), **At a glance** stats, "Also running" nights |
 | `/admin` | `src/app/admin/page.tsx` | Redirects to `/host`: Home is the portal's front door |
-| `/host/[session]` | `src/app/host/[session]/` | Draft: shortlist (up/down/remove, reducer in `src/lib/shortlist.ts`, whole order PUT, server order synced back), **Roll candidates** (see "Candidate generator" below), poster search (debounced, through `/api/v1/tmdb/search`, TMDB attribution line; a 503 says "type the title" and the typed-title form is always there), a **How we vote** picker (Top 3 / Approval / Pick one with a one-line explanation each; `PATCH /sessions/{id}`, draft only), **Open voting** at 2–8 titles. Voting: who has voted (avatars only), proxy ballot, **Close voting**. Then the winner and **End the night**. Rotate code at any stage before `closed` |
+| `/host/[session]` | `src/app/host/[session]/` | Draft: shortlist (up/down/remove, reducer in `src/lib/shortlist.ts`, whole order PUT, server order synced back), **Roll candidates** (see "Candidate generator" below), poster search (debounced, through `/api/v1/tmdb/search`, TMDB attribution line; a 503 says "type the title" and the typed-title form is always there), a **How we vote** picker (Top 3 / Approval / Pick one with a one-line explanation each; `PATCH /sessions/{id}`, draft only), **Open voting** at 2–8 titles. Voting: who has voted (avatars only), proxy ballot, **Close voting**. Then the winner and **End the night**. On `tonight`/`closed`, **Photos on the TV**: **Start slideshow on the TV** / **Stop the slideshow** (see "TV slideshow" below). Rotate code at any stage before `closed` |
 | `/admin/people` | `src/app/admin/people/` | People table (avatar, Family/Guest, added). **Add a person** (name, emoji avatar with one-tap suggestions, colour from the avatar palette, guest flag), **Edit** (rename / re-avatar / recolour in a dialog; only changed fields are PATCHed), **Make family member** for guests, **Merge duplicates** (pick the duplicate and the person to keep; a confirm dialog says ballots, ratings, photos, reactions and phone bindings move to the target, the source is hidden and never deleted, and collisions go the target's way), then the moved/dropped counts as one sentence. A 409 name clash is shown as-is |
 | `/admin/devices` | `src/app/admin/devices/` | Every device (live first, then revoked): label or "Unnamed phone", TV badge, bound people (pending marked), last seen, status. **Rename** (empty clears the label) and **Revoke** with a confirm that says it is final and the phone must rejoin with a night code as a new device |
 | `/admin/settings` | `src/app/admin/settings/` | **Join link**: the current `/j/{slug}` and **Rotate join link** behind a confirm warning that the printed fridge QR stops working at once; the new URL is shown after. **Defaults**: how we vote (Top 3 / Approval / Pick one, with the method's one-line explanation; new nights start with it, ADR-0010), age cap (none, G…NC-17) and region (two letters). **Streaming services**: checkboxes from `GET /api/v1/tmdb/providers` for the household's region, at most 20, saved with `PATCH /admin/settings {streaming_providers}`; JustWatch attribution (the response's `attribution`) and the TMDB notice under the list; a 503 says the list can't load and keeps the saved ones |
@@ -308,6 +308,16 @@ The TV slideshow uses the Screen Wake Lock API where supported.
   failed). The grid is 3 columns of thumbnails, and a tap opens `PhotoViewer`, a native modal
   `<dialog>` with the full image, the uploader's avatar and name, previous/next, and the six
   reactions as `aria-pressed` toggles (`PUT`/`DELETE …/reactions/{emoji}?person_id=`).
+- **Play slideshow** (`src/components/photos/phone-slideshow.tsx`, issue #41): once the album has a
+  ready photo, a button above the grid opens the TV's slideshow full screen on the phone (a native
+  modal `<dialog>`, portrait-friendly, safe-area aware). It is the same schedule and album as the
+  TV (`src/hooks/use-slideshow.ts` over `src/lib/slideshow.ts`): live new photos jump the queue,
+  hidden ones drop out on the 10 s sweep, presigned URLs are refreshed inside their TTL. Tap the
+  photo to pause/resume, swipe left/right to step (`swipeStep`, `src/lib/slideshow-control.ts`),
+  plus previous / pause / next buttons for keyboard and screen-reader users. Caption: uploader's
+  avatar and name, photo count. Screen Wake Lock while open, released on close and while hidden.
+  Under `prefers-reduced-motion` photos cut instead of fading. A guest phone (night-code device,
+  holding nobody) gets exactly the same view: it reads the same album.
 - **Presigned URLs** (`src/hooks/use-album.ts`, `src/lib/photos/album.ts`): query key
   `["album", id]`, refetched every 10 s while visible (so other phones' photos appear) and after
   each completed upload. Each fetch mints new URLs, so a photo keeps the URLs it already has for up
@@ -320,7 +330,18 @@ The TV slideshow uses the Screen Wake Lock API where supported.
 ### TV slideshow
 
 **Built.** `/tv/[session]` on a `tonight` or `closed` night (`src/app/tv/[session]/slideshow.tsx`;
-the scheduling is `src/lib/slideshow.ts`, pure and gated at 100% in vitest with fake timers):
+the scheduling is `src/lib/slideshow.ts`, pure and gated at 100% in vitest with fake timers; the
+React glue, album query and slide clock are `src/hooks/use-slideshow.ts`, shared with the phone's
+**Play slideshow**):
+
+- **Who starts it** (issue #41, `src/lib/slideshow-control.ts`). The snapshot's `slideshow`:
+  `auto` until the host touches it, and the TV plays as soon as the night is `tonight`, as it did
+  before the control existed. We kept auto as the default (rather than waiting for the host) so a
+  forgotten button never strands the family on a blank TV, and nothing changes for a host who
+  never uses it. **Start slideshow on the TV** (`playing`) switches the TV into the slideshow and
+  restarts it from the newest photo: the component is keyed on `slideshow_started_at`. **Stop**
+  (`stopped`) holds the TV on the drop prompt (`data-held`, "The host will start the slideshow")
+  without fetching the album. The TV hears `status_changed` and switches with no reload.
 
 - **Album.** Query key `["night", id, "slideshow"]`: under the night key, so every live hint
   (`photo_added`, `status_changed`, a reconnect, a return to visible) refetches it with the
