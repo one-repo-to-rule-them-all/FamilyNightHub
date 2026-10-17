@@ -10,9 +10,8 @@ Deployed as `fnh-web` on Fly. Read the repo's `AGENTS.md` note: Next 16 uses `pr
 | Group | Routes | Who | Notes |
 |---|---|---|---|
 | `(public)` | `/j/[slug]`, `/who`, `/s/[session]`, `/history`, `/albums/[session]` | devices | Phone-first, 56px+ tap targets, poster-led |
-| host | `/host`, `/host/[session]` | host/admin | Shortlist builder, open/close, proxy vote, approve claims |
+| portal | `/host`, `/host/[session]`, `/admin/*` | host/admin | The owner portal: one `PortalShell`, nav filtered by role (see "Owner portal" below) |
 | tv | `/tv`, `/tv/[session]` | paired TV device | Large type, QR + night code, turnout tiles, reveal, slideshow |
-| admin | `/admin/*` | admin | People, devices, history, movies, photos, settings. Denser tables |
 | auth | `/login`, `/auth/callback` | admins/hosts | Magic link |
 
 `src/proxy.ts` redirects pages based on cookie presence only. That is a UX convenience; the API is
@@ -32,7 +31,8 @@ pairing explanation from the 401.
 | `/history` | `src/app/(public)/history/` | Past nights from `GET /api/v1/sessions` (server default: revealed, tonight, closed): winner poster, date, turnout; each links to its `/s/[session]` |
 | `/login` | `src/app/(auth)/login/` | Email → `POST /api/v1/auth/magic-link`; shows the server's one answer, which is the same whether or not the address exists |
 | `/auth/callback?token=` | `src/app/(auth)/auth/callback/` | `POST /api/v1/auth/verify` once (guarded against StrictMode's double effect), then `router.replace("/host")` so the spent token leaves history. `referrer: no-referrer` |
-| `/host` | `src/app/host/` | Start a night (the code is shown once, see below), nights in progress, pending person claims with approve/reject (polled every 10s), **Use this browser as the TV** (`POST /devices/enroll {as_tv:true}`, then `/tv/{night}`), sign out |
+| `/host` | `src/app/host/` | **Home** (owner-portal §5 P1): the Up-next card (start a night, the code shown once, then the night's next step), the **Needs you** inbox (phone claims, PIN requests, locked profiles, stale and unrated nights; polled every 10s), **At a glance** stats, "Also running" nights |
+| `/admin` | `src/app/admin/page.tsx` | Redirects to `/host`: Home is the portal's front door |
 | `/host/[session]` | `src/app/host/[session]/` | Draft: shortlist (up/down/remove, reducer in `src/lib/shortlist.ts`, whole order PUT, server order synced back), **Roll candidates** (see "Candidate generator" below), poster search (debounced, through `/api/v1/tmdb/search`, TMDB attribution line; a 503 says "type the title" and the typed-title form is always there), a **How we vote** picker (Top 3 / Approval / Pick one with a one-line explanation each; `PATCH /sessions/{id}`, draft only), **Open voting** at 2–8 titles. Voting: who has voted (avatars only), proxy ballot, **Close voting**. Then the winner and **End the night**. On `tonight`/`closed`, **Photos on the TV**: **Start slideshow on the TV** / **Stop the slideshow** (see "TV slideshow" below). Rotate code at any stage before `closed` |
 | `/admin/people` | `src/app/admin/people/` | People table (avatar, Family/Guest, added). **Add a person** (name, emoji avatar with one-tap suggestions, colour from the avatar palette, guest flag), **Edit** (rename / re-avatar / recolour in a dialog; only changed fields are PATCHed), **Make family member** for guests, **Merge duplicates** (pick the duplicate and the person to keep; a confirm dialog says ballots, ratings, photos, reactions and phone bindings move to the target, the source is hidden and never deleted, and collisions go the target's way), then the moved/dropped counts as one sentence. A 409 name clash is shown as-is |
 | `/admin/devices` | `src/app/admin/devices/` | Every device (live first, then revoked): label or "Unnamed phone", TV badge, bound people (pending marked), last seen, status. **Rename** (empty clears the label) and **Revoke** with a confirm that says it is final and the phone must rejoin with a night code as a new device |
@@ -113,16 +113,36 @@ screen. The panel goes away once voting opens.
 (`clamp(14px, 1.45vw, 48px)`) and `em`-based `tv-display` / `tv-title` / `tv-body` / `tv-code`, so
 a 1080p and a 4K TV read the same from the sofa.
 
-## Admin
+## Owner portal (admin and host)
 
-`/admin/*` (`src/app/admin/`) is for signed-in admins. `proxy.ts` sends a browser with no
-`fnh_session` to `/login`; the API is the boundary (`admin:people`, `admin:devices`,
-`admin:movies`, `admin:history`, `admin:settings`), and a host who opens an admin screen gets that screen's 403 as an "Admins only"
-panel (`admin-error.tsx`), not a raw error. `/host` links admins to `/admin`, which opens on People.
+`/host` and `/admin/*` are one portal (`docs/architecture/proposals/owner-portal.md`, #44):
+`src/app/host/layout.tsx` and `src/app/admin/layout.tsx` both render
+`PortalShell` (`src/components/portal/portal-shell.tsx`). `proxy.ts` sends a browser with no
+`fnh_session` to `/login`; signing in lands on `/host` (Home), and `/admin` redirects there too.
 
-- **Layout** (`admin-shell.tsx`): wider than the phone column (`max-w-5xl`), a People / Devices /
-  Movies / History / Settings nav (wraps on a narrow phone) with `aria-current`, a "Back to host" link; a 401 from `GET /auth/me` goes to
-  `/login`.
+- **Roles.** The shell reads `GET /auth/me` (`["me"]`) once and filters the nav by `role`
+  (`navFor` in `src/lib/portal.ts`): an admin sees Home, People, Phones, Library, History,
+  Settings; a host sees Home, History, Settings. That gate is UX only; the API is the boundary
+  (`admin:people`, `admin:devices`, `admin:movies`, `admin:history`, `admin:settings`). A host who
+  types an admin URL gets that screen's 403 as the "Admins only" panel (`admin-error.tsx`) with a
+  **Go to Home** link, not a raw error. A 401 from `/auth/me` goes to `/login`.
+- **Layout** (`portal-nav.tsx`): from `md` up a 240px left sidebar (wordmark, household, nav with
+  `aria-current`, then the signed-in name and role and **Sign out** at the bottom); content is
+  `max-w-5xl`, left-aligned against it. Below `md`, a top bar (household, account) and a fixed
+  bottom tab bar of 56px tabs (admin: Home, People, Library, History, **More**; host: Home,
+  History, More). More opens a sheet with the rest of the nav and **Sign out**. The tab bar
+  respects `env(safe-area-inset-bottom)` and `<main>` is padded so the last row clears it. A night
+  being run (`/host/[session]`) is not a nav item; it marks Home current (`activeNav`).
+- **Badges.** Home's badge counts the inbox rows; People's counts PIN requests plus locked
+  profiles (`navBadges` in `src/lib/portal-shell.ts`, 100% gate). The accent fill means someone
+  is standing there waiting (a phone claim or a PIN request); otherwise it is neutral. The shell
+  rebuilds the inbox with `buildInbox` from the same query keys and fetchers as Home
+  (`["nights","active"]`, `["nights","recent"]`, `["claims"]`, and for admins only
+  `["admin","pin-resets"]` and `["admin","people"]`), so it adds no requests and a host never
+  sends the admin ones. Hidden unrated nights come from the same `localStorage` key as Home's;
+  Home dispatches a `storage` event when it changes so the badge follows in the same tab.
+- **Screens** each carry `data-screen="portal-<id>"` and their own `<h1>` (Home's is visually
+  hidden); the shell has none. Per-screen behaviour is in the spec's §5.
 - **Denser tables**: every admin list is a `DataTable` (`src/components/ui/data-table.tsx`), a real
   `<table>` with a caption, column headers, a row-header cell, per-row `data-*` attributes and an
   empty row; it scrolls sideways inside its own box on a narrow phone. Admin controls use the
@@ -378,7 +398,7 @@ mutations never retry.
 | `npm run typecheck` | `tsc --noEmit` (TypeScript 7) |
 | `npm run lint:install`, then `npm run lint` | ESLint with `eslint-config-next`. ESLint, the Next config and the TypeScript 5 that typescript-eslint needs live in `tools/eslint/` (TypeScript 7 has no JS API for it), and `eslint.config.mjs` resolves its plugins from there. It also bans `waitForTimeout` / `setTimeout` in tests |
 | `npm run format:check` | Prettier + `prettier-plugin-tailwindcss` (class order) |
-| `npm test` | Vitest with v8 coverage, `src/**/*.test.ts`: API client CSRF and error handling, night-code input, the ballot reducer for all three methods (100% gate on `src/lib/ballot.ts`), voting-method labels (100% gate on `src/lib/voting-method.ts`), the photo pipeline (GPS strip on `e2e/fixtures/gps.jpg` through a real JPEG encoder, `@napi-rs/canvas`), the upload queue with fake timers (lines gated at 100%), the IndexedDB job store (`fake-indexeddb`), upload error sorting, album URL reuse (100% gate) and the rating helpers (100% gate on `src/lib/rating.ts`), the admin helpers (100% gate on `src/lib/admin.ts`), the candidate mapping (100% gate on `src/lib/candidates.ts`: request body incl. omitted vs `null` cap, option source per candidate, badge text, shortlist limit), plus (from host/TV) shortlist reducer and bounds, proxy-ballot ranking, reveal sequencing, QR/join link, night-code hand-off |
+| `npm test` | Vitest with v8 coverage, `src/**/*.test.ts`: API client CSRF and error handling, night-code input, the ballot reducer for all three methods (100% gate on `src/lib/ballot.ts`), voting-method labels (100% gate on `src/lib/voting-method.ts`), the photo pipeline (GPS strip on `e2e/fixtures/gps.jpg` through a real JPEG encoder, `@napi-rs/canvas`), the upload queue with fake timers (lines gated at 100%), the IndexedDB job store (`fake-indexeddb`), upload error sorting, album URL reuse (100% gate) and the rating helpers (100% gate on `src/lib/rating.ts`), the admin helpers (100% gate on `src/lib/admin.ts`), the portal shell's nav badges (100% gate on `src/lib/portal-shell.ts`), the candidate mapping (100% gate on `src/lib/candidates.ts`: request body incl. omitted vs `null` cap, option source per candidate, badge text, shortlist limit), plus (from host/TV) shortlist reducer and bounds, proxy-ballot ranking, reveal sequencing, QR/join link, night-code hand-off |
 | `npm run test:e2e` | Playwright + axe against the real API; see [`07-cicd.md`](07-cicd.md#running-e2e-locally) |
 
 ## Where to add new code

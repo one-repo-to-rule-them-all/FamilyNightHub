@@ -1,14 +1,11 @@
-import type { Metadata } from "next";
-
-import { AdminShell } from "./admin-shell";
-
-export const metadata: Metadata = { title: { default: "Admin", template: "%s · Admin" } };
+import { PortalShell } from "@/components/portal/portal-shell";
 
 /**
- * The admin area (04-frontend.md "Admin"): signed-in admins. proxy.ts sends a browser with no
- * `fnh_session` to /login; the API enforces the `admin:*` permissions, and a host gets each
- * screen's 403 as an "admins only" panel.
+ * The admin half of the owner portal (proposals/owner-portal.md §3): People, Phones, Library,
+ * History, Settings inside the one `PortalShell` that also wraps `/host`. proxy.ts sends a browser
+ * with no `fnh_session` to /login; the API enforces the `admin:*` permissions, and a host who
+ * types an admin URL gets that screen's 403 as an "Admins only" panel.
  */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return <AdminShell>{children}</AdminShell>;
+  return <PortalShell>{children}</PortalShell>;
 }
