@@ -1,6 +1,7 @@
 # Proposal: the guest and member flow (QR → night → profile → PIN → vote)
 
-**Status:** Proposal for owner review (issue #36). Nothing here is built yet.
+**Status:** Proposal, revised with the owner's answers to §10 (2026-10-17). Nothing here is built
+yet.
 **Builds on:** [ADR-0002](../decisions/ADR-0002-device-identity-and-join-flow.md) (device identity
 and join), [ADR-0004](../decisions/ADR-0004-sse-live-updates.md) (live updates),
 [ADR-0008](../decisions/ADR-0008-ctrl-alt-defeat-design-tokens.md) (tokens, 56px+ targets) and
@@ -25,25 +26,29 @@ screen changes by itself when either answer changes. Concretely:
 1. **The phone never needs to tap through to the night.** Once it has a current person, it lands
    on the night: the ballot while voting is open, the winner after the reveal, the photo drop
    during the movie.
-2. **The TV QR carries the night code** (in the URL fragment, RFC 8628's
-   `verification_uri_complete` pattern), so a first-time guest never types it. The fridge QR stays
-   a door with no key, and typing the code is the fallback.
+2. **The TV QR can carry the night code, if the admin turns it on.** A new household setting,
+   "Include tonight's code in the TV QR", is **off by default** (owner decision). When it's off,
+   the TV QR is the same door as the fridge QR (`/j/{slug}`) and the code is typed. When it's on,
+   the QR is `/j/{slug}?code=XXXXXX`, and the join page pre-fills the code for one confirming
+   tap (RFC 8628's `verification_uri_complete` pattern).
 3. **A returning phone skips the code and the PIN.** Its device cookie is already the credential
    (ADR-0002), and it is already set to its person (ADR-0014 `is_current`).
 4. **ADR-0014 fits into one sheet over the avatar grid**: a big keypad that submits on the 6th
-   digit. It covers enter PIN, create PIN, wrong PIN, locked and "Ask a grown-up". Each state
-   leads to a next action, never to a dead end.
+   digit. It covers enter PIN, create PIN, wrong PIN, locked and "Ask the family admin". Only an
+   admin can reset a PIN (owner decision). Each state leads to a next action, never to a dead end.
+   A shared phone asks for each person's PIN on **every** switch.
 5. **Every waiting screen says what it is waiting for, shows live progress, and moves on by
    itself**, and it always offers one way out.
 
-The target is **QR scan to ballot cast in under 30 seconds** for a first-time guest who scans the
-TV QR (about 27 s budgeted, §6), and about 12 s for a returning phone. A first-timer who scans the
-fridge QR and types the code comes in at about 35 s. That gap is why the TV QR matters (§8, G1).
+The target is **QR scan to ballot cast in under 30 seconds**. A returning phone takes about 12 s,
+and a first-timer with the code-in-QR setting on about 29 s (§6). With the setting off (the
+default), a first-timer types the code and comes in at about 34 s. That is the honest cost of the
+owner's privacy default, and §6 says where the seconds go.
 
 Four backend gaps against ADR-0014's API need closing before the frontend can meet this spec
-(§8). The biggest are: the TV can't get the join slug, the person tile doesn't say a PIN reset is
-pending, and the wrong-PIN error needs a machine-readable `attempts_left`. Three questions for the
-owner are in §10.
+(§8). The biggest are: the TV can't get the join slug or the new setting, the person tile
+doesn't say a PIN reset is pending, and the wrong-PIN error needs a machine-readable
+`attempts_left`. The owner's answers are recorded in §10.
 
 ---
 
@@ -56,29 +61,31 @@ sources, as marked.
 |---|---|---|
 | **Kahoot** | No account. You join by entering a game PIN, opening a link, or scanning a QR. An optional nickname generator spins a name for you. The lobby echoes your name on the big screen. Rejoining after leaving usually means a new nickname. ([support.kahoot.com](https://support.kahoot.com/hc/articles/360039890713), search snippet only; [digitalcitizen.life](https://www.digitalcitizen.life/how-to-join-a-kahoot-game-web-mobile/)) | Adopt QR-or-code entry and the echo on the big screen. Reject the weak rejoin. |
 | **Jackbox** | A 4-letter room code plus a name at jackbox.tv. The code stays on the TV all game. The first player to join is the VIP. Reconnecting means retyping the code and the *exact* same name; otherwise you land in the audience. (Secondary sources: [fullcoll.edu](https://library.fullcoll.edu/?p=17782), [jackboxgames.com](https://jackboxgames.com/the-jackbox-party-pack-5-streamers-guide/)) | Adopt "the code stays on the TV". Reject name-matching reconnects: our device token resumes in one tap. |
-| **Netflix** | A 4-digit Profile Lock per profile. "Forgot PIN?" re-verifies the account (password, email or SMS). There is an option to require the PIN to add new profiles. Kids profiles cap the maturity rating and can't reach settings. ([help.netflix.com](https://help.netflix.com/en/node/114277)) | Adopt the avatar-tile picker and a per-profile PIN. Reject self-service reset: our guests have no account, so a grown-up approves instead (ADR-0014). |
+| **Netflix** | A 4-digit Profile Lock per profile. "Forgot PIN?" re-verifies the account (password, email or SMS). There is an option to require the PIN to add new profiles. Kids profiles cap the maturity rating and can't reach settings. ([help.netflix.com](https://help.netflix.com/en/node/114277)) | Adopt the avatar-tile picker and a per-profile PIN. Reject self-service reset: our guests have no account, so the family admin approves instead (ADR-0014). |
 | **Disney+** | A 4-digit profile PIN, reset by email. Junior Mode has a "Kid-Proof Exit" reading challenge. ([disneyplus.com](https://www.disneyplus.com/en-gb/explore/articles/parental-controls-guide-disney-plus)) | Reject the reading challenge. It shuts out pre-readers and doesn't stop older kids. |
 | **TV device flow (RFC 8628)** | A short code from an alphabet with no look-alike characters, normalized server-side. `verification_uri_complete` puts the code inside the QR URL, but the device still shows the plain code. Codes expire, the phone polls about every 5 s, and code entry is rate-limited. ([RFC 8628](https://www.rfc-editor.org/rfc/rfc8628)) | Adopt the code in the QR plus a plain-code fallback. We already have the no-look-alike alphabet, the expiry (ADR-0002) and the 5 s poll. |
 | **Plex Home** | Fast user switching. A user with a PIN needs it to switch, and Plex tells admins to always set one. ([support.plex.tv](https://support.plex.tv/articles/204232453-fast-user-switching/)) | This is exactly ADR-0014's "PIN on switch" for shared phones. Plex shows the friction is accepted. |
 | **Spotify Jam** | The host shows a QR, including on the TV app. Guests scan it and tap Join, with no Premium needed. ([support.spotify.com](https://support.spotify.com/pg/article/jam/)) | Adopt the QR on the TV with one tap to join. |
 | **Discord invites** | Invites expire, can cap uses, and can grant temporary membership. ([support.discord.com](https://support.discord.com/hc/articles/208866998)) | We already have this: the night code dies at `closed`. |
-| **Apple Ask to Buy** | The child asks, and the organizer approves or declines with Face ID or a password. The child is told when a request is declined, and a dismissed request must be sent again. ([support.apple.com](https://support.apple.com/105055)) | This is the model for Forgot PIN: one request, a visible status, and approval by a grown-up. |
+| **Apple Ask to Buy** | The child asks, and the organizer approves or declines with Face ID or a password. The child is told when a request is declined, and a dismissed request must be sent again. ([support.apple.com](https://support.apple.com/105055)) | This is the model for Forgot PIN: one request, a visible status, and approval by the family admin. |
 | **NIST SP 800-63B-4** | Caps consecutive failures at 100 at most, and lower is allowed. Reset the count on success. A disabled authenticator must be re-bound. ([pages.nist.gov](https://pages.nist.gov/800-63-4/sp800-63b.html)) | ADR-0014's 5 attempts plus admin reset sits inside this. A disabled authenticator "must be re-bound": we set a new PIN after approval. |
 | **NN/g, children** | Ages 3–5 can't read, and ages 6–8 read slowly and skip instructions. Kids type slowly, expect pictures to be tappable, and avoid scrolling. ([nngroup.com](https://www.nngroup.com/articles/childrens-websites-usability-issues/)) | Avatars as pictures, minimal typing, no scrolling to reach the main action, and short copy. |
 
 **Adopted**
 
-1. The **night code inside the TV QR** (fragment), with the typed code as the fallback.
-2. **Auto-submit** the night code and the PIN at the 6th valid character. No Join or OK button to
-   find.
+1. The **night code inside the TV QR**, as an admin opt-in (off by default), with the typed code
+   always available.
+2. **Auto-submit** a typed night code and the PIN at the 6th valid character, so there's no Join
+   or OK button to find. A code pre-filled from the QR waits for one **Join** tap (owner decision),
+   so the guest sees what is happening.
 3. **Big avatar tiles** as the picker. A **"Continue as RooDog"** shortcut is unnecessary because
    the phone is already set to RooDog (ADR-0014 `is_current`) and skips the grid entirely.
 4. **A custom 0–9 keypad**, with keys ≥ 64px and digits shown as dots.
 5. **Remaining tries are shown from the first wrong PIN.** The research suggests hiding them until
    the 3rd miss. We have only 5 tries and the lock lasts until an admin acts, so an accidental
    lockout costs far more than the tiny help the count gives a guesser.
-6. **Ask-to-Buy-style recovery**: "Ask a grown-up" sends one request and shows its live status.
-   Locked and Forgot PIN share this one queue.
+6. **Ask-to-Buy-style recovery**: "Ask the family admin" sends one request and shows its live
+   status. Locked and Forgot PIN share this one queue, and only admins answer it.
 7. **The TV echoes progress** without showing picks ("5 of 7 voted", turnout tiles). This is
    already built.
 8. **The code stays on the TV all night** (already built).
@@ -89,8 +96,9 @@ sources, as marked.
    resumes the session.
 2. Self-service PIN reset (Netflix, Disney+). The owner chose admin approval.
 3. A reading or maths challenge, or a CAPTCHA, anywhere in the flow.
-4. Shortening the night code to 4 letters (Jackbox). ADR-0002 fixes 6 characters, and with the QR
-   carrying the code, its length stops mattering for speed.
+4. Shortening the night code to 4 letters (Jackbox). ADR-0002 fixes 6 characters. With the setting
+   off it costs about 2 s of typing more than 4 letters would, which isn't worth reopening an
+   accepted ADR.
 5. Growing waits between wrong PINs (NIST's suggestion). The 5-try lock plus ADR-0014's per-device
    budget already covers it. A timer would confuse a kid more than it slows a guesser.
 
@@ -130,11 +138,14 @@ resolver redirects to.
 ```mermaid
 flowchart TD
   QRF["Fridge QR<br/>/j/baez"] --> HAS{"Device cookie<br/>valid?"}
-  QRT["TV QR<br/>/j/baez#35;c=ABC234"] --> HAS
+  QRT{"TV QR: admin setting<br/>'code in QR'"}
+  QRT -- "off (default)<br/>/j/baez" --> HAS
+  QRT -- "on<br/>/j/baez?code=ABC234" --> HAS
   HAS -- yes --> RES((Resolver))
-  HAS -- "no, code in URL" --> AUTO["S1 Join<br/>code pre-filled, auto-submits"]
+  HAS -- "no, ?code= in URL" --> PRE["S1 Join<br/>code pre-filled, tap Join"]
   HAS -- "no, no code" --> S1["S1 Join<br/>type the code (auto-submits at 6)"]
-  AUTO -- ok --> RES
+  PRE -- "tap Join, ok" --> RES
+  PRE -- "code expired" --> S1
   S1 -- ok --> RES
   S1 -- "wrong / 429" --> S1
   RES -- "no current person" --> S2["S2 Who's watching?"]
@@ -145,10 +156,10 @@ flowchart TD
   S3E -- "right PIN" --> RES
   S3E -- "wrong (tries left)" --> S3E
   S3E -- "5th wrong / locked" --> S5["S5 Locked"]
-  S3E -- "Forgot PIN" --> S6["S6 Asked a grown-up"]
-  S5 -- "Ask a grown-up" --> S6
-  S6 -- "approved for this phone" --> S3C
-  S6 -- "dismissed" --> S5
+  S3E -- "Forgot PIN" --> S6["S6 Asked the family admin"]
+  S5 -- "Ask the family admin" --> S6
+  S6 -- "admin approved, this phone" --> S3C
+  S6 -- "admin dismissed" --> S5
   S3C -- "PIN set" --> RES
   S4 -- approved --> RES
   S4 -- rejected --> S2
@@ -156,7 +167,13 @@ flowchart TD
   RES -- "N = draft" --> S9["S9 Almost ready"]
   RES -- "N = voting" --> S10["S10 Ballot"]
   S10 -- Done --> S11["S11 Your picks are in"]
-  S11 -- "Pass to next person" --> SW["Switch sheet"] --> S3E
+  S11 -- "Pass to next person" --> SW["Switch sheet"]
+  SW -- "tap a person" --> SWP["S3s Switch PIN<br/>(every switch)"]
+  SWP -- "right PIN" --> RES
+  SWP -- "wrong (tries left)" --> SWP
+  SWP -- "5th wrong / locked" --> S5
+  SWP -- "close" --> SW
+  S5 -- "Back to {current} (switch only)" --> RES
   RES -- "N = revealed" --> S12["S12 The winner"]
   RES -- "N = tonight" --> S13["S13 Tonight: add photos"]
   RES -- "closed, not rated" --> S14["S14 How was it?"]
@@ -218,9 +235,14 @@ Copy is in §7, keyed by the `copy.*` ids used here.
 - **When:** no valid device. **With a valid device cookie, `/j/[slug]` skips straight to the
   resolver.** It probes `GET /people`, and a 200 means the phone is already in. Today it always
   asks for the code (deviation D1).
-- **Code from the TV QR:** `#c=ABC234` in the URL fragment. It is never sent to the server and
-  never written to a log. It is read once, removed with `history.replaceState`, cleaned with
-  `cleanNightCodeInput`, and auto-submitted.
+- **Code from the TV QR** (only when the admin setting is on): `?code=ABC234`. The page reads it
+  once, cleans it with `cleanNightCodeInput`, puts it in the field, and immediately removes it
+  from the address bar with `router.replace("/j/{slug}")`, so it doesn't stay in history or get
+  shared by a copied link. It is **not** auto-submitted: the field shows the code with
+  `copy.s1.prefilled` and the **Join** button is the primary, one tap (owner decision). An
+  invalid or look-alike value is dropped and the field stays empty. The `/j` response sets
+  `Referrer-Policy: no-referrer`.
+- **Code typed** (setting off, the default, or the fridge QR): the field is empty and focused.
 - **Typed code:** the field auto-submits when `completeNightCode` returns a value (6 valid
   characters). The **Join** button stays, as the primary, for keyboards that don't fire input
   events, and it reads "Joining…" while pending.
@@ -270,6 +292,9 @@ action** and there is no OK button. A close ✕ returns to S2.
   Under the name, a quiet link **Not your name? Change it** (first claim only, while
   `can_rename`) opens the rename field *after* the PIN is set. It is a secondary action and stays
   off the critical path.
+- **S3s Switch PIN** (from the switch sheet, see below): the same Enter PIN sheet, titled
+  `copy.s3s.title`, with the current person named under it (`copy.s3s.still`). Every switch asks
+  for the PIN, even between people who used this phone a minute ago (owner decision; ADR-0014).
 - **Kids:** the same sheet. People have no age or kid flag (only `is_guest`), so the sheet always
   shows the quiet line `copy.s3.kidHint` under the dots. There is no separate kids flow.
 - **Who sees the digits:** dots only. A press-and-hold eye icon shows the digits while held
@@ -285,15 +310,19 @@ action** and there is no OK button. A close ✕ returns to S2.
 - **Way out:** **Pick someone else** (→ S2). The pending claim stays, so the host can still
   approve it.
 - **Host side:** the claim appears on `/host` (already built), and the TV shows a nudge (§5 TV).
+- **Not a PIN unlock.** Approving a pending claim lets this phone act as the person; it never
+  resets, reveals or bypasses a lock. A locked person refuses pending claims too (423, ADR-0014),
+  so a locked tile always goes to S5, never S4.
 
 ### S5 — Locked
 - **When:** a 423, or a `locked` tile tapped.
-- **Primary:** **Ask a grown-up to unlock** → `POST …/forgot-pin` → S6.
+- **Primary:** **Ask the family admin** → `POST …/forgot-pin` → S6. Only admins can reset a PIN
+  (owner decision); hosts can't, so the copy never says "ask the host" here.
 - **Way out:** **Pick someone else**.
 - Copy says what happened without blame (`copy.s5.*`) and that nothing else changes. Phones
   already set to them keep working, as ADR-0014 decides.
 
-### S6 — Asked a grown-up (reset pending)
+### S6 — Asked the family admin (reset pending)
 - **When:** a forgot-PIN request is open for this person (from this phone, or found from the tile
   after a reload, needs G2).
 - **Waiting:** `copy.s6.*`, with a live poll every 5 s. **Approved for this phone** → S3c Create
@@ -301,6 +330,8 @@ action** and there is no OK button. A close ✕ returns to S2.
   **Dismissed** → S5 with `copy.s6.dismissed`. Approved but asked from another phone → S3e with
   `copy.s6.otherPhone`.
 - **Way out:** **Pick someone else**.
+- **Where the request goes:** only to the admin owner portal, `/admin/people` (§5 "Admin"). It
+  never appears on `/host` for a host who isn't an admin, or on the TV.
 
 ### S7 — New guest (self-create)
 - One screen, then S3c. **Name** (a large text field, `autocapitalize="words"`), **pick a
@@ -341,10 +372,28 @@ like the TV's turnout tiles. **It never shows how anyone voted.**
 ### Switch sheet (shared phone, ADR-0014 "one current person per phone")
 - **Opened from:** the **Not you? Switch** chip on every night screen, and **Pass to next
   person** on S11.
-- **Shows:** the people this phone holds (`binding: "mine"`), each with "Voted ✓" while voting,
-  then **＋ Add someone to this phone** (→ S2), and **Remove from this phone** (long-press or ⋯,
-  `DELETE` binding). Tapping a person → S3e for them (ADR-0014: a switch needs the PIN), then the
-  resolver lands them on their own ballot.
+- **Shows:** `copy.switch.title`, then the people this phone holds (`binding: "mine"`) as big
+  tiles. The current person is first, marked "That's you" and not tappable. While voting, the
+  others show "Voted ✓" or nothing. A `locked` person shows 🔒 "Locked". Then
+  **＋ Add someone to this phone** (→ S2), and **Remove from this phone** (⋯ on a tile, `DELETE`
+  binding, confirm first).
+- **Primary:** tapping a person's tile (the grid is the action, as on S2).
+- **Every switch asks for the PIN** (owner decision, ADR-0014). A tap opens **S3s Switch PIN**
+  for that person. `PUT /devices/me/people/{id} {pin}`:
+  - **Right PIN** → they become current, and the resolver lands them on their own screen (their
+    ballot while voting). The chip now reads `copy.chip` with their name.
+  - **Wrong PIN** → the dots shake and clear, and `copy.s3.wrong` shows the tries left. **The
+    current person does not change**: `copy.s3s.still` stays under the dots ("Still set to
+    RooDog"). Closing the sheet returns to the switch sheet with RooDog still current, so a
+    wrong PIN never leaves the phone set to nobody.
+  - **5th wrong PIN (423)** → S5 for **that** person (`copy.s5.*`, primary **Ask the family
+    admin**). Its way out is `copy.switch.backTo` ("Back to RooDog"), which returns to RooDog's
+    screen, not to S2. The previous person stays current throughout. The locked person keeps
+    their 🔒 tile on the sheet. Tapping it later goes straight to S5, or to S6 if a request is
+    already open (G2).
+  - **Per-device budget (429)** → `copy.s3.slow`. The sheet closes back to the switch sheet,
+    and the current person is unchanged.
+  - **Forgot PIN?** → S6 for that person, way out `copy.switch.backTo`.
 - Today's multi-person "Who's voting?" grid inside `voting-flow.tsx` is replaced by this sheet
   (D5).
 
@@ -424,15 +473,37 @@ rating was allowed. The hierarchy, top to bottom, is now fixed:
   open and this browser holds a current person. It links to `/s/[id]`. Without a device the card
   reads **Join as a voter on this phone**, which uses the existing `devices/enroll` host path, so
   no night code is needed.
-- **One queue for help:** pending claims (already built) **and** open PIN-reset requests on
-  `/host`, with a count badge, polled every 10 s. On movie night the host is on `/host`, not
-  `/admin` (G4, Q3).
+- **Pending claims only** on `/host` (already built, `devices:approve`). PIN resets are **not**
+  shown to hosts (owner decision). If the signed-in account is also an admin, `/host` shows one
+  extra line, `copy.host.adminResets`, linking to `/admin/people#pin-requests`.
+
+### Admin (`/admin/people` and `/admin/settings`), the owner portal
+- **PIN requests** (new section at the top of `/admin/people`, `id="pin-requests"`): one row per
+  open request with the avatar, name, "asked {time} from {device label}", and whether the person
+  is locked. **Reset PIN** (primary for the row, confirm dialog with `copy.admin.resetConfirm`)
+  and **Dismiss**. After a reset, the requesting phone moves from S6 to S3c by itself. The admin
+  nav shows a count badge while requests are open, polled every 10 s.
+- **Setting: "Include tonight's code in the TV QR"** on `/admin/settings`, under **Join link**.
+  A switch, **off** by default, with `copy.admin.qrCode.label` and `copy.admin.qrCode.help`.
+  Saved with `PATCH /admin/settings` (G9). The change reaches the TV on its next settings
+  refetch (≤ 10 s) or reload. No phone is affected.
 
 ### TV (`/tv/[session]`)
-- **Lobby, draft and voting:** a big QR to **`/j/{slug}#c={code}`** (needs G1), the night code in
-  large type under it, and "Scan to join". The turnout tiles are already built.
-- **Help nudge:** while any claim or reset is waiting, a corner line `copy.tv.help` ("RooDog needs
-  the host — check your phone"). It needs a TV-readable count (G4).
+- **Lobby, draft and voting:** a big QR, the night code in large type under it, and
+  `copy.tv.scan` / `copy.tv.scanType`. The turnout tiles are already built. Which QR depends on
+  the household setting (G1, G9):
+  - **Off (default):** the QR is `/j/{slug}`, and the label is `copy.tv.scanType` ("Scan, then type
+    the code"). The code under the QR is what people type.
+  - **On:** the QR is `/j/{slug}?code={code}`, and the label is `copy.tv.scan`. The TV builds the
+    URL **in the browser** from the code it already holds in `sessionStorage`
+    (`night-code-handoff.ts`). The server never stores or returns the plaintext code (ADR-0002
+    keeps only its hash). If the TV doesn't hold the code (a new tab, cleared storage), it shows
+    the plain `/j/{slug}` QR and the existing "type tonight's code on the TV" prompt until someone
+    enters it.
+  - The QR is re-rendered when the code rotates or the setting changes.
+- **Help nudge:** while a person claim is waiting for the host, a corner line `copy.tv.help`
+  ("RooDog is waiting for the host. Check your phone."). PIN resets are never shown on the TV
+  (admin only). It needs a TV-readable count (G4).
 - After `revealed`: unchanged (reveal, then slideshow).
 
 ---
@@ -442,18 +513,20 @@ rating was allowed. The hierarchy, top to bottom, is now fixed:
 Times are estimates for a mid-range phone on home Wi-Fi. They are to be measured on staging (the
 issue's last acceptance box).
 
-| Step | First time, TV QR | First time, fridge QR | Returning phone | Shared phone, 2nd person |
+| Step | First time, setting **off** (default; TV or fridge QR) | First time, setting **on** (TV QR) | Returning phone | Shared phone, next person |
 |---|---|---|---|---|
 | Camera to page loaded | 6 s | 6 s | 6 s | — |
-| Night code | 1 s (auto) | 8 s (type 6) | 0 (cookie) | — |
+| Night code | 8 s (type 6, auto-submit) | 2 s (pre-filled, tap Join) | 0 (cookie) | — |
 | Pick tile | 3 s | 3 s | 0 (current) | 3 s (switch sheet) |
-| PIN | 9 s (create + confirm) | 9 s | 0 | 4 s (enter) |
+| PIN | 9 s (create + confirm) | 9 s | 0 | 4 s (enter, every switch) |
 | Ballot (3 taps + Done) | 8 s | 8 s | 6 s | 8 s |
-| **Total** | **≈ 27 s** ✅ | **≈ 34 s** ⚠️ | **≈ 12 s** ✅ | **≈ 15 s** ✅ |
+| **Total** | **≈ 34 s** ⚠️ | **≈ 28 s** ✅ | **≈ 12 s** ✅ | **≈ 15 s** ✅ |
 
-The fridge path is over budget, which is why G1 (the TV QR with the code) is P0 for this spec.
-Without it every first-timer types the code. The kid path adds a hand-over to a parent for the
-PIN (about 5 s), and that is accepted.
+With the default setting, a first-timer is about 4 s over the target. That is the price of
+keeping the code out of the QR, which the owner chose. A first visit happens once per phone; every
+later night is the 12 s column. If the staging retest shows first-timers matter more than
+expected, the admin can turn the setting on for a party night without a code change. The kid path
+adds a hand-over to a parent for the PIN (about 5 s), and that is accepted.
 
 ---
 
@@ -472,7 +545,7 @@ waiting screens.
 | `copy.s1.title` | Join movie night |
 | `copy.s1.lede` | Type the code you see on the TV. |
 | `copy.s1.button` / pending | Join / Joining… |
-| `copy.s1.auto` | Joining with the code from the TV… |
+| `copy.s1.prefilled` | We filled in tonight's code from the TV. Tap **Join**. |
 | `copy.s1.wrong` | That code didn't work. Check the TV: the code changes every movie night. |
 | `copy.s1.slow` | Too many tries. Try again in **{n} minutes**, or ask the host to let this phone in. |
 | `copy.s2.title` | Who's watching? |
@@ -485,11 +558,13 @@ waiting screens.
 | `copy.s3.wrong` | Not quite. **{n} tries left.** |
 | `copy.s3.wrongLast` | Not quite. **1 try left** before {name} gets locked. |
 | `copy.s3.forgot` | Forgot PIN? |
-| `copy.s3.askHost` | Ask the host instead |
-| `copy.s3.slow` | Too many wrong PINs on this phone. Wait a few minutes, or ask the host. |
+| `copy.s3.askHost` | Ask the host to let this phone in |
+| `copy.s3.slow` | Too many wrong PINs on this phone. Wait a few minutes and try again. |
 | `copy.s3c.title1` | Pick a 6-digit PIN for **{name}** |
 | `copy.s3c.hint` | You'll need it if you use another phone. Grown-ups pick it for kids. |
 | `copy.s3c.title2` | Type it again |
+| `copy.s3s.title` | Switch to **{name}**? Type their PIN. |
+| `copy.s3s.still` | Still set to **{current}** until the PIN is right. |
 | `copy.s3.mismatch` | Those didn't match. Let's try again. |
 | `copy.s3c.rename` | Not your name? Change it |
 | `copy.s4.title` | Waiting for the host |
@@ -497,12 +572,12 @@ waiting screens.
 | `copy.s4.rejected` | The host said no for **{name}** on this phone. Pick who you are. |
 | `copy.common.pickElse` | Pick someone else |
 | `copy.s5.title` | **{name}** is locked |
-| `copy.s5.body` | Too many wrong PINs. A grown-up can unlock it. Phones already set to {name} still work. |
-| `copy.s5.button` | Ask a grown-up to unlock |
-| `copy.s6.title` | We asked a grown-up |
-| `copy.s6.body` | The host will see your request. When they say yes, you'll pick a new PIN here. |
-| `copy.s6.dismissed` | The host didn't unlock **{name}** this time. Ask them in person. |
-| `copy.s6.otherPhone` | **{name}** was unlocked. Type the new PIN, or ask whoever set it. |
+| `copy.s5.body` | Too many wrong PINs. Only the family admin can reset it. Phones already set to {name} still work. |
+| `copy.s5.button` | Ask the family admin to reset your PIN |
+| `copy.s6.title` | We asked the family admin |
+| `copy.s6.body` | The family admin will see your request. When they reset your PIN, you'll pick a new one right here. |
+| `copy.s6.dismissed` | The family admin didn't reset **{name}**'s PIN this time. Ask them in person. |
+| `copy.s6.otherPhone` | **{name}**'s PIN was reset on another phone. Type the new PIN, or ask whoever set it. |
 | `copy.s7.title` | Welcome! What should we call you? |
 | `copy.s7.picture` | Pick a picture |
 | `copy.s7.button` | Next |
@@ -512,6 +587,7 @@ waiting screens.
 | `copy.switch.title` | Who's voting now? |
 | `copy.switch.add` | Add someone to this phone |
 | `copy.switch.remove` | Remove from this phone |
+| `copy.switch.backTo` | Back to **{current}** |
 | `copy.chip` | Voting as **{name}** · Switch |
 | `copy.s8.title` | No movie night yet |
 | `copy.s8.body` | When the host starts one, this screen changes by itself. |
@@ -536,9 +612,15 @@ waiting screens.
 | `copy.stale.closed` | That changed while you were away. Here's where things are now. |
 | `copy.host.vote` | Vote as **{name}** |
 | `copy.host.joinVoter` | Join as a voter on this phone |
-| `copy.host.help` | {n} waiting for you: phones to OK and PINs to unlock |
+| `copy.host.help` | {n} phones waiting for you to OK them |
+| `copy.host.adminResets` | {n} PIN reset requests (admin) |
+| `copy.admin.pinRequests` | PIN requests |
+| `copy.admin.resetConfirm` | Reset **{name}**'s PIN? Their old PIN stops working. They'll choose a new one on the phone that asked. |
+| `copy.admin.qrCode.label` | Include tonight's code in the TV QR |
+| `copy.admin.qrCode.help` | Guests who scan the TV just tap Join. Anyone who sees the TV, or a photo of it, can join until the night ends. Off: they scan, then type the code. |
 | `copy.tv.scan` | Scan to join |
-| `copy.tv.help` | **{name}** needs the host. Check your phone. |
+| `copy.tv.scanType` | Scan, then type the code |
+| `copy.tv.help` | **{name}** is waiting for the host. Check your phone. |
 
 ---
 
@@ -550,13 +632,14 @@ the spec works around it.
 
 | # | Gap | Why the spec needs it | Proposal | Priority |
 |---|---|---|---|---|
-| **G1** | No endpoint gives the TV (or a host) the household's join slug. `tv-night.tsx` hard-codes `JOIN_SLUG = null` and points people to the fridge. | The TV QR with the code is what makes 30 s (§6). | `GET /api/v1/devices/me/join-link` for `is_tv` devices → `{url}`, or `join_url` on the session snapshot when the caller is the TV. The TV appends `#c={code}` from `sessionStorage` (it already holds the code). | P0 |
+| **G1** | No endpoint gives the TV (or a host) the household's join slug. `tv-night.tsx` hard-codes `JOIN_SLUG = null` and points people to the fridge. | The TV shows a QR in both setting modes (§5 TV). | `GET /api/v1/devices/me/join-link` for `is_tv` devices → `{url, include_code_in_qr}` (see G9). The TV appends `?code={code}` itself, from `sessionStorage`, only when the flag is on. | P0 |
 | **G2** | `PersonTile` doesn't say a PIN reset is open, or that one was approved for *this* phone. | S6 must survive a reload, and S2 must route a `locked` tile to S6, not S5, when a request is already open. | Add `pin_reset: null \| "open" \| "approved_for_this_phone"` to the tile (the `_RESET_FOR_ME` query already computes the second). | P0 |
 | **G3** | `WrongPin` carries `attempts_left`, but the response shape isn't defined. | S3 shows the tries left, and Playwright asserts on it, not on prose. | Error body `{detail, code: "wrong_pin", attempts_left}` (422 or 401) and `{detail, code: "pin_locked"}` for 423. Keep the codes stable for the OpenAPI types. | P0 |
-| **G4** | Open PIN-reset requests are listed for `admin:people` only. Pending claims are `devices:approve`. Nothing counts either for the TV. | One help queue on `/host` for whoever runs the night (Q3), and the TV nudge. | Let `devices:approve` (hosts) list and approve resets, or answer Q3 "admins only". Add `GET /devices/me/help-count` for the TV → `{count, first_name}`. | P1 |
+| **G4** | Nothing counts pending claims for the TV, and the admin portal needs a cheap count for its badge. PIN resets stay `admin:people` only (owner decision: hosts can't list or approve them), which matches ADR-0014. | The TV nudge for pending claims; the admin nav badge. | `GET /devices/me/help-count` for `is_tv` devices → `{count, first_name}` counting **pending claims only**. An `open_count` on the admin PIN-request list (or a `HEAD`-cheap count route). Add a route test that a host without `admin:people` gets 403 on the reset list and approve routes. | P1 |
 | **G5** | Approvals (claims and resets) publish nothing to the phone, and there is no household-level stream. | S4 and S6 must update live. | **Workaround, no backend change:** poll the people list every 5 s while anything is waiting (the existing `pendingPollInterval`, extended to `pin_reset === "open"`). A household stream is a later ADR if polling ever shows up in costs. | P1 |
 | **G6** | It isn't explicit that `forgot-pin` is allowed on a **locked** person ("a lock blocks claiming, switching and PIN changes"). | S5's only primary action calls it. | Confirm in the ADR-0014 route tests: `POST …/forgot-pin` on a locked person → 202. | P0 (a test, not a feature) |
 | **G7** | The resolver composes `GET /people` and `GET /sessions?…` (two requests per check). | It works, but each wake costs two round-trips. | Optional `GET /devices/me/home` → `{current_person, people_on_phone, live_night: {id, status}}`. | P2 |
+| **G9** | No household setting for putting the code in the TV QR. | The owner's opt-in (§10.1), default off. | Add `include_code_in_qr: bool NOT NULL DEFAULT false` to the household settings, readable and writable through `GET/PATCH /admin/settings` (`admin:settings`), and returned to the TV by G1. **No plaintext code is stored or returned:** the server keeps only the hash (ADR-0002), and the TV composes `?code=` from the code it already holds in the browser. Two follow-ups for the backend owner: (1) the `?code=` query reaches the web server, so make sure request logging on `fnh-web` and `fnh-api` drops the query string for `/j/*` (the code is live until `closed`); and (2) send `Referrer-Policy: no-referrer` on `/j/*`. If either is awkward, a `#code=` fragment gives the same UX and never leaves the phone; that is a one-line change on both sides. | P1 (the default-off path works without it) |
 | **G8** | `GET /sessions/{id}/voters` (ADR-0006) returns only people **with a ballot** (`person_id`, `avatar_emoji`, `color`), and only `ballot_count` is published. Nothing records that a person *joined* a night: `join_service` audits `device.joined` for a device, not a person, and a returning phone under the resolver never calls `/join` at all. Claims and switches publish nothing. | The Here tonight strip (§5) must include people who joined but haven't voted, and during `tonight`, when nobody votes. | A small attendance record: `session_attendance (household_id, session_id, person_id, first_seen_at)`, household-scoped with FORCE RLS like every table. Upsert it when a device whose **current** person is X mints an SSE ticket for the night or casts a ballot. Publish a `presence` event after commit only when a row is new. Expose `GET /sessions/{id}/present` → `{present: [{person_id, avatar_emoji, color, voted: bool}]}`, so it carries the same fields as `/voters` plus `voted`, with **no ranks or tallies**. The TV can use it too, to dim people who aren't here. | P1 (the strip ships voters-only without it) |
 
 Also checked: no gap. `JoinOut` already returns `session_id` (D2). `join_service` reuses an
@@ -570,33 +653,37 @@ S3c.
 
 | # | Today | Changes to |
 |---|---|---|
-| D1 | `/j/[slug]` always asks for the code, even with a valid device cookie. | It probes `GET /people`, and on a 200 goes to the resolver. A `#c=` fragment auto-fills, and 6 valid characters auto-submit. |
+| D1 | `/j/[slug]` always asks for the code, even with a valid device cookie. | It probes `GET /people`, and on a 200 goes to the resolver. A `?code=` value (setting on) pre-fills the field and waits for one Join tap; 6 typed characters auto-submit. |
 | D2 | A successful join goes to `/who` and ignores `JoinOut.session_id`. | It goes to the resolver and prefetches that night. |
 | D3 | `/who` is a station: "You're in as … Vote now". The "Waiting for the host to open voting" variant is a waiting screen that the phone has to leave by tapping. | `/who` is only the picker (S2). With a current person the resolver never shows it, and the phone sits on S8, S9 or S10, which advance by themselves. |
 | D4 | `/who` lede: "Sharing a phone? Tap everyone using it." (multi-claim). | One current person per phone (ADR-0014). More people are added from the switch sheet. |
 | D5 | `voting-flow.tsx` shows its own "Who's voting?" grid for several held people, with no PIN. | Switch sheet plus PIN (ADR-0014 `require_can_act_as` needs `is_current`). The ballot is always for the current person. |
 | D6 | A tile tap claims at once (`PUT …/people/{id}` with no body). | Every claim goes through S3 (`{pin}`), except the current person and the explicit "Ask the host instead". |
 | D7 | 401 on `/who` and `/s/[id]` shows "This phone hasn't joined tonight yet. Scan the QR…" with nothing to tap. | Resolve to S1 when `fnh.lastJoin` is known (a **Join The Baez Family** button), otherwise S0. |
-| D8 | The TV says "Scan the fridge QR to join" (no slug). | QR to `/j/{slug}#c={code}` (G1). |
+| D8 | The TV says "Scan the fridge QR to join" (no slug). | QR to `/j/{slug}` by default, or `/j/{slug}?code={code}` when the admin setting is on (G1, G9). |
 | D9 | No PIN, lock, reset, self-create, rename or profile screens. | S3 to S7, the switch sheet, the profile. |
-| D10 | `/host` lists pending claims only. | Claims plus PIN resets in one badge-counted queue, plus the "Vote as …" card. |
+| D10 | `/host` lists pending claims only. | Still pending claims only (hosts never see PIN resets), plus the "Vote as …" card and, for admins, a link to the PIN requests. PIN requests live on `/admin/people`. |
 | D12 | `tonight`: "Rate later: we'll ask…" sentence above an **outline** "Rate it now" (read as disabled on a phone); empty album is a passive "No photos yet." line. | S13 hierarchy: **Add photos** primary, empty album becomes the Add photos tile, **Already watched? Rate it** as a `secondary` button with no sentence above it (§4 rule 9). |
 | D13 | Phones show no one else; only the TV has turnout tiles (`useVoters`, voters only). | The Here tonight strip on S9/S10/S11/S13, from `/present` (G8), falling back to `/voters`. |
 | D11 | Live-night discovery on `/who` covers `voting/revealed/tonight` (PR #35). | The resolver also includes `draft` (S9), so a phone that joins early sits on "Almost ready" and slides into the ballot. |
 
 ---
 
-## 10. Open questions for the owner
+## 10. Owner decisions (answered 2026-10-17)
 
-1. **The TV QR includes tonight's code** (in the `#` fragment, never sent to the server).
-   Anyone who can see the TV can already read the code, so this adds no access, and the code dies
-   at `closed`. *Recommend: yes.* It is the only way first-timers make 30 s.
-2. **Who unlocks PINs on movie night: admins only, or hosts too?** ADR-0014 says admins. If the
-   person running the night is a host who isn't an admin, a locked kid waits until an admin shows
-   up. *Recommend: hosts too* (G4), with every reset audited (it already is).
-3. **Shared phones type a PIN on every switch** (ADR-0014). A parent passing a tablet to three kids
-   types three PINs per night, about 4 s each. *Recommend: keep it for v1* (Plex does the same),
-   measure it on the staging retest, and revisit only if it hurts.
+1. **Does the TV QR carry the night code? Off by default.** A household setting, "Include
+   tonight's code in the TV QR", lives on `/admin/settings`. When it's on, the QR is
+   `/j/{slug}?code=XXXXXX`, and the join page pre-fills the code for one Join tap. When it's off,
+   the QR is `/j/{slug}` and the code is typed. Specified in §5 S1, TV and Admin; G1 and G9.
+2. **Who resets PINs? Admins only.** Hosts can't. Forgot PIN and locked requests go to the admin
+   owner portal (`/admin/people`) only, and the copy says "the family admin". Specified in §5
+   S5, S6 and Admin; G4.
+3. **Does a shared phone ask for the PIN on every switch? Yes.** Each switch needs that person's
+   PIN. A wrong PIN or a lock during a switch never changes the current person. Specified in §5
+   "Switch sheet" and S3s.
+
+No open questions remain for this spec. The two G9 follow-ups (log scrubbing and the referrer
+header for `?code=`) are for the backend owner, not product decisions.
 
 ---
 
@@ -615,9 +702,15 @@ Conventions: `screen(x)` means `[data-screen="x"]` is visible. `primary` is
 - AC-0.3: Every button and tile has a bounding box ≥ 56px tall, and keypad keys ≥ 64px.
 
 **S0/S1 — join**
-- AC-1.1: A new context opens `/j/baez#c=<code>` → `screen(join)` shows `copy.s1.auto`, then
-  `screen` becomes one of S2/S8/S9/S10 within 3 s with **no** keyboard input. `page.url()` no
-  longer contains `#c=`.
+- AC-1.1 (setting on): a new context opens `/j/baez?code=<code>` → `screen(join)` shows the code
+  in the field and `copy.s1.prefilled`, `page.url()` no longer contains `code=` within 1 s, and **no**
+  join request is sent until **Join** (`primary-action`) is tapped. One tap → one of S2/S8/S9/S10
+  within 3 s.
+- AC-1.1b: `/j/baez?code=ABC1O0` (look-alikes) → the field is empty, no request is sent, and the
+  `code=` parameter is removed.
+- AC-1.1c: `/j/baez?code=<a code from a closed night>` → Join → `copy.s1.wrong`, the field is
+  cleared and focused (the typed path takes over).
+- AC-1.1d: the `/j/baez` response has the header `Referrer-Policy: no-referrer`.
 - AC-1.2: A new context on `/j/baez` types `abc 23-4` (the valid code in a mixed format) → it joins
   without a click on **Join**.
 - AC-1.3: A wrong code → `copy.s1.wrong` is visible, the field is empty and focused, and the screen
@@ -659,7 +752,7 @@ Conventions: `screen(x)` means `[data-screen="x"]` is visible. `primary` is
 - AC-4.3: **Pick someone else** → `screen(who)`, and the claim still appears in `GET /devices/claims`.
 
 **S5/S6 — locked and reset**
-- AC-5.1: `screen(locked)` primary **Ask a grown-up to unlock** → `POST …/forgot-pin` (202) →
+- AC-5.1: `screen(locked)` primary **Ask the family admin to reset your PIN** → `POST …/forgot-pin` (202) →
   `screen(reset-pending)` (waiting).
 - AC-5.2: Reloading on `screen(reset-pending)` returns to `screen(reset-pending)`, not `locked`
   (G2).
@@ -680,6 +773,18 @@ Conventions: `screen(x)` means `[data-screen="x"]` is visible. `primary` is
   `voting-as` = B.
 - AC-8.2: After everyone on the phone has voted, S11 is a waiting screen (no **Pass to next
   person**).
+- AC-8.3 (PIN every switch): A current, B voted earlier tonight on this phone and C held. Switching
+  A → B → A asks for a PIN on **both** switches (two `PUT …/people/{id}` requests with a `pin`);
+  no switch ever succeeds without one.
+- AC-8.4 (wrong PIN on switch): A current, switch to B, wrong PIN → `copy.s3.wrong` with tries
+  left and `copy.s3s.still` naming A. Closing the sheet → the switch sheet, and `GET /people` still
+  reports A as `current`. The chip reads "Voting as A".
+- AC-8.5 (lock during switch): the 5th wrong PIN for B → `screen(locked)` for B with the primary
+  **Ask the family admin to reset your PIN** and the way out **Back to A**. Back → A's night
+  screen (not `who`), with A still `current`. B's tile on the switch sheet shows "Locked", and
+  tapping it opens `screen(locked)` with no keypad.
+- AC-8.6: a 429 per-device budget during a switch → `copy.s3.slow`, back to the switch sheet,
+  and A is still `current`.
 
 **Night status**
 - AC-9.1 (none): no live night → `screen(no-night)` waiting. Creating a night through the API →
@@ -724,12 +829,29 @@ Conventions: `screen(x)` means `[data-screen="x"]` is visible. `primary` is
 **Host and TV**
 - AC-11.1: A signed-in host whose browser holds a current person, during voting → `/host` shows
   **Vote as {name}** linking to `/s/{id}`.
-- AC-11.2: `/host` shows one help count for pending claims plus open resets, and approving either
-  decrements it within 10 s.
-- AC-11.3: The TV lobby renders a QR whose decoded URL is `/j/baez#c=<code>` (G1), with the code in
-  text under it.
-- AC-11.4: With a pending claim or reset open, the TV shows `copy.tv.help` within 10 s.
+- AC-11.2: `/host` signed in as a host **without** admin rights shows pending claims and no PIN
+  requests. An open reset request does not change anything on `/host` or the TV. The API
+  answers that host's request for the reset list with 403.
+- AC-11.2b: signed in as an admin, `/admin/people` lists the open request in `#pin-requests`
+  with the name and device label. **Reset PIN** → confirm → the requesting phone moves from
+  `screen(reset-pending)` to `screen(pin-create)` within 7 s. **Dismiss** → the phone moves to
+  `screen(locked)` with `copy.s6.dismissed`. As an admin, `/host` also shows
+  `copy.host.adminResets` linking to `/admin/people#pin-requests`.
+- AC-11.3 (setting off, the default): a new household's `/admin/settings` shows "Include
+  tonight's code in the TV QR" switched **off**. The TV lobby QR decodes to exactly
+  `<origin>/j/baez` (no query), and the label is `copy.tv.scanType`.
+- AC-11.3b (setting on): the admin turns it on → within 10 s the TV QR decodes to
+  `<origin>/j/baez?code=<tonight's code>`, the label is `copy.tv.scan`, and the code text under it
+  matches. Rotating the code on `/host` re-renders the QR with the new code.
+- AC-11.3c (on, but the TV lacks the code): with the TV's `sessionStorage` cleared, the QR
+  decodes to `<origin>/j/baez`, and the code-entry prompt shows. Entering the code switches to the
+  `?code=` QR.
+- AC-11.3d: no API response to the TV or any device contains the plaintext night code (assert
+  on the JSON of `join-link`, `settings` and the session snapshot).
+- AC-11.4: With a pending person claim open, the TV shows `copy.tv.help` within 10 s. With only a
+  PIN reset open, it shows nothing.
 
 **The 30-second target (manual on staging, then automated as a timing probe)**
-- AC-12.1: On a real phone, the TV QR → ballot saved in **≤ 30 s** for a first-time guest
-  (median of 3 runs). A returning phone in **≤ 15 s**.
+- AC-12.1: On a real phone, the TV QR → ballot saved in **≤ 30 s** for a first-time guest with
+  the setting **on** (median of 3 runs), and recorded (target ≤ 36 s) with it off. A returning
+  phone in **≤ 15 s**.
