@@ -54,16 +54,8 @@ export type PersonTile = Person;
 export type PinResetState = Person["pin_reset"];
 /** GET /devices/me/join-link (G1): what the TV needs to draw its QR. */
 export type JoinLink = Schemas["JoinLinkOut"];
-/**
- * GET /sessions/{id}/present (G8, not in #39 yet): who is here tonight. Avatars and a voted flag,
- * never picks. Hand-written until the backend ships it; the strip falls back to voters on 404.
- */
-export type PresentPerson = {
-  person_id: string;
-  avatar_emoji: string;
-  color: string;
-  voted: boolean;
-};
+/** GET /sessions/{id}/present (G8): who is here tonight. Avatars and a voted flag, never picks. */
+export type PresentPerson = Schemas["PresentOut"];
 /** The album's fixed reaction set (the path parameter's enum). */
 export type ReactionEmoji =
   operations["add_reaction_api_v1_sessions__session_id__photos__photo_id__reactions__emoji__put"]["parameters"]["path"]["emoji"];
@@ -230,6 +222,8 @@ export const api = {
     request<Profile>("GET", `/people/${encodeURIComponent(personId)}/profile`),
   /** The TV's join door and the code-in-QR setting (G1; TV devices only). */
   joinLink: () => request<JoinLink>("GET", "/devices/me/join-link"),
+  /** The TV's "waiting for the host" nudge (G4): pending person claims only, never PIN resets. */
+  helpCount: () => request<Schemas["HelpCountOut"]>("GET", "/devices/me/help-count"),
   /** Username (or email) + password; sets the `fnh_session` cookie (ADR-0014). */
   login: (body: Schemas["LoginIn"]) => request<Account>("POST", "/auth/login", body),
   setPassword: (body: Schemas["PasswordIn"]) => request<void>("POST", "/auth/password", body),
@@ -300,12 +294,9 @@ export const api = {
     request<Night>("PUT", `/sessions/${encodeURIComponent(sessionId)}/slideshow`, { playing }),
   voters: (sessionId: string) =>
     request<Schemas["VotersOut"]>("GET", `/sessions/${encodeURIComponent(sessionId)}/voters`),
-  /** Who is here tonight (G8). A 404 means the backend doesn't serve it yet: use `voters`. */
+  /** Who is here tonight (G8). */
   present: (sessionId: string) =>
-    request<{ present: PresentPerson[] }>(
-      "GET",
-      `/sessions/${encodeURIComponent(sessionId)}/present`,
-    ),
+    request<Schemas["PresenceOut"]>("GET", `/sessions/${encodeURIComponent(sessionId)}/present`),
   proxyBallot: (sessionId: string, body: Schemas["BallotIn"]) =>
     request<void>("PUT", `/sessions/${encodeURIComponent(sessionId)}/ballots/proxy`, body),
   /** Roll candidates for a draft night (ADR-0007). Nothing is added; picks go via addOption. */
@@ -361,6 +352,9 @@ export const api = {
     request<MergeResult>("POST", "/admin/people/merge", body),
   /** Open "Forgot PIN" requests, oldest first (`admin:people`; hosts get 403). */
   pinResets: () => request<PinReset[]>("GET", "/admin/people/pin-resets"),
+  /** The admin nav badge (G4): how many PIN resets are open. */
+  pinResetCount: () =>
+    request<Schemas["PinResetCountOut"]>("GET", "/admin/people/pin-resets/count"),
   /** Clears the PIN, count and lock. No PIN is set or shown: the asking phone picks a new one. */
   approvePinReset: (requestId: string) =>
     request<PinReset>("POST", `/admin/people/pin-resets/${encodeURIComponent(requestId)}/approve`),
