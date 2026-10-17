@@ -312,6 +312,32 @@ action** and there is no OK button. A close ✕ returns to S2.
   `copy.s7.taken`, which offers **That's me** (→ S2 with that tile highlighted) or a name edit.
 - Self-create budget 429 → `copy.s7.slow`, with **Pick someone else** as the way out.
 
+### Here tonight strip (S9, S10, S11, S13)
+Owner request (2026-10-17): the phone's night screens show **who's here tonight** and update live,
+like the TV's turnout tiles. **It never shows how anyone voted.**
+
+- **Who counts as here:** anyone who voted on this night, plus anyone whose phone opened this
+  night while set to them (needs G8). Until G8 ships, the strip shows voters only and its label
+  reads `copy.here.votedOnly`, so it never claims to know who is in the room.
+- **What it shows:** a row of avatars (emoji on the person's colour) with first names under them,
+  family first, then guests, in the server's order. While voting is open, people who have voted
+  get a small ✓ badge, and the count reads `copy.here.countVoting`. That is the same fact the TV
+  already shows (ADR-0006: who voted, never what). The ✓ disappears after `voting`.
+- **Sizes and placement:**
+  - S9, S11 and S13: the full row, 48px avatars, right under the `copy.chip` header. It wraps to
+    a second line, then collapses the rest into `+N`.
+  - S10 (ballot): one compact line, 32px overlapping avatars plus the count, so the posters and
+    the sticky **Done** stay above the fold (§4 rule 4).
+- **Not a control.** The strip is a `<ul aria-label="Here tonight">` of non-interactive items: no
+  button role, no hover or press state, so nobody taps it expecting something (§4 rule 9). Names
+  come from `GET /people`, which the phone already holds; the presence data carries ids and
+  avatars only.
+- **Live:** it is keyed under the night (like `votersKey`), so every stream event refetches it,
+  and it polls only while the stream is down. Only the count line is an `aria-live="polite"`
+  region; avatars appearing are not announced one by one.
+- **Empty:** the strip is hidden until at least one other person is here. Showing just yourself
+  adds nothing.
+
 ### Switch sheet (shared phone, ADR-0014 "one current person per phone")
 - **Opened from:** the **Not you? Switch** chip on every night screen, and **Pass to next
   person** on S11.
@@ -501,6 +527,10 @@ waiting screens.
 | `copy.s13.emptyTitle` | No photos yet |
 | `copy.s13.emptyBody` | Tap here to add the first one: snacks, the couch crew, the screen! |
 | `copy.s13.rate` | Already watched? Rate it |
+| `copy.here.label` | Here tonight |
+| `copy.here.votedOnly` | Voted so far |
+| `copy.here.count` | {n} here |
+| `copy.here.countVoting` | {n} here · {v} voted |
 | `copy.s14.title` | How was **{movie}**? |
 | `copy.live.reconnecting` | Reconnecting… |
 | `copy.stale.closed` | That changed while you were away. Here's where things are now. |
@@ -527,6 +557,7 @@ the spec works around it.
 | **G5** | Approvals (claims and resets) publish nothing to the phone, and there is no household-level stream. | S4 and S6 must update live. | **Workaround, no backend change:** poll the people list every 5 s while anything is waiting (the existing `pendingPollInterval`, extended to `pin_reset === "open"`). A household stream is a later ADR if polling ever shows up in costs. | P1 |
 | **G6** | It isn't explicit that `forgot-pin` is allowed on a **locked** person ("a lock blocks claiming, switching and PIN changes"). | S5's only primary action calls it. | Confirm in the ADR-0014 route tests: `POST …/forgot-pin` on a locked person → 202. | P0 (a test, not a feature) |
 | **G7** | The resolver composes `GET /people` and `GET /sessions?…` (two requests per check). | It works, but each wake costs two round-trips. | Optional `GET /devices/me/home` → `{current_person, people_on_phone, live_night: {id, status}}`. | P2 |
+| **G8** | `GET /sessions/{id}/voters` (ADR-0006) returns only people **with a ballot** (`person_id`, `avatar_emoji`, `color`), and only `ballot_count` is published. Nothing records that a person *joined* a night: `join_service` audits `device.joined` for a device, not a person, and a returning phone under the resolver never calls `/join` at all. Claims and switches publish nothing. | The Here tonight strip (§5) must include people who joined but haven't voted, and during `tonight`, when nobody votes. | A small attendance record: `session_attendance (household_id, session_id, person_id, first_seen_at)`, household-scoped with FORCE RLS like every table. Upsert it when a device whose **current** person is X mints an SSE ticket for the night or casts a ballot. Publish a `presence` event after commit only when a row is new. Expose `GET /sessions/{id}/present` → `{present: [{person_id, avatar_emoji, color, voted: bool}]}`, so it carries the same fields as `/voters` plus `voted`, with **no ranks or tallies**. The TV can use it too, to dim people who aren't here. | P1 (the strip ships voters-only without it) |
 
 Also checked: no gap. `JoinOut` already returns `session_id` (D2). `join_service` reuses an
 existing device for the household rather than minting a new one, so a returning phone that types
@@ -550,6 +581,7 @@ S3c.
 | D9 | No PIN, lock, reset, self-create, rename or profile screens. | S3 to S7, the switch sheet, the profile. |
 | D10 | `/host` lists pending claims only. | Claims plus PIN resets in one badge-counted queue, plus the "Vote as …" card. |
 | D12 | `tonight`: "Rate later: we'll ask…" sentence above an **outline** "Rate it now" (read as disabled on a phone); empty album is a passive "No photos yet." line. | S13 hierarchy: **Add photos** primary, empty album becomes the Add photos tile, **Already watched? Rate it** as a `secondary` button with no sentence above it (§4 rule 9). |
+| D13 | Phones show no one else; only the TV has turnout tiles (`useVoters`, voters only). | The Here tonight strip on S9/S10/S11/S13, from `/present` (G8), falling back to `/voters`. |
 | D11 | Live-night discovery on `/who` covers `voting/revealed/tonight` (PR #35). | The resolver also includes `draft` (S9), so a phone that joins early sits on "Almost ready" and slides into the ballot. |
 
 ---
@@ -669,6 +701,15 @@ Conventions: `screen(x)` means `[data-screen="x"]` is visible. `primary` is
   the screen's only `primary-action`; its box is ≥ 160px tall and contains `copy.s13.emptyTitle`.
   Setting a file on its input starts an upload, and once a photo exists (own upload, or another
   phone's within 12 s) the tile is gone and the grid plus a normal Add photos button show.
+- AC-9.5c (here tonight): with persons A (this phone) and B (another context) on a voting night,
+  this phone's `getByRole("list", { name: "Here tonight" })` contains B's avatar within 2 s of B
+  voting (stream up), and B's item shows the ✓ badge. The count reads "2 here · 1 voted" (or
+  "Voted so far" without G8). The list has no descendant with role `button` or `link`. No text
+  inside it matches any option title of the night, and the `/present` and `/voters` responses
+  contain no `option_id`, `rank` or score field (assert on the JSON).
+- AC-9.5d (presence without a vote, needs G8): B's phone opens the night without voting → B
+  appears on A's strip within 2 s with no ✓. On `tonight`, the strip shows the same people with
+  no ✓ badges.
 - AC-9.6 (closed): with a rating owed → `screen(rate)` with stars as the primary; after a star
   tap → the primary is **Past movie nights**.
 
