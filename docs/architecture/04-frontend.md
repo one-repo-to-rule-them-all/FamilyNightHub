@@ -139,6 +139,11 @@ panel (`admin-error.tsx`), not a raw error. `/host` links admins to `/admin`, wh
 
 ## Phone state machine
 
+> **Proposed redesign:** [`proposals/guest-flow.md`](proposals/guest-flow.md) (issue #36) replaces
+> the `/j` → `/who` → `/s` stations below with one resolver, and specifies the ADR-0014 PIN, lock,
+> reset and self-create screens, a copy deck and per-state acceptance criteria. Until it is built,
+> this section describes what ships.
+
 `/s/[session]` renders from the session snapshot: `voting` → poster ballot; `revealed` → winner
 card; `tonight` → **Add photos** + album + "Rate later"; `closed` → rating prompt (if not yet rated)
 and album. On first open after a night, the home screen shows a "How was *Movie*?" prompt, because
