@@ -18,7 +18,7 @@ from alembic import op
 
 revision: str = "0005_session_attendance"
 # Rebase pending: 0004_slideshow_control (PR #46) is not on main yet. Set this to it then.
-down_revision: str | None = "0003_passwords_person_pins"
+down_revision: str | None = "0004_slideshow_control"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
