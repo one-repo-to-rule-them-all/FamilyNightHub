@@ -45,7 +45,7 @@ from app.realtime.events import DEGRADED
 from app.realtime.publisher import session_channel
 from app.realtime.tickets import TICKET_TTL_SECONDS, consume_ticket
 from app.schemas.live import SseTicketIn, SseTicketOut
-from app.services import live_service
+from app.services import attendance_service, live_service
 from app.services.errors import NotFound
 
 router = APIRouter(tags=["live"])
@@ -162,6 +162,11 @@ async def create_sse_ticket(body: SseTicketIn, viewer: CurrentViewer, db: Viewer
         ticket = await live_service.issue_ticket(db, viewer.household_id, body.session_id)
     except NotFound as err:
         raise_http(err)
+    if viewer.device is not None:
+        # Opening the night on a phone set to someone means they're here (G8).
+        await attendance_service.mark_device_present(
+            db, viewer.household_id, body.session_id, viewer.device.device_id
+        )
     return SseTicketOut(ticket=ticket, expires_in=TICKET_TTL_SECONDS)
 
 
