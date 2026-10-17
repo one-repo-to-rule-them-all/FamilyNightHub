@@ -26,7 +26,11 @@ import type { LiveState } from "@/lib/live";
 import { cn } from "@/lib/utils";
 import { phonePeople } from "@/lib/who";
 
-const ballotsKey = (sessionId: string) => ["ballots", sessionId] as const;
+/**
+ * Under the night's key, so every stream event refreshes it too: a person held by two phones
+ * who votes on one must show as voted on the other (found by the sign-off e2e run, #42).
+ */
+const ballotsKey = (sessionId: string) => [...nightKey(sessionId), "ballots", "mine"] as const;
 
 type Cast = { personId: string; ranks: { option_id: string; rank: number }[] };
 
