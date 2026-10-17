@@ -9,8 +9,8 @@ restarts the slideshow (the TV keys on it) and the audit trail and the row agree
 `sessions` already has ENABLE + FORCE RLS and its household policy (0001); new columns inherit
 both, so there is no policy to add. Existing rows get NULLs (auto): nothing changes for them.
 
-Revision ID: 0003_slideshow_control
-Revises: 0002_voting_methods_ranks
+Revision ID: 0004_slideshow_control
+Revises: 0003_passwords_person_pins
 Create Date: 2026-10-17 12:00:00.000000
 
 """
@@ -20,8 +20,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0003_slideshow_control"
-down_revision: str | None = "0002_voting_methods_ranks"
+revision: str = "0004_slideshow_control"
+down_revision: str | None = "0003_passwords_person_pins"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

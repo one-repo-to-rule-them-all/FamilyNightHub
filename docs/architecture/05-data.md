@@ -15,7 +15,7 @@ PostgreSQL 16 on Fly, SQLAlchemy 2 async, Alembic. Object storage on Tigris (S3 
 | `pin_reset_requests` | yes | Forgot-PIN requests: `person_id`, `requested_by_device_id`, `status` `open`/`approved`/`dismissed`, `resolved_at`, `resolved_by_account_id`; one open request per person (partial unique index). Never holds a PIN |
 | `movies` | yes | `tmdb_id`, title, year, poster_path, genres, runtime, `us_cert`, `owned`, `watchlist`, `blocked` |
 | `tmdb_cache` | no (global) | Cached TMDB responses keyed by request, `fetched_at` (refresh at 30 days or less) |
-| `sessions` | yes | `status`, `voting_method`, `ballot_size`, `night_code_hash` (unique per household among non-closed nights), `age_cap`, `ranking jsonb`, `tie_seed numeric(20)`, `winner_option_id`, `host_account_id`, `voting_opened_at`/`revealed_at`/`closed_at`, `slideshow_started_at`/`slideshow_stopped_at` (the host's TV slideshow Start/Stop, at most one set, both null = auto; migration `0003_slideshow_control`) |
+| `sessions` | yes | `status`, `voting_method`, `ballot_size`, `night_code_hash` (unique per household among non-closed nights), `age_cap`, `ranking jsonb`, `tie_seed numeric(20)`, `winner_option_id`, `host_account_id`, `voting_opened_at`/`revealed_at`/`closed_at`, `slideshow_started_at`/`slideshow_stopped_at` (the host's TV slideshow Start/Stop, at most one set, both null = auto; migration `0004_slideshow_control`) |
 | `options` | yes | Shortlisted movie per session, `source` (`manual`/`owned`/`streaming`/`tmdb`) |
 | `ballot_ranks` | yes | `session_id`, `person_id`, `option_id`, `rank`, `cast_by_device_id` or `cast_by_account_id` (one required), `is_proxy` |
 | `ratings` | yes | `session_id`, `person_id`, `score 1–5` (unique per pair). Table ships in Phase 1, UI in Phase 2 |
