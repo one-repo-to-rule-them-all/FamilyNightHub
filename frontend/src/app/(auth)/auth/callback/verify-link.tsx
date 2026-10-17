@@ -3,53 +3,116 @@
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { api, type Account, type ApiError } from "@/lib/api";
+import { passwordProblem } from "@/lib/password";
 
+/**
+ * The emailed "forgot password" link (ADR-0014): it sets a new password and signs in, in one
+ * step. The link is consumed only on submit, and the server checks the password before it spends
+ * the link, so a rejected password can be fixed and sent again.
+ */
 export function VerifyLink({ token }: { token: string | null }) {
   const router = useRouter();
-  const started = useRef(false);
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
   const verify = useMutation<Account, ApiError, string>({
-    mutationFn: (value) => api.verifyMagicLink({ token: value }),
+    mutationFn: (newPassword) =>
+      api.verifyMagicLink({ token: token ?? "", new_password: newPassword }),
     // replace, not push: the spent token must not stay in history.
     onSuccess: () => router.replace("/host"),
   });
-  const { mutate } = verify;
 
-  useEffect(() => {
-    // Links are single-use: StrictMode's double effect must not spend it twice.
-    if (!token || started.current) return;
-    started.current = true;
-    mutate(token);
-  }, [token, mutate]);
-
-  // A mangled token fails schema validation (422) before the server can call it expired; to the
-  // person holding the link that is the same thing as an incomplete link.
-  const malformed = verify.error?.code === "validation_error";
-
-  if (!token || verify.isError) {
+  if (!token) {
     return (
       <div className="flex flex-col gap-5">
-        {verify.error && !malformed ? (
-          <ApiErrorNotice error={verify.error} />
-        ) : (
-          <p role="alert" className="text-lg">
-            This sign-in link is incomplete. Open the link from your email again.
-          </p>
-        )}
+        <p role="alert" className="text-lg">
+          This link is incomplete. Open the link from your email again.
+        </p>
         <Link href="/login" className={buttonVariants({ variant: "default", size: "tap" })}>
-          Send a new link
+          Back to sign in
         </Link>
       </div>
     );
   }
 
+  if (verify.isSuccess) {
+    return (
+      <p aria-live="polite" className="text-lg text-muted-foreground">
+        Welcome, {verify.data.display_name}.
+      </p>
+    );
+  }
+
+  // 401: expired or already used. Anything else (a weak password) can be fixed and resent.
+  const spent = verify.error?.status === 401;
+
   return (
-    <p aria-live="polite" className="text-lg text-muted-foreground">
-      {verify.isSuccess ? `Welcome, ${verify.data.display_name}.` : "Checking your link…"}
-    </p>
+    <form
+      className="flex flex-col gap-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const reason = passwordProblem(password, confirm);
+        setProblem(reason);
+        if (!reason && !verify.isPending) verify.mutate(password);
+      }}
+    >
+      <div className="flex flex-col gap-3">
+        <Label htmlFor="new-password" className="text-base">
+          New password
+        </Label>
+        <Input
+          id="new-password"
+          type="password"
+          autoComplete="new-password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          aria-describedby="new-password-hint"
+          className="h-14 text-lg md:text-lg"
+        />
+        <p id="new-password-hint" className="text-sm text-muted-foreground">
+          At least 12 characters. A short sentence works well.
+        </p>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label htmlFor="confirm-password" className="text-base">
+          Type it again
+        </Label>
+        <Input
+          id="confirm-password"
+          type="password"
+          autoComplete="new-password"
+          value={confirm}
+          onChange={(event) => setConfirm(event.target.value)}
+          className="h-14 text-lg md:text-lg"
+        />
+      </div>
+      {problem ? (
+        <p role="alert" className="text-lg">
+          {problem}
+        </p>
+      ) : null}
+      <ApiErrorNotice error={verify.error} />
+      {spent ? (
+        <Link href="/login" className={buttonVariants({ variant: "secondary", size: "tap" })}>
+          Send a new link
+        </Link>
+      ) : null}
+      <Button
+        type="submit"
+        size="tap"
+        className="w-full"
+        data-testid="primary-action"
+        disabled={verify.isPending || spent}
+      >
+        {verify.isPending ? "Saving…" : "Save and sign in"}
+      </Button>
+    </form>
   );
 }

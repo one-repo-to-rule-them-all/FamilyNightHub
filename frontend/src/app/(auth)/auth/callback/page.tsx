@@ -5,7 +5,7 @@ import { PhoneScreen } from "@/components/phone-screen";
 import { VerifyLink } from "./verify-link";
 
 // The one-time token is in the URL: never leak it to another origin through Referer.
-export const metadata: Metadata = { title: "Signing in", referrer: "no-referrer" };
+export const metadata: Metadata = { title: "New password", referrer: "no-referrer" };
 
 export default async function CallbackPage({
   searchParams,
@@ -14,7 +14,7 @@ export default async function CallbackPage({
 }) {
   const { token } = await searchParams;
   return (
-    <PhoneScreen title="Signing you in">
+    <PhoneScreen title="Choose a new password">
       <VerifyLink token={typeof token === "string" && token ? token : null} />
     </PhoneScreen>
   );

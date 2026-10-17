@@ -45,6 +45,26 @@ export type BulkLine = Schemas["BulkLineOut"];
 export type BulkPick = Schemas["BulkPickIn"];
 export type TypedTitle = Schemas["TypedTitleIn"];
 export type PhotoCreated = Schemas["PhotoCreatedOut"];
+export type PinReset = Schemas["PinResetOut"];
+export type Profile = Schemas["ProfileOut"];
+export type ProfileNight = Schemas["ProfileNightOut"];
+
+/**
+ * Fields #39 (ADR-0014 gaps G2, G9) adds on top of the generated types. Optional until the
+ * backend ships them, so every screen has a fallback when they are missing.
+ */
+export type PinResetState = "open" | "approved_for_this_phone" | null;
+export type PersonTile = Person & { pin_reset?: PinResetState };
+export type QrSettings = { qr_includes_night_code?: boolean };
+/** GET /devices/me/join-link (G1): what the TV needs to draw its QR. */
+export type JoinLink = { join_slug: string; qr_includes_night_code: boolean };
+/** GET /sessions/{id}/present (G8): who is here tonight. Avatars and a voted flag, never picks. */
+export type PresentPerson = {
+  person_id: string;
+  avatar_emoji: string;
+  color: string;
+  voted: boolean;
+};
 /** The album's fixed reaction set (the path parameter's enum). */
 export type ReactionEmoji =
   operations["add_reaction_api_v1_sessions__session_id__photos__photo_id__reactions__emoji__put"]["parameters"]["path"]["emoji"];
@@ -59,6 +79,8 @@ export class ApiError extends Error {
   readonly requestId: string | null;
   /** Seconds from the Retry-After header (429s), or null. */
   readonly retryAfter: number | null;
+  /** PIN tries left before the person locks (`wrong_pin` / `pin_locked`, ADR-0014), or null. */
+  readonly attemptsLeft: number | null;
 
   constructor(
     status: number,
@@ -66,6 +88,7 @@ export class ApiError extends Error {
     message: string,
     requestId: string | null = null,
     retryAfter: number | null = null,
+    attemptsLeft: number | null = null,
   ) {
     super(message);
     this.name = "ApiError";
@@ -73,6 +96,7 @@ export class ApiError extends Error {
     this.code = code;
     this.requestId = requestId;
     this.retryAfter = retryAfter;
+    this.attemptsLeft = attemptsLeft;
   }
 }
 
@@ -114,6 +138,7 @@ export async function toApiError(response: Response): Promise<ApiError> {
       envelope.message,
       typeof envelope.request_id === "string" ? envelope.request_id : null,
       retryAfter,
+      typeof envelope.attempts_left === "number" ? envelope.attempts_left : null,
     );
   }
   return new ApiError(response.status, "unknown_error", NETWORK_MESSAGE, null, retryAfter);
@@ -172,14 +197,47 @@ async function request<T>(method: Method, path: string, body?: unknown, retried 
 /** One function per endpoint the UI uses, typed from the generated schema. */
 export const api = {
   join: (body: Schemas["JoinIn"]) => request<JoinResult>("POST", "/join", body),
-  people: () => request<Person[]>("GET", "/people"),
+  people: () => request<PersonTile[]>("GET", "/people"),
   myDevice: () => request<Device>("GET", "/devices/me"),
-  claimPerson: (personId: string) =>
-    request<Binding>("PUT", `/devices/me/people/${encodeURIComponent(personId)}`),
+  /**
+   * Claim a person or switch to one this phone holds (ADR-0014). `pin` is their PIN, or the new
+   * one on a first claim; leave it out to ask a host instead (the claim goes `pending`).
+   */
+  claimPerson: (personId: string, pin?: string) =>
+    request<Binding>(
+      "PUT",
+      `/devices/me/people/${encodeURIComponent(personId)}`,
+      pin === undefined ? undefined : { pin },
+    ),
   releasePerson: (personId: string) =>
     request<void>("DELETE", `/devices/me/people/${encodeURIComponent(personId)}`),
+  /** A new guest profile, current on this phone, with its PIN set in the same request. */
+  createSelf: (body: Schemas["SelfCreateIn"]) =>
+    request<Person>("POST", "/devices/me/people", body),
+  /** Your own display name, once (409 after that). */
+  renameSelf: (personId: string, name: string) =>
+    request<Person>("PATCH", `/devices/me/people/${encodeURIComponent(personId)}`, { name }),
+  /** Set a first PIN for someone this phone holds, or change it with `current_pin`. */
+  setPin: (personId: string, body: Schemas["SetPinIn"]) =>
+    request<Binding>("POST", `/devices/me/people/${encodeURIComponent(personId)}/pin`, body),
+  /** Ask the family admin to reset a PIN; repeating it while one is open returns that one. */
+  forgotPin: (personId: string) =>
+    request<Schemas["PinResetRequestOut"]>(
+      "POST",
+      `/devices/me/people/${encodeURIComponent(personId)}/forgot-pin`,
+    ),
+  /** History and stats. Ballots only for revealed nights (ADR-0014 "Profiles"). */
+  profile: (personId: string) =>
+    request<Profile>("GET", `/people/${encodeURIComponent(personId)}/profile`),
+  /** The TV's join door (G1). A 404 means the backend doesn't serve it yet. */
+  joinLink: () => request<JoinLink>("GET", "/devices/me/join-link"),
+  /** Username (or email) + password; sets the `fnh_session` cookie (ADR-0014). */
+  login: (body: Schemas["LoginIn"]) => request<Account>("POST", "/auth/login", body),
+  setPassword: (body: Schemas["PasswordIn"]) => request<void>("POST", "/auth/password", body),
+  /** Forgot password: emails a link that sets a new one. */
   requestMagicLink: (body: Schemas["MagicLinkIn"]) =>
     request<Schemas["MagicLinkOut"]>("POST", "/auth/magic-link", body),
+  /** Consumes the emailed link: sets `new_password` and signs in. */
   verifyMagicLink: (body: Schemas["VerifyIn"]) => request<Account>("POST", "/auth/verify", body),
   me: () => request<Account>("GET", "/auth/me"),
   logout: () => request<void>("POST", "/auth/logout"),
@@ -240,6 +298,12 @@ export const api = {
     request<Night>("POST", `/sessions/${encodeURIComponent(sessionId)}/close`),
   voters: (sessionId: string) =>
     request<Schemas["VotersOut"]>("GET", `/sessions/${encodeURIComponent(sessionId)}/voters`),
+  /** Who is here tonight (G8). A 404 means the backend doesn't serve it yet: use `voters`. */
+  present: (sessionId: string) =>
+    request<{ present: PresentPerson[] }>(
+      "GET",
+      `/sessions/${encodeURIComponent(sessionId)}/present`,
+    ),
   proxyBallot: (sessionId: string, body: Schemas["BallotIn"]) =>
     request<void>("PUT", `/sessions/${encodeURIComponent(sessionId)}/ballots/proxy`, body),
   /** Roll candidates for a draft night (ADR-0007). Nothing is added; picks go via addOption. */
@@ -293,6 +357,13 @@ export const api = {
   /** Folds `from` into `into`; the source is hidden (merged_into_id), never deleted. */
   mergePeople: (body: Schemas["MergeIn"]) =>
     request<MergeResult>("POST", "/admin/people/merge", body),
+  /** Open "Forgot PIN" requests, oldest first (`admin:people`; hosts get 403). */
+  pinResets: () => request<PinReset[]>("GET", "/admin/people/pin-resets"),
+  /** Clears the PIN, count and lock. No PIN is set or shown: the asking phone picks a new one. */
+  approvePinReset: (requestId: string) =>
+    request<PinReset>("POST", `/admin/people/pin-resets/${encodeURIComponent(requestId)}/approve`),
+  dismissPinReset: (requestId: string) =>
+    request<PinReset>("POST", `/admin/people/pin-resets/${encodeURIComponent(requestId)}/dismiss`),
   adminDevices: () => request<AdminDevice[]>("GET", "/admin/devices"),
   /** `label: null` clears it. */
   updateDevice: (deviceId: string, label: string | null) =>
@@ -300,9 +371,9 @@ export const api = {
   /** Final: there is no un-revoke; the phone rejoins with a night code as a new device. */
   revokeDevice: (deviceId: string) =>
     request<AdminDevice>("POST", `/admin/devices/${encodeURIComponent(deviceId)}/revoke`),
-  settings: () => request<HouseholdSettings>("GET", "/admin/settings"),
-  updateSettings: (body: Schemas["SettingsUpdateIn"]) =>
-    request<HouseholdSettings>("PATCH", "/admin/settings", body),
+  settings: () => request<HouseholdSettings & QrSettings>("GET", "/admin/settings"),
+  updateSettings: (body: Schemas["SettingsUpdateIn"] & QrSettings) =>
+    request<HouseholdSettings & QrSettings>("PATCH", "/admin/settings", body),
   /** `/j/{old}` stops resolving at once; the printed fridge QR needs reprinting. */
   rotateJoinSlug: () => request<Schemas["JoinSlugOut"]>("POST", "/admin/join-slug/rotate"),
   /** Streaming services in the household's region (JustWatch data: show `attribution`). */
