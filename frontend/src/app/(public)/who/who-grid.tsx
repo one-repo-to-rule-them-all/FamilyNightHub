@@ -212,6 +212,12 @@ export function WhoGrid() {
         <PinSheet
           person={pinPerson}
           mode={view.mode}
+          // People bound before ADR-0014 set their first PIN on the phone that holds them.
+          submit={
+            view.mode === "create" && pinPerson.binding === "mine"
+              ? (pin) => api.setPin(pinPerson.id, { new_pin: pin })
+              : undefined
+          }
           offerRename={
             view.mode === "create" && pinPerson.binding !== "mine" && pinPerson.can_rename
           }
