@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { api, type ApiError, type PersonTile } from "@/lib/api";
 import { POLL_MS } from "@/lib/live";
 import {
+  canFollow,
   cleanGuestName,
   colorFor,
   followWaiting,
@@ -36,9 +37,10 @@ type View =
   | { kind: "done" }
   | { kind: "grid"; notice?: React.ReactNode; highlight?: string }
   | { kind: "pin"; personId: string; mode: "enter" | "create"; notice?: React.ReactNode }
-  | { kind: "pending"; personId: string }
+  // `since`: when this phone asked (Date.now()); unset when the tile was already waiting.
+  | { kind: "pending"; personId: string; since?: number }
   | { kind: "locked"; personId: string; notice?: React.ReactNode }
-  | { kind: "reset"; personId: string }
+  | { kind: "reset"; personId: string; since?: number }
   | { kind: "new"; name: string; emoji: string | null; taken?: string; slow?: boolean }
   | { kind: "new-pin"; name: string; emoji: string };
 
@@ -71,15 +73,19 @@ export function WhoGrid() {
   const byId = (id: string) => tiles.find((p) => p.id === id);
 
   // Waiting screens follow the server (adjusting state during render, not in an effect).
-  const next = people.data ? followServer(view, byId) : null;
+  const since = view.kind === "pending" || view.kind === "reset" ? view.since : undefined;
+  const next =
+    people.data && waiting && canFollow(since, people.dataUpdatedAt)
+      ? followServer(view, byId)
+      : null;
   if (next) setView(next);
 
   const finish = (outcome: PinOutcome, personId: string, options?: { rename?: boolean }) => {
     void queryClient.invalidateQueries({ queryKey: PEOPLE });
     if (outcome === "done") router.replace(options?.rename ? "/me?rename=1" : "/");
     else if (outcome === "locked") setView({ kind: "locked", personId });
-    else if (outcome === "reset-asked") setView({ kind: "reset", personId });
-    else if (outcome === "asked-host") setView({ kind: "pending", personId });
+    else if (outcome === "reset-asked") setView({ kind: "reset", personId, since: Date.now() });
+    else if (outcome === "asked-host") setView({ kind: "pending", personId, since: Date.now() });
   };
 
   const pickElse = (

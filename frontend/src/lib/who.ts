@@ -120,6 +120,16 @@ export type FollowResult =
  * - S6 (`reset`): approved for this phone → choose a new PIN; dismissed → S5 with
  *   `copy.s6.dismissed`; reset from another phone → type the new PIN (`copy.s6.otherPhone`).
  */
+/**
+ * Whether a waiting screen may act on the people list yet. Asking the host (S4) or the admin (S6)
+ * opens the screen before the list refetches, and the tile it still holds predates the request
+ * (`taken`, no `pin_reset`): read as an answer, that is an instant "the host said no". So the
+ * screen follows only data fetched at or after it opened (`since`, from `Date.now()`).
+ */
+export function canFollow(since: number | undefined, dataUpdatedAt: number): boolean {
+  return since === undefined || dataUpdatedAt >= since;
+}
+
 export function followWaiting(
   waiting: "pending" | "reset",
   person: PersonTile | undefined,

@@ -6,6 +6,7 @@ import {
   cleanGuestName,
   colorFor,
   currentPerson,
+  canFollow,
   followWaiting,
   GUEST_EMOJI,
   orderTiles,
@@ -125,6 +126,19 @@ describe("new guest", () => {
     expect(cleanGuestName("  Tío   Beto ")).toBe("Tío Beto");
     expect(cleanGuestName("   ")).toBeNull();
     expect(cleanGuestName("x".repeat(41))).toBeNull();
+  });
+});
+
+describe("canFollow", () => {
+  // E2E 2026-10-17: "Ask the host" showed "The host said no" at once, from the pre-request tile.
+  it("waits for data fetched after the phone asked", () => {
+    expect(canFollow(1_000, 999)).toBe(false);
+    expect(canFollow(1_000, 1_000)).toBe(true);
+    expect(canFollow(1_000, 1_500)).toBe(true);
+  });
+
+  it("follows at once when the tile was already waiting", () => {
+    expect(canFollow(undefined, 0)).toBe(true);
   });
 });
 
