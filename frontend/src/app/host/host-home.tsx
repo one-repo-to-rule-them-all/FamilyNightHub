@@ -21,7 +21,7 @@ import {
   enrollDevice,
   type Night,
   type NightSummary,
-  type Schemas,
+  type PinReset,
 } from "@/lib/api";
 import {
   ACTIVE_STATUSES,
@@ -40,25 +40,11 @@ import {
   withoutResolved,
 } from "@/lib/portal";
 
+import { PIN_RESETS_KEY } from "@/app/admin/people/pin-requests";
+
 import { STATUS_LABEL } from "./status";
 
-type PinReset = Schemas["PinResetOut"];
 type ResetItem = Extract<InboxItem, { kind: "pin-reset" }>;
-
-/**
- * The PIN-reset calls land in `api.ts` with #47 (ADR-0014 frontend), under these names. Until then
- * they are absent and the `pin-reset` rows simply don't appear; nothing else changes.
- * TODO(#47): drop this cast and call `api.pinResets` etc. directly once #47 is on main.
- */
-const pinApi = api as typeof api &
-  Partial<{
-    pinResets: () => Promise<PinReset[]>;
-    approvePinReset: (requestId: string) => Promise<PinReset>;
-    dismissPinReset: (requestId: string) => Promise<PinReset>;
-  }>;
-
-/** Same key as #47's `PIN_RESETS_KEY`, so People and the nav badge share the request. */
-const PIN_RESETS_KEY = ["admin", "pin-resets"] as const;
 
 function readHidden(): string[] {
   try {
@@ -127,8 +113,8 @@ function Dashboard({ me }: { me: Account }) {
   // Hosts never send the admin-only queries (AC-P2.2).
   const pinResets = useQuery<PinReset[], ApiError>({
     queryKey: PIN_RESETS_KEY,
-    queryFn: () => pinApi.pinResets!(),
-    enabled: admin && !!pinApi.pinResets,
+    queryFn: api.pinResets,
+    enabled: admin,
     refetchInterval: INBOX_POLL_MS,
   });
   const people = useQuery<AdminPerson[], ApiError>({
@@ -205,7 +191,7 @@ function Dashboard({ me }: { me: Account }) {
     rejectClaim: (item) => decideClaim(item, false),
     resetPin: (item) => setConfirmReset(item),
     dismissReset: (item) =>
-      resolveRow(item.id, () => pinApi.dismissPinReset!(item.reset.id), [
+      resolveRow(item.id, () => api.dismissPinReset(item.reset.id), [
         [...PIN_RESETS_KEY],
         ["admin", "people"],
       ]),
@@ -297,7 +283,7 @@ function Dashboard({ me }: { me: Account }) {
               onClick={() => {
                 const item = confirmReset;
                 setConfirmReset(null);
-                resolveRow(item.id, () => pinApi.approvePinReset!(item.reset.id), [
+                resolveRow(item.id, () => api.approvePinReset(item.reset.id), [
                   [...PIN_RESETS_KEY],
                   ["admin", "people"],
                 ]);
