@@ -42,6 +42,26 @@ const header = (call: Call, name: string) => (call.init.headers as Record<string
 beforeEach(() => configureApi());
 afterEach(() => configureApi());
 
+describe("PIN errors (ADR-0014)", () => {
+  it("carries attempts_left from the envelope and sends the PIN in the body", async () => {
+    const calls = transport(
+      json(200, { csrf_token: "tok-1" }),
+      json(403, {
+        error: { code: "wrong_pin", message: "Wrong PIN.", request_id: "r", attempts_left: 2 },
+      }),
+    );
+    const error = await api.claimPerson("p", "123456").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 403, code: "wrong_pin", attemptsLeft: 2 });
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({ pin: "123456" });
+  });
+
+  it("leaves attemptsLeft null on other errors", async () => {
+    const error = await toApiError(json(404, envelope("http_error", "Person not found")));
+    expect(error.attemptsLeft).toBeNull();
+  });
+});
+
 describe("CSRF", () => {
   it("fetches the token once and sends it on every mutation", async () => {
     const calls = transport(

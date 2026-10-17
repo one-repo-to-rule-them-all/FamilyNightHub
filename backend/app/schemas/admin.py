@@ -78,6 +78,24 @@ class AdminPersonOut(BaseModel):
     color: str
     is_guest: bool
     created_at: datetime
+    # ADR-0014: whether they have set a PIN, and whether 5 wrong PINs locked them.
+    has_pin: bool
+    locked: bool
+
+
+class PinResetOut(BaseModel):
+    """A "forgot PIN" request. Approving clears the PIN; no PIN is ever shown or chosen."""
+
+    id: uuid.UUID
+    person_id: uuid.UUID
+    person_name: str
+    avatar_emoji: str
+    person_locked: bool
+    requested_by_device_id: uuid.UUID
+    device_label: str | None
+    status: Literal["open", "approved", "dismissed"]
+    requested_at: datetime
+    resolved_at: datetime | None
 
 
 class MergeOut(BaseModel):
@@ -142,6 +160,8 @@ class SettingsOut(BaseModel):
     # TMDB watch-provider ids of the household's subscriptions (GET /tmdb/providers).
     streaming_providers: list[int]
     updated_at: datetime
+    # The TV's join QR carries the night code (`/j/{slug}?code=`). Default off.
+    qr_includes_night_code: bool
 
 
 class SettingsUpdateIn(BaseModel):
@@ -155,6 +175,7 @@ class SettingsUpdateIn(BaseModel):
     streaming_providers: list[Annotated[int, Field(gt=0)]] | None = Field(
         default=None, max_length=MAX_STREAMING_PROVIDERS
     )
+    qr_includes_night_code: bool | None = None
 
     @field_validator("streaming_providers")
     @classmethod
@@ -173,3 +194,12 @@ class SettingsUpdateIn(BaseModel):
 
 class JoinSlugOut(BaseModel):
     join_slug: str
+
+
+class JoinLinkOut(BaseModel):
+    """What the TV needs to draw its join QR: `/j/{join_slug}`, plus `?code={code}` when
+    `qr_includes_night_code` is on. The night code is never here: the server only keeps its
+    hash (ADR-0002), and the TV already holds the plaintext from create/rotate."""
+
+    join_slug: str
+    qr_includes_night_code: bool
