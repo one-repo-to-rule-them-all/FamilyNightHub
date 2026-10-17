@@ -33,6 +33,12 @@ class SessionUpdateIn(BaseModel):
     voting_method: VotingMethod
 
 
+class SlideshowIn(BaseModel):
+    """Start (`true`) or stop (`false`) the paired TV's slideshow (issue #41)."""
+
+    playing: bool
+
+
 class SessionCreatedOut(BaseModel):
     session_id: uuid.UUID
     # Shown once: only its hash is stored, so it cannot be fetched again. Rotate if lost.
@@ -100,6 +106,11 @@ class SessionOut(BaseModel):
     result: VotingResultOut | None
     # The family's average score; null until ratings open (`tonight`/`closed`).
     rating: RatingSummaryOut | None
+    # The host's slideshow control (issue #41). `auto`: the TV plays once the night is
+    # `tonight` (the default). `playing`: the host pressed Start at `slideshow_started_at`.
+    # `stopped`: the host pressed Stop; the TV holds on "drop your photos".
+    slideshow: Literal["auto", "playing", "stopped"]
+    slideshow_started_at: datetime | None
 
 
 class TmdbResultOut(BaseModel):

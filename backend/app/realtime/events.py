@@ -16,7 +16,7 @@ from __future__ import annotations
 # Wire channel is `session:{session_id}`; this is the prefix.
 SESSION = "session"
 
-STATUS_CHANGED = "status_changed"  # open-voting, close (tonight -> closed)
+STATUS_CHANGED = "status_changed"  # open-voting, close (tonight -> closed), slideshow start/stop
 SHORTLIST_CHANGED = "shortlist_changed"  # option added/removed/reordered; method changed
 BALLOT_COUNT = "ballot_count"  # someone's ballot landed; refetch who has voted
 REVEALED = "revealed"  # close-voting tallied the night
