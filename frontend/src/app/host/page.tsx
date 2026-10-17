@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
 
-import { PhoneScreen } from "@/components/phone-screen";
-
 import { HostHome } from "./host-home";
 
-export const metadata: Metadata = { title: "Host" };
+export const metadata: Metadata = { title: "Home" };
 
-/** Start a night, approve phones, pair the TV (04-frontend.md route table). */
+/** Home: Up next, Needs you, At a glance (proposals/owner-portal.md §5 P1). */
 export default function HostPage() {
   return (
-    <PhoneScreen title="Host">
+    <>
+      <h1 className="sr-only">Home</h1>
       <HostHome />
-    </PhoneScreen>
+    </>
   );
 }

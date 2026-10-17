@@ -25,6 +25,7 @@ export default defineConfig({
         "src/lib/rating.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/admin.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/portal.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
+        "src/lib/portal-shell.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/slideshow.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/bulk-titles.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/photos/album.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
