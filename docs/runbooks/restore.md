@@ -271,4 +271,25 @@ The next normal deploy from `main` restores the regular config and its release c
 
 ---
 
-**Rehearsals:** none yet.
+**Rehearsals:**
+
+| Date | Environment | What was rehearsed | Result |
+|---|---|---|---|
+| 2026-10-17 | staging (`fnh-db-staging`, Postgres 18.1) | §2.1 step 1: on-demand snapshot `vs_avnwpJjPyPK2UmMxxe7NPGRQ` (110 MiB) restored with `fly postgres create --snapshot-id` into a side cluster `fnh-db-staging-restore`, verified, then destroyed. The live database was not touched. | **Pass.** The restore took 24 s. A fingerprint of the live and restored databases matched exactly: `alembic_version` 0002, 1 household, 2 people, 1 account, 3 devices, 1 night, 4 options, 3 ballot rows, 1 photo, 22 audit events, roles `fnh`/`fnh_app`/`fnh_resolver(nologin)`. FORCE RLS survived. As `fnh_app` in the restored copy: 0 people visible with no household set (fails closed), 2 people and 1 photo with the `baez` household set, and `auth_resolve_household_by_slug` works. |
+
+Verification needs no database password: `fly ssh console -a <app> -C "su postgres -c 'psql -p 5433 -d fnh …'"`
+runs as the local superuser inside the Postgres machine.
+
+**Not yet rehearsed:**
+- §2.1 steps 2–4 (cut-over). Repointing `DATABASE_URL` / `MIGRATION_DATABASE_URL` means handling the role
+  passwords in Fly secrets, which the owner does. The role passwords inside the snapshot are those at snapshot
+  time, so only the host in the URLs changes.
+- §2.2 (photo restore): there is no backup bucket on staging, by design.
+
+**Findings from the rehearsal:**
+- The staging volume had **no scheduled snapshot** 21 hours after creation, even though scheduled
+  snapshots were enabled (possibly the Fly host-reboot incident of 2026-10-16). Check
+  `fly volumes snapshots list <vol>` on the second day after provisioning. The restore plan
+  depends on these snapshots.
+- Snapshot retention was 5 days, not 7: the provisioning script's retention step had been skipped
+  silently. Fixed in the script, and staging was set to 7 by hand.
