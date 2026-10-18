@@ -131,8 +131,17 @@ The other way in is a signed-in host: `POST /devices/enroll` mints a device for 
 `is_tv` and the host's `fnh_session` is cleared, so the living-room TV never carries host rights.
 Approving a pending claim leaves the person bound to their other phone as well, and makes them
 current on the approved phone.
-The device cookie is `fnh_device`: 256-bit token, `HttpOnly; Secure; SameSite=Lax`, 365-day
-sliding `Max-Age`.
+The device cookie is `fnh_device`: 256-bit token, `HttpOnly; Secure; SameSite=Lax`, sliding
+`Max-Age` of `DEVICE_IDLE_DAYS` (30).
+
+**Idle timeout** (ADR-0002 amendment, 2026-10-18, issue #56; `services/device_idle.py`). A live
+device whose `last_seen_at` (or `created_at`, if never stamped) is older than `DEVICE_IDLE_DAYS`
+gets 401 with code `device_expired` on every device route; unknown and revoked tokens keep the
+generic 401. `device_db` stamps `last_seen_at` at most once per `DEVICE_TOUCH_INTERVAL_SECONDS`
+(1 h), so active devices never drift past the window. An expired device is not revoked: a night
+code (or a host enrollment) revives the same row, clears its `device_people` bindings and
+`is_tv`, and audits `device.rejoined`. Its people must be picked again with their PINs, and a
+TV needs a host to pair it again.
 
 **Rate limiting.** Join *failures* are counted per slug (`JOIN_FAILURE_LIMIT` per
 `JOIN_FAILURE_WINDOW_SECONDS`, default 30 per 15 min), never per client IP: a family shares one
@@ -271,7 +280,8 @@ the CSRF header and writes an audit row.
   409. The response and the `person.merged` audit row carry moved/dropped counts per table.
 - **Devices** (`services/device_admin_service.py`, `admin:devices`). The list returns every
   device (live first, most recently seen first, then revoked) with label, `is_tv`,
-  `last_seen_at`, `revoked_at` and its people with binding status. `PATCH` sets or clears the
+  `last_seen_at`, `revoked_at`, `expired` (live but past the idle window, shown as "Expired (not
+  used in 30 days)") and its people with binding status. `PATCH` sets or clears the
   label. **Revoke** stamps `revoked_at`: the ADR-0009 resolver ignores revoked devices, so the
   cookie is 401 on its next request, its bindings stop counting as "taken" (the people are free
   to claim without approval) and its pending claims leave the review list. Bindings are kept for

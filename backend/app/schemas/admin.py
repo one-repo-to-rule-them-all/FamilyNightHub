@@ -131,6 +131,8 @@ class AdminDeviceOut(BaseModel):
     last_seen_at: datetime | None
     revoked_at: datetime | None
     created_at: datetime
+    # Not revoked, but unused for DEVICE_IDLE_DAYS: it must enter a night code again.
+    expired: bool
     people: list[DeviceBindingOut]
 
 

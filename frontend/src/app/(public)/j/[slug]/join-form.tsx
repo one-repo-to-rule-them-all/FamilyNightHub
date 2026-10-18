@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { PEOPLE_KEY } from "@/hooks/use-phone";
 import { nightKey } from "@/hooks/use-live-session";
 import { api, type ApiError, type JoinResult, type PersonTile } from "@/lib/api";
+import { DEVICE_EXPIRED_COPY, isDeviceExpired } from "@/lib/device-idle";
 import { codeFromQuery } from "@/lib/join-link";
 import { recallLastJoin, rememberLastJoin } from "@/lib/last-join";
 import { cleanNightCodeInput, completeNightCode, lookalikes } from "@/lib/night-code";
@@ -20,7 +21,8 @@ import { cleanNightCodeInput, completeNightCode, lookalikes } from "@/lib/night-
  * S1, Join (guest-flow spec §5 S1). A phone that already has a device skips straight to the
  * resolver. A code from the TV QR (`?code=`, only when the admin turned it on) is pre-filled and
  * removed from the address bar at once, and still waits for one Join tap (owner decision §10.1).
- * A typed code submits by itself at the 6th valid character.
+ * A typed code submits by itself at the 6th valid character. A phone unused for 30 days (issue
+ * #56) lands here from the resolver and is told why.
  */
 export function JoinForm({ slug }: { slug: string }) {
   const router = useRouter();
@@ -37,6 +39,7 @@ export function JoinForm({ slug }: { slug: string }) {
     retry: false,
   });
   const joined = probe.isSuccess;
+  const expired = isDeviceExpired(probe.error);
 
   useEffect(() => {
     if (joined) router.replace("/");
@@ -106,6 +109,11 @@ export function JoinForm({ slug }: { slug: string }) {
         if (ready && !join.isPending && !slow) join.mutate(ready);
       }}
     >
+      {expired ? (
+        <p role="status" className="text-lg" data-testid="join-expired">
+          {DEVICE_EXPIRED_COPY.phone}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-3">
         <Label htmlFor="night-code" className="text-base">
           Night code

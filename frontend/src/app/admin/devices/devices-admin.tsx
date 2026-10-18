@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import { deviceName, lastSeen } from "@/lib/admin";
 import { type AdminDevice, type ApiError, api } from "@/lib/api";
+import { DEVICE_EXPIRED_COPY } from "@/lib/device-idle";
 
 import { AdminQueryError } from "../admin-error";
 
@@ -109,6 +110,11 @@ export function DevicesAdmin() {
           <span className="text-destructive">
             Revoked {new Date(d.revoked_at).toLocaleDateString()}
           </span>
+        ) : d.expired ? (
+          // Not revoked: it comes back by entering a night code (issue #56).
+          <span className="text-muted-foreground" data-testid="device-expired">
+            {DEVICE_EXPIRED_COPY.admin}
+          </span>
         ) : (
           <span className="text-muted-foreground">Active</span>
         ),
@@ -154,6 +160,7 @@ export function DevicesAdmin() {
         rowProps={(d) => ({
           "data-device": deviceName(d),
           "data-revoked": String(d.revoked_at !== null),
+          "data-expired": String(d.expired),
           className: d.revoked_at ? "text-muted-foreground" : undefined,
         })}
         empty={COPY.empty}

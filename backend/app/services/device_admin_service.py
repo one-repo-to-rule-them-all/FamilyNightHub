@@ -12,6 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_device_token, new_token
+from app.services import device_idle
 from app.services.errors import NotFound
 
 
@@ -61,8 +62,10 @@ async def enroll(
 ) -> Enrolled:
     """Let this browser in on the host's authority. `existing_device_id` is a live device
     of *this* household already held by the browser (resolved by the caller); it is reused
-    rather than duplicated."""
+    rather than duplicated. An idle-expired one (issue #56) is revived first, which clears its
+    bindings and TV flag, so `as_tv` decides afresh whether it is the TV."""
     if existing_device_id is not None:
+        await device_idle.revive_if_expired(db, existing_device_id)
         await db.execute(
             text(
                 "UPDATE devices SET is_tv = is_tv OR :tv, label = COALESCE(:l, label), "
@@ -199,6 +202,8 @@ class DeviceSummary:
     revoked_at: datetime | None
     created_at: datetime
     people: list[DeviceBinding]
+    # Live but unused for DEVICE_IDLE_DAYS: needs a night code again (issue #56).
+    expired: bool = False
 
 
 async def list_devices(db: AsyncSession) -> list[DeviceSummary]:
@@ -206,9 +211,11 @@ async def list_devices(db: AsyncSession) -> list[DeviceSummary]:
     devices = (
         await db.execute(
             text(
-                "SELECT id, label, is_tv, last_seen_at, revoked_at, created_at FROM devices "
+                "SELECT id, label, is_tv, last_seen_at, revoked_at, created_at, "
+                f"revoked_at IS NULL AND {device_idle.EXPIRED_SQL} AS expired FROM devices "
                 "ORDER BY revoked_at IS NOT NULL, last_seen_at DESC NULLS LAST, created_at DESC"
-            )
+            ),
+            {"cutoff": device_idle.idle_cutoff()},
         )
     ).all()
     bindings: dict[uuid.UUID, list[DeviceBinding]] = {d.id: [] for d in devices}
@@ -227,7 +234,14 @@ async def list_devices(db: AsyncSession) -> list[DeviceSummary]:
         bindings[r.device_id].append(DeviceBinding(r.id, r.name, r.avatar_emoji, r.status))
     return [
         DeviceSummary(
-            d.id, d.label, d.is_tv, d.last_seen_at, d.revoked_at, d.created_at, bindings[d.id]
+            d.id,
+            d.label,
+            d.is_tv,
+            d.last_seen_at,
+            d.revoked_at,
+            d.created_at,
+            bindings[d.id],
+            d.expired,
         )
         for d in devices
     ]
