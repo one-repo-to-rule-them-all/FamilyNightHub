@@ -33,6 +33,7 @@ def _out(d: device_admin_service.DeviceSummary) -> AdminDeviceOut:
         last_seen_at=d.last_seen_at,
         revoked_at=d.revoked_at,
         created_at=d.created_at,
+        expired=d.expired,
         people=[
             DeviceBindingOut(
                 person_id=b.person_id,

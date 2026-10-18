@@ -2,7 +2,8 @@
 
 The fridge QR's slug is a door, not a key: joining needs the code of a live night. A
 successful join mints a device token (only its hash is stored) or, if the phone already
-holds a live token for this household, reuses that device instead of piling up rows.
+holds a live token for this household, reuses that device instead of piling up rows. A
+token that went idle (issue #56, `device_idle`) is reused too, minus its people bindings.
 The host-approved path (a signed-in host on the device) lands with magic-link auth.
 """
 
@@ -17,6 +18,7 @@ from app.core.database import AsyncSessionLocal, household_session
 from app.core.dependencies import resolve_device_token
 from app.core.security import hash_device_token, hash_night_code, new_token
 from app.domain import night_code
+from app.services import device_idle
 from app.services.errors import InvalidJoin
 
 
@@ -66,6 +68,16 @@ async def join(
         token: str | None = None
         if existing is not None and existing[1] == household_id:
             device_id = existing[0]
+            # Idle past DEVICE_IDLE_DAYS (issue #56): live again, people picked afresh.
+            if await device_idle.revive_if_expired(db, device_id):
+                await db.execute(
+                    text(
+                        "INSERT INTO audit_events (household_id, actor_device_id, action, "
+                        "target_type, target_id, data) VALUES (:h, :d, 'device.rejoined', "
+                        "'session', :s, '{}'::jsonb)"
+                    ),
+                    {"h": household_id, "d": device_id, "s": session_id},
+                )
         else:
             token = new_token()
             device_id = (

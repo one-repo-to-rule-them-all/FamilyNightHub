@@ -13,6 +13,7 @@ import { useLiveSession } from "@/hooks/use-live-session";
 import { useVoters } from "@/hooks/use-voters";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { api, ApiError, type JoinLink, type Night, type Person, type Schemas } from "@/lib/api";
+import { DEVICE_EXPIRED_COPY, isDeviceExpired } from "@/lib/device-idle";
 import { qrShape, tvJoinUrl } from "@/lib/join-link";
 import {
   forgetNightCode,
@@ -60,9 +61,17 @@ export function TvNight({ sessionId }: { sessionId: string }) {
   }, [status, sessionId]);
 
   if (night.error?.status === 401) {
+    // Unused for 30 days (issue #56): a host pairs it again, same as a new TV.
+    const expired = isDeviceExpired(night.error);
     return (
-      <p className="tv-title m-auto text-center" data-testid="tv-unpaired">
-        This screen isn&apos;t paired. A host can pair it from the host page.
+      <p
+        className="tv-title m-auto text-center"
+        data-testid="tv-unpaired"
+        data-expired={expired || undefined}
+      >
+        {expired
+          ? `${DEVICE_EXPIRED_COPY.tv} A host can pair it again from the host page.`
+          : "This screen isn't paired. A host can pair it from the host page."}
       </p>
     );
   }
