@@ -1,7 +1,8 @@
 # Proposal: the guest home (a signed-in phone gets a Home, History and Me)
 
-**Status:** Proposal, waiting for the owner's review of the mockups (2026-10-18). Nothing here is
-built yet.
+**Status:** Approved by the owner from the mockups (2026-10-18), with the §11 answers folded in
+(cold open to the ballot, a 60 s auto-move from past nights, pictures changeable anytime). Build in
+progress, split across sessions (§10, [`guest-home-build-split.md`](guest-home-build-split.md)).
 **Issue:** #58. Rolls up into #42 (staging finalization and owner sign-off).
 **Builds on:** [`guest-flow.md`](guest-flow.md) (the resolver, the screen rules, S0–S14, the switch
 sheet and the PIN sheet, all unchanged unless §9 says otherwise),
@@ -41,11 +42,15 @@ This proposal gives a signed-in phone three places, joined by a light bottom nav
 
 Every past-night screen, including **That's a wrap**, gets the nav and a **live hand-off card**:
 when another night is running, the card says so and its **Go to tonight's movie night** button
-becomes the screen's one primary action. No screen in the signed-in app can strand the phone again.
+becomes the screen's one primary action. On That's a wrap and a past night's recap, the card also
+counts down: if the guest doesn't tap it or **Stay here**, the phone moves to the new night after
+60 s (paused while a photo uploads or a dialog is open). No screen in the signed-in app can strand
+the phone again.
 
 The phone still jumps straight into the night at the moments it always did (after joining, after
-a right PIN, after a switch), so the guest-flow 30-second budget holds. What changes is that a
-returning phone opens on Home, one tap from the ballot, instead of being redirected (§3.3).
+a right PIN, after a switch), and a cold open while voting is open and this person hasn't voted
+goes straight to the ballot, so the guest-flow 30-second budget holds. Any other open lands on
+Home (§3.3).
 
 Everything ships on **existing endpoints**. Four backend items would make it better, none block it
 (§8): a self-service picture change (**G10**, the only one the owner will see missing), a household
@@ -112,22 +117,32 @@ No URL is removed, so links already on phones and in the e2e suite keep resolvin
 
 ### 3.3 When the phone moves by itself
 
-The guest-flow rule "the resolver is the only place that navigates" becomes two rules:
+The guest-flow rule "the resolver is the only place that navigates" becomes four rules. All the
+decisions live in `src/lib/home.ts` as pure functions, so they're unit-tested in one place.
 
 1. **Arrivals jump into the night.** After a successful join (`/j`), a right PIN or a new PIN
    (`/who`), or a switch, the phone goes to `/?arrive=1`. Home sees `arrive=1`, and if a night is
    live it replaces itself with `/s/{id}`; otherwise it strips the parameter and stays. That keeps
    the guest-flow 30-second path and AC-3.3/AC-7.1 exactly as they are.
-2. **Everything else updates in place.** Home never redirects away on its own. A new night, or a
-   status change, changes the **Tonight card** (and the live hand-off card on past-night screens)
+2. **A cold open while voting goes straight to the ballot** (owner decision, §11.1). A *cold open*
+   is the first time Home mounts in this page load (a module-level flag in the Home component, so
+   it survives nothing but a full load: opening the app, a reload, a link from outside). If the live
+   night is `voting` and the current person has no ballot (`ballots/mine` is empty for them), Home
+   replaces itself with `/s/{id}`. Any other status, or a person who already voted, stays on Home.
+   Tapping **Home** in the nav or a back link is never a cold open, so the phone stays put
+   (AC-H2.3). Guest-flow §6's 12 s returning-phone path is unchanged.
+3. **Past-night screens auto-move after 60 s** (owner decision, §11.2). On That's a wrap (H3w) and
+   the recap (H3r), when the household has a live night that isn't this one, the hand-off card shows
+   a countdown, `copy.h.handoff.countdown` ("Taking you there in 60s"), and a `secondary`
+   **Stay here** button. At 0 the phone navigates to `/s/{id}` (`router.push`, so Back returns to
+   the past night). The full rules are in §5 H0h; in short, the countdown **pauses** while a photo
+   upload is in progress, a `<dialog>` is open, or the page is hidden, and **Stay here** cancels it
+   for that new night in this tab. No other screen auto-moves.
+4. **Everything else updates in place.** Home never redirects away after its first mount. A new
+   night, or a status change, changes the **Tonight card** (and the hand-off card on browse screens)
    within the cadences in §6, with a short vibration (`navigator.vibrate(40)`, where supported) and
    an `aria-live="polite"` announcement. Inside a night (`/s/[id]`, S9→S10→S11→S12→S13), the
    existing auto-advance is unchanged: that is the night's own flow, and the guest chose it.
-
-The cost: a returning phone that opens the app while voting is open lands on Home, and **Vote now**
-is one tap. That adds about 1 s to guest-flow §6's 12 s returning-phone column (≈ 13 s, still
-inside 30 s). Open question 1 (§11) asks the owner whether the phone should instead jump to the
-ballot on a cold open while this person hasn't voted.
 
 ```mermaid
 flowchart TD
@@ -136,7 +151,9 @@ flowchart TD
   SW["Switch sheet, right PIN"] --> AR
   AR -- "live night" --> S["/s/{id} (night flow, auto-advances)"]
   AR -- "no live night" --> H["Home"]
-  OPEN["Open the app / tap Home"] --> H
+  COLD["Open the app (cold open)"] -- "voting, I haven't voted" --> S
+  COLD -- "anything else" --> H
+  TAP["Tap Home / back"] --> H
   H -- "Tonight card primary" --> S
   H -- "nav" --> HI["History"] & ME["Me"]
   HI -- "a night" --> PAST{"latest night?"}
@@ -144,7 +161,8 @@ flowchart TD
   PAST -- no --> REC["Night recap"]
   S -- "host ends the night" --> WRAP
   WRAP & REC & HI & ME -. "a new night starts (≤ 5 s)" .-> HAND["Live hand-off card<br/>Go to tonight's movie night"]
-  HAND --> S
+  HAND -- "tap Go" --> S
+  HAND -- "60 s on That's a wrap / recap,<br/>not paused, no Stay here" --> S
   H -. "a new night starts (≤ 5 s)" .-> H
 ```
 
@@ -177,9 +195,10 @@ dead ends, live not refreshed). This proposal adds:
    `aria-label="Movie night is on"`) shows while a night is live; it says *something is happening*,
    not *you must act*.
 3. **The live hand-off is the same component everywhere** (`data-testid="live-handoff"`), at the
-   top of the content, under the app bar. It never covers content and is never dismissable while
-   the night needs this person (voting open and they haven't voted); otherwise it has a ✕ that hides
-   it for that night in this tab.
+   top of the content, under the app bar. It never covers content and has no ✕: it stays while the
+   night is live. On That's a wrap and the recap it carries the countdown and **Stay here** (rule 3
+   of §3.3); **Stay here** stops the countdown but leaves the card, so the night is still one tap
+   away.
 4. **The primary sits above the nav.** A sticky primary (the ballot's Done, a long recap) is placed
    at `bottom: nav height + 12px`; the last content row scrolls fully above both.
 5. **Copy says "movie night", never "session"**, and never "device", "binding" or "profile"
@@ -206,6 +225,32 @@ Copy is in §7, keyed by `copy.h.*`.
   the night's poster (or the clapperboard while `draft`), `copy.h.handoff.<status>` and a full-width
   button `copy.h.handoff.go` (→ `/s/{id}`). On browse screens it is the one primary; on That's a
   wrap it replaces the rating as the primary (H3w).
+- **Auto-move countdown** (H0c, only on That's a wrap and the recap, owner decision §11.2). When the
+  hand-off appears on one of those two screens, it adds a countdown line and a **Stay here** button
+  (`secondary`, `data-testid="handoff-stay"`) under **Go**:
+  - **Starts** at 60 s when the hand-off first renders on the screen (`data-testid="handoff-countdown"`,
+    text `copy.h.handoff.countdown` with the seconds left, `data-seconds` carrying the number for
+    tests). Each fresh mount of a wrap/recap screen starts again at 60.
+  - **Pauses** (the line reads `copy.h.handoff.paused`, the number holds) while any of these is
+    true, and resumes from the same second when none is:
+    1. a photo upload on this phone is in progress (any upload-queue job in `processing`, `queued`,
+       `uploading` or `waiting`), signalled through the `autoMoveHold` store (§6);
+    2. a `<dialog>` is open (`document.querySelector("dialog[open]")`: `ModalDialog`, the PIN and
+       switch sheets, `PhotoViewer`, `PhoneSlideshow` all use native dialogs);
+    3. the page is hidden (`document.visibilityState === "hidden"`).
+  - **At 0** it navigates with `router.push("/s/{id}")` and records the night as seen. If the
+    hand-off's night changed during the countdown (rare: two nights back to back), it restarts at 60
+    for the new one.
+  - **Stay here** cancels the countdown for **that** night in this tab (`sessionStorage["fnh.stayNight"]
+    = id`, guarded with try/catch). The card stays, with **Go** still the primary, and no countdown
+    appears again for that night on any wrap/recap screen in this tab. A different new night starts a
+    fresh countdown.
+  - **Tapping Go** navigates at once; there is no countdown on the night's own screens.
+  - **Announcements:** the countdown line is not a live region every second. A visually hidden
+    `aria-live="polite"` span announces `copy.h.handoff.countdown` at 60, 30 and 10 seconds, and
+    `copy.h.handoff.paused` once when a pause starts. `prefers-reduced-motion` drops the progress
+    ring animation, not the countdown.
+  - **Not on** Home, History, Me, a profile or an album. Those keep the plain hand-off card.
 
 ### H1 — Home (`/`, `data-screen="home"`)
 
@@ -282,7 +327,7 @@ the album with **Add photos** (`secondary`), the nav.
 
 | Situation | Primary |
 |---|---|
-| A newer night is live | The hand-off's **Go to tonight's movie night** |
+| A newer night is live | The hand-off's **Go to tonight's movie night**, with the 60 s countdown and **Stay here** (H0c) |
 | No live night, this person hasn't rated | The star row (as S14) |
 | No live night, rated | **Back to Home** (`copy.h.wrap.home`) |
 
@@ -295,7 +340,7 @@ A browse screen for remembering a night: the date and title as the heading, the 
 **Your night** (my picks with the winner marked, my rating as stars, editable while ratings are
 open), **The family's picks** (results, expanded), **Who came** (Here tonight row for that night,
 from `/present`), and the album grid with **See all photos** (→ `/albums/{id}`). Primary: none,
-except the live hand-off.
+except the live hand-off, which here carries the 60 s countdown and **Stay here** (H0c).
 
 ### H4 — Me (`/me`, `data-screen="me"`)
 
@@ -313,7 +358,9 @@ except the live hand-off.
 6. Footer: `copy.common.hostSignIn` (text link).
 
 Primary: none, except the live hand-off. **Change picture** (G10) opens a sheet with the 8
-`GUEST_EMOJI` plus the avatar colours; tapping saves immediately and closes the sheet.
+`GUEST_EMOJI` plus the avatar colours; tapping saves immediately and closes the sheet. Pictures can
+be changed **any number of times** (owner decision §11.3); only the name is rename-once, so
+`copy.h.me.renameHelp` sits under **Change my name** and nothing like it sits under the picture.
 
 ### H5 — A person's profile (`/people/[id]`, `data-screen="profile"`)
 
@@ -356,6 +403,16 @@ returns `{ night, isNew, markSeen }`; `isNew` compares against `fnh.seenNight` i
 (`refetchIntervalInBackground: false`, TanStack's default) and resumes on `visibilitychange`, so a
 pocketed phone costs nothing. At household scale (≤ 10 phones × one request per 5 s while
 foregrounded) this matches the cost guest-flow already accepted for S8.
+
+**Auto-move hold (H0c).** A tiny module store, `src/lib/auto-move.ts`, holds a counter of reasons
+to pause the countdown: `holdAutoMove(): () => void` (returns its release) and
+`useAutoMoveHeld(): boolean` (`useSyncExternalStore`). The upload queue (the module-level `UploadQueue` in `src/hooks/use-photo-uploads.ts`, which keeps running when `PhotoDrop` unmounts) holds it while any job is
+`processing`, `queued`, `uploading` or `waiting`, and releases when none is. The countdown hook
+(`useAutoMoveCountdown(nightId, enabled)`) ticks once a second and pauses when the store is held,
+when `document.querySelector("dialog[open]")` is non-null (checked each tick; no component changes
+needed because every modal in the app is a native `<dialog>`), or when the page is hidden. The
+countdown arithmetic (`nextCountdown(state, {held, now})`) is a pure function in the same file, so
+it's unit-tested with fake timers.
 
 Home's request count on a cold open: `people`, `nights/live`, `profile`, `rate-prompt`, one photos
 read, plus `session` and `ballots` when a night is live: 5–7 small reads, in parallel. G11 folds
@@ -417,6 +474,9 @@ Rules as guest-flow §7: second person, short sentences, no jargon, no blame; na
 | `copy.h.handoff.revealed` | Tonight's winner is in. |
 | `copy.h.handoff.tonight` | Tonight's movie: **{movie}** |
 | `copy.h.handoff.go` | Go to tonight's movie night |
+| `copy.h.handoff.countdown` | Taking you there in {n}s |
+| `copy.h.handoff.paused` | Paused while you finish up |
+| `copy.h.handoff.stay` | Stay here |
 | `copy.h.wrap.title` | That's a wrap |
 | `copy.h.wrap.lede` | Thanks for movie night. |
 | `copy.h.wrap.home` | Back to Home |
@@ -460,12 +520,13 @@ open on `closed` nights, so the recap's stars are editable; `ballots/mine` answe
 
 | # | Guest-flow today | Changes to |
 |---|---|---|
-| D14 | `/` is a resolver that redirects to the live night; S8 is the only page there. | `/` is Home. Resolver rules for no device / no current person are unchanged; a live night is shown on the Tonight card instead of redirected to, except on arrival (`?arrive=1`, §3.3). S8 becomes Tonight state T0. |
+| D14 | `/` is a resolver that redirects to the live night; S8 is the only page there. | `/` is Home. Resolver rules for no device / no current person are unchanged; a live night is shown on the Tonight card instead of redirected to, except on arrival (`?arrive=1`) and on a cold open while voting with no ballot from this person (§3.3). S8 becomes Tonight state T0. |
 | D15 | Join, PIN success and switch go to `/`. | They go to `/?arrive=1`. |
 | D16 | "That's a wrap" (`closed`) is one screen for every past night, with **Past movie nights** and `CurrentChip`. | H3w for the latest night (with the hand-off), H3r for older nights; both in the shell; no chip. |
 | D17 | History rows have no "mine" view; `/me` shows the nights list. | History has Mine and Family; Me keeps stats and settings and links to Mine. |
 | D18 | `RatePromptCard` appears on S8 only. | Home shows T7 or the card; Mine rows offer **Rate it**. |
 | D19 | No nav anywhere on the phone. | App bar + bottom nav on Home, History, Me, profiles, albums, past nights and S9/S11–S13. |
+| D20 | A past night never moves the phone. | That's a wrap and the recap move to a newly started night after a 60 s countdown, unless paused or cancelled with **Stay here** (H0c). |
 
 Acceptance criteria superseded (any spec asserting the old behaviour changes in piece F, §10):
 
@@ -486,9 +547,9 @@ below gives every file one owner. Piece **A** lands first (small, shared plumbin
 
 | Piece | Owns | Delivers |
 |---|---|---|
-| **A — Shell + live hand-off** (first) | new `src/lib/home.ts` (+test), new `src/hooks/use-household-night.ts`, new `src/components/home/{app-bar,bottom-nav,live-handoff,guest-shell}.tsx`, `src/hooks/use-phone.ts`, `docs/architecture/04-frontend.md` | `tonightState()`, `isNewNight()`, `arrivalTarget()`, `pastNightKind()`; the shell; the hand-off; §3.3 rule 1 helper. |
-| **B — Home** | `src/app/home-resolver.tsx` (→ Home), new `src/components/home/{tonight-card,recent-nights,photo-strip}.tsx`, `src/components/night/rate-prompt-card.tsx`, `src/app/(public)/who/who-grid.tsx` and `src/app/(public)/j/[slug]/join-form.tsx` (the `?arrive=1` lines only), `src/components/night/switch-sheet.tsx` (arrival line only) | H1, T0–T7, §3.3. |
-| **C — Night screens + past nights** | `src/app/(public)/s/[session]/*`, `src/app/(public)/albums/[session]/*` | H3w, H3r, shell on S9/S11–S13, ‹ Home on S10, H6. |
+| **A — Shell + live hand-off** (first) | new `src/lib/home.ts` (+test), new `src/lib/auto-move.ts` (+test), new `src/hooks/use-household-night.ts`, new `src/hooks/use-auto-move-countdown.ts`, new `src/components/home/{app-bar,bottom-nav,live-handoff,guest-shell}.tsx`, `src/hooks/use-phone.ts`, `src/hooks/use-photo-uploads.ts` (the upload hold only), `docs/architecture/04-frontend.md` | `tonightState()`, `isNewNight()`, `arrivalTarget()`, `coldOpenTarget()`, `pastNightKind()`; the auto-move store, countdown reducer and hook; the shell; the hand-off with an optional countdown + **Stay here**. |
+| **B — Home** | `src/app/home-resolver.tsx` (→ Home), new `src/components/home/{tonight-card,recent-nights,photo-strip}.tsx`, `src/components/night/rate-prompt-card.tsx`, `src/app/(public)/who/who-grid.tsx` and `src/app/(public)/j/[slug]/join-form.tsx` (the `?arrive=1` lines only), `src/components/night/switch-sheet.tsx` (arrival line only) | H1, T0–T7, §3.3 rules 1, 2 and 4. |
+| **C — Night screens + past nights** | `src/app/(public)/s/[session]/*`, `src/app/(public)/albums/[session]/*` | H3w, H3r (both with the countdown on, H0c), shell on S9/S11–S13, ‹ Home on S10, H6. |
 | **D — History + Me + profile** | `src/app/(public)/history/*`, `src/app/(public)/me/*`, `src/app/(public)/people/[id]/*` | H2, H4 (Change picture behind G10), H5. |
 | **E — Backend G10** (optional, parallel) | `backend/app/api/v1/people.py`, `backend/app/services/people_service.py`, `backend/app/schemas/identity.py`, their tests, the generated OpenAPI types and an **additive** `src/lib/api.ts` method | Self picture change. D shows the button once E merges. |
 | **F — e2e** (last) | `frontend/e2e/guest-home.spec.ts` (new). No existing spec asserts `no-night`/AC-9.1 today (checked 2026-10-18); re-check after the e2e sign-off merges | §12 as Playwright, written but run only by the owner's sign-off pass. |
@@ -498,17 +559,22 @@ No full suite, no Playwright runs, no deploys.
 
 ---
 
-## 11. Open questions for the owner
+## 11. Owner decisions (answered 2026-10-18)
 
-1. **Cold open during voting.** When a returning phone opens the app while voting is open and this
-   person hasn't voted, should it land on **Home** (Vote now is one tap; the proposal) or jump
-   straight to the **ballot** (guest-flow's behaviour, ≈ 1 s faster)? Either is a one-line rule in
-   `arrivalTarget()`.
-2. **That's a wrap when a new night starts.** The proposal makes the hand-off card the primary but
-   doesn't move the phone. Should That's a wrap instead move to the new night by itself once voting
-   opens there?
-3. **Picture changes.** Should guests be allowed to change their picture as often as they like (the
-   proposal), or once like their name?
+1. **Cold open during voting: straight to the ballot.** When the app is opened fresh while voting is
+   open and the current person hasn't voted, the phone goes to the ballot; Home is one tap away
+   (‹ Home in the ballot header). Any other cold open lands on Home. Specified in §3.3 rule 2 and
+   `coldOpenTarget()`; AC-H2.4–2.6.
+2. **A new night while on That's a wrap or a recap: hand-off first, then auto-move after 60 s.** The
+   hand-off card shows at once with **Go to tonight's movie night** as the primary. If the guest
+   doesn't tap it, the phone moves to the new night after 60 s, with a visible countdown ("Taking you
+   there in 60s") and **Stay here**, which cancels it for that night. The countdown pauses while a
+   photo upload is in progress or a dialog is open, so nobody is moved mid-upload. Specified in §3.3
+   rule 3 and §5 H0c; AC-H3.5–3.11.
+3. **Pictures: change anytime.** The name stays rename-once. Specified in §5 H4 and G10; AC-H5.3,
+   AC-H5.5.
+
+No open questions remain.
 
 ---
 
@@ -550,7 +616,14 @@ RooDog" has RooDog current with a PIN.
 - AC-H2.1: Join with a live night in `voting` → `screen(ballot)` within 3 s (guest-flow AC-1.2 path
   intact). With no live night → `screen(home)`, and the URL has no `arrive`.
 - AC-H2.2: A right PIN on `/who` with a live night → the night screen within 2 s (AC-3.3 intact).
-- AC-H2.3: Tapping **Home** from `ballot` → `screen(home)` and the phone stays there for 10 s.
+- AC-H2.3: Tapping **Home** from `ballot` → `screen(home)` and the phone stays there for 10 s
+  (an in-app navigation is never a cold open).
+- AC-H2.4 (cold open, voting, not voted): a phone set to RooDog with a night in `voting` and no
+  ballot from RooDog loads `/` in a fresh page → `screen(ballot)` within 3 s, with no tap.
+- AC-H2.5 (cold open, voting, already voted): the same with RooDog's ballot cast → `screen(home)`
+  with `tonight-card[data-state=T4]` (or `T3` on a shared phone), and it stays there for 10 s.
+- AC-H2.6 (cold open, other statuses): `page.goto("/")` with the night in `draft`, `revealed` or
+  `tonight` → `screen(home)` with the matching Tonight state (T1, T5, T6); no redirect.
 
 **Past nights and the hand-off**
 - AC-H3.1 (the staging bug): on `screen(wrap)` for the latest night, create a new night through the
@@ -562,6 +635,31 @@ RooDog" has RooDog current with a PIN.
   (no live night), the person's picks with the winner marked, and the album link.
 - AC-H3.4: `live-handoff` appears on `history`, `me`, `recap`, `profile` and `album` whenever a night
   is live, and never on `home` or that night's own screens.
+
+**Auto-move countdown (H0c).** These use Playwright's clock (`page.clock.install()` before load,
+then `page.clock.runFor()`), so no test waits 60 real seconds. "The hand-off appears" means after
+creating a new night through the API and waiting for `live-handoff` (≤ 7 s, AC-H3.1).
+- AC-H3.5 (shows): when the hand-off appears on `wrap`, `handoff-countdown` is visible with
+  `data-seconds="60"` and the text "Taking you there in 60s", and `handoff-stay` ("Stay here") is a
+  `secondary` button. **Go** is still the only `primary-action`.
+- AC-H3.6 (moves): advancing the clock 60 s with no interaction → the URL is `/s/{new id}` and the
+  new night's screen shows (e.g. `screen(almost-ready)` for a `draft` night). Going **Back** returns
+  to `screen(wrap)` for the old night.
+- AC-H3.7 (recap too): the same as AC-H3.5–3.6 on `screen(recap)`.
+- AC-H3.8 (Stay here): tapping **Stay here** at 40 s left → `handoff-countdown` disappears,
+  `live-handoff` and **Go** remain, and advancing the clock 120 s leaves the phone on `screen(wrap)`.
+  Opening another past night (`recap`) in the same tab shows the hand-off with **no** countdown for
+  that night. Starting a second new night through the API brings a fresh countdown at 60.
+- AC-H3.9 (paused by an upload): start a photo upload on `screen(wrap)` (route the upload request so
+  it stays pending) at 50 s left → the countdown text becomes "Paused while you finish up" and
+  `data-seconds` holds at 50 while the clock advances 120 s; fulfilling the upload resumes from 50,
+  and the phone moves 50 s later.
+- AC-H3.10 (paused by a dialog): open the switch sheet (a `<dialog>`) at 30 s left → the countdown
+  holds at 30 while the clock advances 90 s; closing it resumes, and the phone moves 30 s later.
+  The same holds for `PhotoViewer` (tap a photo in the album).
+- AC-H3.11 (never elsewhere): with a live night, `history`, `me`, `profile` and `album` show
+  `live-handoff` without `handoff-countdown`, and advancing the clock 120 s leaves the phone where it
+  is. `home` never auto-moves after its first mount.
 
 **History**
 - AC-H4.1: `/history` opens on **Mine** (`data-tab=mine`); rows show the person's picks in rank
@@ -580,3 +678,6 @@ RooDog" has RooDog current with a PIN.
 - AC-H5.3 (with G10): **Change picture** → pick 🐙 → one `PATCH /devices/me/people/{id}` with
   `avatar_emoji` → the app bar and Me show 🐙; `can_rename` is unchanged.
 - AC-H5.4: `/people/{own id}` redirects to `/me`.
+- AC-H5.5 (with G10, pictures anytime): change the picture three times in a row → three successful
+  `PATCH` requests, each reflected in the app bar; **Change my name** is still offered if it was
+  before, and after a rename the picture can still be changed.
