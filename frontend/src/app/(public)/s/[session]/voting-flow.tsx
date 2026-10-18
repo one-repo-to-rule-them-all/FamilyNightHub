@@ -2,10 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
-import { useReducer, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
-import { PhoneScreen } from "@/components/phone-screen";
+import { GuestShell } from "@/components/home/guest-shell";
 import { Poster } from "@/components/poster";
 import { CurrentChip, SwitchSheet } from "@/components/night/switch-sheet";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,17 @@ import type { LiveState } from "@/lib/live";
 import { cn } from "@/lib/utils";
 import { phonePeople } from "@/lib/who";
 
+import { clearBallotDraft, draftDiffers, readBallotDraft, writeBallotDraft } from "./ballot-draft";
+import { ScreenTitle } from "./screen-title";
+
 const ballotsKey = (sessionId: string) => ["ballots", sessionId] as const;
+
+/** The ballot leaves the nav out (its sticky Done owns the bottom) and links back Home instead. */
+const BALLOT_SHELL = {
+  hideNav: true,
+  handoff: "none",
+  back: { href: "/", label: "Home" },
+} as const;
 
 type Cast = { personId: string; ranks: { option_id: string; rank: number }[] };
 
@@ -35,6 +45,8 @@ type Cast = { personId: string; ranks: { option_id: string; rank: number }[] };
  * (ADR-0014), so there is no "Who's voting?" grid any more (D5); a shared phone hands over with
  * **Pass to next person**, which opens the switch sheet and asks for the next person's PIN.
  * Ballots are replaceable until close, so a person who already voted can change their picks.
+ * Guest home (§5 "Live-night screens"): picks-in (S11) sits in the shell with the nav; the ballot
+ * (S10) has no nav, a **‹ Home** link, and keeps unsaved picks for this tab (`ballot-draft.ts`).
  */
 export function VotingFlow({
   night,
@@ -60,7 +72,8 @@ export function VotingFlow({
 
   const cast = useMutation<void, ApiError, Cast>({
     mutationFn: ({ personId, ranks }) => api.castBallot(night.id, { person_id: personId, ranks }),
-    onSuccess: async () => {
+    onSuccess: async (_, { personId }) => {
+      clearBallotDraft(night.id, personId);
       await queryClient.invalidateQueries({ queryKey: ballotsKey(night.id) });
       setEditing(false);
     },
@@ -77,18 +90,20 @@ export function VotingFlow({
 
   if (ballots.isPending) {
     return (
-      <PhoneScreen title="Vote">
+      <GuestShell screen="ballot" {...BALLOT_SHELL}>
+        <ScreenTitle title="Vote" />
         {chip}
         <p className="text-lg text-muted-foreground">Loading…</p>
-      </PhoneScreen>
+      </GuestShell>
     );
   }
   if (ballots.isError) {
     return (
-      <PhoneScreen title="Vote">
+      <GuestShell screen="ballot" {...BALLOT_SHELL}>
+        <ScreenTitle title="Vote" />
         {chip}
         <ApiErrorNotice error={ballots.error} />
-      </PhoneScreen>
+      </GuestShell>
     );
   }
 
@@ -97,18 +112,18 @@ export function VotingFlow({
     (p) => p.id !== current.id && !votedIds.has(p.id) && !p.locked,
   );
 
-  if (savedRanks.length > 0 && !editing) {
+  // Back from Home with unsaved changes to saved picks: reopen the ballot where it was left.
+  const resume = draftDiffers(readBallotDraft(night.id, current.id), savedRanks);
+
+  if (savedRanks.length > 0 && !editing && !resume) {
     const titles = new Map(night.options.map((o) => [o.id, o.title]));
     const voted = voters.data?.length ?? votedIds.size;
     return (
-      <PhoneScreen title={`Thanks, ${current.name}!`} lede="Your picks are in.">
+      <GuestShell screen="picks-in" handoff="none">
+        <ScreenTitle title={`Thanks, ${current.name}!`} lede="Your picks are in." />
         {chip}
         {here()}
-        <div
-          data-screen="picks-in"
-          data-testid={nextUp ? undefined : "waiting"}
-          className="flex flex-col gap-5"
-        >
+        <div data-testid={nextUp ? undefined : "waiting"} className="flex flex-col gap-5">
           <ol className="flex flex-col gap-2" data-testid="saved-picks">
             {[...savedRanks]
               .sort((a, b) => a.rank - b.rank)
@@ -160,7 +175,7 @@ export function VotingFlow({
             onClose={() => setPassing(false)}
           />
         ) : null}
-      </PhoneScreen>
+      </GuestShell>
     );
   }
 
@@ -169,6 +184,7 @@ export function VotingFlow({
       // A fresh reducer per voter, starting from what they already saved.
       key={current.id}
       night={night}
+      personId={current.id}
       savedRanks={savedRanks}
       header={
         <>
@@ -185,6 +201,7 @@ export function VotingFlow({
 
 function BallotForm({
   night,
+  personId,
   savedRanks,
   header,
   error,
@@ -192,6 +209,7 @@ function BallotForm({
   onSubmit,
 }: {
   night: Night;
+  personId: string;
   savedRanks: { option_id: string; rank: number }[];
   header: React.ReactNode;
   error: React.ReactNode;
@@ -201,13 +219,21 @@ function BallotForm({
   const size = night.ballot_size ?? 0;
   const ranked = night.voting_method === "top3";
   const [ballot, dispatch] = useReducer(ballotReducer, size, (k) =>
-    ballotReducer(initialBallot(k, night.voting_method), { type: "load", ranks: savedRanks }),
+    ballotReducer(initialBallot(k, night.voting_method), {
+      type: "load",
+      ranks: readBallotDraft(night.id, personId) ?? savedRanks,
+    }),
   );
+  // Every change is kept for this tab, so ‹ Home and back restores it (cleared once saved).
+  useEffect(() => {
+    writeBallotDraft(night.id, personId, toRanks(ballot));
+  }, [ballot, night.id, personId]);
   const options = [...night.options].sort((a, b) => a.position - b.position);
   const prompt = ballotPrompt(ballot);
 
   return (
-    <PhoneScreen title={prompt.title} lede={prompt.lede} screen="ballot">
+    <GuestShell screen="ballot" {...BALLOT_SHELL}>
+      <ScreenTitle title={prompt.title} lede={prompt.lede} />
       {header}
 
       <p aria-live="polite" className="text-muted-foreground" data-testid="pick-count">
@@ -260,7 +286,7 @@ function BallotForm({
           {busy ? "Saving…" : "Done"}
         </Button>
       </div>
-    </PhoneScreen>
+    </GuestShell>
   );
 }
 

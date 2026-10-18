@@ -1,28 +1,29 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
+import { GuestShell } from "@/components/home/guest-shell";
 import { HereTonight } from "@/components/night/here-tonight";
 import { RatingPanel } from "@/components/night/rating-panel";
-import { CurrentChip } from "@/components/night/switch-sheet";
 import { PhoneScreen } from "@/components/phone-screen";
 import { PhotoAlbum } from "@/components/photos/photo-album";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useLiveSession } from "@/hooks/use-live-session";
 import { usePhonePeople } from "@/hooks/use-phone";
 import type { Night, PersonTile } from "@/lib/api";
 import type { LiveState } from "@/lib/live";
-import { cn } from "@/lib/utils";
 
+import { PastNight } from "./past-night";
+import { ScreenTitle } from "./screen-title";
 import { VotingFlow } from "./voting-flow";
 import { Results, WinnerCard } from "./winner";
 
 /**
  * /s/[session]: the phone's view of one night, driven by the snapshot's `status`
- * (04-frontend.md "Phone state machine"; guest-flow spec §5 S9–S14). It always acts as this
+ * (04-frontend.md "Phone state machine"; guest-flow spec §5 S9–S13; guest-home §5 H3 for `closed`,
+ * which is That's a wrap or the recap). It always acts as this
  * phone's current person (ADR-0014): without one, the resolver (`/`) sends the phone to /who.
  * `data-live` mirrors useLiveSession, so tests and the SSE hook agree on when the screen is live.
  */
@@ -95,32 +96,34 @@ function NightState({
   current: PersonTile;
   closedNotice: boolean;
 }) {
-  const chip = <CurrentChip current={current} people={people} />;
   const here = (compact = false) => (
     <HereTonight night={night} live={live} people={people} selfId={current.id} compact={compact} />
   );
 
+  // S9, S12 and S13 sit in the shell (nav, Home's live dot); the app bar's person button replaces
+  // the CurrentChip, which stays only on the ballot and picks-in (guest-home §5 "Live-night
+  // screens"). No hand-off: these are the live night's own screens.
   switch (night.status) {
     case "draft":
       return (
-        <PhoneScreen title="Almost ready">
-          {chip}
+        <GuestShell screen="almost-ready" handoff="none">
+          <ScreenTitle title="Almost ready" />
           {here()}
-          <div data-screen="almost-ready" data-testid="waiting">
+          <div data-testid="waiting">
             <p aria-live="polite" className="text-lg text-muted-foreground">
               The host is picking movies ({night.options.length} so far). Voting starts here by
               itself.
             </p>
           </div>
-        </PhoneScreen>
+        </GuestShell>
       );
     case "voting":
       return <VotingFlow night={night} live={live} people={people} current={current} here={here} />;
     case "revealed":
       return (
-        <PhoneScreen title="The winner is…">
-          {chip}
-          <div data-screen="winner" data-testid="waiting" className="flex flex-col gap-6">
+        <GuestShell screen="winner" handoff="none">
+          <ScreenTitle title="The winner is…" />
+          <div data-testid="waiting" className="flex flex-col gap-6">
             {closedNotice ? (
               <p role="status" className="rounded-xl bg-cinema-muted p-4 text-lg">
                 Voting just closed. Here&apos;s the winner!
@@ -132,38 +135,20 @@ function NightState({
             </p>
             <Results night={night} />
           </div>
-        </PhoneScreen>
+        </GuestShell>
       );
     case "tonight":
       return (
-        <PhoneScreen title="Tonight">
-          {chip}
-          <div data-screen="tonight" className="flex flex-col gap-6">
-            <WinnerCard night={night} compact />
-            {here()}
-            <PhotoAlbum sessionId={night.id} live={live} actorId={current.id} />
-            <RateIt night={night} />
-          </div>
-        </PhoneScreen>
+        <GuestShell screen="tonight" handoff="none">
+          <ScreenTitle title="Tonight" />
+          <WinnerCard night={night} compact />
+          {here()}
+          <PhotoAlbum sessionId={night.id} live={live} actorId={current.id} />
+          <RateIt night={night} />
+        </GuestShell>
       );
     case "closed":
-      return (
-        <PhoneScreen title="That's a wrap" lede="Thanks for movie night.">
-          {chip}
-          <div data-screen="rate" className="flex flex-col gap-6">
-            <WinnerCard night={night} compact />
-            <RatingPanel night={night} />
-            <Results night={night} />
-            <PhotoAlbum sessionId={night.id} live={live} actorId={current.id} />
-            <Link
-              href="/history"
-              className={cn(buttonVariants({ variant: "secondary", size: "tap" }), "w-full")}
-            >
-              Past movie nights
-            </Link>
-          </div>
-        </PhoneScreen>
-      );
+      return <PastNight night={night} live={live} people={people} current={current} />;
   }
 }
 
