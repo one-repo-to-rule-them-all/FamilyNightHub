@@ -89,6 +89,7 @@ test.describe("live updates", () => {
     request,
     browser,
   }) => {
+    test.slow(); // two phones with PINs (argon2id), plus a deliberate stream outage and poll fallback
     const night = seedNight({ movies: 3, openVoting: true });
     const [paddington] = night.movies;
     await joinAs(page, night, ["Ava"]);
