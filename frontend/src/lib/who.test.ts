@@ -183,6 +183,23 @@ describe("followWaiting", () => {
     expect(followWaiting("pending", undefined)).toEqual({ kind: "grid" });
   });
 
+  // Staging 2026-10-18 (#42): a phone tapped a held, no-PIN guest and saw "The host said no"
+  // although no claim was ever pending. Only a wait that saw the claim pending reads a rejection.
+  it("S4: never says 'rejected' for a claim that was not seen pending", () => {
+    expect(followWaiting("pending", tile({ binding: "taken" }), false)).toEqual({
+      kind: "grid",
+      notice: "not-waiting",
+    });
+    expect(followWaiting("pending", tile({ binding: "free" }), false)).toEqual({
+      kind: "grid",
+      notice: "not-waiting",
+    });
+    expect(followWaiting("pending", tile({ binding: "pending" }), false)).toBeNull();
+    expect(followWaiting("pending", tile({ binding: "mine", current: true }), false)).toEqual({
+      kind: "done",
+    });
+  });
+
   it("S6: follows the family admin's answer (G2)", () => {
     const locked = { locked: true, has_pin: true };
     expect(followWaiting("reset", tile({ ...locked, pin_reset: "open" }))).toBeNull();

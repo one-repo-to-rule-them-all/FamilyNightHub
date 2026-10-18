@@ -115,20 +115,13 @@ export function cleanGuestName(raw: string): string | null {
   return name.length >= 1 && name.length <= NAME_MAX ? name : null;
 }
 
-export type WaitingNotice = "rejected" | "dismissed" | "other-phone";
+export type WaitingNotice = "rejected" | "not-waiting" | "dismissed" | "other-phone";
 export type FollowResult =
   | { kind: "done" }
   | { kind: "grid"; notice?: WaitingNotice }
   | { kind: "pin"; mode: "enter" | "create"; notice?: WaitingNotice }
   | { kind: "locked"; notice?: WaitingNotice };
 
-/**
- * Where a waiting screen goes once the server moved on, or null to keep waiting (spec §5 S4, S6).
- * - S4 (`pending`): approved → the resolver (`done`) or the PIN; rejected → the grid with
- *   `copy.s4.rejected`.
- * - S6 (`reset`): approved for this phone → choose a new PIN; dismissed → S5 with
- *   `copy.s6.dismissed`; reset from another phone → type the new PIN (`copy.s6.otherPhone`).
- */
 /**
  * Whether a waiting screen may act on the people list yet. Asking the host (S4) or the admin (S6)
  * opens the screen before the list refetches, and the tile it still holds predates the request
@@ -139,9 +132,19 @@ export function canFollow(since: number | undefined, dataUpdatedAt: number): boo
   return since === undefined || dataUpdatedAt >= since;
 }
 
+/**
+ * Where a waiting screen goes once the server moved on, or null to keep waiting (spec §5 S4, S6).
+ * - S4 (`pending`): approved → the resolver (`done`) or the PIN. No longer pending → the grid:
+ *   with `copy.s4.rejected` only if this wait saw the claim pending (`sawPending`), since a claim
+ *   that never became pending was not rejected by anyone (staging, #42); otherwise
+ *   `copy.s4.notWaiting`.
+ * - S6 (`reset`): approved for this phone → choose a new PIN; dismissed → S5 with
+ *   `copy.s6.dismissed`; reset from another phone → type the new PIN (`copy.s6.otherPhone`).
+ */
 export function followWaiting(
   waiting: "pending" | "reset",
   person: PersonTile | undefined,
+  sawPending = true,
 ): FollowResult | null {
   if (!person) return { kind: "grid" };
   if (waiting === "pending") {
@@ -150,7 +153,7 @@ export function followWaiting(
     if (person.binding === "mine")
       return { kind: "pin", mode: person.has_pin ? "enter" : "create" };
     if (person.locked) return { kind: "locked" };
-    return { kind: "grid", notice: "rejected" };
+    return { kind: "grid", notice: sawPending ? "rejected" : "not-waiting" };
   }
   if (person.pin_reset === "approved_for_this_phone") return { kind: "pin", mode: "create" };
   if (person.pin_reset === "open") return null;
