@@ -87,5 +87,5 @@ was also used as a phone becomes the TV with its people still bound.
 **Not done here: "Pair a TV" short code** (Option B in #57), for a separate screen (smart-TV
 browser, Fire TV) without anyone signing in on it: the TV shows a short code, the host types it
 in the portal, which mints a TV device for that screen. It needs a new pre-auth pairing table or
-Redis key with a TTL, a rate limit, a pairing poll on `/tv`, and a portal form. Filed as its own
+Redis key with a TTL, a rate limit, a pairing poll on `/tv`, and a portal form. Filed as #61, its own
 issue, since it is more than half a day of work.
