@@ -67,7 +67,7 @@ export function WhoGrid() {
   useEffect(() => {
     // No device: the resolver shows the join screen (or "Scan the QR") instead of a dead end.
     // An approved claim: the resolver lands the phone on the night.
-    if (leave) router.replace("/");
+    if (leave) router.replace("/?arrive=1");
   }, [leave, router]);
 
   const tiles = people.data ?? [];
@@ -83,7 +83,7 @@ export function WhoGrid() {
 
   const finish = (outcome: PinOutcome, personId: string, options?: { rename?: boolean }) => {
     void queryClient.invalidateQueries({ queryKey: PEOPLE });
-    if (outcome === "done") router.replace(options?.rename ? "/me?rename=1" : "/");
+    if (outcome === "done") router.replace(options?.rename ? "/me?rename=1" : "/?arrive=1");
     else if (outcome === "locked") setView({ kind: "locked", personId });
     else if (outcome === "reset-asked") setView({ kind: "reset", personId, since: Date.now() });
     else if (outcome === "asked-host") setView({ kind: "pending", personId, since: Date.now() });
@@ -198,7 +198,7 @@ export function WhoGrid() {
                     ? askHost.mutate(person.id)
                     : setView(tapTarget(person))
                 }
-                onCurrent={() => router.replace("/")}
+                onCurrent={() => router.replace("/?arrive=1")}
               />
             </li>
           ))}
