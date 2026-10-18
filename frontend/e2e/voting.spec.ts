@@ -23,6 +23,7 @@ test.describe("phone voting", () => {
     browser,
     request,
   }) => {
+    test.slow(); // several phones; every PIN claim or switch is an argon2id check (ADR-0014)
     // 4 movies → ballot_size 3 (ADR-0006).
     const night = seedNight({ movies: 4, openVoting: true });
     const [paddington, spirited, ironGiant, coco] = night.movies;
@@ -116,6 +117,7 @@ test.describe("phone voting", () => {
   });
 
   test("a phone can't vote for someone bound to another phone", async ({ page, browser }) => {
+    test.slow(); // several phones; every PIN claim or switch is an argon2id check (ADR-0014)
     const night = seedNight({ movies: 3, openVoting: true });
     const [first] = night.movies;
 
@@ -153,6 +155,7 @@ test.describe("phone voting", () => {
     browser,
     baseURL,
   }) => {
+    test.slow(); // several phones; every PIN claim or switch is an argon2id check (ADR-0014)
     const night = seedNight({ movies: 2, openVoting: true });
     await joinAs(page, night, ["Ava"]);
 

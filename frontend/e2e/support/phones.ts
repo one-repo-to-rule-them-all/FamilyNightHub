@@ -59,9 +59,16 @@ export const PINS: Record<string, string> = {
 };
 export const pinFor = (name: string) => PINS[name] ?? "112358";
 
-/** Types a PIN on the open PIN sheet's keypad input (the hidden numeric input the keypad drives). */
+/**
+ * Types a PIN on the open PIN sheet's keypad input (the hidden numeric input the keypad drives).
+ * Waits for the pad to be clear and idle first: retyping the same wrong PIN before the dots reset
+ * would change nothing, so no attempt would be sent.
+ */
 export async function typePin(page: Page, pin: string) {
-  await page.getByTestId("pin-input").fill(pin);
+  const input = page.getByTestId("pin-input");
+  await expect(input).toHaveValue("");
+  await expect(input).toBeEnabled();
+  await input.fill(pin);
 }
 
 /**

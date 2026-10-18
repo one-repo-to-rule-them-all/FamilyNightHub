@@ -149,6 +149,7 @@ test.describe("sign-off", () => {
   test("a shared-phone switch needs that person's PIN; a wrong one changes nothing", async ({
     page,
   }) => {
+    test.slow(); // several phones; every PIN claim or switch is an argon2id check (ADR-0014)
     const night = seedNight({ movies: 3, openVoting: true });
     await joinAs(page, night, ["Mia", "Ava"]);
     await expect(page.getByTestId("voting-as")).toHaveText("Ava");
@@ -231,6 +232,7 @@ test.describe("sign-off", () => {
   });
 
   test("a host account never sees or approves PIN resets", async ({ page, browser, baseURL }) => {
+    test.slow(); // several phones; every PIN claim or switch is an argon2id check (ADR-0014)
     const night = seedNight({ movies: 3, openVoting: true, hostAccount: true });
     await joinAs(page, night, ["Ava"]);
     const phoneB = await newPhone(browser);
@@ -310,6 +312,7 @@ test.describe("sign-off", () => {
   });
 
   test("Here tonight shows a phone that joined but hasn't voted", async ({ page, browser }) => {
+    test.slow(); // several phones; every PIN claim or switch is an argon2id check (ADR-0014)
     const night = seedNight({ movies: 3, openVoting: true });
     await joinAs(page, night, ["Ava"]);
     const phoneB = await newPhone(browser);

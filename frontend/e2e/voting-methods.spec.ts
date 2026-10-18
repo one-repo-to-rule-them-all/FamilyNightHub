@@ -58,6 +58,7 @@ test.describe("voting methods", () => {
     request,
     baseURL,
   }) => {
+    test.slow(); // several phones; every PIN claim or switch is an argon2id check (ADR-0014)
     const night = seedNight({ movies: 3 });
     const [paddington, spirited, ironGiant] = night.movies;
     await hostOpensVotingWith(browser, baseURL!, night, "Pick one");
@@ -109,6 +110,7 @@ test.describe("voting methods", () => {
     request,
     baseURL,
   }) => {
+    test.slow(); // several phones; every PIN claim or switch is an argon2id check (ADR-0014)
     const night = seedNight({ movies: 4 });
     const [paddington, spirited, ironGiant, coco] = night.movies;
     await hostOpensVotingWith(browser, baseURL!, night, "Approval");
