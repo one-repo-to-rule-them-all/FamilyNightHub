@@ -9,7 +9,7 @@ Deployed as `fnh-web` on Fly. Read the repo's `AGENTS.md` note: Next 16 uses `pr
 
 | Group | Routes | Who | Notes |
 |---|---|---|---|
-| `(public)` | `/j/[slug]`, `/who`, `/s/[session]`, `/history`, `/albums/[session]` | devices | Phone-first, 56px+ tap targets, poster-led |
+| `(public)` | `/`, `/j/[slug]`, `/who`, `/s/[session]`, `/history`, `/me`, `/people/[id]`, `/albums/[session]` | devices | Phone-first, 56px+ tap targets, poster-led. Signed-in screens sit in the `GuestShell` (app bar + Home/History/Me nav, see "Phone home" below); `/j`, `/who` and the ballot don't |
 | portal | `/host`, `/host/[session]`, `/admin/*` | host/admin | The owner portal: one `PortalShell`, nav filtered by role (see "Owner portal" below) |
 | tv | `/tv`, `/tv/[session]` | paired TV device | Large type, QR + night code, turnout tiles, reveal, slideshow |
 | auth | `/login`, `/auth/callback` | admins/hosts | Magic link |
@@ -23,7 +23,7 @@ pairing explanation from the 401.
 
 | Route | File | What it does |
 |---|---|---|
-| `/` | `src/app/page.tsx` | "Scan the QR" landing |
+| `/` | `src/app/page.tsx` → `home-resolver.tsx` | No device → "Scan the QR" landing (or the rejoin link); nobody current → `/who`. Becoming the phone **Home** (guest-home §5 H1, issue #58): the Tonight card instead of a redirect, except on arrival (`/?arrive=1`) and a cold open while voting |
 | `/j/[slug]` | `src/app/(public)/j/[slug]/` | Night-code entry → `POST /api/v1/join` → `/who`. Forgiving input (`src/lib/night-code.ts`: case, spaces, dashes; flags 0/O/1/I/L before sending). Shows the server's generic error, plus "Try again in N minutes" from `Retry-After` on a 429 |
 | `/who` | `src/app/(public)/who/` | Avatar grid from `GET /api/v1/people`; tiles show `mine` / `pending` / `taken` / `free`; a tap is `PUT /api/v1/devices/me/people/{id}`, then the grid refetches. Claiming a `taken` person makes it `pending` ("ask the host"); while any tile is `pending` the list polls every 5s (`pendingPollInterval` in `src/lib/live.ts`), so the host's approval flips it to `mine` with no reload (an approval publishes nothing to the phone). Once the phone holds someone, a "Vote now" / "See tonight's movie" button links to the household's live night (`GET /api/v1/sessions?status=voting&status=revealed&status=tonight&limit=1`) |
 | `/s/[session]` | `src/app/(public)/s/[session]/` | The night from the snapshot (`GET /api/v1/sessions/{id}`) via `useLiveSession`; see "Phone state machine" below. `draft` → "Almost ready"; `voting` → ballot (`voting-flow.tsx`); `revealed` → winner card + the rest of the ranking; `tonight` → winner + photo drop + album; `closed` → summary + album + link to history |
@@ -163,6 +163,49 @@ a 1080p and a 4K TV read the same from the sofa.
   and the 20-service selection.
 - Query keys `["admin", "people" | "devices" | "settings"]` and `["tmdb", "providers"]`
   (invalidated when the region changes).
+
+## Phone home (guest shell)
+
+> **Spec:** [`proposals/guest-home.md`](proposals/guest-home.md) (issue #58, approved 2026-10-18),
+> built in pieces per [`proposals/guest-home-build-split.md`](proposals/guest-home-build-split.md).
+> The shell below (piece A) is built; Home, the past-night screens and History/Me adopt it in
+> pieces B–D.
+
+A signed-in phone has three places, Home (`/`), History (`/history`) and Me (`/me`), joined by
+`GuestShell` (`src/components/home/guest-shell.tsx`):
+
+- **App bar** (`app-bar.tsx`): optional ‹ back link, the household name from `fnh.lastJoin` (else
+  "Family Night"; G11 would give the device its household), and the current person as a button
+  that opens the existing `SwitchSheet` (PIN on every switch, ADR-0014).
+- **Bottom nav** (`bottom-nav.tsx`, `nav[aria-label=Main]`, `data-testid="bottom-nav"`): three
+  56px links with `aria-current="page"` (`activeTab()`: `/s/*` and albums count as Home, profiles as
+  History), and a cinema dot on Home (`aria-label="Movie night is on"`) while a night is live.
+  Never the primary. Hidden with `hideNav` (the ballot).
+- **Live hand-off** (`live-handoff.tsx`, `data-testid="live-handoff"`): at the top of the content
+  whenever the household has a live night and the page isn't that night's own `/s/{id}`. Its
+  **Go to tonight's movie night** is the screen's `primary-action`. `handoff="none"` on Home (the
+  Tonight card does this job) and on the night's own screens.
+- **Auto-move** (`handoff="countdown"`, That's a wrap and the recap only; owner decision §11.2):
+  the hand-off counts down from 60 s (`handoff-countdown`, `data-seconds`) with a `secondary`
+  **Stay here** (`handoff-stay`). `useAutoMoveCountdown` ticks once a second and pauses, holding
+  the number, while `src/lib/auto-move.ts`'s hold is taken (the upload queue in
+  `use-photo-uploads.ts` holds it while any job is processing/queued/uploading/waiting), while any
+  `dialog[open]` exists (every modal here is a native `<dialog>`), or while the page is hidden. At 0
+  it marks the night seen and `router.push`es to it (Back returns). **Stay here** writes
+  `sessionStorage["fnh.stayNight"]`: no countdown for that night again in this tab. A polite,
+  visually hidden live region announces 60/30/10 s and the pause, not every second.
+
+**Data.** The shell mounts `useHouseholdNight()` (`src/hooks/use-household-night.ts`), which is the
+`["nights","live"]` query (`useLiveNight`: 5 s while visible, never in the background, on focus)
+plus `isNew` (a live night id that isn't `sessionStorage["fnh.seenNight"]`, for 10 minutes from its
+creation) and `markSeen()`. Mounting the poll on every signed-in screen is what fixes the dead end
+where That's a wrap never learned of a new night. `useLatestNight()` (`["nights","latest"]`, 30 s)
+is for a closed night's screen to tell That's a wrap from the recap (`pastNightKind`).
+
+**Pure logic** is in `src/lib/home.ts` (Tonight states T0–T7 via `tonightState()`,
+`arrivalTarget()`, `coldOpenTarget()`, `pastNightKind()`, `isNewNight()`, the guarded
+`fnh.seenNight`/`fnh.stayNight` storage, the tab mapping and the §7 copy deck as `HOME_COPY`) and
+`src/lib/auto-move.ts` (the hold store and the `nextCountdown` reducer), both unit-tested to 100%.
 
 ## Phone state machine
 
