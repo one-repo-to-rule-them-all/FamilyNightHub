@@ -447,6 +447,106 @@ async def test_rename_respects_household_name_uniqueness(two_households: Pair) -
     assert row.name_changed_at is None  # a refused rename does not use up the one change
 
 
+# --- Change your picture anytime (guest-home G10) --------------------------------------
+
+
+async def test_the_current_person_may_change_their_picture_any_number_of_times(
+    two_households: Pair,
+) -> None:
+    a, _ = two_households
+    await _night(a)
+    mia = await _person(a, "Mia")
+    async with phone() as p:
+        await _joined(p, a)
+        await p.bind(mia)
+        changes = [
+            await _send(p, "PATCH", f"{ME}/{mia}", {"avatar_emoji": "🐙"}),
+            await _send(p, "PATCH", f"{ME}/{mia}", {"color": "#22C55E"}),
+            await _send(p, "PATCH", f"{ME}/{mia}", {"avatar_emoji": "🦄", "color": "#3b82f6"}),
+        ]
+    assert [r.status_code for r in changes] == [200, 200, 200]
+    assert [(r.json()["avatar_emoji"], r.json()["color"]) for r in changes] == [
+        ("🐙", "#f97316"),
+        ("🐙", "#22c55e"),
+        ("🦄", "#3b82f6"),
+    ]
+    assert changes[-1].json()["can_rename"] is True  # the picture never uses up the rename
+    row = await _row(a, "SELECT name_changed_at FROM people WHERE id = :p", p=mia)
+    assert row.name_changed_at is None
+    audit = await _row(
+        a,
+        "SELECT count(*) AS n FROM audit_events "
+        "WHERE action = 'person.avatar_changed' AND target_id = :p",
+        p=mia,
+    )
+    assert audit.n == 3
+
+
+async def test_picture_and_rename_once_are_independent(two_households: Pair) -> None:
+    a, _ = two_households
+    await _night(a)
+    mia = await _person(a, "Mia")
+    new_name = f"Mia C {uuid.uuid4().hex[:4]}"
+    async with phone() as p:
+        await _joined(p, a)
+        await p.bind(mia)
+        picture_first = await _send(p, "PATCH", f"{ME}/{mia}", {"avatar_emoji": "🐙"})
+        rename = await _send(p, "PATCH", f"{ME}/{mia}", {"name": new_name})
+        picture_after = await _send(p, "PATCH", f"{ME}/{mia}", {"color": "#22c55e"})
+        same_name = await _send(p, "PATCH", f"{ME}/{mia}", {"name": new_name, "color": "#000000"})
+        second_rename = await _send(
+            p, "PATCH", f"{ME}/{mia}", {"name": "Other Name", "avatar_emoji": "🦄"}
+        )
+    assert picture_first.status_code == 200
+    assert rename.status_code == 200  # a picture change before it doesn't count as the rename
+    assert (rename.json()["name"], rename.json()["can_rename"]) == (new_name, False)
+    assert picture_after.status_code == 200
+    assert same_name.status_code == 200  # the unchanged name is not a second rename
+    assert second_rename.status_code == 409
+    row = await _row(a, "SELECT name, avatar_emoji, color FROM people WHERE id = :p", p=mia)
+    # The refused request changed nothing, not even the picture it carried.
+    assert (row.name, row.avatar_emoji, row.color) == (new_name, "🐙", "#000000")
+
+
+async def test_only_the_current_person_may_change_a_picture(two_households: Pair) -> None:
+    a, b = two_households
+    await _night(a)
+    mia, sam = await _person(a, "Mia"), await _person(a, "Sam")
+    async with phone() as p:
+        await _joined(p, a)
+        never_held = await _send(p, "PATCH", f"{ME}/{mia}", {"avatar_emoji": "🐙"})
+        await p.bind(mia)
+        await p.bind(sam)  # this phone holds both; Sam is current now
+        not_current = await _send(p, "PATCH", f"{ME}/{mia}", {"avatar_emoji": "🐙"})
+        other_household = await _send(p, "PATCH", f"{ME}/{b.ids['person']}", {"color": "#000000"})
+    assert never_held.status_code == 403
+    assert not_current.status_code == 403
+    assert other_household.status_code == 404
+    row = await _row(a, "SELECT avatar_emoji FROM people WHERE id = :p", p=mia)
+    assert row.avatar_emoji == "🦊"
+    theirs = await _row(b, "SELECT color FROM people WHERE id = :p", p=b.ids["person"])
+    assert theirs.color != "#000000"
+
+
+async def test_a_picture_change_is_validated_like_self_create(two_households: Pair) -> None:
+    a, _ = two_households
+    await _night(a)
+    mia = await _person(a, "Mia")
+    async with phone() as p:
+        await _joined(p, a)
+        await p.bind(mia)
+        responses = {
+            "empty": await _send(p, "PATCH", f"{ME}/{mia}", {}),
+            "nulls": await _send(p, "PATCH", f"{ME}/{mia}", {"avatar_emoji": None}),
+            "ascii_emoji": await _send(p, "PATCH", f"{ME}/{mia}", {"avatar_emoji": "ab"}),
+            "long_emoji": await _send(p, "PATCH", f"{ME}/{mia}", {"avatar_emoji": "🐙" * 17}),
+            "bad_colour": await _send(p, "PATCH", f"{ME}/{mia}", {"color": "orange"}),
+        }
+    assert {k: r.status_code for k, r in responses.items()} == dict.fromkeys(responses, 422)
+    row = await _row(a, "SELECT avatar_emoji, color FROM people WHERE id = :p", p=mia)
+    assert (row.avatar_emoji, row.color) == ("🦊", "#f97316")
+
+
 async def test_a_joined_phone_can_create_a_guest_profile(two_households: Pair) -> None:
     a, _ = two_households
     await _night(a)
