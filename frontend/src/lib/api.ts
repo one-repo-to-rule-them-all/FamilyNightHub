@@ -220,6 +220,9 @@ export const api = {
   /** Your own display name, once (409 after that). */
   renameSelf: (personId: string, name: string) =>
     request<Person>("PATCH", `/devices/me/people/${encodeURIComponent(personId)}`, { name }),
+  /** Your own name (once) and/or picture (`avatar_emoji`, `color`; any number of times). */
+  updateSelf: (personId: string, body: Schemas["UpdateSelfIn"]) =>
+    request<Person>("PATCH", `/devices/me/people/${encodeURIComponent(personId)}`, body),
   /** Set a first PIN for someone this phone holds, or change it with `current_pin`. */
   setPin: (personId: string, body: Schemas["SetPinIn"]) =>
     request<Binding>("POST", `/devices/me/people/${encodeURIComponent(personId)}/pin`, body),

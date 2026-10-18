@@ -672,10 +672,11 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Rename Self
-         * @description Change your own display name, once. After that only an admin can rename you.
+         * Update Self
+         * @description Change your own display name (once; after that only an admin can rename you) and/or
+         *     your picture (`avatar_emoji`, `color`; any number of times). Only the fields sent change.
          */
-        patch: operations["rename_self_api_v1_devices_me_people__person_id__patch"];
+        patch: operations["update_self_api_v1_devices_me_people__person_id__patch"];
         trace?: never;
     };
     "/api/v1/devices/me/people/{person_id}/forgot-pin": {
@@ -2476,11 +2477,6 @@ export interface components {
             /** Emoji */
             emoji: string;
         };
-        /** RenameSelfIn */
-        RenameSelfIn: {
-            /** Name */
-            name: string;
-        };
         /** ReorderIn */
         ReorderIn: {
             /** Option Ids */
@@ -2658,6 +2654,19 @@ export interface components {
             title: string;
             /** Year */
             year?: number | null;
+        };
+        /**
+         * UpdateSelfIn
+         * @description Change your own name and/or picture; only the fields sent change, at least one.
+         *     The name changes once (ADR-0014); the picture any number of times.
+         */
+        UpdateSelfIn: {
+            /** Avatar Emoji */
+            avatar_emoji?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Name */
+            name?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -3973,7 +3982,7 @@ export interface operations {
             };
         };
     };
-    rename_self_api_v1_devices_me_people__person_id__patch: {
+    update_self_api_v1_devices_me_people__person_id__patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -3984,7 +3993,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RenameSelfIn"];
+                "application/json": components["schemas"]["UpdateSelfIn"];
             };
         };
         responses: {
@@ -4018,14 +4027,12 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description No field given, or a bad name, emoji or colour */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
+                content?: never;
             };
         };
     };

@@ -2674,19 +2674,6 @@
         "title": "ReactionCountOut",
         "type": "object"
       },
-      "RenameSelfIn": {
-        "properties": {
-          "name": {
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "title": "RenameSelfIn",
-        "type": "object"
-      },
       "ReorderIn": {
         "properties": {
           "option_ids": {
@@ -3246,6 +3233,46 @@
           "title"
         ],
         "title": "TypedTitleIn",
+        "type": "object"
+      },
+      "UpdateSelfIn": {
+        "description": "Change your own name and/or picture; only the fields sent change, at least one.\nThe name changes once (ADR-0014); the picture any number of times.",
+        "properties": {
+          "avatar_emoji": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Emoji"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "UpdateSelfIn",
         "type": "object"
       },
       "ValidationError": {
@@ -4856,8 +4883,8 @@
         ]
       },
       "patch": {
-        "description": "Change your own display name, once. After that only an admin can rename you.",
-        "operationId": "rename_self_api_v1_devices_me_people__person_id__patch",
+        "description": "Change your own display name (once; after that only an admin can rename you) and/or\nyour picture (`avatar_emoji`, `color`; any number of times). Only the fields sent change.",
+        "operationId": "update_self_api_v1_devices_me_people__person_id__patch",
         "parameters": [
           {
             "in": "path",
@@ -4874,7 +4901,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RenameSelfIn"
+                "$ref": "#/components/schemas/UpdateSelfIn"
               }
             }
           },
@@ -4901,17 +4928,10 @@
             "description": "Already renamed once, or the name is taken"
           },
           "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
+            "description": "No field given, or a bad name, emoji or colour"
           }
         },
-        "summary": "Rename Self",
+        "summary": "Update Self",
         "tags": [
           "people"
         ]

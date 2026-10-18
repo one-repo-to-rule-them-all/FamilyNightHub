@@ -27,9 +27,9 @@ from app.schemas.identity import (
     PersonOut,
     PinErrorOut,
     PinResetRequestOut,
-    RenameSelfIn,
     SelfCreateIn,
     SetPinIn,
+    UpdateSelfIn,
 )
 from app.schemas.profile import (
     ProfileAlbumOut,
@@ -268,15 +268,23 @@ async def bind_person(
         **NOT_FOUND,
         403: {"description": "This phone isn't currently acting as them"},
         409: {"description": "Already renamed once, or the name is taken"},
+        422: {"description": "No field given, or a bad name, emoji or colour"},
     },
 )
-async def rename_self(
-    person_id: uuid.UUID, body: RenameSelfIn, device: CurrentDevice, db: DeviceDb
+async def update_self(
+    person_id: uuid.UUID, body: UpdateSelfIn, device: CurrentDevice, db: DeviceDb
 ) -> PersonOut:
-    """Change your own display name, once. After that only an admin can rename you."""
+    """Change your own display name (once; after that only an admin can rename you) and/or
+    your picture (`avatar_emoji`, `color`; any number of times). Only the fields sent change."""
     try:
-        tile = await people_service.rename_self(
-            db, device.household_id, device.device_id, person_id, body.name
+        tile = await people_service.update_self(
+            db,
+            device.household_id,
+            device.device_id,
+            person_id,
+            name=body.name,
+            avatar_emoji=body.avatar_emoji,
+            color=body.color,
         )
     except (NotFound, Forbidden, Conflict) as err:
         _raise(err)

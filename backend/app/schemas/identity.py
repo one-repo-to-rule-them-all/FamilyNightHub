@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, model_validator
 
 from app.domain import credentials
 from app.schemas.admin import Color, Emoji, Name
@@ -156,8 +156,19 @@ class SelfCreateIn(BaseModel):
     pin: Pin
 
 
-class RenameSelfIn(BaseModel):
-    name: Name
+class UpdateSelfIn(BaseModel):
+    """Change your own name and/or picture; only the fields sent change, at least one.
+    The name changes once (ADR-0014); the picture any number of times."""
+
+    name: Name | None = None
+    avatar_emoji: Emoji | None = None
+    color: Color | None = None
+
+    @model_validator(mode="after")
+    def _at_least_one(self) -> UpdateSelfIn:
+        if self.name is None and self.avatar_emoji is None and self.color is None:
+            raise ValueError("give at least one of name, avatar_emoji or color")
+        return self
 
 
 class PinResetRequestOut(BaseModel):

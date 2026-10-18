@@ -381,21 +381,26 @@ async def create_self(
     return await get_tile(db, device_id, person_id)
 
 
-async def rename_self(
+async def update_self(
     db: AsyncSession,
     household_id: uuid.UUID,
     device_id: uuid.UUID,
     person_id: uuid.UUID,
-    name: str,
+    *,
+    name: str | None = None,
+    avatar_emoji: str | None = None,
+    color: str | None = None,
 ) -> PersonTile:
-    """The person this phone is acting as may change their own name once. Admin renames
-    (people_admin_service.update) are unlimited and don't count. Locks in the admin
-    update's order (names, then the row), so the two cannot deadlock."""
-    await people_admin_service.lock_names(db, household_id)
+    """The person this phone is acting as may change their own name once, and their picture
+    (emoji, colour) any number of times. Admin renames (people_admin_service.update) are
+    unlimited and don't count. Locks in the admin update's order (names, then the row), so
+    the two cannot deadlock."""
+    if name is not None:
+        await people_admin_service.lock_names(db, household_id)
     row = (
         await db.execute(
             text(
-                "SELECT name, name_changed_at FROM people "
+                "SELECT name, name_changed_at, avatar_emoji, color FROM people "
                 "WHERE id = :p AND merged_into_id IS NULL FOR UPDATE"
             ),
             {"p": person_id},
@@ -404,9 +409,9 @@ async def rename_self(
     if row is None:
         raise NotFound
     await require_can_act_as(db, device_id, person_id)
-    if row.name_changed_at is not None:
-        raise Conflict("You've already changed your name once. Ask an admin to change it.")
-    if name != row.name:
+    if name is not None and name != row.name:
+        if row.name_changed_at is not None:
+            raise Conflict("You've already changed your name once. Ask an admin to change it.")
         if name.lower() != row.name.lower():
             await people_admin_service.require_unique_name(db, name, except_id=person_id)
         await db.execute(
@@ -414,6 +419,14 @@ async def rename_self(
             {"n": name, "p": person_id},
         )
         await _audit(db, household_id, device_id, "person.renamed_self", person_id)
+    emoji = avatar_emoji if avatar_emoji is not None else row.avatar_emoji
+    colour = color if color is not None else row.color
+    if (emoji, colour) != (row.avatar_emoji, row.color):
+        await db.execute(
+            text("UPDATE people SET avatar_emoji = :e, color = :c WHERE id = :p"),
+            {"e": emoji, "c": colour, "p": person_id},
+        )
+        await _audit(db, household_id, device_id, "person.avatar_changed", person_id)
     return await get_tile(db, device_id, person_id)
 
 
