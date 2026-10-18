@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { nightKey } from "@/hooks/use-live-session";
@@ -14,11 +15,15 @@ import { VOTING_METHODS } from "@/lib/voting-method";
  */
 export function VotingMethodPicker({ night }: { night: Night }) {
   const queryClient = useQueryClient();
+  // Set in the click's own event: the mutation's pending state lands a tick later, and until then
+  // the controlled radio snapped back to the old method for a frame (flaky in e2e, #42).
+  const [wanted, setWanted] = useState<VotingMethod | null>(null);
   const change = useMutation<Night, ApiError, VotingMethod>({
     mutationFn: (method) => api.setVotingMethod(night.id, method),
     onSuccess: (next) => queryClient.setQueryData(nightKey(night.id), next),
+    onSettled: () => setWanted(null),
   });
-  const current = change.isPending ? change.variables : night.voting_method;
+  const current = wanted ?? night.voting_method;
 
   return (
     <fieldset className="flex flex-col gap-3" data-testid="voting-method">
@@ -37,7 +42,10 @@ export function VotingMethodPicker({ night }: { night: Night }) {
             value={method.value}
             checked={current === method.value}
             disabled={change.isPending}
-            onChange={() => change.mutate(method.value)}
+            onChange={() => {
+              setWanted(method.value);
+              change.mutate(method.value);
+            }}
             className="mt-1 size-5 accent-primary"
           />
           <span className="flex flex-col gap-0.5">
