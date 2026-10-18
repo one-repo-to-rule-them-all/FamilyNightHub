@@ -137,7 +137,8 @@ export async function portalNav(page: Page, label: string) {
     return;
   }
   const tabs = page.getByRole("navigation", { name: "Portal" });
-  const tab = tabs.getByRole("link", { name: new RegExp(`^(\d+ )?${label}`) });
+  // A tab's name includes its badge ("2 things need you Home"): match the label as a substring.
+  const tab = tabs.getByRole("link", { name: label });
   if ((await tab.count()) > 0) {
     await tab.first().click();
     return;
