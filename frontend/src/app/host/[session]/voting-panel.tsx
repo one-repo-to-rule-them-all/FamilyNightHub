@@ -88,7 +88,8 @@ function ProxyBallot({
         : `rank up to ${k}`;
 
   const enroll = useMutation<unknown, ApiError>({
-    mutationFn: () => enrollDevice({ as_tv: false, device_label: "Host browser" }),
+    mutationFn: () =>
+      enrollDevice({ as_tv: false, keep_session: false, device_label: "Host browser" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["people"] }),
   });
   const cast = useMutation<void, ApiError, { personId: string; ranked: string[] }>({

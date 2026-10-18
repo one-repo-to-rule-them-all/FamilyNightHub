@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import text
 
 from app.core.database import household_session
-from app.core.security import ACCOUNT_COOKIE, DEVICE_COOKIE
+from app.core.security import ACCOUNT_COOKIE, DEVICE_COOKIE, DEVICE_ONLY_HEADER
 from app.services import people_service
 from tests.integration.phones import Phone, add_account, open_night, phone
 from tests.integration.seed import SeededHousehold
@@ -64,6 +64,70 @@ async def test_pairing_the_tv_signs_the_host_out_of_that_browser(two_households:
         assert (await tv.client.get("/api/v1/auth/me")).status_code == 401
         assert (await tv.client.get("/api/v1/devices/me")).status_code == 200
     assert await _device_row(a, resp.json()["device_id"]) == (True, "Living room")
+
+
+async def test_opening_a_tv_window_keeps_the_host_signed_in(two_households: Pair) -> None:
+    """ADR-0002 amendment 2026-10-18: the host's laptop drives the TV from a second window.
+    Both cookies end up in the one jar, under different names, and neither is cleared."""
+    a, _ = two_households
+    async with phone() as laptop:
+        _as_admin(laptop, a)
+        body = {"as_tv": True, "keep_session": True, "device_label": "Living room"}
+        resp = await laptop.post("/api/v1/devices/enroll", body)
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["is_tv"] is True
+        set_cookies = resp.headers.get_list("set-cookie")
+        assert not any(c.startswith(ACCOUNT_COOKIE) for c in set_cookies)
+        assert any(c.startswith(DEVICE_COOKIE) for c in set_cookies)
+        assert ACCOUNT_COOKIE in laptop.client.cookies and DEVICE_COOKIE in laptop.client.cookies
+        # The portal tab: still the host.
+        assert (await laptop.client.get("/api/v1/auth/me")).status_code == 200
+        # The TV window: the device. Using it doesn't disturb the session (the cookie slide
+        # re-issues only fnh_device).
+        tv = await laptop.client.get("/api/v1/devices/me", headers={DEVICE_ONLY_HEADER: "1"})
+        assert tv.status_code == 200
+        assert not any(c.startswith(ACCOUNT_COOKIE) for c in tv.headers.get_list("set-cookie"))
+        assert (await laptop.client.get("/api/v1/auth/me")).status_code == 200
+    assert await _device_row(a, resp.json()["device_id"]) == (True, "Living room")
+
+
+async def test_tv_window_requests_never_act_as_the_account(two_households: Pair) -> None:
+    """With the device-only header, a valid fnh_session is ignored: account routes are 401,
+    viewer routes see the TV device, device routes work as before."""
+    a, _ = two_households
+    await open_night(a.household_id, a.ids["session"], CODE)
+    async with phone() as laptop:
+        _as_admin(laptop, a)
+        await laptop.post("/api/v1/devices/enroll", {"as_tv": True, "keep_session": True})
+        tv = {DEVICE_ONLY_HEADER: "1"}
+        assert (await laptop.client.get("/api/v1/auth/me", headers=tv)).status_code == 401
+        assert (await laptop.client.get("/api/v1/admin/devices", headers=tv)).status_code == 401
+        assert (
+            await laptop.client.get("/api/v1/devices/me/help-count", headers=tv)
+        ).status_code == 200
+        night = await laptop.client.get(f"/api/v1/sessions/{a.ids['session']}", headers=tv)
+        assert night.status_code == 200
+        # The header can't hand a phone anything: no account, no device → still 401.
+    async with phone() as stranger:
+        resp = await stranger.client.get(
+            f"/api/v1/sessions/{a.ids['session']}", headers={DEVICE_ONLY_HEADER: "1"}
+        )
+        assert resp.status_code == 401
+
+
+async def test_tv_window_without_a_device_is_not_rescued_by_the_session(
+    two_households: Pair,
+) -> None:
+    """A device-only request from a signed-in browser that holds no TV device is refused, so
+    a TV window whose device was revoked shows "not paired" instead of host data."""
+    a, _ = two_households
+    async with phone() as laptop:
+        _as_admin(laptop, a)
+        resp = await laptop.client.get(
+            f"/api/v1/sessions/{a.ids['session']}", headers={DEVICE_ONLY_HEADER: "1"}
+        )
+        assert resp.status_code == 401
+        assert (await laptop.client.get(f"/api/v1/sessions/{a.ids['session']}")).status_code == 200
 
 
 async def test_enrolling_a_browser_that_already_has_a_device_reuses_it(

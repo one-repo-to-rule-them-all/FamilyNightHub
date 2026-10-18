@@ -559,7 +559,9 @@ export interface paths {
          * Enroll
          * @description Let this browser in on the signed-in host's authority. With `as_tv`, the device is
          *     marked as the TV and the host session is cleared from this browser, so a TV left in the
-         *     living room never holds host rights.
+         *     living room never holds host rights. With `keep_session` as well (the host's own laptop
+         *     driving the TV from a second window), the session stays: the two cookies have different
+         *     names and the TV screens send the device-only header, so neither clobbers the other.
          */
         post: operations["enroll_api_v1_devices_enroll_post"];
         delete?: never;
@@ -1708,6 +1710,11 @@ export interface components {
             as_tv: boolean;
             /** Device Label */
             device_label?: string | null;
+            /**
+             * Keep Session
+             * @default false
+             */
+            keep_session: boolean;
         };
         /** EnrollOut */
         EnrollOut: {

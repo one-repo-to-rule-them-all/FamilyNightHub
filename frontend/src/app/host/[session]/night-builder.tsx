@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Poster } from "@/components/night/poster";
+import { OpenTvWindowButton } from "@/components/portal/use-as-tv";
 import { Button } from "@/components/ui/button";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import { type LiveState, nightKey, useLiveSession } from "@/hooks/use-live-session";
@@ -67,6 +68,8 @@ export function NightBuilder({ sessionId }: { sessionId: string }) {
           {STATUS_LABEL[data.status]}
         </p>
       </header>
+
+      {data.status !== "closed" ? <OpenTvWindowButton sessionId={data.id} /> : null}
 
       {data.status === "draft" ? <DraftStage night={data} /> : null}
       {data.status === "voting" ? <VotingStage night={data} live={live} /> : null}

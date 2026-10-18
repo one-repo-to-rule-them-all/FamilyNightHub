@@ -5,6 +5,7 @@ import {
   ApiError,
   configureApi,
   CSRF_HEADER,
+  DEVICE_ONLY_HEADER,
   enrollDevice,
   retryAfterHint,
   toApiError,
@@ -231,6 +232,29 @@ describe("retryAfterHint", () => {
   });
 });
 
+describe("TV screens run on the device only (ADR-0002 amendment 2026-10-18)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const at = (pathname: string) => vi.stubGlobal("window", { location: { pathname } });
+
+  it("sends the device-only header from /tv and /tv/[session]", async () => {
+    for (const path of ["/tv", "/tv/n1"]) {
+      at(path);
+      const calls = transport(json(200, []));
+      await api.nights({ status: ["voting"], limit: 1 });
+      expect(header(calls[0], DEVICE_ONLY_HEADER)).toBe("1");
+    }
+  });
+
+  it("leaves it off the portal, phones and look-alike paths", async () => {
+    for (const path of ["/host", "/host/n1", "/s/n1", "/tvguide"]) {
+      at(path);
+      const calls = transport(json(200, []));
+      await api.nights({ status: ["voting"], limit: 1 });
+      expect(header(calls[0], DEVICE_ONLY_HEADER)).toBeUndefined();
+    }
+  });
+});
+
 describe("enrollDevice", () => {
   const unauthorized = () => json(401, envelope("unauthorized", "Not signed in"));
 
@@ -243,7 +267,9 @@ describe("enrollDevice", () => {
       json(200, { id: "d", people: [] }),
     );
 
-    await expect(enrollDevice({ as_tv: true }, { delayMs: 0 })).resolves.toEqual({
+    await expect(
+      enrollDevice({ as_tv: true, keep_session: false }, { delayMs: 0 }),
+    ).resolves.toEqual({
       device_id: "d",
       is_tv: true,
     });
@@ -263,11 +289,11 @@ describe("enrollDevice", () => {
       unauthorized(),
       unauthorized(),
     );
-    await expect(enrollDevice({ as_tv: false }, { attempts: 2, delayMs: 0 })).rejects.toMatchObject(
-      {
-        status: 401,
-      },
-    );
+    await expect(
+      enrollDevice({ as_tv: false, keep_session: false }, { attempts: 2, delayMs: 0 }),
+    ).rejects.toMatchObject({
+      status: 401,
+    });
   });
 
   it("does not retry anything but a 401", async () => {
@@ -276,7 +302,9 @@ describe("enrollDevice", () => {
       json(200, { device_id: "d", is_tv: false }),
       json(500, envelope("internal_error", "Something went wrong")),
     );
-    await expect(enrollDevice({ as_tv: false }, { delayMs: 0 })).rejects.toMatchObject({
+    await expect(
+      enrollDevice({ as_tv: false, keep_session: false }, { delayMs: 0 }),
+    ).rejects.toMatchObject({
       status: 500,
     });
   });
