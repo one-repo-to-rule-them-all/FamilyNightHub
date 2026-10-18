@@ -311,6 +311,73 @@ test.describe("sign-off", () => {
     await tvContext.close();
   });
 
+  test("a held person with no PIN waits for the host; only a real rejection says no", async ({
+    page,
+    browser,
+    request,
+  }) => {
+    test.slow(); // several phones; every PIN claim or switch is an argon2id check (ADR-0014)
+    const night = seedNight({ movies: 3, openVoting: true });
+    const admin = { Cookie: `fnh_session=${night.hostCookie}; fnh_csrf=c`, "X-FNH-CSRF": "c" };
+
+    // Staging (#42): Ava is held by phone A but has no PIN (here: her PIN was reset, as a pre-PIN
+    // binding would be).
+    await joinAs(page, night, ["Ava"]);
+    const people = (await apiFromPhone(page, "GET", "/people")).body as {
+      id: string;
+      name: string;
+    }[];
+    const ava = people.find((p) => p.name === "Ava")!;
+    expect(
+      (await apiFromPhone(page, "POST", `/devices/me/people/${ava.id}/forgot-pin`)).status,
+    ).toBe(202);
+    const [reset] = (await (
+      await request.get(`${API_URL}/api/v1/admin/people/pin-resets`, { headers: admin })
+    ).json()) as { id: string }[];
+    expect(
+      (
+        await request.post(`${API_URL}/api/v1/admin/people/pin-resets/${reset.id}/approve`, {
+          headers: admin,
+        })
+      ).status(),
+    ).toBe(200);
+
+    // Phone B taps her: the claim goes to the host and the phone waits, through the next polls.
+    const phoneB = await newPhone(browser);
+    await joinAs(phoneB, night, ["Leo"]);
+    await phoneB.goto("/who");
+    const tile = phoneB.getByRole("button", { name: /^Ava/ });
+    await expect(tile).toHaveAttribute("data-action", "ask-host");
+    await tile.click();
+    await expect(phoneB.locator('[data-screen="pending"]')).toBeVisible();
+    for (let i = 0; i < 2; i++) {
+      await phoneB.waitForResponse(
+        (r) => r.url().endsWith("/api/v1/people") && r.request().method() === "GET",
+      );
+      await expect(phoneB.locator('[data-screen="pending"]')).toBeVisible();
+    }
+    await expect(phoneB.getByText(/The host said no/)).toHaveCount(0);
+
+    // The claim is really there; when the host rejects it, the phone says so.
+    const claims = (await (
+      await request.get(`${API_URL}/api/v1/devices/claims`, { headers: admin })
+    ).json()) as { device_id: string; person_name: string; person_id: string }[];
+    const claim = claims.find((c) => c.person_name === "Ava")!;
+    expect(claim).toBeTruthy();
+    expect(
+      (
+        await request.post(
+          `${API_URL}/api/v1/devices/${claim.device_id}/people/${claim.person_id}/reject`,
+          { headers: admin },
+        )
+      ).status(),
+    ).toBeLessThan(300);
+    await expect(phoneB.getByText(/The host said no for/)).toBeVisible(POLL);
+    await expect(phoneB.locator('[data-screen="who"]')).toBeVisible();
+
+    await phoneB.context().close();
+  });
+
   test("Here tonight shows a phone that joined but hasn't voted", async ({ page, browser }) => {
     test.slow(); // several phones; every PIN claim or switch is an argon2id check (ADR-0014)
     const night = seedNight({ movies: 3, openVoting: true });
