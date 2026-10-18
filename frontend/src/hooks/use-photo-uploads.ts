@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 
 import { albumKey } from "@/hooks/use-album";
+import { holdAutoMove, uploadsInProgress } from "@/lib/auto-move";
 import { indexedDbStore } from "@/lib/photos/job-store";
 import { browserCodec, processPhoto, UnreadablePhotoError } from "@/lib/photos/process";
 import { type JobStatus, UploadQueue } from "@/lib/photos/queue";
@@ -14,8 +15,24 @@ let queue: UploadQueue | null = null;
 /** Files are processed one at a time (ADR-0005): each new pick joins the end of this chain. */
 let processing: Promise<void> = Promise.resolve();
 
+/** The auto-move hold while a photo is on its way (guest-home §5 H0c): nobody moves mid-upload. */
+let releaseHold: (() => void) | null = null;
+
+function syncAutoMoveHold(q: UploadQueue): void {
+  const busy = uploadsInProgress(q.snapshot());
+  if (busy && !releaseHold) releaseHold = holdAutoMove();
+  else if (!busy && releaseHold) {
+    releaseHold();
+    releaseHold = null;
+  }
+}
+
 function getQueue(): UploadQueue {
-  queue ??= new UploadQueue({ store: indexedDbStore(), upload: makeUploader() });
+  if (!queue) {
+    const q = new UploadQueue({ store: indexedDbStore(), upload: makeUploader() });
+    q.subscribe(() => syncAutoMoveHold(q));
+    queue = q;
+  }
   return queue;
 }
 
