@@ -791,6 +791,11 @@
               }
             ],
             "title": "Device Label"
+          },
+          "keep_session": {
+            "default": false,
+            "title": "Keep Session",
+            "type": "boolean"
           }
         },
         "title": "EnrollIn",
@@ -4651,7 +4656,7 @@
     },
     "/api/v1/devices/enroll": {
       "post": {
-        "description": "Let this browser in on the signed-in host's authority. With `as_tv`, the device is\nmarked as the TV and the host session is cleared from this browser, so a TV left in the\nliving room never holds host rights.",
+        "description": "Let this browser in on the signed-in host's authority. With `as_tv`, the device is\nmarked as the TV and the host session is cleared from this browser, so a TV left in the\nliving room never holds host rights. With `keep_session` as well (the host's own laptop\ndriving the TV from a second window), the session stays: the two cookies have different\nnames and the TV screens send the device-only header, so neither clobbers the other.",
         "operationId": "enroll_api_v1_devices_enroll_post",
         "requestBody": {
           "content": {

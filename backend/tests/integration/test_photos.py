@@ -13,7 +13,7 @@ from httpx import Response
 from sqlalchemy import text
 
 from app.core.database import household_session
-from app.core.security import CSRF_HEADER
+from app.core.security import CSRF_HEADER, DEVICE_ONLY_HEADER
 from app.services import photo_service
 from tests.integration.phones import Phone, add_account, open_night, phone
 from tests.integration.seed import SeededHousehold
@@ -514,6 +514,30 @@ async def test_hosts_hide_and_unhide(two_households: Pair, fake: FakeStorage) ->
         # CSRF on moderation.
         resp = await _send(host, "POST", f"{_base(sid)}/{photo_id}/hide", csrf=False)
         assert resp.status_code == 403
+
+
+async def test_the_tv_window_never_shows_hidden_photos(
+    two_households: Pair, fake: FakeStorage
+) -> None:
+    """ADR-0002 amendment 2026-10-18: on the host's laptop the TV window shares the cookie jar
+    with the signed-in portal. Its requests are device-only, so the album it reads is the
+    TV's (hidden photos left out), not the host's moderation view."""
+    a, _ = two_households
+    async with phone() as p, phone() as laptop:
+        person = await _member(p, a)
+        photo_id = await _ready_photo(p, a, fake, person)
+        sid = a.ids["session"]
+        await _host(laptop, a)
+        enrolled = await laptop.post(
+            "/api/v1/devices/enroll", {"as_tv": True, "keep_session": True}
+        )
+        assert enrolled.status_code == 200, enrolled.text
+        assert (await laptop.post(f"{_base(sid)}/{photo_id}/hide")).status_code == 204
+
+        assert [ph["status"] for ph in await _album(laptop, a)] == ["hidden"]  # the portal
+        tv = await laptop.client.get(_base(sid), headers={DEVICE_ONLY_HEADER: "1"})
+        assert tv.status_code == 200
+        assert tv.json() == []
 
 
 async def test_cannot_hide_a_pending_photo(two_households: Pair, fake: FakeStorage) -> None:

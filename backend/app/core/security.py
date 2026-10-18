@@ -21,6 +21,10 @@ DEVICE_COOKIE = "fnh_device"
 ACCOUNT_COOKIE = "fnh_session"
 CSRF_COOKIE = "fnh_csrf"
 CSRF_HEADER = "X-FNH-CSRF"
+# Sent by the TV screens (ADR-0002 amendment 2026-10-18): this request runs on the device
+# cookie only, even when the browser also holds the host's `fnh_session`. It can only take
+# authority away, so it needs no protection of its own.
+DEVICE_ONLY_HEADER = "X-FNH-Device-Only"
 
 
 def new_token() -> str:

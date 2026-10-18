@@ -32,7 +32,9 @@ async def enroll(
 ) -> EnrollOut:
     """Let this browser in on the signed-in host's authority. With `as_tv`, the device is
     marked as the TV and the host session is cleared from this browser, so a TV left in the
-    living room never holds host rights."""
+    living room never holds host rights. With `keep_session` as well (the host's own laptop
+    driving the TV from a second window), the session stays: the two cookies have different
+    names and the TV screens send the device-only header, so neither clobbers the other."""
     existing_id: uuid.UUID | None = None
     token = request.cookies.get(DEVICE_COOKIE)
     if token:
@@ -49,7 +51,7 @@ async def enroll(
     )
     if result.new_token is not None:
         set_device_cookie(response, result.new_token)
-    if body.as_tv:
+    if body.as_tv and not body.keep_session:
         clear_account_cookie(response)
     return EnrollOut(device_id=result.device_id, is_tv=result.is_tv)
 

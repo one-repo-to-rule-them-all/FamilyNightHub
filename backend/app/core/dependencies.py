@@ -32,6 +32,7 @@ from app.core.security import (
     CSRF_COOKIE,
     CSRF_HEADER,
     DEVICE_COOKIE,
+    DEVICE_ONLY_HEADER,
     csrf_matches,
     hash_device_token,
     set_device_cookie,
@@ -104,7 +105,10 @@ class AccountContext:
 
 async def current_account(request: Request) -> AccountContext:
     """Signed `fnh_session` cookie, then a fresh read of the account row (role, disabled),
-    so a disabled account or changed role takes effect on the next request."""
+    so a disabled account or changed role takes effect on the next request. A device-only
+    request (the TV window) never acts as the account, even with a valid cookie."""
+    if device_only(request):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in required")
     raw = request.cookies.get(ACCOUNT_COOKIE)
     claims = verify_account_session(raw, int(time.time())) if raw else None
     if claims is None:
@@ -125,6 +129,13 @@ async def current_account(request: Request) -> AccountContext:
 
 
 CurrentAccount = Annotated[AccountContext, Depends(current_account)]
+
+
+def device_only(request: Request) -> bool:
+    """The TV window shares the laptop's cookie jar with the host portal (ADR-0002 amendment
+    2026-10-18), so it says which credential it means: with this header the account cookie
+    is ignored and the request is the TV device or nothing."""
+    return request.headers.get(DEVICE_ONLY_HEADER) == "1"
 
 
 async def account_db(account: CurrentAccount) -> AsyncIterator[AsyncSession]:
@@ -159,8 +170,10 @@ class ViewerContext:
 
 async def current_viewer(request: Request) -> ViewerContext:
     """A signed-in account if the session cookie is valid, else a live device; else 401.
-    Read-only routes (the night snapshot) use this so the TV, phones and hosts share them."""
-    if request.cookies.get(ACCOUNT_COOKIE):
+    Read-only routes (the night snapshot) use this so the TV, phones and hosts share them.
+    A device-only request skips the account, so the TV never sees what only hosts see
+    (hidden photos) just because the host is signed in in another tab."""
+    if request.cookies.get(ACCOUNT_COOKIE) and not device_only(request):
         try:
             account = await current_account(request)
         except HTTPException:

@@ -6,6 +6,9 @@
  * - CSRF is double-submit (ADR-0002): GET /api/v1/csrf once, cache the token, and send it as
  *   `X-FNH-CSRF` on every mutation. A 403 CSRF rejection (cookie cleared or rotated) refreshes the
  *   token and retries once.
+ * - On the TV screens (`/tv/*`) every request also sends `X-FNH-Device-Only: 1`, so it runs as the
+ *   TV device even when the host is signed in in another window of the same browser (ADR-0002
+ *   amendment 2026-10-18). The API then ignores `fnh_session` for that request.
  * - Every non-2xx is the envelope `{"error": {code, message, request_id}}` (backend app/main.py),
  *   surfaced as `ApiError`. Screens show `message` as-is: the server already keeps it generic.
  *
@@ -61,6 +64,14 @@ export type ReactionEmoji =
   operations["add_reaction_api_v1_sessions__session_id__photos__photo_id__reactions__emoji__put"]["parameters"]["path"]["emoji"];
 
 export const CSRF_HEADER = "X-FNH-CSRF";
+export const DEVICE_ONLY_HEADER = "X-FNH-Device-Only";
+
+/** The TV screens run on the device cookie alone (see the header comment). */
+export function onTvScreen(): boolean {
+  if (typeof window === "undefined") return false;
+  const path = window.location.pathname;
+  return path === "/tv" || path.startsWith("/tv/");
+}
 const BASE = "/api/v1";
 const NETWORK_MESSAGE = "Can't reach Family Night right now. Check your Wi-Fi and try again.";
 
@@ -167,6 +178,7 @@ async function request<T>(method: Method, path: string, body?: unknown, retried 
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (method !== "GET") headers[CSRF_HEADER] = await fetchCsrfToken();
+  if (onTvScreen()) headers[DEVICE_ONLY_HEADER] = "1";
 
   const response = await send(path, {
     method,
