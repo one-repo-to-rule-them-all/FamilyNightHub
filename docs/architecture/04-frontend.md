@@ -67,6 +67,13 @@ a hash, so no screen can fetch it again. The browser that received it keeps it i
 gone when the tab closes, never sent back to the server, dropped once the night is `closed`.
 - The ADR-0002 flow (host signs in on the TV's browser, starts the night, **Use this browser as the
   TV**) stays in one tab, so `/tv/[session]` reads the code the host page just stored.
+- **Open TV window** (Home's Up-next card and the night page; ADR-0002 amendment 2026-10-18) is the
+  host's laptop driving the TV: `src/components/portal/use-as-tv.tsx` opens the named window
+  `fnh-tv` synchronously in the click (so popup blockers allow it), enrolls with
+  `{as_tv: true, keep_session: true}`, copies this tab's code into the window's `sessionStorage`
+  (`handNightCodeTo`) and only then navigates it to `/tv/{night}`. The portal tab stays signed in.
+  A blocked popup gets a plain "Open the TV screen" link. On `/tv*` the API client adds
+  `X-FNH-Device-Only: 1` to every request, so that window runs on the TV device only.
 - A TV paired on an earlier night never saw tonight's code: it shows a "Host: type tonight's code"
   field (typed from the host's phone, which shows the code on create), kept the same way.
 - Another host browser sees "Rotate code" instead of a code.

@@ -30,7 +30,7 @@ backend/app/
 | TV help count | `GET /api/v1/devices/me/help-count` | The TV (`is_tv`) only: `{count, first_name}` of pending person claims (never PIN resets); other phones 403 |
 | Join link | `GET /api/v1/devices/me/join-link` | The TV (`is_tv`) or a host account (`sessions:run`) reads `{join_slug, qr_includes_night_code}` to draw the join QR; other phones 403. The night code is never returned |
 | Profiles | `GET /api/v1/people/{id}/profile` | A person's revealed nights, picks, winners, ratings, albums and stats (any device or account of the household) |
-| Host devices | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}` | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it); review pending person claims (`devices:enroll` / `devices:approve`) |
+| Host devices | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}` | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it, unless `keep_session`: the host's laptop opening a TV window); review pending person claims (`devices:enroll` / `devices:approve`) |
 | Sessions | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET/PATCH /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}`, `PUT /sessions/{id}/slideshow` | Host (`sessions:run`): create (code shown once; `voting_method` defaults to the household's), change the voting method while `draft`, rotate code, shortlist, open/close voting, close the night, start/stop the TV slideshow. Snapshot and history: any device or account of the household |
 | Ballots | `PUT /api/v1/sessions/{id}/ballots`, `PUT …/ballots/proxy`, `GET …/ballots/mine`, `GET …/voters` | Phone casts/replaces a bound person's ballot; host proxy ballot (`ballots:proxy`); a phone reads back its own people's ballots; who has voted (avatars only) |
 | Live | `/api/v1/sse-tickets`, `/api/v1/sessions/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md) |
@@ -129,10 +129,23 @@ which slugs exist. A phone that already holds a live token for the household reu
 The other way in is a signed-in host: `POST /devices/enroll` mints a device for that browser
 (reusing one it already holds for the household). With `as_tv: true` the device is marked
 `is_tv` and the host's `fnh_session` is cleared, so the living-room TV never carries host rights.
+With `keep_session: true` as well (the host's laptop driving the TV from a second window, ADR-0002
+amendment 2026-10-18) the session stays, and the TV window instead sends `X-FNH-Device-Only: 1`
+on every request: `current_account` then refuses the session (401) and `current_viewer` resolves
+only the device, so that window is the TV and nothing more even though the browser is signed in.
 Approving a pending claim leaves the person bound to their other phone as well, and makes them
 current on the approved phone.
-The device cookie is `fnh_device`: 256-bit token, `HttpOnly; Secure; SameSite=Lax`, 365-day
-sliding `Max-Age`.
+The device cookie is `fnh_device`: 256-bit token, `HttpOnly; Secure; SameSite=Lax`, sliding
+`Max-Age` of `DEVICE_IDLE_DAYS` (30).
+
+**Idle timeout** (ADR-0002 amendment, 2026-10-18, issue #56; `services/device_idle.py`). A live
+device whose `last_seen_at` (or `created_at`, if never stamped) is older than `DEVICE_IDLE_DAYS`
+gets 401 with code `device_expired` on every device route; unknown and revoked tokens keep the
+generic 401. `device_db` stamps `last_seen_at` at most once per `DEVICE_TOUCH_INTERVAL_SECONDS`
+(1 h), so active devices never drift past the window. An expired device is not revoked: a night
+code (or a host enrollment) revives the same row, clears its `device_people` bindings and
+`is_tv`, and audits `device.rejoined`. Its people must be picked again with their PINs, and a
+TV needs a host to pair it again.
 
 **Rate limiting.** Join *failures* are counted per slug (`JOIN_FAILURE_LIMIT` per
 `JOIN_FAILURE_WINDOW_SECONDS`, default 30 per 15 min), never per client IP: a family shares one
@@ -271,7 +284,8 @@ the CSRF header and writes an audit row.
   409. The response and the `person.merged` audit row carry moved/dropped counts per table.
 - **Devices** (`services/device_admin_service.py`, `admin:devices`). The list returns every
   device (live first, most recently seen first, then revoked) with label, `is_tv`,
-  `last_seen_at`, `revoked_at` and its people with binding status. `PATCH` sets or clears the
+  `last_seen_at`, `revoked_at`, `expired` (live but past the idle window, shown as "Expired (not
+  used in 30 days)") and its people with binding status. `PATCH` sets or clears the
   label. **Revoke** stamps `revoked_at`: the ADR-0009 resolver ignores revoked devices, so the
   cookie is 401 on its next request, its bindings stop counting as "taken" (the people are free
   to claim without approval) and its pending claims leave the review list. Bindings are kept for

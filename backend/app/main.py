@@ -142,7 +142,8 @@ def create_app() -> FastAPI:
         rid = getattr(request.state, "request_id", None)
         return JSONResponse(
             status_code=exc.status_code,
-            content=_error_body("http_error", str(exc.detail), rid),
+            # A subclass may name its own code (e.g. DeviceExpired's `device_expired`).
+            content=_error_body(getattr(exc, "code", "http_error"), str(exc.detail), rid),
             headers=exc.headers,
         )
 

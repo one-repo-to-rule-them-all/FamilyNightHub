@@ -7,6 +7,8 @@
  *
  * - the host creates the night on the TV's browser, then "Use this browser as the TV": same tab,
  *   so /tv/[session] reads the code the host page just stored;
+ * - the host's laptop opens the TV in a second window ("Open TV window"): the portal copies the
+ *   code into that window's storage before it navigates (`handNightCodeTo`);
  * - a TV paired on an earlier night: the TV asks for the code once (typed from the host's phone)
  *   and keeps it the same way.
  *
@@ -37,6 +39,17 @@ export function recallNightCode(sessionId: string): string | null {
     return storage()?.getItem(PREFIX + sessionId) ?? null;
   } catch {
     return null;
+  }
+}
+
+/** Copies this tab's code for `sessionId` into another same-origin window (the TV window). */
+export function handNightCodeTo(target: Window, sessionId: string): void {
+  const code = recallNightCode(sessionId);
+  if (!code) return;
+  try {
+    target.sessionStorage.setItem(PREFIX + sessionId, code);
+  } catch {
+    // Storage disabled there: the TV asks for the code instead.
   }
 }
 

@@ -18,7 +18,6 @@ import {
   api,
   type ApiError,
   type Claim,
-  enrollDevice,
   type Night,
   type NightSummary,
   type PinReset,
@@ -131,7 +130,6 @@ function Dashboard({ me }: { me: Account }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState<ResetItem | null>(null);
   const [confirmEnd, setConfirmEnd] = useState<string | null>(null);
-  const [confirmTv, setConfirmTv] = useState<string | null>(null);
 
   const { current, others } = splitActive(active.data ?? []);
   const past = pastNights(recent.data ?? []);
@@ -221,17 +219,6 @@ function Dashboard({ me }: { me: Account }) {
     },
   });
 
-  // ADR-0002 "Use as TV": mints a TV device for this browser and clears the account session, so
-  // a TV left in the living room never holds host rights.
-  // TODO(piece D): use the shared confirm from components/portal/use-as-tv.tsx once it exists.
-  const enrollTv = useMutation<unknown, ApiError, string>({
-    mutationFn: () => enrollDevice({ as_tv: true, device_label: "Living-room TV" }),
-    onSuccess: (_, sessionId) => {
-      queryClient.clear();
-      router.replace(`/tv/${sessionId}`);
-    },
-  });
-
   const lastNight = past[0] ?? null;
 
   return (
@@ -246,14 +233,7 @@ function Dashboard({ me }: { me: Account }) {
           {active.isPending ? (
             <p className="text-muted-foreground">Loading…</p>
           ) : (
-            <UpNextCard
-              current={current}
-              lastNight={lastNight}
-              onUseAsTv={(id) => {
-                enrollTv.reset();
-                setConfirmTv(id);
-              }}
-            />
+            <UpNextCard current={current} lastNight={lastNight} />
           )}
         </div>
         <div className="xl:col-span-2">
@@ -325,33 +305,6 @@ function Dashboard({ me }: { me: Account }) {
               {close.isPending ? "Ending…" : "End the night"}
             </Button>
             <Button variant="ghost" size="lg" className="px-4" onClick={() => setConfirmEnd(null)}>
-              Cancel
-            </Button>
-          </div>
-        </ModalDialog>
-      ) : null}
-
-      {confirmTv ? (
-        <ModalDialog
-          title="Show it on this TV?"
-          onClose={() => setConfirmTv(null)}
-          testId="use-as-tv-confirm"
-        >
-          <p className="text-sm">
-            This browser becomes the living-room TV and signs you out here. Sign in again on your
-            own phone or computer.
-          </p>
-          <ApiErrorNotice error={enrollTv.error} />
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="lg"
-              className="px-4"
-              disabled={enrollTv.isPending}
-              onClick={() => enrollTv.mutate(confirmTv)}
-            >
-              {enrollTv.isPending ? "Pairing…" : "Yes, make it the TV"}
-            </Button>
-            <Button variant="ghost" size="lg" className="px-4" onClick={() => setConfirmTv(null)}>
               Cancel
             </Button>
           </div>

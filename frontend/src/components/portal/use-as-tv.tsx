@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Tv } from "lucide-react";
+import { ExternalLink, Tv } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -9,14 +9,104 @@ import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Button } from "@/components/ui/button";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import { type ApiError, enrollDevice } from "@/lib/api";
+import { handNightCodeTo } from "@/lib/night-code-handoff";
+
+/** One named window, so a second tap reuses the TV window instead of stacking new ones. */
+export const TV_WINDOW_NAME = "fnh-tv";
+const TV_WINDOW_FEATURES = "popup,width=1280,height=720";
+
+type Opened = { win: Window | null; sessionId: string };
+
+/** The TV screen for a night (device auth only; it never links back into the portal). */
+export function tvHref(sessionId: string): string {
+  return `/tv/${encodeURIComponent(sessionId)}`;
+}
 
 /**
- * ADR-0002 "Use as TV" confirm: mints a TV for this browser and clears the signed-in account here,
+ * After enrollment: point the blank window at the TV screen, handing it the night code this tab
+ * holds. Returns the href to offer as a plain link when there is no window (a popup blocker ate
+ * it, or the host closed it while pairing), else null.
+ */
+export function sendTvWindowTo(win: Window | null, sessionId: string): string | null {
+  const href = tvHref(sessionId);
+  if (!win || win.closed) return href;
+  handNightCodeTo(win, sessionId);
+  win.location.replace(href);
+  win.focus();
+  return null;
+}
+
+/**
+ * ADR-0002 amendment 2026-10-18 "Open TV window": the host's laptop drives the living-room TV
+ * from a second window and stays signed in in this one.
+ *
+ * The window is opened synchronously inside the click (a popup blocker only allows that), on a
+ * blank page; then this browser is enrolled as the TV with `keep_session`, and only then does the
+ * window navigate to `/tv/{night}`, so the TV never flashes "not paired". The TV screens send
+ * the device-only header (lib/api.ts), so that window runs on the TV device even though the
+ * cookie jar also holds the host session. If the blocker ate the window, `fallbackHref` is set
+ * and the caller shows a plain link instead.
+ */
+export function useTvWindow() {
+  const [fallbackHref, setFallbackHref] = useState<string | null>(null);
+  const enroll = useMutation<unknown, ApiError, Opened>({
+    mutationFn: () =>
+      enrollDevice({ as_tv: true, keep_session: true, device_label: "Living-room TV" }),
+    onSuccess: (_, { win, sessionId }) => setFallbackHref(sendTvWindowTo(win, sessionId)),
+    onError: (_, { win }) => win?.close(),
+  });
+
+  const open = (sessionId: string) => {
+    setFallbackHref(null);
+    const win = window.open("", TV_WINDOW_NAME, TV_WINDOW_FEATURES);
+    enroll.mutate({ win, sessionId });
+  };
+
+  return { open, pending: enroll.isPending, error: enroll.error, fallbackHref };
+}
+
+/**
+ * "Open TV window" for one night: Home's Up-next card and the night page. One tap, no confirm:
+ * nothing here signs anyone out (unlike Settings → "Use this browser as the TV").
+ */
+export function OpenTvWindowButton({ sessionId }: { sessionId: string }) {
+  const tv = useTvWindow();
+  return (
+    <div className="flex flex-col gap-2">
+      <Button
+        variant="secondary"
+        size="lg"
+        className="self-start px-3.5"
+        disabled={tv.pending}
+        onClick={() => tv.open(sessionId)}
+        data-testid="open-tv-window"
+      >
+        <Tv aria-hidden /> {tv.pending ? "Opening the TV…" : "Open TV window"}
+      </Button>
+      <ApiErrorNotice error={tv.error} />
+      {tv.fallbackHref ? (
+        <p className="text-sm" role="status" data-testid="tv-window-blocked">
+          Your browser blocked the new window.{" "}
+          <a
+            href={tv.fallbackHref}
+            target={TV_WINDOW_NAME}
+            className="inline-flex items-center gap-1 font-medium underline underline-offset-4"
+          >
+            Open the TV screen <ExternalLink aria-hidden className="size-3.5" />
+          </a>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * ADR-0002 "Use as TV" confirm, for a screen that is *only* the TV (a smart-TV browser): mints a TV for this browser and clears the signed-in account here,
  * so a TV left in the living room never holds host rights. With `sessionId` it lands on that
  * night's TV screen; a night code just created stays in this tab's sessionStorage, which is how
  * it reaches the TV. Mounted only while open (ModalDialog); the caller unmounts it from `onClose`.
  *
- * Used by Settings → This browser and by Home's Up-next card (via its `onUseAsTv` prop).
+ * Used by Settings → This browser. The host's own laptop uses `OpenTvWindowButton` instead.
  */
 export function UseAsTvDialog({
   sessionId,
@@ -28,7 +118,8 @@ export function UseAsTvDialog({
   const router = useRouter();
   const queryClient = useQueryClient();
   const enroll = useMutation<unknown, ApiError>({
-    mutationFn: () => enrollDevice({ as_tv: true, device_label: "Living-room TV" }),
+    mutationFn: () =>
+      enrollDevice({ as_tv: true, keep_session: false, device_label: "Living-room TV" }),
     onSuccess: () => {
       queryClient.clear();
       router.replace(sessionId ? `/tv/${sessionId}` : "/tv");

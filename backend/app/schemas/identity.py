@@ -106,8 +106,11 @@ class AccountOut(BaseModel):
 
 class EnrollIn(BaseModel):
     device_label: str | None = Field(default=None, max_length=80)
-    # "Use as TV": marks the device as the TV and signs the host out of this browser.
+    # "Use as TV": marks the device as the TV and signs the host out of this browser...
     as_tv: bool = False
+    # ...unless `keep_session`: the host's laptop opens the TV in a second window and stays
+    # signed in in the first (ADR-0002 amendment 2026-10-18). Ignored without `as_tv`.
+    keep_session: bool = False
 
 
 class EnrollOut(BaseModel):

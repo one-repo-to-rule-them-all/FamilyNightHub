@@ -7,6 +7,7 @@ import { useState } from "react";
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Avatar } from "@/components/night/avatar";
 import { Poster } from "@/components/night/poster";
+import { OpenTvWindowButton } from "@/components/portal/use-as-tv";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,11 +32,9 @@ type Created = { session_id: string; night_code: string };
 export function UpNextCard({
   current,
   lastNight,
-  onUseAsTv,
 }: {
   current: NightSummary | null;
   lastNight: NightSummary | null;
-  onUseAsTv?: (sessionId: string) => void;
 }) {
   const [created, setCreated] = useState<Created | null>(null);
   const snapshot = useQuery<Night, ApiError>({
@@ -53,12 +52,8 @@ export function UpNextCard({
     setCreated(null);
   }
 
-  const tvButton = (id: string) =>
-    onUseAsTv ? (
-      <Button variant="secondary" size="lg" className="px-3.5" onClick={() => onUseAsTv(id)}>
-        Show it on this TV
-      </Button>
-    ) : null;
+  // ADR-0002 amendment 2026-10-18: the TV opens in its own window; this tab stays signed in.
+  const tvButton = (id: string) => <OpenTvWindowButton sessionId={id} />;
 
   return (
     <section

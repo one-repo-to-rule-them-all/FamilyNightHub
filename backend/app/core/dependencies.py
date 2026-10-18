@@ -32,11 +32,13 @@ from app.core.security import (
     CSRF_COOKIE,
     CSRF_HEADER,
     DEVICE_COOKIE,
+    DEVICE_ONLY_HEADER,
     csrf_matches,
     hash_device_token,
     set_device_cookie,
     verify_account_session,
 )
+from app.services import device_idle
 
 
 @dataclass(frozen=True)
@@ -58,6 +60,19 @@ async def resolve_device_token(token: str) -> tuple[uuid.UUID, uuid.UUID] | None
     return (row.device_id, row.household_id) if row else None
 
 
+class DeviceExpired(HTTPException):
+    """401 `device_expired`: a live token unused for DEVICE_IDLE_DAYS (issue #56). The phone
+    re-enters a night code; a TV needs a host to pair it again."""
+
+    code = "device_expired"
+
+    def __init__(self) -> None:
+        super().__init__(
+            status.HTTP_401_UNAUTHORIZED,
+            "It's been a while. Enter tonight's code to join again.",
+        )
+
+
 async def current_device(request: Request) -> DeviceContext:
     token = request.cookies.get(DEVICE_COOKIE)
     resolved = await resolve_device_token(token) if token else None
@@ -65,6 +80,10 @@ async def current_device(request: Request) -> DeviceContext:
         # Unknown, revoked and missing all look the same to the caller.
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Device not recognised")
     device_id, household_id = resolved
+    # Expiry is told apart (the holder already proved the token), so the phone can say why.
+    async with household_session(household_id) as session:
+        if await device_idle.is_expired(session, device_id):
+            raise DeviceExpired
     return DeviceContext(device_id=device_id, household_id=household_id, token=token or "")
 
 
@@ -104,7 +123,10 @@ class AccountContext:
 
 async def current_account(request: Request) -> AccountContext:
     """Signed `fnh_session` cookie, then a fresh read of the account row (role, disabled),
-    so a disabled account or changed role takes effect on the next request."""
+    so a disabled account or changed role takes effect on the next request. A device-only
+    request (the TV window) never acts as the account, even with a valid cookie."""
+    if device_only(request):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in required")
     raw = request.cookies.get(ACCOUNT_COOKIE)
     claims = verify_account_session(raw, int(time.time())) if raw else None
     if claims is None:
@@ -125,6 +147,13 @@ async def current_account(request: Request) -> AccountContext:
 
 
 CurrentAccount = Annotated[AccountContext, Depends(current_account)]
+
+
+def device_only(request: Request) -> bool:
+    """The TV window shares the laptop's cookie jar with the host portal (ADR-0002 amendment
+    2026-10-18), so it says which credential it means: with this header the account cookie
+    is ignored and the request is the TV device or nothing."""
+    return request.headers.get(DEVICE_ONLY_HEADER) == "1"
 
 
 async def account_db(account: CurrentAccount) -> AsyncIterator[AsyncSession]:
@@ -159,8 +188,10 @@ class ViewerContext:
 
 async def current_viewer(request: Request) -> ViewerContext:
     """A signed-in account if the session cookie is valid, else a live device; else 401.
-    Read-only routes (the night snapshot) use this so the TV, phones and hosts share them."""
-    if request.cookies.get(ACCOUNT_COOKIE):
+    Read-only routes (the night snapshot) use this so the TV, phones and hosts share them.
+    A device-only request skips the account, so the TV never sees what only hosts see
+    (hidden photos) just because the host is signed in in another tab."""
+    if request.cookies.get(ACCOUNT_COOKIE) and not device_only(request):
         try:
             account = await current_account(request)
         except HTTPException:
