@@ -7,7 +7,10 @@ import Link from "next/link";
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Poster } from "@/components/poster";
 import { api, type ApiError, type NightSummary } from "@/lib/api";
+import { HOME_COPY, nightHref } from "@/lib/home";
 import { describeAverage } from "@/lib/rating";
+
+import { HISTORY_COPY } from "./history";
 
 const dateFormat = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -16,7 +19,10 @@ const dateFormat = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
 });
 
-/** GET /api/v1/sessions with the server's default filter: revealed, tonight and closed. */
+/**
+ * History *Family* (guest-home §5 H2): GET /api/v1/sessions with the server's default filter
+ * (revealed, tonight and closed). The 📷 count waits on G13 (`photo_count` on the summary).
+ */
 export function HistoryList() {
   const nights = useQuery<NightSummary[], ApiError>({
     queryKey: ["nights", "history"],
@@ -49,8 +55,8 @@ export function HistoryList() {
   }
   if (nights.data.length === 0) {
     return (
-      <p className="text-lg text-muted-foreground">
-        No movie nights yet. Tonight could be the first.
+      <p className="text-lg text-muted-foreground" data-testid="history-empty">
+        {HOME_COPY.empty.family}
       </p>
     );
   }
@@ -63,7 +69,7 @@ export function HistoryList() {
         return (
           <li key={night.id}>
             <Link
-              href={`/s/${night.id}`}
+              href={nightHref(night.id)}
               className="flex items-center gap-4 rounded-2xl bg-card p-3 ring-1 ring-foreground/10 outline-none focus-visible:ring-3 focus-visible:ring-ring"
             >
               <Poster
@@ -79,7 +85,7 @@ export function HistoryList() {
                   {dateFormat.format(when)}
                 </time>
                 <span className="text-sm text-muted-foreground" data-testid="history-turnout">
-                  {night.turnout} {night.turnout === 1 ? "person" : "people"} voted
+                  {HISTORY_COPY.turnout(night.turnout)}
                 </span>
                 {average ? (
                   <span className="flex items-center gap-1 text-sm" data-testid="history-rating">
