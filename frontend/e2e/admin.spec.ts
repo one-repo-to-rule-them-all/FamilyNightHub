@@ -1,6 +1,6 @@
 import { type Browser, type BrowserContext, type Page } from "@playwright/test";
 
-import { expectNoAxeViolations, signInAsHost } from "./support/host";
+import { expectNoAxeViolations, portalNav, signInAsHost } from "./support/host";
 import { joinAs, newPhoneLike } from "./support/phones";
 import { expect, seedNight, test } from "./support/seed";
 
@@ -20,12 +20,13 @@ function row(page: Page, attribute: "data-person" | "data-device", value: string
   return page.locator(`tr[${attribute}="${value}"]`);
 }
 
-/** The radio's input is visually hidden under its swatch; click the swatch. */
+/** People's primary opens the Add dialog; the radio's input is hidden under its swatch. */
 async function addPerson(
   page: Page,
   person: { name: string; emoji: string; color: string; guest?: boolean },
 ) {
-  const form = page.getByRole("region", { name: "Add a person" });
+  await page.getByTestId("primary-action").click();
+  const form = page.getByTestId("add-person");
   await form.getByLabel("Name").fill(person.name);
   await form.getByLabel("Emoji avatar").fill(person.emoji);
   await form.getByRole("radio", { name: person.color }).check({ force: true });
@@ -43,12 +44,21 @@ test("an admin manages people, devices and settings", async ({ browser, baseURL 
   const admin = await adminContext.newPage();
   const { context: phoneContext, page: phone } = await newPhoneLike(browser, "Pixel 7", baseURL!);
 
-  // /host links admins to /admin, which opens on People.
+  // The portal's sidebar takes the admin from Home to People (owner portal §3).
   await admin.goto("/host");
-  await admin.getByRole("link", { name: "Admin: people, devices, settings" }).click();
+  await expect(admin.locator('[data-screen="portal-home"]')).toBeVisible();
+  await portalNav(admin, "People");
   await expect(admin).toHaveURL(/\/admin\/people$/);
-  await expect(admin.getByRole("link", { name: "People" })).toHaveAttribute("aria-current", "page");
+  await expect(admin.locator('[data-screen="portal-people"]')).toBeVisible();
+  const sidebar = admin.getByRole("navigation", { name: "Portal" });
+  await expect(sidebar.getByRole("link", { name: "People" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   for (const name of night.people) await expect(row(admin, "data-person", name)).toBeVisible();
+  // Nobody has a PIN yet: People says so, and the PIN-requests section shows its empty state.
+  await expect(admin.getByTestId("pin-requests-empty")).toBeVisible();
+  await expect(admin.getByTestId("attention-line")).toContainText("haven't set a PIN yet");
 
   // Add a guest, then make them family.
   await addPerson(admin, { name: "Grandma", emoji: "👵", color: "Teal", guest: true });
@@ -58,11 +68,13 @@ test("an admin manages people, devices and settings", async ({ browser, baseURL 
   await expect(row(admin, "data-person", "Grandma")).toHaveAttribute("data-guest", "false");
 
   // A name the household already has is the API's 409, shown as-is.
-  const addForm = admin.getByRole("region", { name: "Add a person" });
+  await admin.getByTestId("primary-action").click();
+  const addForm = admin.getByTestId("add-person");
   await addForm.getByLabel("Name").fill("grandma");
   await addForm.getByLabel("Emoji avatar").fill("👵");
   await addForm.getByRole("button", { name: "Add person" }).click();
   await expect(addForm.getByTestId("api-error-message")).toContainText("Grandma");
+  await addForm.getByRole("button", { name: "Cancel" }).click();
 
   // Someone also added her as "Nana", and a phone has already picked Nana.
   await addPerson(admin, { name: "Nana", emoji: "🧶", color: "Amber" });
@@ -91,8 +103,8 @@ test("an admin manages people, devices and settings", async ({ browser, baseURL 
   );
   await expect(phone.getByRole("button", { name: /^Nana/ })).toHaveCount(0);
 
-  // Devices: the phone is listed with Grandma; rename it, then revoke it.
-  await admin.getByRole("link", { name: "Devices" }).click();
+  // Phones: the phone is listed with Grandma; rename it, then revoke it.
+  await portalNav(admin, "Phones");
   await expect(admin).toHaveURL(/\/admin\/devices$/);
   const unnamed = row(admin, "data-device", "Unnamed phone");
   await expect(unnamed.locator('[data-col="people"]')).toContainText("Grandma");
@@ -118,10 +130,10 @@ test("an admin manages people, devices and settings", async ({ browser, baseURL 
   await expect(admin.getByRole("button", { name: "Revoke Kitchen phone" })).toHaveCount(0);
   // The revoked phone is bounced back to joining.
   await phone.reload();
-  await expect(phone.getByText("This phone hasn't joined tonight yet.")).toBeVisible();
+  await expect(phone.locator('[data-screen="landing"]')).toBeVisible();
 
   // Settings: rotate the join link. The old one stops working; the new one lets a phone in.
-  await admin.getByRole("link", { name: "Settings" }).click();
+  await portalNav(admin, "Settings");
   await expect(admin).toHaveURL(/\/admin\/settings$/);
   await expect(admin.getByTestId("join-url")).toHaveText(`${baseURL}/j/${night.slug}`);
   await admin.getByRole("button", { name: "Rotate join link…" }).click();
@@ -137,9 +149,8 @@ test("an admin manages people, devices and settings", async ({ browser, baseURL 
 
   await phone.goto(`/j/${night.slug}`);
   await phone.getByLabel("Night code").fill(night.nightCode);
-  await phone.getByRole("button", { name: "Join" }).click();
-  await expect(phone.getByTestId("api-error-message")).toHaveText(
-    "That code doesn't match tonight's night.",
+  await expect(phone.getByRole("alert").filter({ hasText: "code" })).toContainText(
+    "That code didn't work",
   );
   await expect(phone).toHaveURL(new RegExp(`/j/${night.slug}$`));
   // Rejoining at the new link makes it a new device; Grandma is free to pick again.
@@ -182,7 +193,7 @@ test("a host without admin rights gets 'Admins only' on every admin screen", asy
   browser,
   baseURL,
 }) => {
-  test.slow(); // three screens, each a fresh navigation
+  test.slow(); // four screens, each a fresh navigation
   const night = seedNight({ hostAccount: true });
   const context = await laptop(browser, baseURL!);
   await context.addCookies([
@@ -197,19 +208,32 @@ test("a host without admin rights gets 'Admins only' on every admin screen", asy
   ]);
   const page = await context.newPage();
 
-  // /host shows no admin link to a host.
+  // A host's portal nav is Home, History and Settings: no People, Phones or Library (AC-P2.2).
   await page.goto("/host");
-  await expect(page.getByTestId("signed-in-as")).toContainText("(host)");
-  await expect(page.getByRole("link", { name: "Admin: people, devices, settings" })).toHaveCount(0);
+  await expect(page.locator('[data-screen="portal-home"]')).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Portal" });
+  await expect(nav.getByRole("link")).toHaveText(["Home", "History", "Settings"]);
 
-  for (const screen of ["people", "devices", "settings"]) {
+  // The admin screens still answer the API's 403 as "Admins only" if opened by URL.
+  for (const [screen, path] of [
+    ["people", "people"],
+    ["devices", "devices"],
+    ["movies", "movies"],
+  ]) {
     const answer = page.waitForResponse(
-      (r) => r.url().includes(`/api/v1/admin/${screen}`) && r.request().method() === "GET",
+      (r) => r.url().includes(`/api/v1/admin/${path}`) && r.request().method() === "GET",
     );
     await page.goto(`/admin/${screen}`);
     expect((await answer).status()).toBe(403);
     await expect(page.getByTestId("admin-forbidden")).toContainText("Admins only");
   }
+
+  // Settings opens for a host with their own groups only: no household settings or QR toggle.
+  await page.goto("/admin/settings");
+  await expect(page.locator('[data-screen="portal-settings"]')).toBeVisible();
+  await expect(page.locator("#account")).toBeVisible();
+  await expect(page.locator("#joining")).toHaveCount(0);
+  await expect(page.getByText(/Include tonight's code/)).toHaveCount(0);
   await expectNoAxeViolations(page);
   await context.close();
 });

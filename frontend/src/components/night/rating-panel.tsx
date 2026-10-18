@@ -11,6 +11,7 @@ import { nightKey } from "@/hooks/use-live-session";
 import { api, type ApiError, type Night, type OwnRating, type Person } from "@/lib/api";
 import { SCORES, describeAverage } from "@/lib/rating";
 import { cn } from "@/lib/utils";
+import { actingPeople } from "@/lib/who";
 
 const PEOPLE = ["people"] as const;
 /** Keyed under the night, so every live event (incl. `rating_count`) refreshes it too. */
@@ -19,9 +20,10 @@ export const myRatingsKey = (sessionId: string) => ["night", sessionId, "ratings
 type Rate = { personId: string; score: number };
 
 /**
- * "How was it?": one row of five big stars per person this phone holds (04-frontend.md
- * "Ratings"). Tapping a star saves that score at once; tapping another replaces it. Below, the
- * family average, never anyone else's own score.
+ * "How was it?": five big stars for this phone's current person (04-frontend.md "Ratings";
+ * ADR-0014: a phone rates only as its current person, so someone else on a shared phone switches
+ * with the chip and their PIN first). Tapping a star saves that score at once; tapping another
+ * replaces it. Below, the family average, never anyone else's own score.
  */
 export function RatingPanel({ night }: { night: Night }) {
   const queryClient = useQueryClient();
@@ -53,7 +55,7 @@ export function RatingPanel({ night }: { night: Night }) {
         <p className="text-muted-foreground">Loading…</p>
       ) : people.data && ratings.data ? (
         <RatingRows
-          people={people.data.filter((p) => p.binding === "mine")}
+          people={actingPeople(people.data)}
           ratings={ratings.data}
           pending={rate.isPending ? rate.variables : undefined}
           onRate={(personId, score) => rate.mutate({ personId, score })}

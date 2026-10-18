@@ -34,6 +34,7 @@ test.describe("photo drop", () => {
     browser,
     request,
   }) => {
+    test.slow(); // two phones with PINs (argon2id), two photo pipelines incl. HEIC decoding
     const night = seedNight({ movies: 2, tonight: true });
 
     await joinAs(page, night, ["Ava"]);
@@ -137,7 +138,8 @@ test.describe("photo drop", () => {
     expect(direct.body).not.toMatch(PRESIGNED);
 
     await strangerPage.goto(`/s/${night.sessionId}`);
-    await expect(strangerPage.getByText("This phone hasn't joined tonight yet.")).toBeVisible();
+    // No device: the resolver's landing (S0), never the night.
+    await expect(strangerPage.locator('[data-screen="landing"]')).toBeVisible();
     await expect(strangerPage.locator("img")).toHaveCount(0);
     expect(answers.length).toBeGreaterThan(0);
     for (const answer of answers) expect(answer).not.toMatch(PRESIGNED);

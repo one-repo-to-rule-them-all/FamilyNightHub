@@ -13,6 +13,7 @@ import {
   filterPeople,
   deviceName,
   lastSeen,
+  attentionLine,
   needsAttention,
   normalizeRegion,
   peopleSummary,
@@ -238,6 +239,42 @@ describe("filterPeople", () => {
     expect(filterPeople(all, "guests")).toEqual([guest]);
     expect(filterPeople(all, "attention")).toEqual([guest, locked]);
     expect(PEOPLE_FILTERS.map((f) => f.key)).toEqual(["all", "family", "guests", "attention"]);
+  });
+});
+
+describe("attentionLine", () => {
+  const named = (name: string, overrides: Parameters<typeof person>[0] = {}) => ({
+    name,
+    ...person(overrides),
+  });
+
+  it("is null when everyone has a PIN", () => {
+    expect(attentionLine([named("Ava"), named("Leo")])).toBeNull();
+    expect(attentionLine([])).toBeNull();
+  });
+
+  // Staging 2026-10-17: two pre-PIN people made People read "Needs attention · 2" while the
+  // inbox and the nav badge (correctly) showed nothing. The line names who and why.
+  it("explains no-PIN people, who are never an inbox row", () => {
+    expect(
+      attentionLine([named("Ava", { has_pin: false }), named("Leo", { has_pin: false })]),
+    ).toBe(
+      "Ava and Leo haven't set a PIN yet. Nothing to do here: they choose one on their phone " +
+        "the next time they pick their name.",
+    );
+    expect(attentionLine([named("Ava", { has_pin: false })])).toMatch(/^Ava hasn't set a PIN/);
+  });
+
+  it("explains locked people, and counts long lists", () => {
+    expect(attentionLine([named("Mia", { locked: true })])).toBe(
+      "Mia is locked after 5 wrong PINs. A Forgot PIN request from their phone shows up under " +
+        "PIN requests.",
+    );
+    const many = ["A", "B", "C", "D"].map((n) => named(n, { locked: true, has_pin: false }));
+    expect(attentionLine(many)).toMatch(/^4 people are locked/);
+    expect(
+      attentionLine([named("Ava", { has_pin: false }), named("Mia", { locked: true })]),
+    ).toMatch(/^Ava hasn't set a PIN yet\..* Mia is locked/);
   });
 });
 

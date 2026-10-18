@@ -142,7 +142,7 @@ function Row({
             "Reset PIN",
             () => actions.resetPin(item),
             "secondary",
-            `Reset ${r.person_name}'s PIN`,
+            `Reset PIN for ${r.person_name}`,
           )}
           {btn("Dismiss", () => actions.dismissReset(item), "ghost")}
         </>

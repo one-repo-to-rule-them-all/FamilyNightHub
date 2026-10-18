@@ -55,6 +55,7 @@ export function AlbumScreen({ sessionId }: { sessionId: string }) {
     <div
       data-testid="album-screen"
       data-status={night.data.status}
+      data-live={night.live}
       className="flex flex-1 flex-col"
     >
       <PhoneScreen title="Photos" lede={winner ? winner.title : night.data.title}>

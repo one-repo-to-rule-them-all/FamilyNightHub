@@ -176,6 +176,37 @@ export function filterPeople<T extends PersonStatusLike>(people: T[], filter: Pe
   }
 }
 
+/** "Ava and Leo", or "4 people" once a list of names stops being readable. */
+function nameList(names: string[]): string {
+  return names.length <= 3 ? joinAnd(names) : `${names.length} people`;
+}
+
+/**
+ * Why the "Needs attention · N" filter counts N, said in words under it. No-PIN people are not an
+ * inbox row (nothing for the admin to do: each picks a PIN on their phone), so without this line
+ * the count reads like an unexplained alert. Null when nobody needs attention.
+ */
+export function attentionLine(people: (PersonStatusLike & { name: string })[]): string | null {
+  const locked = people.filter((p) => personStatus(p) === "locked").map((p) => p.name);
+  const noPin = people.filter((p) => personStatus(p) === "no-pin").map((p) => p.name);
+  const parts: string[] = [];
+  if (noPin.length > 0) {
+    const verb = noPin.length === 1 ? "hasn't" : "haven't";
+    parts.push(
+      `${nameList(noPin)} ${verb} set a PIN yet. Nothing to do here: they choose one on their ` +
+        "phone the next time they pick their name.",
+    );
+  }
+  if (locked.length > 0) {
+    const verb = locked.length === 1 ? "is" : "are";
+    parts.push(
+      `${nameList(locked)} ${verb} locked after 5 wrong PINs. A Forgot PIN request from their ` +
+        "phone shows up under PIN requests.",
+    );
+  }
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
 /** "6 people · 5 family, 1 guest" under the People header. */
 export function peopleSummary(people: PersonStatusLike[]): string {
   const guests = people.filter((p) => p.is_guest).length;

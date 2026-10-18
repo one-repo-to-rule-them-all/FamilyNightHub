@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
-import { PersonAvatar } from "@/components/photos/person-avatar";
 import { PhoneSlideshow } from "@/components/photos/phone-slideshow";
 import { PhotoDrop } from "@/components/photos/photo-drop";
 import { PhotoViewer } from "@/components/photos/photo-viewer";
@@ -15,6 +14,7 @@ import { albumKey, useAlbum } from "@/hooks/use-album";
 import { api, type ApiError, type Person, type ReactionEmoji } from "@/lib/api";
 import { type LiveState } from "@/lib/live";
 import { cn } from "@/lib/utils";
+import { actingPeople } from "@/lib/who";
 
 const PEOPLE = ["people"] as const;
 
@@ -41,7 +41,6 @@ export function PhotoAlbum({
   const queryClient = useQueryClient();
   const album = useAlbum(sessionId);
   const people = useQuery<Person[], ApiError>({ queryKey: PEOPLE, queryFn: api.people });
-  const [chosen, setChosen] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -53,9 +52,10 @@ export function PhotoAlbum({
     onSettled: () => queryClient.invalidateQueries({ queryKey: albumKey(sessionId) }),
   });
 
-  const mine = (people.data ?? []).filter((p) => p.binding === "mine");
-  const actor =
-    mine.find((p) => p.id === chosen) ?? mine.find((p) => p.id === actorId) ?? mine[0] ?? null;
+  // ADR-0014: photos and reactions act as the phone's current person only (the API refuses
+  // anyone else), so there is no "Sharing as" picker: a shared phone switches with the chip.
+  const mine = actingPeople(people.data ?? []);
+  const actor = mine.find((p) => p.id === actorId) ?? mine[0] ?? null;
   const photos = album.data ?? [];
   // On an empty album the drop is the empty state, so there is still one primary (spec S13).
   const emptyDrop = canAdd && actor !== null && album.isSuccess && photos.length === 0;
@@ -78,30 +78,6 @@ export function PhotoAlbum({
           </Link>
         ) : (
           <>
-            {mine.length > 1 ? (
-              <div className="flex flex-col gap-2">
-                <p className="text-muted-foreground" id="sharing-as">
-                  Sharing as
-                </p>
-                <div role="group" aria-labelledby="sharing-as" className="flex flex-wrap gap-2">
-                  {mine.map((person) => (
-                    <button
-                      key={person.id}
-                      type="button"
-                      aria-pressed={person.id === actor?.id}
-                      onClick={() => setChosen(person.id)}
-                      className={cn(
-                        "flex h-14 items-center gap-2 rounded-full bg-card pr-4 pl-2 ring-1 ring-foreground/10 outline-none focus-visible:ring-3 focus-visible:ring-ring",
-                        person.id === actor?.id && "ring-2 ring-foreground/60",
-                      )}
-                    >
-                      <PersonAvatar emoji={person.avatar_emoji} color={person.color} />
-                      {person.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
             {actor ? (
               <PhotoDrop sessionId={sessionId} personId={actor.id} empty={emptyDrop} />
             ) : null}

@@ -27,18 +27,45 @@ export async function signInAsHost(
 }
 
 /**
- * The real sign-in: request a link on /login, read it from MailHog, open it, land on /host.
- * `except` lists links already used for this address (see magicLinkToken). Returns the token.
+ * ADR-0014 sign-in: username (or email) + password on /login, landing on the portal's Home.
+ * The seed gives every account the test password `night.password`.
  */
-export async function signInWithMagicLink(page: Page, email: string, except: string[] = []) {
+export async function signInWithPassword(
+  page: Page,
+  night: Pick<SeededHousehold, "adminUsername" | "password">,
+  identifier: string = night.adminUsername,
+) {
   await page.goto("/login");
+  await page.getByLabel("Username or email").fill(identifier);
+  await page.getByLabel("Password").fill(night.password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/host$/);
+  await expect(page.locator('[data-screen="portal-home"]')).toBeVisible();
+}
+
+/**
+ * "Forgot password?": request a link on /login, read it from MailHog, open it and choose a new
+ * password (POST /auth/verify now requires `new_password`), landing on /host. `except` lists links
+ * already used for this address (see magicLinkToken). Returns the token.
+ */
+export async function signInWithMagicLink(
+  page: Page,
+  email: string,
+  except: string[] = [],
+  newPassword = "a brand new e2e password",
+) {
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Forgot password?" }).click();
   await page.getByLabel("Email").fill(email);
-  await page.getByRole("button", { name: "Email me a sign-in link" }).click();
+  await page.getByRole("button", { name: "Email me a reset link" }).click();
   await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
   const token = await magicLinkToken(email, except);
   await page.goto(`/auth/callback?token=${token}`);
+  await page.getByLabel("New password").fill(newPassword);
+  await page.getByLabel("Type it again").fill(newPassword);
+  await page.getByRole("button", { name: "Save and sign in" }).click();
   await expect(page).toHaveURL(/\/host$/);
-  await expect(page.getByTestId("signed-in-as")).toContainText("Signed in as E2E Host (admin)");
+  await expect(page.locator('[data-screen="portal-home"]')).toBeVisible();
   return token;
 }
 
@@ -97,4 +124,57 @@ export async function castPhoneBallot(
     },
     { sessionId, personName, titles },
   );
+}
+
+/** Opens a portal destination through the nav: sidebar from md up, bottom tabs or More below. */
+export async function portalNav(page: Page, label: string) {
+  const phone = (page.viewportSize()?.width ?? 1280) < 768;
+  if (!phone) {
+    await page
+      .getByRole("navigation", { name: "Portal" })
+      .getByRole("link", { name: label })
+      .click();
+    return;
+  }
+  const tabs = page.getByRole("navigation", { name: "Portal" });
+  // A tab's name includes its badge ("2 things need you Home"): match the label as a substring.
+  const tab = tabs.getByRole("link", { name: label });
+  if ((await tab.count()) > 0) {
+    await tab.first().click();
+    return;
+  }
+  await tabs.getByRole("button", { name: "More" }).click();
+  await page.getByTestId("portal-more").getByRole("link", { name: label }).click();
+}
+
+/** Sign out from the portal shell: the sidebar footer, or the More sheet on a phone. */
+export async function signOut(page: Page) {
+  await expect(
+    page.getByTestId("signed-in-as").or(page.locator("[data-screen^=portal-]")).first(),
+  ).toBeVisible();
+  if ((page.viewportSize()?.width ?? 1280) < 768) {
+    await page
+      .getByRole("navigation", { name: "Portal" })
+      .getByRole("button", { name: "More" })
+      .click();
+    await page.getByTestId("portal-more").getByTestId("sign-out").click();
+  } else {
+    await page.getByTestId("sign-out").first().click();
+  }
+  await expect(page).toHaveURL(/\/login$/);
+}
+
+/**
+ * Pairs this signed-in browser as the living-room TV the way the owner portal offers it for any
+ * night (Settings → This browser → "Use as the TV…", ADR-0002). The account session is dropped,
+ * and /tv follows the household's current night.
+ */
+export async function pairAsTv(tv: Page) {
+  await tv.goto("/admin/settings");
+  await tv.getByTestId("use-as-tv").click();
+  await tv
+    .getByTestId("use-as-tv-confirm")
+    .getByRole("button", { name: "Yes, make it the TV" })
+    .click();
+  await expect(tv).toHaveURL(/\/tv(\/[0-9a-f-]{36})?$/);
 }

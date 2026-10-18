@@ -26,7 +26,11 @@ import type { LiveState } from "@/lib/live";
 import { cn } from "@/lib/utils";
 import { phonePeople } from "@/lib/who";
 
-const ballotsKey = (sessionId: string) => ["ballots", sessionId] as const;
+/**
+ * Under the night's key, so every stream event refreshes it too: a person held by two phones
+ * who votes on one must show as voted on the other (found by the sign-off e2e run, #42).
+ */
+const ballotsKey = (sessionId: string) => [...nightKey(sessionId), "ballots", "mine"] as const;
 
 type Cast = { personId: string; ranks: { option_id: string; rank: number }[] };
 
@@ -57,6 +61,7 @@ export function VotingFlow({
   const voters = useVoters(night.id, true, live);
   const [editing, setEditing] = useState(false);
   const [passing, setPassing] = useState(false);
+  const [switching, setSwitching] = useState(false);
 
   const cast = useMutation<void, ApiError, Cast>({
     mutationFn: ({ personId, ranks }) => api.castBallot(night.id, { person_id: personId, ranks }),
@@ -73,7 +78,17 @@ export function VotingFlow({
 
   const saved = new Map((ballots.data ?? []).map((b) => [b.person_id, b.ranks]));
   const votedIds = new Set([...saved].filter(([, ranks]) => ranks.length > 0).map(([id]) => id));
-  const chip = <CurrentChip current={current} people={people} votedIds={votedIds} />;
+  // The chip shows in the loading view and again in the ballot: its sheet's open state lives
+  // here, so a tap while ballots load isn't lost when the ballot replaces the loading view.
+  const chip = (
+    <CurrentChip
+      current={current}
+      people={people}
+      votedIds={votedIds}
+      open={switching}
+      onOpenChange={setSwitching}
+    />
+  );
 
   if (ballots.isPending) {
     return (

@@ -76,6 +76,11 @@ async def test_binding_is_committed_before_the_response_starts(two_households: P
     async with AsyncClient(
         transport=ASGITransport(app=wrapper), base_url="https://fnh.test", cookies=cookies
     ) as client:
-        resp = await client.put(f"/api/v1/devices/me/people/{person}", headers={CSRF_HEADER: csrf})
+        # ADR-0014: a first claim sets the person's PIN in the same request.
+        resp = await client.put(
+            f"/api/v1/devices/me/people/{person}",
+            headers={CSRF_HEADER: csrf},
+            json={"pin": "246810"},
+        )
     assert resp.status_code == 200, resp.text
     assert wrapper.results == [True], "write was not committed when the response started"

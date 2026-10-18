@@ -36,6 +36,15 @@ export function currentPerson(people: readonly PersonTile[] | undefined): Person
   return people?.find((p) => p.current && p.binding === "mine" && p.has_pin) ?? null;
 }
 
+/**
+ * Who a rating, photo or reaction can be from on this phone: the current person only (ADR-0014;
+ * the API answers 403 "Switch to them on this phone first" for anyone else it holds).
+ */
+export function actingPeople<T extends PersonTile>(people: readonly T[] | undefined): T[] {
+  const current = currentPerson(people);
+  return current ? [current as T] : [];
+}
+
 /** Family first, then guests, each in the server's order (spec §5 S2). */
 export function orderTiles<T extends Pick<PersonTile, "is_guest">>(people: readonly T[]): T[] {
   return [...people.filter((p) => !p.is_guest), ...people.filter((p) => p.is_guest)];
@@ -106,7 +115,7 @@ export function cleanGuestName(raw: string): string | null {
   return name.length >= 1 && name.length <= NAME_MAX ? name : null;
 }
 
-export type WaitingNotice = "rejected" | "dismissed" | "other-phone";
+export type WaitingNotice = "rejected" | "not-waiting" | "dismissed" | "other-phone";
 export type FollowResult =
   | { kind: "done" }
   | { kind: "grid"; notice?: WaitingNotice }
@@ -114,15 +123,28 @@ export type FollowResult =
   | { kind: "locked"; notice?: WaitingNotice };
 
 /**
+ * Whether a waiting screen may act on the people list yet. Asking the host (S4) or the admin (S6)
+ * opens the screen before the list refetches, and the tile it still holds predates the request
+ * (`taken`, no `pin_reset`): read as an answer, that is an instant "the host said no". So the
+ * screen follows only data fetched at or after it opened (`since`, from `Date.now()`).
+ */
+export function canFollow(since: number | undefined, dataUpdatedAt: number): boolean {
+  return since === undefined || dataUpdatedAt >= since;
+}
+
+/**
  * Where a waiting screen goes once the server moved on, or null to keep waiting (spec §5 S4, S6).
- * - S4 (`pending`): approved → the resolver (`done`) or the PIN; rejected → the grid with
- *   `copy.s4.rejected`.
+ * - S4 (`pending`): approved → the resolver (`done`) or the PIN. No longer pending → the grid:
+ *   with `copy.s4.rejected` only if this wait saw the claim pending (`sawPending`), since a claim
+ *   that never became pending was not rejected by anyone (staging, #42); otherwise
+ *   `copy.s4.notWaiting`.
  * - S6 (`reset`): approved for this phone → choose a new PIN; dismissed → S5 with
  *   `copy.s6.dismissed`; reset from another phone → type the new PIN (`copy.s6.otherPhone`).
  */
 export function followWaiting(
   waiting: "pending" | "reset",
   person: PersonTile | undefined,
+  sawPending = true,
 ): FollowResult | null {
   if (!person) return { kind: "grid" };
   if (waiting === "pending") {
@@ -131,7 +153,7 @@ export function followWaiting(
     if (person.binding === "mine")
       return { kind: "pin", mode: person.has_pin ? "enter" : "create" };
     if (person.locked) return { kind: "locked" };
-    return { kind: "grid", notice: "rejected" };
+    return { kind: "grid", notice: sawPending ? "rejected" : "not-waiting" };
   }
   if (person.pin_reset === "approved_for_this_phone") return { kind: "pin", mode: "create" };
   if (person.pin_reset === "open") return null;

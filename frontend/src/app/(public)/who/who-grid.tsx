@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Hourglass, Lock, Plus, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { api, type ApiError, type PersonTile } from "@/lib/api";
 import { POLL_MS } from "@/lib/live";
 import {
+  canFollow,
   cleanGuestName,
   colorFor,
   followWaiting,
@@ -36,9 +37,11 @@ type View =
   | { kind: "done" }
   | { kind: "grid"; notice?: React.ReactNode; highlight?: string }
   | { kind: "pin"; personId: string; mode: "enter" | "create"; notice?: React.ReactNode }
-  | { kind: "pending"; personId: string }
+  // `since`: when this phone asked (Date.now()); unset when the tile was already waiting.
+  // `seen`: this wait has seen the claim pending on the server, so leaving it is an answer.
+  | { kind: "pending"; personId: string; since?: number; seen?: boolean }
   | { kind: "locked"; personId: string; notice?: React.ReactNode }
-  | { kind: "reset"; personId: string }
+  | { kind: "reset"; personId: string; since?: number }
   | { kind: "new"; name: string; emoji: string | null; taken?: string; slow?: boolean }
   | { kind: "new-pin"; name: string; emoji: string };
 
@@ -71,16 +74,28 @@ export function WhoGrid() {
   const byId = (id: string) => tiles.find((p) => p.id === id);
 
   // Waiting screens follow the server (adjusting state during render, not in an effect).
-  const next = people.data ? followServer(view, byId) : null;
+  const since = view.kind === "pending" || view.kind === "reset" ? view.since : undefined;
+  const next =
+    people.data && waiting && canFollow(since, people.dataUpdatedAt)
+      ? followServer(view, byId)
+      : null;
   if (next) setView(next);
 
   const finish = (outcome: PinOutcome, personId: string, options?: { rename?: boolean }) => {
     void queryClient.invalidateQueries({ queryKey: PEOPLE });
     if (outcome === "done") router.replace(options?.rename ? "/me?rename=1" : "/");
     else if (outcome === "locked") setView({ kind: "locked", personId });
-    else if (outcome === "reset-asked") setView({ kind: "reset", personId });
-    else if (outcome === "asked-host") setView({ kind: "pending", personId });
+    else if (outcome === "reset-asked") setView({ kind: "reset", personId, since: Date.now() });
+    else if (outcome === "asked-host") setView({ kind: "pending", personId, since: Date.now() });
   };
+
+  // A held person with no PIN: the claim itself asks the host (ADR-0014 host override), so it is
+  // sent before the waiting screen opens. Its refusal is shown as-is, never as "the host said no".
+  const askHost = useMutation<unknown, ApiError, string>({
+    mutationFn: (personId) => api.claimPerson(personId),
+    onSuccess: (_, personId) => finish("asked-host", personId),
+    onError: () => void queryClient.invalidateQueries({ queryKey: PEOPLE }),
+  });
 
   const pickElse = (
     <Button
@@ -161,6 +176,7 @@ export function WhoGrid() {
             {view.notice}
           </p>
         ) : null}
+        <ApiErrorNotice error={askHost.error} />
         {tiles.length === 0 ? (
           <p className="text-lg text-muted-foreground">
             No one&apos;s here yet. Tap{" "}
@@ -177,7 +193,11 @@ export function WhoGrid() {
               <Tile
                 person={person}
                 highlight={view.kind === "grid" && view.highlight === person.id}
-                onTap={() => setView(tapTarget(person))}
+                onTap={() =>
+                  tileAction(person) === "ask-host"
+                    ? askHost.mutate(person.id)
+                    : setView(tapTarget(person))
+                }
                 onCurrent={() => router.replace("/")}
               />
             </li>
@@ -271,8 +291,10 @@ function tapTarget(person: PersonTile): View {
     case "create":
       return { kind: "pin", personId: person.id, mode: "create" };
     case "ask-host":
+      // Not reached: WhoGrid sends the claim first (askHost), then opens the waiting screen.
+      return { kind: "grid" };
     case "pending":
-      return { kind: "pending", personId: person.id };
+      return { kind: "pending", personId: person.id, seen: true };
     case "locked":
       return { kind: "locked", personId: person.id };
     case "reset-pending":
@@ -284,7 +306,10 @@ function tapTarget(person: PersonTile): View {
 function followServer(view: View, byId: (id: string) => PersonTile | undefined): View | null {
   if (view.kind !== "pending" && view.kind !== "reset") return null;
   const person = byId(view.personId);
-  const next = followWaiting(view.kind, person);
+  if (view.kind === "pending" && !view.seen && person?.binding === "pending") {
+    return { ...view, seen: true };
+  }
+  const next = followWaiting(view.kind, person, view.kind === "pending" ? !!view.seen : true);
   if (!next) return null;
   if (next.kind === "done") return next;
   const notice = person && next.notice ? noticeCopy(next.notice, person.name) : undefined;
@@ -299,6 +324,13 @@ function noticeCopy(notice: WaitingNotice, name: string): React.ReactNode {
       return (
         <>
           The host said no for <strong>{name}</strong> on this phone. Pick who you are.
+        </>
+      );
+    case "not-waiting":
+      return (
+        <>
+          <strong>{name}</strong> isn&apos;t waiting for the host on this phone. Tap them to ask
+          again.
         </>
       );
     case "dismissed":
