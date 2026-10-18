@@ -119,7 +119,7 @@ def set_device_cookie(response: Response, token: str) -> None:
     response.set_cookie(
         DEVICE_COOKIE,
         token,
-        max_age=settings.DEVICE_COOKIE_MAX_AGE_DAYS * 86400,
+        max_age=settings.DEVICE_IDLE_DAYS * 86400,
         path="/",
         secure=True,
         httponly=True,
@@ -132,7 +132,7 @@ def set_csrf_cookie(response: Response, token: str) -> None:
     response.set_cookie(
         CSRF_COOKIE,
         token,
-        max_age=settings.DEVICE_COOKIE_MAX_AGE_DAYS * 86400,
+        max_age=settings.DEVICE_IDLE_DAYS * 86400,
         path="/",
         secure=True,
         httponly=False,

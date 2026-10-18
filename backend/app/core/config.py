@@ -34,8 +34,11 @@ class Settings(BaseSettings):
     DEVICE_TOKEN_PEPPER: str = "dev-insecure-device-pepper"
 
     # --- Devices (ADR-0002) ---
-    DEVICE_COOKIE_MAX_AGE_DAYS: int = 365
-    # Sliding expiry: re-issue the cookie and stamp last_seen_at at most this often.
+    # A device unused this long must enter a night code again (401 `device_expired`, issue
+    # #56). Enforced server-side on last_seen_at; the cookie's max-age matches it.
+    DEVICE_IDLE_DAYS: int = 30
+    # Sliding expiry: re-issue the cookie and stamp last_seen_at at most this often. Must stay
+    # far below DEVICE_IDLE_DAYS so an active device never drifts past the window.
     DEVICE_TOUCH_INTERVAL_SECONDS: int = 3600
 
     # --- Accounts (ADR-0014: username/email + password; the magic link resets it) ---

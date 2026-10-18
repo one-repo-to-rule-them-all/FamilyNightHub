@@ -39,7 +39,7 @@ async def test_join_mints_a_hashed_device_token_in_a_hardened_cookie(two_househo
         cookie = next(c for c in resp.headers.get_list("set-cookie") if c.startswith(DEVICE_COOKIE))
         attrs = cookie.lower()
         assert "httponly" in attrs and "secure" in attrs and "samesite=lax" in attrs
-        assert f"max-age={365 * 86400}" in attrs
+        assert f"max-age={settings.DEVICE_IDLE_DAYS * 86400}" in attrs
 
         token = p.client.cookies[DEVICE_COOKIE]
         assert len(token) >= 43  # 256 bits

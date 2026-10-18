@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { POLL_MS } from "@/hooks/use-live-session";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { api, type ApiError, type NightSummary } from "@/lib/api";
+import { DEVICE_EXPIRED_COPY, isDeviceExpired } from "@/lib/device-idle";
 
 /** Nights the TV should be showing, newest first. A closed night is history, not the TV's job. */
 const ON_SCREEN = ["draft", "voting", "revealed", "tonight"] as const;
@@ -34,14 +35,21 @@ export function TvHome() {
   }, [target, router]);
 
   if (current.error?.status === 401) {
+    // Unused for 30 days (issue #56): the same pairing, said as "again".
+    const expired = isDeviceExpired(current.error);
     return (
       <div
         className="m-auto flex max-w-[40em] flex-col gap-[1em] text-center"
         data-testid="tv-unpaired"
+        data-expired={expired || undefined}
       >
-        <h1 className="tv-title">This screen isn&apos;t paired yet</h1>
+        <h1 className="tv-title">
+          {expired ? DEVICE_EXPIRED_COPY.tvTitle : "This screen isn't paired yet"}
+        </h1>
         <p className="tv-body text-muted-foreground">
-          A host signs in here, then chooses <strong>Use this browser as the TV</strong>.
+          {expired ? `${DEVICE_EXPIRED_COPY.tv} ` : null}A host signs in here, then chooses{" "}
+          <strong>Use this browser as the TV</strong>
+          {expired ? " again" : null}.
         </p>
         <Link
           href="/login"

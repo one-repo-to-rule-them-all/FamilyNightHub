@@ -38,6 +38,7 @@ from app.core.security import (
     set_device_cookie,
     verify_account_session,
 )
+from app.services import device_idle
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,19 @@ async def resolve_device_token(token: str) -> tuple[uuid.UUID, uuid.UUID] | None
     return (row.device_id, row.household_id) if row else None
 
 
+class DeviceExpired(HTTPException):
+    """401 `device_expired`: a live token unused for DEVICE_IDLE_DAYS (issue #56). The phone
+    re-enters a night code; a TV needs a host to pair it again."""
+
+    code = "device_expired"
+
+    def __init__(self) -> None:
+        super().__init__(
+            status.HTTP_401_UNAUTHORIZED,
+            "It's been a while. Enter tonight's code to join again.",
+        )
+
+
 async def current_device(request: Request) -> DeviceContext:
     token = request.cookies.get(DEVICE_COOKIE)
     resolved = await resolve_device_token(token) if token else None
@@ -66,6 +80,10 @@ async def current_device(request: Request) -> DeviceContext:
         # Unknown, revoked and missing all look the same to the caller.
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Device not recognised")
     device_id, household_id = resolved
+    # Expiry is told apart (the holder already proved the token), so the phone can say why.
+    async with household_session(household_id) as session:
+        if await device_idle.is_expired(session, device_id):
+            raise DeviceExpired
     return DeviceContext(device_id=device_id, household_id=household_id, token=token or "")
 
 

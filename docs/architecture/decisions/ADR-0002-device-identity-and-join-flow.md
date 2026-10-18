@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted (2026-10-15). Amended 2026-10-18: "Open TV window" (see the end of this ADR).
+Accepted (2026-10-15). Amended 2026-10-18: devices expire after 30 days unused (see
+"Amendment: idle timeout" below; issue #56). Also amended 2026-10-18: "Open TV window" (issue #57, see the end).
 
 ## Context
 
@@ -24,7 +25,8 @@ vote as anyone, forever. Safari can also wipe script-writable storage after 7 da
   the TV, valid while a session is `draft`/`voting`/`revealed`/`tonight` so people can join
   while the TV shows the lobby, dead once it is `closed`, rotates per session). A successful
   join mints a device token (256-bit random, stored hashed in `devices`) in an **httpOnly, Secure,
-  SameSite=Lax cookie** (365-day sliding expiry) — not `localStorage`.
+  SameSite=Lax cookie** (365-day sliding expiry; 30 days since the 2026-10-18 amendment) — not
+  `localStorage`.
 - **People** are rows in `people` (name, emoji avatar, colour). After joining, the phone shows an
   avatar grid; picking a person binds a `device_people` row. A device can hold several people
   (shared phone, "pass to next person"). Picking a person already bound to *another* device requires
@@ -49,6 +51,36 @@ permanent access from a photographed QR; Safari storage eviction.
 - **Tests:** device without night code cannot join; revoked device gets 401; device A cannot vote
   as a person bound only to device B (pytest + Playwright).
 - See [`03-backend.md`](../03-backend.md) "Auth" and [`05-data.md`](../05-data.md).
+
+## Amendment: idle timeout (2026-10-18, issue #56)
+
+**Owner decision:** a phone or TV not used for **30 days** must enter the night code again. With
+a 365-day sliding cookie a known phone never had to, so an occasional visitor's phone kept
+household access for a year.
+
+- **Enforced on the server, not only by the cookie.** `current_device` rejects a live token whose
+  `COALESCE(last_seen_at, created_at)` is older than `DEVICE_IDLE_DAYS` (default 30) with 401 and
+  error code **`device_expired`**. Unknown, revoked and missing tokens keep the generic 401
+  (`http_error`), so the distinct code only tells a holder of a real token why. The check runs in
+  a short household transaction after the ADR-0009 resolver; the resolver itself is unchanged (no
+  new pre-auth column), so no migration.
+- **Expired is not revoked.** The row stays (label, history, audit trail) and the admin Phones list
+  shows it as "Expired (not used in 30 days)" (`expired: true` on `GET /admin/devices`). Revoked
+  wins: a revoked device is never shown as expired.
+- **Sliding window.** `last_seen_at` is stamped and the cookie re-issued at most once per
+  `DEVICE_TOUCH_INTERVAL_SECONDS` (1 h), so an active device is never more than an hour behind.
+  The cookie's `Max-Age` is now `DEVICE_IDLE_DAYS` (30 days) instead of 365.
+- **Coming back.** Entering a live night code at `/j/{slug}` (or a host enrollment) revives the
+  *same* device row and cookie, stamps `last_seen_at`, and audits `device.rejoined`. The phone UI
+  sends an expired phone straight to the join door it last used, with "It's been a while. Enter
+  tonight's code."
+- **People bindings do not carry over.** Reviving drops the device's `device_people` rows, so
+  whoever holds the phone now picks their people again, each with their PIN (ADR-0014). A month
+  is long enough for a phone to change hands; keeping the bindings would hand the next holder
+  someone else's identity without a PIN.
+- **TVs follow the same rule.** Reviving also clears `is_tv`: the night code alone brings a TV
+  back as an ordinary phone, and a host has to choose "Use this browser as the TV" again (TV
+  rights are host-granted, ADR-0002). The TV's unpaired screen says so.
 
 ## Amendment 2026-10-18: the host's laptop opens the TV in a second window (issue #57)
 

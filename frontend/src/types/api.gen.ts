@@ -1437,6 +1437,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Expired */
+            expired: boolean;
             /**
              * Id
              * Format: uuid
