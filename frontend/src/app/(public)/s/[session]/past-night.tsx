@@ -128,14 +128,8 @@ function ThatsAWrap({
           <Results night={night} />
         </div>
       </details>
-      <PhotoAlbum sessionId={night.id} live={live} actorId={current.id} canAdd={false} />
-      <Link
-        href={`/albums/${night.id}`}
-        data-testid="wrap-add-photos"
-        className={cn(buttonVariants({ variant: "secondary", size: "tap" }), "w-full")}
-      >
-        Add photos
-      </Link>
+      {/* The rating or the hand-off is the primary here, so Add photos is `secondary`. */}
+      <PhotoAlbum sessionId={night.id} live={live} actorId={current.id} primary={false} />
     </>
   );
 }

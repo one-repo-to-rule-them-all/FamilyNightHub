@@ -30,11 +30,14 @@ export function PhotoAlbum({
   sessionId,
   live,
   canAdd = true,
+  primary = true,
   actorId,
 }: {
   sessionId: string;
   live: LiveState;
   canAdd?: boolean;
+  /** False when the screen's one primary is elsewhere: **Add photos** turns `secondary`. */
+  primary?: boolean;
   /** This phone's current person (ADR-0014): the default "Sharing as". */
   actorId?: string;
 }) {
@@ -103,7 +106,12 @@ export function PhotoAlbum({
               </div>
             ) : null}
             {actor ? (
-              <PhotoDrop sessionId={sessionId} personId={actor.id} empty={emptyDrop} />
+              <PhotoDrop
+                sessionId={sessionId}
+                personId={actor.id}
+                empty={emptyDrop}
+                primary={primary}
+              />
             ) : null}
           </>
         )

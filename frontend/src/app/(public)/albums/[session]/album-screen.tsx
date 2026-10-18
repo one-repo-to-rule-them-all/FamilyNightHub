@@ -7,6 +7,7 @@ import { GuestShell } from "@/components/home/guest-shell";
 import { PhoneScreen } from "@/components/phone-screen";
 import { PhotoAlbum } from "@/components/photos/photo-album";
 import { buttonVariants } from "@/components/ui/button";
+import { useHouseholdNight } from "@/hooks/use-household-night";
 import { useLiveSession } from "@/hooks/use-live-session";
 import { type Night } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -19,10 +20,12 @@ const ALBUM_OPEN: ReadonlySet<Night["status"]> = new Set(["tonight", "closed"]);
 /**
  * /albums/[session]: one night's photos on their own, e.g. from history days later. Inside the
  * guest shell with **‹** back to the night (guest-home §5 H6); a live night shows the plain
- * hand-off (no countdown here, AC-H3.11).
+ * hand-off (no countdown here, AC-H3.11). While a night is live the hand-off's Go is the one
+ * primary, so **Add photos** turns `secondary` (guest-home §4 rule 1).
  */
 export function AlbumScreen({ sessionId }: { sessionId: string }) {
   const night = useLiveSession(sessionId);
+  const { night: liveNight } = useHouseholdNight(night.isSuccess);
   const back = { href: `/s/${sessionId}`, label: "Movie night" };
 
   // No device on this browser: the shell's person and nav mean nothing yet, so no shell.
@@ -71,7 +74,7 @@ export function AlbumScreen({ sessionId }: { sessionId: string }) {
       <GuestShell screen="album" back={back}>
         <ScreenTitle title="Photos" lede={winner ? winner.title : night.data.title} />
         {ALBUM_OPEN.has(night.data.status) ? (
-          <PhotoAlbum sessionId={sessionId} live={night.live} />
+          <PhotoAlbum sessionId={sessionId} live={night.live} primary={liveNight === undefined} />
         ) : (
           <p className="text-lg text-muted-foreground">
             Photos open once tonight&apos;s movie is picked.

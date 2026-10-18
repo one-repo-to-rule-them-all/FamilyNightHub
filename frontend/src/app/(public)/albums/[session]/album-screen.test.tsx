@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const state: { result: Record<string, unknown> } = { result: {} };
+const state: { result: Record<string, unknown>; liveNight?: { id: string } } = { result: {} };
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: React.ComponentProps<"a">) => (
@@ -30,7 +30,12 @@ vi.mock("@/components/home/guest-shell", () => ({
   ),
 }));
 vi.mock("@/components/photos/photo-album", () => ({
-  PhotoAlbum: () => <div data-testid="photo-album" />,
+  PhotoAlbum: ({ primary = true }: { primary?: boolean }) => (
+    <div data-testid="photo-album" data-primary={primary} />
+  ),
+}));
+vi.mock("@/hooks/use-household-night", () => ({
+  useHouseholdNight: () => ({ night: state.liveNight, isNew: false, markSeen: () => {} }),
 }));
 vi.mock("@/components/api-error-notice", () => ({ ApiErrorNotice: () => <p role="alert" /> }));
 vi.mock("@/hooks/use-live-session", () => ({ useLiveSession: () => state.result }));
@@ -44,6 +49,7 @@ let host: HTMLDivElement;
 const main = () => host.querySelector<HTMLElement>("main");
 
 beforeEach(() => {
+  state.liveNight = undefined;
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -67,6 +73,21 @@ describe("AlbumScreen (guest-home §5 H6)", () => {
     expect(main()?.dataset.back).toBe("/s/n1");
     expect(main()?.dataset.handoff).toBe("plain");
     expect(host.querySelector('[data-testid="photo-album"]')).not.toBeNull();
+  });
+
+  it("Add photos is the primary only while no night is live (one primary, §4 rule 1)", () => {
+    state.result = {
+      isPending: false,
+      isError: false,
+      live: "live",
+      data: { id: "n1", status: "closed", title: "Fri", options: [], result: null },
+    };
+    act(() => root.render(<AlbumScreen sessionId="n1" />));
+    const album = () => host.querySelector<HTMLElement>('[data-testid="photo-album"]');
+    expect(album()?.dataset.primary).toBe("true");
+    state.liveNight = { id: "n2" };
+    act(() => root.render(<AlbumScreen sessionId="n1" />));
+    expect(album()?.dataset.primary).toBe("false");
   });
 
   it("keeps the shell while loading", () => {

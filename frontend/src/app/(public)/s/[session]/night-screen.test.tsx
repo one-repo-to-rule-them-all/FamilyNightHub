@@ -103,8 +103,8 @@ vi.mock("@/components/night/rating-panel", () => ({
   RatingPanel: () => <div data-testid="rating-panel" />,
 }));
 vi.mock("@/components/photos/photo-album", () => ({
-  PhotoAlbum: ({ canAdd = true }: { canAdd?: boolean }) => (
-    <div data-testid="photo-album" data-can-add={canAdd} />
+  PhotoAlbum: ({ canAdd = true, primary = true }: { canAdd?: boolean; primary?: boolean }) => (
+    <div data-testid="photo-album" data-can-add={canAdd} data-primary={primary} />
   ),
 }));
 vi.mock("@/components/night/switch-sheet", () => ({
@@ -267,8 +267,10 @@ describe("past nights (§5 H3)", () => {
     expect(host.textContent).toContain("That's a wrap");
     expect(host.textContent).not.toContain("Past movie nights");
     expect(host.querySelector('[data-testid="current-chip"]')).toBeNull();
-    const add = host.querySelector<HTMLAnchorElement>('[data-testid="wrap-add-photos"]');
-    expect(add?.getAttribute("href")).toBe("/albums/n1");
+    // Add photos stays on the wrap, as a `secondary` button (the stars or Go are the primary).
+    const album = host.querySelector<HTMLElement>('[data-testid="photo-album"]');
+    expect(album?.dataset.canAdd).toBe("true");
+    expect(album?.dataset.primary).toBe("false");
   });
 
   it("wrap, no live night, unrated: the star row is the one primary (AC-H3.2)", async () => {
