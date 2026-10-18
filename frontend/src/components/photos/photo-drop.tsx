@@ -8,6 +8,23 @@ import { usePhotoUploads } from "@/hooks/use-photo-uploads";
 import { type JobStatus } from "@/lib/photos/queue";
 import { cn } from "@/lib/utils";
 
+/**
+ * Which test ids and button variant the picker gets: the filled `primary-action` by default, or a
+ * `secondary` `add-photos` when the screen's primary is elsewhere. The empty tile keeps
+ * `album-empty` on the label either way.
+ */
+export function dropMark(
+  empty: boolean,
+  primary: boolean,
+): { label: string; tile: string | undefined; variant: "default" | "secondary" } {
+  const action = primary ? "primary-action" : "add-photos";
+  return {
+    label: empty ? "album-empty" : action,
+    tile: empty ? action : undefined,
+    variant: primary ? "default" : "secondary",
+  };
+}
+
 const STATE_TEXT: Record<JobStatus["state"], string> = {
   processing: "Getting it ready…",
   queued: "Waiting to upload…",
@@ -21,33 +38,40 @@ const STATE_TEXT: Record<JobStatus["state"], string> = {
  * "Add photos": a plain multi-file picker (no `capture`, never `image/heic` in `accept`, so iOS
  * offers the library and the camera both), then one progress row per file. On an empty album the
  * picker **is** the empty state (guest-flow spec §5 S13): one large tile, still the only primary.
+ * `primary={false}` is for screens where something else is the one primary (That's a wrap, an
+ * album while a night is live, guest-home §4): the button turns `secondary` and loses the
+ * `primary-action` mark.
  */
 export function PhotoDrop({
   sessionId,
   personId,
   empty = false,
+  primary = true,
 }: {
   sessionId: string;
   personId: string;
   empty?: boolean;
+  primary?: boolean;
 }) {
   const inputId = useId();
+  const mark = dropMark(empty, primary);
   const { rows, add, retry, dismiss } = usePhotoUploads(sessionId);
 
   return (
     <div className="flex flex-col gap-3">
       <label
         htmlFor={inputId}
-        data-testid={empty ? "album-empty" : "primary-action"}
+        data-testid={mark.label}
+        data-variant={empty ? undefined : mark.variant}
         className={cn(
           empty
             ? "flex min-h-40 w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-foreground/25 p-5 text-center"
-            : cn(buttonVariants({ size: "tap" }), "w-full"),
+            : cn(buttonVariants({ variant: mark.variant, size: "tap" }), "w-full"),
           "cursor-pointer has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
         )}
       >
         {empty ? (
-          <span data-testid="primary-action" className="flex flex-col items-center gap-2">
+          <span data-testid={mark.tile} className="flex flex-col items-center gap-2">
             <Camera aria-hidden className="size-10 text-cinema" />
             <span className="text-xl font-medium">No photos yet</span>
             <span className="text-muted-foreground">
