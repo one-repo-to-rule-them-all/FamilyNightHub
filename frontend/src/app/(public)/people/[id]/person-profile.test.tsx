@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { notifyManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -33,7 +33,7 @@ const state: { search: string; replace: ReturnType<typeof vi.fn> } = {
 const api = { profile: vi.fn(async () => lulu) };
 
 vi.mock("@/lib/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/api")>()),
+  ...(await importOriginal<object>()),
   api,
 }));
 vi.mock("next/navigation", () => ({
@@ -74,6 +74,8 @@ vi.mock("@/components/home/guest-shell", () => ({
 const { PersonProfile } = await import("./person-profile");
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+// Query results land on microtasks, so a test can flush them without waiting on timers.
+notifyManager.setScheduler(queueMicrotask);
 
 let root: Root;
 let host: HTMLDivElement;
@@ -88,7 +90,10 @@ async function render(personId: string) {
       </QueryClientProvider>,
     ),
   );
-  for (let i = 0; i < 5; i++) await act(async () => new Promise((r) => setTimeout(r, 0)));
+  for (let i = 0; i < 5; i++)
+    await act(async () => {
+      await Promise.resolve();
+    });
 }
 
 beforeEach(() => {

@@ -20,9 +20,7 @@ export function memberSince(
 }
 
 /** Me's 2×2 stats, in reading order: nights, winning picks, average rating given, photos. */
-export function meStats(
-  stats: Schemas["ProfileStatsOut"],
-): { label: string; value: string }[] {
+export function meStats(stats: Schemas["ProfileStatsOut"]): { label: string; value: string }[] {
   return [
     { label: "Movie nights", value: String(stats.nights_joined) },
     { label: "Winning picks", value: String(stats.winners_picked) },

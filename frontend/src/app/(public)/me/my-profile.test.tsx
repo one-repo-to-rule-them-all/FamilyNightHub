@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { notifyManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,7 +58,7 @@ const api = {
 };
 
 vi.mock("@/lib/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/api")>()),
+  ...(await importOriginal<object>()),
   api,
 }));
 vi.mock("next/navigation", () => ({
@@ -98,6 +98,8 @@ vi.mock("@/components/night/switch-sheet", () => ({
 const { MyProfile } = await import("./my-profile");
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+// Query results land on microtasks, so a test can flush them without waiting on timers.
+notifyManager.setScheduler(queueMicrotask);
 // jsdom has no modal dialogs; ModalDialog only needs showModal/close to exist.
 HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
   this.open = true;
@@ -109,10 +111,16 @@ HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
 let root: Root;
 let host: HTMLDivElement;
 const q = (testId: string) => host.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
-const byLabel = (label: string) => host.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+const byLabel = (label: string) =>
+  [...host.querySelectorAll<HTMLElement>("[aria-label]")].find(
+    (el) => el.getAttribute("aria-label") === label,
+  ) ?? null;
 
 async function settle() {
-  for (let i = 0; i < 5; i++) await act(async () => new Promise((r) => setTimeout(r, 0)));
+  for (let i = 0; i < 5; i++)
+    await act(async () => {
+      await Promise.resolve();
+    });
 }
 
 async function render() {

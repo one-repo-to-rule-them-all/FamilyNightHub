@@ -21,7 +21,10 @@ export function historyTab(raw: string | null | undefined): HistoryTab {
 
 /** `copy.h.hist.mineSummary`, as parts so the numbers can be bold. Null average drops its part. */
 export function mineSummary(
-  stats: Pick<Schemas["ProfileStatsOut"], "nights_joined" | "winners_picked" | "average_rating_given">,
+  stats: Pick<
+    Schemas["ProfileStatsOut"],
+    "nights_joined" | "winners_picked" | "average_rating_given"
+  >,
 ): { prefix?: string; value: string; label: string }[] {
   const parts: { prefix?: string; value: string; label: string }[] = [
     { value: String(stats.nights_joined), label: stats.nights_joined === 1 ? "night" : "nights" },
@@ -37,9 +40,7 @@ export function mineSummary(
 }
 
 /** The picks line: top three in rank order, or "You liked N" for an approval night. */
-export function picksLine(
-  night: Pick<ProfileNight, "picks" | "voting_method">,
-): string | null {
+export function picksLine(night: Pick<ProfileNight, "picks" | "voting_method">): string | null {
   if (night.picks.length === 0) return null;
   if (night.voting_method === "approval") return HISTORY_COPY.approved(night.picks.length);
   const titles = [...night.picks]
