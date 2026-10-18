@@ -1,6 +1,6 @@
 import { type Browser, type BrowserContext, type Page } from "@playwright/test";
 
-import { castPhoneBallot, signInAsHost } from "./support/host";
+import { castPhoneBallot, pairAsTv, signInAsHost } from "./support/host";
 import { expectNoAxeViolations, hostClosesVoting, joinAs, newPhone } from "./support/phones";
 import { expect, seedNight, type SeededNight, test } from "./support/seed";
 
@@ -25,9 +25,7 @@ async function pairTv(browser: Browser, night: SeededNight, origin: string) {
   });
   await signInAsHost(context, night, origin);
   const tv = await context.newPage();
-  await tv.goto("/host");
-  await tv.getByRole("button", { name: "Use this browser as the TV" }).click();
-  await tv.getByRole("button", { name: "Yes, make it the TV" }).click();
+  await pairAsTv(tv);
   await expect(tv).toHaveURL(new RegExp(`/tv/${night.sessionId}$`));
   return { context, tv };
 }
@@ -91,6 +89,7 @@ test.describe("live updates", () => {
     request,
     browser,
   }) => {
+    test.slow(); // two phones with PINs (argon2id), plus a deliberate stream outage and poll fallback
     const night = seedNight({ movies: 3, openVoting: true });
     const [paddington] = night.movies;
     await joinAs(page, night, ["Ava"]);

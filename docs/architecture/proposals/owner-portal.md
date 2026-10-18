@@ -228,8 +228,11 @@ sentence in bold-name style, a muted time ("2 min ago"), and its inline actions.
 Keeps #40's table and PIN-requests section; the redesign changes only the frame and adds status:
 
 - Header: "People" + **Add a person** as the screen's primary.
-- **PIN requests** section stays at the top (#40), but collapses to nothing when empty (the inbox
-  already says "all clear").
+- **PIN requests** section stays at the top (#40). When empty it shows one muted line saying where a
+  request would come from (amended 2026-10-17, #42: a collapsed section left the owner unsure
+  whether PIN requests existed at all).
+- Under the filter row, a muted line names who "Needs attention" counts and why (`No PIN yet`
+  people are never an inbox row: they pick a PIN on their phone, so there is nothing to approve).
 - The table gains a **Status** column from ADR-0014's `has_pin` / `locked`: `PIN set`, `No PIN yet`
   (muted), `Locked` (chip). A filter row: All · Family · Guests · Needs attention.
 - Each row gets `id="person-{id}"` so inbox links scroll to it.

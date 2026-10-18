@@ -14,9 +14,12 @@ test("bulk add resolves an ambiguous title and marks everything owned", async ({
   const house = seedHousehold();
   await signInAsHost(context, house, baseURL!);
   await page.goto("/admin/movies");
-  await expect(page.getByRole("link", { name: "Movies" })).toHaveAttribute("aria-current", "page");
+  await expect(page.locator('[data-screen="portal-library"]')).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Portal" }).getByRole("link", { name: /Library/ }),
+  ).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("heading", { name: "Add owned titles" })).toBeVisible();
-  await expect(page.getByTestId("library-table")).toContainText("No titles match.");
+  await expect(page.getByTestId("library-table")).toContainText("No titles yet.");
   await expect(page.getByTestId("tmdb-attribution")).toContainText("not endorsed or certified");
   await expectNoAxeViolations(page);
 
@@ -64,7 +67,9 @@ test("an admin corrects a winner and /history shows it", async ({ page, context,
   const night = seedNight({ movies: 3, tonight: true });
   await signInAsHost(context, night, baseURL!);
   await page.goto("/admin/history");
-  await expect(page.getByRole("link", { name: "History" })).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("navigation", { name: "Portal" }).getByRole("link", { name: /History/ }),
+  ).toHaveAttribute("aria-current", "page");
 
   const winnerCell = page.getByTestId("admin-history-winner");
   await expect(winnerCell).toHaveCount(1);

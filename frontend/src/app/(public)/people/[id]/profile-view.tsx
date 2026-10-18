@@ -6,24 +6,19 @@ import Link from "next/link";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Avatar } from "@/components/night/avatar";
-import { PhoneScreen } from "@/components/phone-screen";
 import { api, type ApiError, type Profile, type ProfileNight } from "@/lib/api";
 import { profileStats } from "@/lib/profile";
+
+import { memberSince } from "../../me/me";
 
 export const profileKey = (personId: string) => ["people", personId, "profile"] as const;
 
 /**
  * A person's history and stats (ADR-0014 "Profiles"): nights joined, picks, winners, ratings and
- * photos. Ballots appear only for nights past the reveal; the server enforces that.
+ * photos. Ballots appear only for nights past the reveal; the server enforces that. Content only:
+ * `/people/[id]` renders it inside the guest shell (guest-home §5 H5), which owns the `<main>`.
  */
-export function ProfileView({
-  personId,
-  children,
-}: {
-  personId: string;
-  /** Self-service controls on `/me` (rename once, change PIN). */
-  children?: React.ReactNode;
-}) {
+export function ProfileView({ personId }: { personId: string }) {
   const profile = useQuery<Profile, ApiError>({
     queryKey: profileKey(personId),
     queryFn: () => api.profile(personId),
@@ -31,36 +26,28 @@ export function ProfileView({
 
   if (profile.isPending) {
     return (
-      <PhoneScreen title="Profile">
-        <div
-          role="status"
-          aria-busy="true"
-          aria-label="Loading profile"
-          className="h-40 animate-pulse rounded-2xl bg-muted"
-        />
-      </PhoneScreen>
+      <div
+        role="status"
+        aria-busy="true"
+        aria-label="Loading profile"
+        className="h-40 animate-pulse rounded-2xl bg-muted"
+      />
     );
   }
   if (profile.isError) {
-    return (
-      <PhoneScreen title="Profile">
-        <ApiErrorNotice error={profile.error} />
-      </PhoneScreen>
-    );
+    return <ApiErrorNotice error={profile.error} />;
   }
 
   const p = profile.data;
   return (
-    <PhoneScreen title={p.name} screen="profile">
+    <>
       <div className="flex items-center gap-4">
         <Avatar emoji={p.avatar_emoji} color={p.color} className="size-20 text-5xl" />
-        <p className="text-muted-foreground">
-          {p.is_guest ? "Guest" : "Family"} since{" "}
-          {new Date(p.created_at).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
-        </p>
+        <div className="flex min-w-0 flex-col gap-1">
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">{p.name}</h1>
+          <p className="text-muted-foreground">{memberSince(p)}</p>
+        </div>
       </div>
-
-      {children}
 
       <section aria-labelledby="stats-title" className="flex flex-col gap-3">
         <h2 id="stats-title" className="text-xl font-medium">
@@ -113,7 +100,7 @@ export function ProfileView({
           </ul>
         </section>
       ) : null}
-    </PhoneScreen>
+    </>
   );
 }
 

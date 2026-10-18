@@ -292,11 +292,15 @@ function JoinLink({ slug }: { slug: string }) {
 function QrCodeSetting({ settings }: { settings: HouseholdSettings }) {
   const id = useId();
   const queryClient = useQueryClient();
+  // Set in the same event as the click: the mutation's pending state lands a tick later, and until
+  // then the controlled checkbox snapped back to the old value (a flicker; flaky in e2e, #42).
+  const [wanted, setWanted] = useState<boolean | null>(null);
   const save = useMutation<HouseholdSettings, ApiError, boolean>({
     mutationFn: (on) => api.updateSettings({ qr_includes_night_code: on }),
     onSuccess: (next) => queryClient.setQueryData(SETTINGS_KEY, next),
+    onSettled: () => setWanted(null),
   });
-  const on = save.isPending ? save.variables : settings.qr_includes_night_code;
+  const on = wanted ?? settings.qr_includes_night_code;
 
   return (
     <div className="flex flex-col gap-2 border-t border-foreground/10 pt-4">
@@ -308,7 +312,10 @@ function QrCodeSetting({ settings }: { settings: HouseholdSettings }) {
           checked={on}
           disabled={save.isPending}
           aria-describedby={`${id}-help`}
-          onChange={(event) => save.mutate(event.target.checked)}
+          onChange={(event) => {
+            setWanted(event.target.checked);
+            save.mutate(event.target.checked);
+          }}
           className="mt-1 size-5 shrink-0 accent-[var(--accent-cinema)]"
           data-testid="qr-code-setting"
         />

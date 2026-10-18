@@ -5,7 +5,9 @@ import { POLL_MS } from "./live";
 import {
   cleanGuestName,
   colorFor,
+  actingPeople,
   currentPerson,
+  canFollow,
   followWaiting,
   GUEST_EMOJI,
   orderTiles,
@@ -128,6 +130,35 @@ describe("new guest", () => {
   });
 });
 
+describe("actingPeople", () => {
+  // E2E 2026-10-17: a shared phone's rating panel and "Sharing as" offered everyone it holds,
+  // and the API refused all but the current person.
+  it("is only the current person, never others held by the phone", () => {
+    const ava = tile({ id: "a", name: "Ava", binding: "mine", current: true });
+    const leo = tile({ id: "l", name: "Leo", binding: "mine" });
+    expect(actingPeople([leo, ava])).toEqual([ava]);
+  });
+
+  it("is nobody without a current person with a PIN", () => {
+    expect(actingPeople([tile({ binding: "mine" })])).toEqual([]);
+    expect(actingPeople([tile({ binding: "mine", current: true, has_pin: false })])).toEqual([]);
+    expect(actingPeople(undefined)).toEqual([]);
+  });
+});
+
+describe("canFollow", () => {
+  // E2E 2026-10-17: "Ask the host" showed "The host said no" at once, from the pre-request tile.
+  it("waits for data fetched after the phone asked", () => {
+    expect(canFollow(1_000, 999)).toBe(false);
+    expect(canFollow(1_000, 1_000)).toBe(true);
+    expect(canFollow(1_000, 1_500)).toBe(true);
+  });
+
+  it("follows at once when the tile was already waiting", () => {
+    expect(canFollow(undefined, 0)).toBe(true);
+  });
+});
+
 describe("followWaiting", () => {
   it("S4: keeps waiting, then follows the host's answer", () => {
     expect(followWaiting("pending", tile({ binding: "pending" }))).toBeNull();
@@ -150,6 +181,23 @@ describe("followWaiting", () => {
       kind: "locked",
     });
     expect(followWaiting("pending", undefined)).toEqual({ kind: "grid" });
+  });
+
+  // Staging 2026-10-18 (#42): a phone tapped a held, no-PIN guest and saw "The host said no"
+  // although no claim was ever pending. Only a wait that saw the claim pending reads a rejection.
+  it("S4: never says 'rejected' for a claim that was not seen pending", () => {
+    expect(followWaiting("pending", tile({ binding: "taken" }), false)).toEqual({
+      kind: "grid",
+      notice: "not-waiting",
+    });
+    expect(followWaiting("pending", tile({ binding: "free" }), false)).toEqual({
+      kind: "grid",
+      notice: "not-waiting",
+    });
+    expect(followWaiting("pending", tile({ binding: "pending" }), false)).toBeNull();
+    expect(followWaiting("pending", tile({ binding: "mine", current: true }), false)).toEqual({
+      kind: "done",
+    });
   });
 
   it("S6: follows the family admin's answer (G2)", () => {

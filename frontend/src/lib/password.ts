@@ -14,3 +14,12 @@ export function passwordProblem(password: string, confirm: string): string | nul
   if (password !== confirm) return "The two passwords don't match.";
   return null;
 }
+
+/**
+ * Whether POST /auth/verify refused the link itself (invalid, expired or already used), so the
+ * callback offers "Send a new link" instead of another try. The API answers 400 for that
+ * (03-backend.md); 422 is a weak password, and the link still works.
+ */
+export function linkSpent(status: number | undefined): boolean {
+  return status === 400 || status === 401;
+}

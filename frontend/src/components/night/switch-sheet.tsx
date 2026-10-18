@@ -211,13 +211,23 @@ export function CurrentChip({
   people,
   votedIds,
   verb = "Voting as",
+  open: openProp,
+  onOpenChange,
 }: {
   current: PersonTile;
   people: PersonTile[];
   votedIds?: ReadonlySet<string>;
   verb?: string;
+  /**
+   * Controlled open state, for a screen that renders the chip in more than one branch (the
+   * ballot's loading and loaded views): a tap while loading must survive the switch of branch.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = onOpenChange ?? setOpenState;
   return (
     <>
       <button

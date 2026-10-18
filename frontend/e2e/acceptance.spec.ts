@@ -1,8 +1,16 @@
 import { type Browser, type BrowserContext, type Page } from "@playwright/test";
 
-import { pinTieBreakSeed, signInWithMagicLink } from "./support/host";
+import { pairAsTv, pinTieBreakSeed, signInWithMagicLink, signInWithPassword } from "./support/host";
 import { MAILHOG_URL } from "./support/mail";
-import { apiFromPhone, expectNoAxeViolations, joinAs, newPhoneLike, vote } from "./support/phones";
+import {
+  apiFromPhone,
+  expectNoAxeViolations,
+  joinAs,
+  newPhoneLike,
+  switchTo,
+  typePin,
+  vote,
+} from "./support/phones";
 import {
   addPhotos,
   type AlbumPhoto,
@@ -76,18 +84,19 @@ test.describe("Phase 1 acceptance", () => {
       return page;
     };
 
-    // --- The TV: the host signs in on its browser by the emailed link and pairs it.
+    // --- The TV: the host resets their password by the emailed link on its browser (ADR-0014:
+    // the link is "forgot password"), then pairs it from Settings → This browser.
     const tv = await newTv(browser, origin, contexts);
-    const tvLink = await signInWithMagicLink(tv, household.adminEmail);
+    const password = "acceptance night password";
+    await signInWithMagicLink(tv, household.adminEmail, [], password);
     await expectNoAxeViolations(tv);
-    await tv.getByRole("button", { name: "Use this browser as the TV" }).click();
-    await tv.getByRole("button", { name: "Yes, make it the TV" }).click();
+    await pairAsTv(tv);
     await expect(tv.getByTestId("tv-waiting")).toHaveText("Waiting for the host to start a night.");
     await expectNoAxeViolations(tv);
 
-    // --- The host's phone: its own emailed link, then the family and the night.
+    // --- The host's phone: username + the new password, then the family and the night.
     const host = await phone("iPhone 13");
-    await signInWithMagicLink(host, household.adminEmail, [tvLink]);
+    await signInWithPassword(host, { adminUsername: household.adminUsername, password });
     await expectNoAxeViolations(host);
     for (const person of MORE_PEOPLE) {
       // API: adding people has no UI until Phase 2's admin screens (BUILD-PROMPT.md).
@@ -95,7 +104,7 @@ test.describe("Phase 1 acceptance", () => {
       expect(added.status).toBe(201);
     }
     await host.getByLabel("Name it (optional)").fill("Acceptance night");
-    await host.getByRole("button", { name: "Start a night" }).click();
+    await host.getByRole("button", { name: "Start movie night" }).click();
     await expect(host.getByTestId("night-code")).toHaveText(/^[2-9A-HJKMNP-Z]{6}$/);
     const hostCode = (await host.getByTestId("night-code").textContent())!.trim();
     await host.getByRole("link", { name: "Build the shortlist" }).click();
@@ -136,10 +145,8 @@ test.describe("Phase 1 acceptance", () => {
     await phoneA.goto(`/j/${household.slug}`);
     await expect(phoneA.getByRole("heading", { name: "Join movie night" })).toBeVisible();
     await expectNoAxeViolations(phoneA);
-    await joinAs(phoneA, joinable, ["Ava", "Mia"]);
-    await expect(phoneA.getByTestId("who-status")).toHaveText(
-      "You're in as Ava & Mia. Voting opens on the TV.",
-    );
+    // Phone A is shared: Mia, then Ava (current, the last one picked).
+    await joinAs(phoneA, joinable, ["Mia", "Ava"]);
     await expectNoAxeViolations(phoneA);
 
     const phoneB = await phone("Pixel 7");
@@ -147,30 +154,30 @@ test.describe("Phase 1 acceptance", () => {
     const phoneD = await phone("Pixel 7");
     await joinAs(phoneD, joinable, ["Zoe"]);
 
-    // Phone C is Noah's, and asks for Leo too: Leo is on phone B, so it waits for the host.
+    // Phone C is Noah's, and asks for Leo too. Leo is on phone B with a PIN phone C doesn't know:
+    // after two wrong tries it asks the host instead (ADR-0014's host override).
     const phoneC = await phone("iPhone 13");
     await joinAs(phoneC, joinable, ["Noah"]);
-    const leoOnC = phoneC.getByRole("button", { name: /^Leo/ });
-    await leoOnC.click();
-    await expect(leoOnC).toHaveAttribute("data-binding", "pending");
-    await expect(leoOnC).toContainText("Pending — ask the host");
+    await phoneC.goto("/who");
+    await phoneC.getByRole("button", { name: /^Leo/ }).click();
+    for (let i = 0; i < 2; i++) {
+      await typePin(phoneC, "000000");
+      await expect(phoneC.getByTestId("pin-message")).toContainText("tries left");
+    }
+    await phoneC.getByRole("button", { name: /Ask the host/ }).click();
+    await expect(phoneC.locator('[data-screen="pending"]')).toBeVisible();
 
+    // The host approves it from Home's "Needs you" inbox; the nav badge counted it.
     await host.goto("/host");
-    const claim = host.getByTestId("claim");
+    const claim = host.locator('[data-inbox-kind="claim"]');
     await expect(claim).toHaveCount(1, POLL);
-    await expect(claim).toContainText("wants to be Leo.");
+    await expect(claim).toContainText("Leo");
+    await expect(host.getByTestId("nav-badge").first()).toHaveText("1");
     await expectNoAxeViolations(host);
-    await host.getByRole("button", { name: "Approve Leo" }).click();
-    await expect(host.getByText("No phones are waiting.")).toBeVisible();
-    // /who polls while a claim is pending, so the tile flips with no reload.
-    await expect(phoneC.getByRole("button", { name: /^Leo/ })).toHaveAttribute(
-      "data-binding",
-      "mine",
-      POLL,
-    );
-    await expect(phoneC.getByTestId("who-status")).toHaveText(
-      "You're in as Leo & Noah. Voting opens on the TV.",
-    );
+    await claim.getByRole("button", { name: /^Approve/ }).click();
+    await expect(host.getByTestId("inbox-empty")).toBeVisible(POLL);
+    // The waiting screen polls, so phone C moves on to the night as Leo by itself.
+    await expect(phoneC.getByTestId("voting-as")).toHaveText("Leo", POLL);
 
     // --- Everyone ranks posters; each ballot lights a TV tile through the stream.
     const voted = async (name: string, count: number) => {
@@ -178,44 +185,30 @@ test.describe("Phase 1 acceptance", () => {
       await expect(tv.getByTestId("tv-headline")).toHaveText(`${count} of ${EVERYONE} voted`, LIVE);
     };
 
-    await phoneA.getByRole("link", { name: "Vote now" }).click();
     await expect(phoneA).toHaveURL(new RegExp(`/s/${sessionId}$`));
     await expect(phoneA.getByTestId("night-screen")).toHaveAttribute("data-live", "ready");
-    await expect(phoneA.getByRole("heading", { name: "Who's voting?" })).toBeVisible();
-    await expectNoAxeViolations(phoneA);
-    await phoneA.getByRole("button", { name: /^Ava/ }).click();
     await expect(phoneA.getByRole("heading", { name: "Rank your favourites" })).toBeVisible();
     await expectNoAxeViolations(phoneA);
     await vote(phoneA, "Ava", BALLOTS.Ava!);
     await expectNoAxeViolations(phoneA);
     await voted("Ava", 1);
-    await phoneA.getByRole("button", { name: "Pass to next person" }).click();
-    await expect(phoneA.getByRole("button", { name: /^Ava/ })).toHaveAttribute(
-      "data-voted",
-      "true",
-    );
-    await phoneA.getByRole("button", { name: /^Mia/ }).click();
+    await switchTo(phoneA, "Mia", { via: "pass" });
     await vote(phoneA, "Mia", BALLOTS.Mia!);
     await voted("Mia", 2);
 
     // One person on the phone: straight to the ballot.
-    await phoneB.getByRole("link", { name: "Vote now" }).click();
     await expect(phoneB.getByTestId("night-screen")).toHaveAttribute("data-live", "ready");
     await vote(phoneB, "Leo", BALLOTS.Leo!);
     await voted("Leo", 3);
 
-    // Phone C now holds Noah and the approved Leo (who already voted on phone B).
-    await phoneC.getByRole("link", { name: "Vote now" }).click();
+    // Phone C now holds Noah and the approved Leo (who already voted on phone B): it shows Leo's
+    // picks, and passes to Noah with his PIN.
     await expect(phoneC.getByTestId("night-screen")).toHaveAttribute("data-live", "ready");
-    await expect(phoneC.getByRole("button", { name: /^Leo/ })).toHaveAttribute(
-      "data-voted",
-      "true",
-    );
-    await phoneC.getByRole("button", { name: /^Noah/ }).click();
+    await expect(phoneC.getByRole("heading", { name: "Thanks, Leo!" })).toBeVisible(LIVE);
+    await switchTo(phoneC, "Noah", { via: "pass" });
     await vote(phoneC, "Noah", BALLOTS.Noah!);
     await voted("Noah", 4);
 
-    await phoneD.getByRole("link", { name: "Vote now" }).click();
     await expect(phoneD.getByTestId("night-screen")).toHaveAttribute("data-live", "ready");
     await vote(phoneD, "Zoe", BALLOTS.Zoe!);
     await voted("Zoe", 5);
@@ -256,12 +249,9 @@ test.describe("Phase 1 acceptance", () => {
     await expect(phoneA.getByTestId("album-empty")).toBeVisible();
     await expectNoAxeViolations(phoneA);
 
-    // Two phones add photos: phone A as Mia (the GPS JPEG), phone B as Leo (the GPS HEIC).
-    await phoneA.getByRole("button", { name: "Mia", exact: true }).click();
-    await expect(phoneA.getByRole("button", { name: "Mia", exact: true })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    // Two phones add photos as their current person: phone A as Mia (the GPS JPEG), phone B as
+    // Leo (the GPS HEIC).
+    await expect(phoneA.getByTestId("voting-as")).toHaveText("Mia");
     await addPhotos(phoneA, [JPEG_FIXTURE]);
     await addPhotos(phoneB, [HEIC_FIXTURE]);
 
@@ -322,7 +312,7 @@ test.describe("Phase 1 acceptance", () => {
     expect(direct.status).toBe(401);
     expect(direct.body).not.toMatch(PRESIGNED);
     await stranger.goto(`/s/${sessionId}`);
-    await expect(stranger.getByText("This phone hasn't joined tonight yet.")).toBeVisible();
+    await expect(stranger.locator('[data-screen="landing"]')).toBeVisible();
     await expect(stranger.locator("img")).toHaveCount(0);
     expect(answers.length).toBeGreaterThan(0);
     expect(answers.filter((answer) => PRESIGNED.test(answer))).toEqual([]);

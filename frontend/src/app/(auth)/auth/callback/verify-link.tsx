@@ -10,7 +10,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, type Account, type ApiError } from "@/lib/api";
-import { passwordProblem } from "@/lib/password";
+import { linkSpent, passwordProblem } from "@/lib/password";
 
 /**
  * The emailed "forgot password" link (ADR-0014): it sets a new password and signs in, in one
@@ -50,8 +50,8 @@ export function VerifyLink({ token }: { token: string | null }) {
     );
   }
 
-  // 401: expired or already used. Anything else (a weak password) can be fixed and resent.
-  const spent = verify.error?.status === 401;
+  // A dead link offers a new one; a weak password (422) can be fixed and resent.
+  const spent = linkSpent(verify.error?.status);
 
   return (
     <form

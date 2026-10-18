@@ -16,6 +16,8 @@ and `--providers 337,8` sets the household's streaming services, so the candidat
 (ADR-0007) rolls owned titles first, then streaming, against tmdb-fake.
 `--no-night` seeds the household and its people only (`sessionId`/`nightCode` are null): the
 acceptance spec starts its night from the host's phone, as a family would.
+Every account gets the test password E2E_PASSWORD (ADR-0014 login; username `host-{slug}`), and
+`--pins` gives every person the PIN E2E_PIN.
 `hostCookie` is a signed `fnh_session` value for the household's admin, so a test can act as
 the host through the API (close voting with X-FNH-Test-Seed) without a magic-link round trip.
 `--host-account` also adds a second account with the `host` role (no `admin:*` permissions) and
@@ -40,8 +42,9 @@ sys.path.insert(0, os.getcwd())
 
 from sqlalchemy import text  # noqa: E402
 
-from app.cli import Bootstrapped, bootstrap  # noqa: E402
+from app.cli import Bootstrapped, bootstrap, set_password  # noqa: E402
 from app.core.database import household_session  # noqa: E402
+from app.core.hashing import hash_pin  # noqa: E402
 from app.core.security import hash_night_code, sign_account_session  # noqa: E402
 from app.domain import night_code  # noqa: E402
 from app.services import session_service  # noqa: E402
@@ -57,6 +60,12 @@ OWNED: list[tuple[str, int | None, int, str | None, list[str]]] = [
     ("Toy Story", 862, 1995, "/fake-toy-story.jpg", ["Animation", "Family"]),
     ("Grandma's Camcorder Classics", None, 2004, None, ["Family"]),
 ]
+
+# ADR-0014 test credentials: every seeded account signs in with this password (username
+# `host-{slug}` for the admin, `helper-{slug}` for the host account). Test-only value.
+E2E_PASSWORD = "e2e family night password"
+# `--pins`: every seeded person's PIN, so a spec can start from "everyone has a PIN".
+E2E_PIN = "246810"
 
 MOVIES = [
     "Paddington 2",
@@ -79,6 +88,7 @@ async def seed(
     host_account: bool = False,
     owned: int = 0,
     providers: list[int] | None = None,
+    pins: bool = False,
 ) -> dict[str, object]:
     household = f"E2E {slug}"
     email = f"host-{slug}@e2e.test"
@@ -88,13 +98,20 @@ async def seed(
     titles = MOVIES[:movies]
     async with household_session(created.household_id) as db:
         for name, emoji, color in PEOPLE:
-            await db.execute(
-                text(
-                    "INSERT INTO people (household_id, name, avatar_emoji, color) "
-                    "VALUES (:h, :n, :e, :c)"
-                ),
-                {"h": created.household_id, "n": name, "e": emoji, "c": color},
-            )
+            person_id = (
+                await db.execute(
+                    text(
+                        "INSERT INTO people (household_id, name, avatar_emoji, color) "
+                        "VALUES (:h, :n, :e, :c) RETURNING id"
+                    ),
+                    {"h": created.household_id, "n": name, "e": emoji, "c": color},
+                )
+            ).scalar_one()
+            if pins:
+                await db.execute(
+                    text("UPDATE people SET pin_hash = :p, pin_set_at = now() WHERE id = :id"),
+                    {"p": await hash_pin(person_id, E2E_PIN), "id": person_id},
+                )
         host_id: uuid.UUID | None = None
         if host_account:
             host_id = (
@@ -126,6 +143,9 @@ async def seed(
                 text("UPDATE settings SET streaming_providers = :p WHERE household_id = :h"),
                 {"h": created.household_id, "p": providers},
             )
+    await set_password(email, E2E_PASSWORD, f"host-{slug}")
+    if host_id is not None:
+        await set_password(f"helper-{slug}@e2e.test", E2E_PASSWORD, f"helper-{slug}")
     if code is not None:
         session_id = await _seed_night(created, code, titles, open_voting, tonight)
     return {
@@ -133,6 +153,9 @@ async def seed(
         "nightCode": code,
         "householdName": household,
         "adminEmail": email,
+        "adminUsername": f"host-{slug}",
+        "password": E2E_PASSWORD,
+        "pin": E2E_PIN if pins else None,
         "people": [name for name, _, _ in PEOPLE],
         "sessionId": None if session_id is None else str(session_id),
         "movies": titles,
@@ -199,6 +222,7 @@ def main() -> int:
     parser.add_argument("--host-account", action="store_true", help="add a host-role account")
     parser.add_argument("--owned", type=int, default=0, choices=range(len(OWNED) + 1))
     parser.add_argument("--providers", default="", help="TMDB provider ids, e.g. 337,8")
+    parser.add_argument("--pins", action="store_true", help=f"every person's PIN is {E2E_PIN}")
     args = parser.parse_args()
     if args.tonight and args.movies < 2:
         parser.error("--tonight needs --movies 2 or more")
@@ -214,6 +238,7 @@ def main() -> int:
         args.host_account,
         args.owned,
         providers,
+        args.pins,
     )
     print(json.dumps(asyncio.run(seeded)))
     return 0
