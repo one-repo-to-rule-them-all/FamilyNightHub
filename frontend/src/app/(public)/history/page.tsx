@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
-import { PhoneScreen } from "@/components/phone-screen";
+import { HistoryScreen } from "./history-screen";
 
-import { HistoryList } from "./history-list";
-
-export const metadata: Metadata = { title: "Past movie nights" };
+export const metadata: Metadata = { title: "History" };
 
 export default function HistoryPage() {
+  // useSearchParams (?tab=) needs a Suspense boundary for the static shell.
   return (
-    <PhoneScreen title="Past movie nights" lede="What we picked, and how many of us voted.">
-      <HistoryList />
-    </PhoneScreen>
+    <Suspense>
+      <HistoryScreen />
+    </Suspense>
   );
 }
