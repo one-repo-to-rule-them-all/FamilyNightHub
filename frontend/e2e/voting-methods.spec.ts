@@ -1,6 +1,6 @@
 import { type Browser, type Page } from "@playwright/test";
 
-import { expectNoAxeViolations, signInAsHost } from "./support/host";
+import { expectNoAxeViolations, pairAsTv, signInAsHost } from "./support/host";
 import { hostClosesVoting, joinAs, newPhone, switchTo } from "./support/phones";
 import { expect, type SeededNight, seedNight, test } from "./support/seed";
 
@@ -40,6 +40,8 @@ async function tvShowsTheResult(browser: Browser, baseURL: string, night: Seeded
   const context = await browser.newContext({ baseURL, reducedMotion: "reduce" });
   await signInAsHost(context, night, baseURL);
   const tv = await context.newPage();
+  // The TV screen needs a paired TV device (#62), not just an account session.
+  await pairAsTv(tv);
   await tv.goto(`/tv/${night.sessionId}`);
   await expect(tv.getByTestId("tv-winner")).toBeVisible();
   return tv;

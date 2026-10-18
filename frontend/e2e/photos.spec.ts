@@ -34,6 +34,7 @@ test.describe("photo drop", () => {
     browser,
     request,
   }) => {
+    test.slow(); // two phones with PINs (argon2id), two photo pipelines incl. HEIC decoding
     const night = seedNight({ movies: 2, tonight: true });
 
     await joinAs(page, night, ["Ava"]);

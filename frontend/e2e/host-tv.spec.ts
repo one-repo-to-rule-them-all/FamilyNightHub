@@ -3,6 +3,7 @@ import { devices } from "@playwright/test";
 import {
   castPhoneBallot,
   expectNoAxeViolations,
+  pairAsTv,
   pinTieBreakSeed,
   signInAsHost,
 } from "./support/host";
@@ -31,7 +32,7 @@ test.describe("host and TV", () => {
       viewport: { width: 1280, height: 720 },
     });
     await signInAsHost(tvContext, night, origin);
-    const tv = await tvContext.newPage();
+    let tv = await tvContext.newPage();
     await tv.goto("/host");
     await expect(tv.getByTestId("signed-in-as")).toContainText(night.householdName);
     await expect(tv.getByTestId("up-next")).toHaveAttribute("data-up-next", "none");
@@ -42,11 +43,13 @@ test.describe("host and TV", () => {
     await expect(codeText).toHaveText(/^[2-9A-HJKMNP-Z]{6}$/);
     const code = (await codeText.textContent())!.trim();
 
-    await tv.getByRole("button", { name: "Show it on this TV" }).click();
-    await tv
-      .getByTestId("use-as-tv-confirm")
-      .getByRole("button", { name: "Yes, make it the TV" })
-      .click();
+    // "Open TV window" (#62): a named popup on this laptop becomes the TV; the portal tab
+    // stays signed in, and the code is handed to the TV window.
+    const portal = tv;
+    [tv] = await Promise.all([
+      tvContext.waitForEvent("page"),
+      portal.getByTestId("open-tv-window").click(),
+    ]);
     await expect(tv).toHaveURL(/\/tv\/[0-9a-f-]{36}$/);
     const sessionId = tv.url().split("/").at(-1)!;
 
@@ -55,8 +58,10 @@ test.describe("host and TV", () => {
     await expect(tv.locator("[data-live]").first()).toHaveAttribute("data-live", "ready");
     await expect(tv.getByTestId("tv-tile")).toHaveCount(night.people.length);
     await expectNoAxeViolations(tv);
-    // Pairing signed the host out of the TV's browser (ADR-0002).
-    expect((await tvContext.cookies()).map((c) => c.name)).not.toContain("fnh_session");
+    // The TV window keeps the host's laptop signed in (keep_session, #62): the portal still works.
+    expect((await tvContext.cookies()).map((c) => c.name)).toContain("fnh_session");
+    await portal.reload();
+    await expect(portal.locator('[data-screen="portal-home"]')).toBeVisible();
 
     // --- The host's phone: build the shortlist.
     await signInAsHost(page.context(), night, origin);
@@ -165,11 +170,8 @@ test.describe("host and TV", () => {
     const tv = await context.newPage();
     await tv.goto("/host");
     // Pair without starting a night here: /tv follows the seeded night, whose code it never saw.
-    await tv.getByRole("button", { name: "Show it on this TV" }).click();
-    await tv
-      .getByTestId("use-as-tv-confirm")
-      .getByRole("button", { name: "Yes, make it the TV" })
-      .click();
+    // A smart-TV browser that is only the TV pairs from Settings → This browser.
+    await pairAsTv(tv);
     await expect(tv).toHaveURL(/\/tv\/[0-9a-f-]{36}$/);
 
     await expect(tv.getByTestId("tv-night-code")).toHaveCount(0);
