@@ -160,7 +160,7 @@ test.describe("Phase 1 acceptance", () => {
     await joinAs(phoneC, joinable, ["Noah"]);
     await phoneC.goto("/who");
     await phoneC.getByRole("button", { name: /^Leo/ }).click();
-    for (const _ of [1, 2]) {
+    for (let i = 0; i < 2; i++) {
       await typePin(phoneC, "000000");
       await expect(phoneC.getByTestId("pin-message")).toContainText("tries left");
     }

@@ -82,8 +82,10 @@ async function forgotPinFor(phone: Page, name: string) {
   await phone.getByRole("button", { name: new RegExp(`^${name}`) }).click();
   await phone.getByRole("button", { name: "Forgot PIN?" }).click();
   await expect(phone.locator('[data-screen="reset-pending"]')).toBeVisible();
-  // It stays waiting: the pre-request tile is never read as the admin's answer.
-  await phone.waitForTimeout(1_500);
+  // It stays waiting through the next poll: the pre-request tile is never read as an answer.
+  await phone.waitForResponse(
+    (r) => r.url().endsWith("/api/v1/people") && r.request().method() === "GET",
+  );
   await expect(phone.locator('[data-screen="reset-pending"]')).toBeVisible();
 }
 

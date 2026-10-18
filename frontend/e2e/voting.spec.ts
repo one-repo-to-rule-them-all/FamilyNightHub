@@ -163,7 +163,7 @@ test.describe("phone voting", () => {
     await phoneB.goto("/who");
     await phoneB.getByRole("button", { name: /^Ava/ }).click();
     await expect(phoneB.locator('[data-screen="pin-enter"]')).toBeVisible();
-    for (const _ of [1, 2]) {
+    for (let i = 0; i < 2; i++) {
       await typePin(phoneB, "000000");
       await expect(phoneB.getByTestId("pin-message")).toContainText("tries left");
     }
