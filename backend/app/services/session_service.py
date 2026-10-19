@@ -520,7 +520,8 @@ async def close_voting(
 async def close(
     db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, session_id: uuid.UUID
 ) -> None:
-    """tonight -> closed: the night code stops joining. Idempotent once closed."""
+    """revealed/tonight -> closed: the night code stops joining. Idempotent once closed.
+    A reveal still inside its settle window closes directly (issue #69)."""
     status = await _lock(db, household_id, account_id, session_id)
     try:
         new_status = session_state.close_night(status)

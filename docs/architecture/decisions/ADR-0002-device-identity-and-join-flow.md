@@ -103,8 +103,9 @@ says which one it means.
   (hidden photos stay hidden), can't call an account route even by mistake, and shows "not
   paired" rather than host data if its device is revoked. The header can only remove authority,
   so it needs no protection of its own.
-- "Open TV window" on Home's Up-next card and the night page opens a named window
-  (`fnh-tv`, reused on a second tap) synchronously in the click, enrolls, then navigates it to
+- "Open TV window" on Home's Up-next card and the night page opens a named tab
+  (`fnh-tv`, reused on a second tap; no window features, so it is a tab, not a popup: #69)
+  synchronously in the click, enrolls, then navigates it to
   `/tv/{night}` and copies the night code from this tab's `sessionStorage` into it. If a popup
   blocker eats the window, the portal shows a plain link instead. The TV screens never link into
   the portal; the only exit is the unpaired screen's "Host sign-in".

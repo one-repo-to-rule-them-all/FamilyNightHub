@@ -553,7 +553,6 @@ async def test_tonight_is_lazy_and_the_next_write_persists_it(two_households: Pa
         await _host(host, a)
         sid, code, _opts = await _night(host, 2)
         assert (await _close_voting(host, sid)).status_code == 200
-        too_early = await _send(host, "POST", f"{BASE}/{sid}/close")
         async with household_session(a.household_id) as db:
             await db.execute(
                 text("UPDATE sessions SET revealed_at = now() - interval '1 minute' WHERE id = :s"),
@@ -563,7 +562,6 @@ async def test_tonight_is_lazy_and_the_next_write_persists_it(two_households: Pa
         stored = (await _rows(a, "SELECT status FROM sessions WHERE id = :s", s=sid))[0].status
         closed = await _send(host, "POST", f"{BASE}/{sid}/close")
         closed_again = await _send(host, "POST", f"{BASE}/{sid}/close")
-    assert too_early.status_code == 409
     assert stored == "revealed"  # reading never writes
     assert closed.status_code == closed_again.status_code == 200
     body = closed.json()
@@ -577,6 +575,30 @@ async def test_tonight_is_lazy_and_the_next_write_persists_it(two_households: Pa
     assert actions.count("session.settled") == 1
     async with phone() as late:
         assert (await late.join(a.slug, code)).status_code == 400  # the code is released
+
+
+async def test_end_the_night_right_after_the_reveal_takes_one_tap(two_households: Pair) -> None:
+    """Issue #69: inside the settle window the stored status is still `revealed`; End the night
+    must close it directly instead of answering 409 until the reveal settles."""
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        sid, code, _opts = await _night(host, 2)
+        assert (await _close_voting(host, sid)).status_code == 200
+        assert (await host.client.get(f"{BASE}/{sid}")).json()["status"] == "revealed"
+        closed = await _send(host, "POST", f"{BASE}/{sid}/close")
+    assert closed.status_code == 200
+    body = closed.json()
+    assert body["status"] == "closed" and body["closed_at"] is not None
+    assert body["result"] is not None
+    assert (await _rows(a, "SELECT status FROM sessions WHERE id = :s", s=sid))[
+        0
+    ].status == "closed"
+    actions = await _actions(a, sid)
+    assert actions.count("session.closed") == 1
+    assert "session.settled" not in actions  # closed straight from revealed
+    async with phone() as late:
+        assert (await late.join(a.slug, code)).status_code == 400
 
 
 async def test_any_later_write_persists_the_settle(two_households: Pair) -> None:
