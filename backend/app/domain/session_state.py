@@ -1,12 +1,14 @@
 """The night's state machine and shortlist rules (03-backend.md "Voting", ADR-0006). Pure.
 
     draft -> voting -> revealed -> tonight -> closed
+                       revealed -----------> closed   (End the night, issue #69)
 
 Only `draft` may edit the shortlist or change the voting method. Opening voting freezes
 the shortlist at 2..8 options and fixes the ballot size k for the night's method: top3
 min(3, n - 1), pick_one 1, approval n (ADR-0006, ADR-0010). `revealed -> tonight` is
 lazy: `effective_status` reports `tonight` once `revealed_at` is REVEAL_SETTLE old, and
-the next write persists it.
+the next write persists it. So `close` is allowed from a stored `revealed` too: the host sees
+the winner and "End the night" at once, and must not wait out the settle (issue #69).
 Services call these functions and persist the result; nothing here touches I/O.
 """
 
@@ -30,6 +32,7 @@ TRANSITIONS: dict[tuple[str, Action], Status] = {
     ("draft", "open_voting"): "voting",
     ("voting", "close_voting"): "revealed",
     ("revealed", "settle"): "tonight",
+    ("revealed", "close"): "closed",
     ("tonight", "close"): "closed",
 }
 
@@ -175,7 +178,7 @@ def close_voting(status: str) -> Status | None:
 
 
 def close_night(status: str) -> Status | None:
-    """tonight -> closed. None if already closed."""
+    """revealed/tonight -> closed. None if already closed."""
     if status == "closed":
         return None
     return transition(status, "close")

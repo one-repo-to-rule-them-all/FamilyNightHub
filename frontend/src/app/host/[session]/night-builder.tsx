@@ -200,7 +200,8 @@ function WinnerStage({ night }: { night: Night }) {
           </p>
         </div>
       </div>
-      {night.status === "tonight" ? (
+      {/* Right after the reveal too, not only once it settles into tonight (issue #69). */}
+      {night.status === "revealed" || night.status === "tonight" ? (
         <>
           <Button size="tap" data-testid="primary-action" onClick={() => setConfirming(true)}>
             End the night

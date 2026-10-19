@@ -931,7 +931,7 @@ export interface paths {
         put?: never;
         /**
          * Close Night
-         * @description tonight -> closed: the night code stops joining. Idempotent.
+         * @description revealed/tonight -> closed: the night code stops joining. Idempotent.
          */
         post: operations["close_night_api_v1_sessions__session_id__close_post"];
         delete?: never;

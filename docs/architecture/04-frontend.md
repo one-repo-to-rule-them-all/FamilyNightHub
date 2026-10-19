@@ -68,8 +68,9 @@ gone when the tab closes, never sent back to the server, dropped once the night 
 - The ADR-0002 flow (host signs in on the TV's browser, starts the night, **Use this browser as the
   TV**) stays in one tab, so `/tv/[session]` reads the code the host page just stored.
 - **Open TV window** (Home's Up-next card and the night page; ADR-0002 amendment 2026-10-18) is the
-  host's laptop driving the TV: `src/components/portal/use-as-tv.tsx` opens the named window
-  `fnh-tv` synchronously in the click (so popup blockers allow it), enrolls with
+  host's laptop driving the TV: `src/components/portal/use-as-tv.tsx` opens the named tab
+  `fnh-tv` synchronously in the click (so popup blockers allow it; no features string, so a tab
+  rather than a popup window, #69), enrolls with
   `{as_tv: true, keep_session: true}`, copies this tab's code into the window's `sessionStorage`
   (`handNightCodeTo`) and only then navigates it to `/tv/{night}`. The portal tab stays signed in.
   A blocked popup gets a plain "Open the TV screen" link. On `/tv*` the API client adds
