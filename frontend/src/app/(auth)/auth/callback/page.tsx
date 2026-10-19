@@ -10,12 +10,14 @@ export const metadata: Metadata = { title: "New password", referrer: "no-referre
 export default async function CallbackPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string | string[] }>;
+  searchParams: Promise<{ token?: string | string[]; invite?: string | string[] }>;
 }) {
-  const { token } = await searchParams;
+  const { token, invite } = await searchParams;
+  // An invite (issue #71) is the same single-use link; only the words differ.
+  const invited = invite === "1";
   return (
-    <PhoneScreen title="Choose a new password">
-      <VerifyLink token={typeof token === "string" && token ? token : null} />
+    <PhoneScreen title={invited ? "Welcome to Family Night" : "Choose a new password"}>
+      <VerifyLink token={typeof token === "string" && token ? token : null} invited={invited} />
     </PhoneScreen>
   );
 }

@@ -49,6 +49,8 @@ export type BulkPick = Schemas["BulkPickIn"];
 export type TypedTitle = Schemas["TypedTitleIn"];
 export type PhotoCreated = Schemas["PhotoCreatedOut"];
 export type PinReset = Schemas["PinResetOut"];
+export type AdminAccount = Schemas["AdminAccountOut"];
+export type AccountRole = AdminAccount["role"];
 export type Profile = Schemas["ProfileOut"];
 export type ProfileNight = Schemas["ProfileNightOut"];
 
@@ -412,6 +414,17 @@ export const api = {
     request<BulkResult>("POST", "/admin/movies/bulk", { titles }),
   confirmBulkMovies: (picks: BulkPick[]) =>
     request<BulkResult>("POST", "/admin/movies/bulk/confirm", { picks }),
+  // Hosts and admins (issue #71, `admin:accounts`). The invite link is emailed, never returned.
+  adminAccounts: () => request<AdminAccount[]>("GET", "/admin/accounts"),
+  inviteAccount: (body: Schemas["AccountInviteIn"]) =>
+    request<AdminAccount>("POST", "/admin/accounts", body),
+  resendInvite: (accountId: string) =>
+    request<AdminAccount>("POST", `/admin/accounts/${encodeURIComponent(accountId)}/resend`),
+  /** 409 when it would leave the household without an admin. */
+  changeAccountRole: (accountId: string, role: AccountRole) =>
+    request<AdminAccount>("PATCH", `/admin/accounts/${encodeURIComponent(accountId)}`, { role }),
+  removeAccount: (accountId: string) =>
+    request<void>("DELETE", `/admin/accounts/${encodeURIComponent(accountId)}`),
   /** History edit (`admin:history`): re-point the winner; the ranking stays as voted. */
   correctWinner: (sessionId: string, body: Schemas["CorrectWinnerIn"]) =>
     request<Night>("POST", `/admin/sessions/${encodeURIComponent(sessionId)}/correct-winner`, body),

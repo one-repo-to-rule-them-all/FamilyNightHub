@@ -9,6 +9,8 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 
+from app.domain import credentials
+
 _COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 _REGION = re.compile(r"^[A-Za-z]{2}$")
 _EMOJI_MAX_CODEPOINTS = 16  # people.avatar_emoji is varchar(16); ZWJ families fit
@@ -219,3 +221,63 @@ class JoinLinkOut(BaseModel):
 
     join_slug: str
     qr_includes_night_code: bool
+
+
+# --- Accounts (issue #71) -----------------------------------------------------------
+
+
+AccountRole = Literal["admin", "host"]
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def clean_email(value: str) -> str:
+    """Trimmed and lowercased: accounts.email is unique case-insensitively."""
+    email = value.strip().lower()
+    if not _EMAIL.match(email):
+        raise ValueError("email does not look like an email address")
+    return email
+
+
+def clean_display_name(value: str) -> str:
+    name = " ".join(value.split())
+    if not name:
+        raise ValueError("name must not be blank")
+    if len(name) > 80:
+        raise ValueError("name must be at most 80 characters")
+    return name
+
+
+class AccountInviteIn(BaseModel):
+    """Invite an adult by email. They choose their own password from the emailed link."""
+
+    email: Annotated[str, AfterValidator(clean_email)] = Field(max_length=320)
+    display_name: Annotated[str, AfterValidator(clean_display_name)] = Field(max_length=200)
+    role: AccountRole
+    username: str | None = Field(default=None, max_length=64)
+
+    @field_validator("username")
+    @classmethod
+    def _username(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        return credentials.normalize_username(value)
+
+
+class AccountRoleIn(BaseModel):
+    role: AccountRole
+
+
+class AdminAccountOut(BaseModel):
+    """A host or admin as other admins see it. Never carries a password, hash or link."""
+
+    id: uuid.UUID
+    email: str
+    username: str | None
+    display_name: str
+    role: AccountRole
+    # active: has set a password. invited: hasn't yet (a pending invite, or a CLI bootstrap).
+    status: Literal["active", "invited"]
+    is_you: bool
+    # The newest unused invite/reset link's expiry while `invited`, else null.
+    invite_expires_at: datetime | None
+    created_at: datetime

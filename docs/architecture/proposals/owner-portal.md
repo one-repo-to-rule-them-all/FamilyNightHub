@@ -254,6 +254,7 @@ never mixes groups.
 | **Joining** (`joining`) | Join link + Rotate (today), **Include tonight's code in the TV QR** (#40's toggle, moved here as-is) | admin |
 | **Movie nights** (`nights`) | Default voting method, default age cap | admin |
 | **Streaming** (`streaming`) | Region, streaming services | admin |
+| **Hosts & admins** (`accounts`) | The adults who sign in: invite by email with a role, change role, resend, remove ([ADR-0015](../decisions/ADR-0015-inviting-hosts-and-admins.md), issue #71). Saves per action, no group Save | admin |
 | **Your account** (`account`) | Name, username, email (read-only), **Set/Change password** (ADR-0014 `POST /auth/password`; "Set a password" when `has_password` is false) | admin, host |
 | **This browser** (`browser`) | **Use this browser as the TV** (moved from Home), Sign out | admin, host |
 

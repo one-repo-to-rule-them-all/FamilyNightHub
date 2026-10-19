@@ -41,6 +41,7 @@ import {
   streamingPatch,
   visibleGroups,
 } from "./groups";
+import { HostsAdmins } from "./hosts-admins";
 
 const ME_KEY = ["me"] as const;
 const SETTINGS_KEY = ["admin", "settings"] as const;
@@ -90,6 +91,7 @@ export function SettingsAdmin() {
     streaming: settings.data ? (
       <Streaming settings={settings.data} look={look("streaming")} onDirty={onDirty} />
     ) : null,
+    accounts: isAdmin ? <HostsAdmins /> : null,
     account: <YourAccount account={me.data} look={look("account")} onDirty={onDirty} />,
     browser: <ThisBrowser />,
   };

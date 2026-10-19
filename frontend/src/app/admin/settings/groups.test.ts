@@ -19,6 +19,7 @@ describe("visibleGroups", () => {
       "joining",
       "nights",
       "streaming",
+      "accounts",
       "account",
       "browser",
     ]);

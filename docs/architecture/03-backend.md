@@ -40,6 +40,7 @@ backend/app/
 | Admin people | `GET/POST /api/v1/admin/people`, `PATCH /admin/people/{id}`, `POST /admin/people/{id}/convert-to-member`, `POST /admin/people/merge`, `GET /admin/people/pin-resets`, `POST /admin/people/pin-resets/{id}/{approve,dismiss}` | Add, rename/re-avatar/recolour, guest → member, merge, the forgot-PIN queue (`admin:people`; hosts may add guests). See "People and devices admin" |
 | Admin devices | `GET /api/v1/admin/devices`, `PATCH /admin/devices/{id}`, `POST /admin/devices/{id}/revoke` | The "Devices" list with each device's people, label, revoke (`admin:devices`) |
 | Admin settings | `GET/PATCH /api/v1/admin/settings`, `POST /admin/join-slug/rotate` | Household defaults and the fridge-QR slug (`admin:settings`) |
+| Admin accounts | `GET/POST /api/v1/admin/accounts`, `PATCH/DELETE /admin/accounts/{id}`, `POST /admin/accounts/{id}/resend` | Hosts and admins: invite an adult by email with a role, list, change role, remove access, resend an invite (`admin:accounts`). See "Hosts and admins" ([ADR-0015](decisions/ADR-0015-inviting-hosts-and-admins.md)) |
 | Admin movies | `GET /api/v1/admin/movies?q=&owned=&watchlist=&blocked=&limit=&offset=`, `PATCH /admin/movies/{id}`, `POST /admin/movies/bulk`, `POST /admin/movies/bulk/confirm` | Library search/filter/paginate, flags, bulk add of owned titles through TMDB search (`admin:movies`). See "Library and history admin" |
 | Admin history | `POST /api/v1/admin/sessions/{id}/correct-winner` | Correct a past night's winner with a reason (`admin:history`); ranking and seed untouched. See "Library and history admin" |
 | Health | `/api/health` | DB + Redis |
@@ -111,7 +112,30 @@ link usable.
 account on every request, so disabling an account or changing its role takes effect
 immediately. Trade-off: one stolen session can't be revoked on its own; disable the account or
 rotate `SESSION_SECRET` (which signs everyone out). Revisit with a sessions table if that ever
-matters. The first admin is created by `python -m app.cli bootstrap` (`app/cli.py`).
+matters. The first admin is created by `python -m app.cli bootstrap` (`app/cli.py`); every other
+host or admin is invited from the portal (below).
+
+**Hosts and admins** ([ADR-0015](decisions/ADR-0015-inviting-hosts-and-admins.md), issue #71;
+`services/accounts_admin_service.py`, `admin:accounts`). `POST /admin/accounts {email,
+display_name, role, username?}` creates the account with **no password** and emails a single-use
+link to `FRONTEND_BASE_URL/auth/callback?token=…&invite=1`. It is the ADR-0014 magic link with a
+longer life (`INVITE_LINK_TTL_HOURS`, default 72), consumed by the same `POST /auth/verify`, so the
+invitee chooses their own password (audited `account.password_set` with `via: "invite"`). The
+link is never in the API response: no admin can sign in as, or set a password for, someone else.
+Email and username are unique across households, so an address already used anywhere is 409.
+`GET /admin/accounts` lists live accounts with `status` `active` (has a password) or `invited`
+(not yet), `is_you`, and the pending link's expiry. `POST /admin/accounts/{id}/resend` mints a new
+link and kills the old one (409 once a password is set). `PATCH /admin/accounts/{id} {role}`
+changes the role; `DELETE /admin/accounts/{id}` sets `disabled_at` and kills unused links (204).
+Both lock the household's live admin rows `FOR UPDATE` and refuse with **409 if no admin would be
+left**, which also serializes two admins removing each other. Because `CurrentAccount` re-reads
+the row, a removal or role change bites on that account's next request. Re-inviting a removed
+address revives the same row with its password cleared. Invites and resends are budgeted per
+inviting account (`INVITE_ACCOUNT_LIMIT`, default 10 per hour) and per invited address
+(`INVITE_EMAIL_LIMIT`, default 3 per hour), every request counting; never per IP. Every change is
+audited: `account.invited`, `account.invite_resent`, `account.role_changed`, `account.removed`.
+No migration: `accounts.disabled_at`, `magic_links.expires_at` and the role check already cover
+it, and both tables are already household-scoped with FORCE RLS.
 
 The permission map (`core/permissions.py`) is the single source of truth. Hosts get
 `sessions:run` (which also lets them add a guest), `ballots:proxy`, `devices:enroll` and `devices:approve`; admins get everything;
