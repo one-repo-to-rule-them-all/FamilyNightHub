@@ -161,3 +161,20 @@ export function followWaiting(
   if (!person.has_pin) return { kind: "pin", mode: "create" };
   return { kind: "pin", mode: "enter", notice: "other-phone" };
 }
+
+/**
+ * After a right PIN: wait for the people list to name the new current person, then go. Navigating
+ * first lets Home read the old list ("nobody current") and send the phone straight back to /who,
+ * where it then sits (seen in the acceptance e2e after `/?arrive=1`, #58). Goes even if the
+ * refresh fails: Home's own query retries.
+ */
+export async function goAfterRefresh(
+  refresh: () => Promise<unknown>,
+  go: () => void,
+): Promise<void> {
+  try {
+    await refresh();
+  } finally {
+    go();
+  }
+}

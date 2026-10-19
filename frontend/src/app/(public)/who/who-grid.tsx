@@ -22,6 +22,7 @@ import {
   colorFor,
   followWaiting,
   GUEST_EMOJI,
+  goAfterRefresh,
   NAME_MAX,
   orderTiles,
   tileAction,
@@ -82,9 +83,14 @@ export function WhoGrid() {
   if (next) setView(next);
 
   const finish = (outcome: PinOutcome, personId: string, options?: { rename?: boolean }) => {
-    void queryClient.invalidateQueries({ queryKey: PEOPLE });
-    if (outcome === "done") router.replace(options?.rename ? "/me?rename=1" : "/?arrive=1");
-    else if (outcome === "locked") setView({ kind: "locked", personId });
+    const refresh = queryClient.invalidateQueries({ queryKey: PEOPLE });
+    if (outcome === "done") {
+      const to = options?.rename ? "/me?rename=1" : "/?arrive=1";
+      void goAfterRefresh(
+        () => refresh,
+        () => router.replace(to),
+      ).catch(() => undefined);
+    } else if (outcome === "locked") setView({ kind: "locked", personId });
     else if (outcome === "reset-asked") setView({ kind: "reset", personId, since: Date.now() });
     else if (outcome === "asked-host") setView({ kind: "pending", personId, since: Date.now() });
   };

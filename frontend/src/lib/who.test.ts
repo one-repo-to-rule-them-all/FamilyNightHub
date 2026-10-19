@@ -10,6 +10,7 @@ import {
   canFollow,
   followWaiting,
   GUEST_EMOJI,
+  goAfterRefresh,
   orderTiles,
   phonePeople,
   resolve,
@@ -219,5 +220,30 @@ describe("followWaiting", () => {
       mode: "enter",
       notice: "other-phone",
     });
+  });
+});
+
+describe("goAfterRefresh", () => {
+  it("navigates only once the people list has refreshed", async () => {
+    const order: string[] = [];
+    await goAfterRefresh(
+      async () => {
+        await Promise.resolve();
+        order.push("refreshed");
+      },
+      () => order.push("go"),
+    );
+    expect(order).toEqual(["refreshed", "go"]);
+  });
+
+  it("still navigates when the refresh fails", async () => {
+    const order: string[] = [];
+    await expect(
+      goAfterRefresh(
+        () => Promise.reject(new Error("offline")),
+        () => order.push("go"),
+      ),
+    ).rejects.toThrow("offline");
+    expect(order).toEqual(["go"]);
   });
 });
