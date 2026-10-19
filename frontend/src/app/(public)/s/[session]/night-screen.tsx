@@ -102,11 +102,11 @@ function NightState({
 
   // S9, S12 and S13 sit in the shell (nav, Home's live dot); the app bar's person button replaces
   // the CurrentChip, which stays only on the ballot and picks-in (guest-home §5 "Live-night
-  // screens"). No hand-off: these are the live night's own screens.
+  // screens"). The new-night toast never shows here: these are the live night's own screens.
   switch (night.status) {
     case "draft":
       return (
-        <GuestShell screen="almost-ready" handoff="none">
+        <GuestShell screen="almost-ready">
           <ScreenTitle title="Almost ready" />
           {here()}
           <div data-testid="waiting">
@@ -121,7 +121,7 @@ function NightState({
       return <VotingFlow night={night} live={live} people={people} current={current} here={here} />;
     case "revealed":
       return (
-        <GuestShell screen="winner" handoff="none">
+        <GuestShell screen="winner">
           <ScreenTitle title="The winner is…" />
           <div data-testid="waiting" className="flex flex-col gap-6">
             {closedNotice ? (
@@ -139,7 +139,7 @@ function NightState({
       );
     case "tonight":
       return (
-        <GuestShell screen="tonight" handoff="none">
+        <GuestShell screen="tonight">
           <ScreenTitle title="Tonight" />
           <WinnerCard night={night} compact />
           {here()}

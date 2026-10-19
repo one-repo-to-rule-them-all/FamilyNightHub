@@ -179,7 +179,7 @@ function Home({ people, current }: { people: PersonTile[]; current: PersonTile }
   const cardAsks = night ? night.status === "tonight" : ratePrompt !== null;
 
   return (
-    <GuestShell screen="home" handoff="none">
+    <GuestShell screen="home">
       <h1 className="font-heading text-3xl font-semibold tracking-tight" data-testid="home-hi">
         {HOME_COPY.home.hi} <strong>{current.name}</strong>
       </h1>

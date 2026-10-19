@@ -76,20 +76,17 @@ vi.mock("next/link", () => ({
 vi.mock("@/components/home/guest-shell", () => ({
   GuestShell: ({
     screen,
-    handoff = "plain",
     hideNav = false,
     back,
     children,
   }: {
     screen: string;
-    handoff?: string;
     hideNav?: boolean;
     back?: { href: string; label: string };
     children: React.ReactNode;
   }) => (
     <main
       data-screen={screen}
-      data-handoff={handoff}
       data-hide-nav={hideNav}
       data-back={back ? `${back.label}:${back.href}` : undefined}
     >
@@ -126,6 +123,7 @@ vi.mock("@/hooks/use-phone", () => ({
 }));
 vi.mock("@/hooks/use-household-night", () => ({
   useHouseholdNight: () => ({ night: state.liveNight, isNew: false, markSeen: () => {} }),
+  markNightSeen: () => {},
 }));
 vi.mock("@/hooks/use-voters", () => ({ useVoters: () => ({ data: [] }) }));
 vi.mock("@/lib/api", () => ({
@@ -198,10 +196,9 @@ describe("live-night screens in the shell (§5 S9–S13)", () => {
     ["draft", "almost-ready"],
     ["revealed", "winner"],
     ["tonight", "tonight"],
-  ] as const)("%s → %s with the nav, no hand-off and no chip", async (status, screen) => {
+  ] as const)("%s → %s with the nav and no chip", async (status, screen) => {
     await show(makeNight(status));
     expect(main()?.dataset.screen).toBe(screen);
-    expect(main()?.dataset.handoff).toBe("none");
     expect(main()?.dataset.hideNav).toBe("false");
     expect(host.querySelector('[data-testid="current-chip"]')).toBeNull();
   });
@@ -211,7 +208,6 @@ describe("live-night screens in the shell (§5 S9–S13)", () => {
     expect(main()?.dataset.screen).toBe("ballot");
     expect(main()?.dataset.hideNav).toBe("true");
     expect(main()?.dataset.back).toBe("Home:/");
-    expect(main()?.dataset.handoff).toBe("none");
     expect(host.querySelector('[data-testid="current-chip"]')).not.toBeNull();
   });
 
@@ -258,11 +254,10 @@ describe("live-night screens in the shell (§5 S9–S13)", () => {
 });
 
 describe("past nights (§5 H3)", () => {
-  it("the latest night is That's a wrap with the countdown hand-off and ‹ History", async () => {
+  it("the latest night is That's a wrap with ‹ History", async () => {
     state.latestId = "n1";
     await show(makeNight("closed"));
     expect(main()?.dataset.screen).toBe("wrap");
-    expect(main()?.dataset.handoff).toBe("countdown");
     expect(main()?.dataset.back).toBe("History:/history");
     expect(host.textContent).toContain("That's a wrap");
     expect(host.textContent).not.toContain("Past movie nights");
@@ -289,12 +284,23 @@ describe("past nights (§5 H3)", () => {
     expect(primaries()[0].getAttribute("href")).toBe("/");
   });
 
-  it("wrap with a newer night live: nothing of its own is primary (AC-H3.1)", async () => {
+  it("wrap with a newer night live: the small live-night link is the one primary (AC-H3.1)", async () => {
     // Until the 30 s latest-night poll sees the new night, this is still That's a wrap.
     state.liveNight = { id: "n2", status: "draft" };
     await show(makeNight("closed"));
     expect(main()?.dataset.screen).toBe("wrap");
-    expect(primaries()).toHaveLength(0);
+    expect(primaries()).toHaveLength(1);
+    expect(primaries()[0].getAttribute("href")).toBe("/s/n2");
+    expect(primaries()[0].textContent).toBe("Go to tonight's movie night");
+  });
+
+  it("the recap with a newer night live: the same link, as its one primary", async () => {
+    state.latestId = "n9";
+    state.liveNight = { id: "n2", status: "voting" };
+    await show(makeNight("closed"));
+    expect(main()?.dataset.screen).toBe("recap");
+    expect(primaries()).toHaveLength(1);
+    expect(primaries()[0].getAttribute("href")).toBe("/s/n2");
   });
 
   it("stays That's a wrap when the latest-night poll then sees a newer night", async () => {
@@ -306,7 +312,7 @@ describe("past nights (§5 H3)", () => {
     state.liveNight = { id: "n2", status: "draft" };
     await show(makeNight("closed"));
     expect(main()?.dataset.screen).toBe("wrap");
-    // Same element: the shell (and the hand-off's countdown in it) was never remounted.
+    // Same element: the shell was never remounted.
     expect(main()).toBe(shell);
   });
 
@@ -323,7 +329,6 @@ describe("past nights (§5 H3)", () => {
     ];
     await show(makeNight("closed"));
     expect(main()?.dataset.screen).toBe("recap");
-    expect(main()?.dataset.handoff).toBe("countdown");
     expect(main()?.dataset.back).toBe("History:/history");
     expect(primaries()).toHaveLength(0);
     const picks = [...host.querySelectorAll<HTMLElement>('[data-testid="recap-picks"] li')];

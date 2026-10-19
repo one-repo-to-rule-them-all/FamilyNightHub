@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { GuestShell } from "@/components/home/guest-shell";
+import { LiveNightLink } from "@/components/home/live-night-link";
 import { Avatar } from "@/components/night/avatar";
 import { myRatingsKey, RatingPanel } from "@/components/night/rating-panel";
 import { PhotoAlbum } from "@/components/photos/photo-album";
@@ -36,8 +37,8 @@ const presentKey = (sessionId: string) => [...nightKey(sessionId), "present"] as
 const HISTORY_BACK = { href: "/history", label: HOME_COPY.hist.title };
 
 /**
- * That's a wrap's one primary (guest-home §5 H3w): the live hand-off's **Go** when a newer night
- * is on (the shell renders it), else the star row while this person hasn't rated, else **Back to
+ * That's a wrap's one primary (guest-home §5 H3w): the inline **Go to tonight's movie night** link
+ * when a newer night is on, else the star row while this person hasn't rated, else **Back to
  * Home**. `null` while the rating is still loading, so nothing is marked primary twice.
  */
 export function wrapPrimary(input: {
@@ -51,12 +52,12 @@ export function wrapPrimary(input: {
 
 /**
  * A closed night (guest-home §5 H3): That's a wrap for the household's latest night, the recap for
- * an older one (`pastNightKind`). Both sit in the shell with the 60 s auto-move on the hand-off
- * (H0c, owner decision §11.2); the countdown itself lives in `LiveHandoff`.
+ * an older one (`pastNightKind`). Both sit in the shell, whose new-night toast carries the 60 s
+ * auto-move (H0c, issue #70); here a newer live night only adds the small `LiveNightLink`.
  *
  * The kind is settled once the latest night is known and then kept for this visit: when a new
  * night starts, the 30 s latest-night poll would otherwise turn That's a wrap into the recap under
- * the guest. One shell stays mounted either way, so the hand-off's countdown never restarts.
+ * the guest.
  */
 export function PastNight(props: {
   night: Night;
@@ -73,7 +74,7 @@ export function PastNight(props: {
   const kind = settled ?? pastNightKind(props.night.id, latestId);
 
   return (
-    <GuestShell screen={kind} handoff="countdown" back={HISTORY_BACK}>
+    <GuestShell screen={kind} back={HISTORY_BACK}>
       {kind === "wrap" ? <ThatsAWrap {...props} /> : <NightRecap {...props} />}
     </GuestShell>
   );
@@ -99,6 +100,7 @@ function ThatsAWrap({
   return (
     <>
       <ScreenTitle title={HOME_COPY.wrap.title} lede={HOME_COPY.wrap.lede} />
+      {liveNight ? <LiveNightLink night={liveNight} primary={primary === "handoff"} /> : null}
       <WinnerCard night={night} compact />
       <div
         data-testid={primary === "stars" ? "primary-action" : undefined}
@@ -128,7 +130,7 @@ function ThatsAWrap({
           <Results night={night} />
         </div>
       </details>
-      {/* The rating or the hand-off is the primary here, so Add photos is `secondary`. */}
+      {/* The rating or the live-night link is the primary here, so Add photos is `secondary`. */}
       <PhotoAlbum sessionId={night.id} live={live} actorId={current.id} primary={false} />
     </>
   );
@@ -145,6 +147,7 @@ function NightRecap({
   people: PersonTile[];
   current: PersonTile;
 }) {
+  const { night: liveNight } = useHouseholdNight(true);
   const winnerId = night.result?.winner_option_id;
   const winner = night.options.find((o) => o.id === winnerId);
   const date = new Date(night.created_at).toLocaleDateString(undefined, {
@@ -157,6 +160,7 @@ function NightRecap({
   return (
     <>
       <ScreenTitle title={night.title ?? winner?.title ?? "Movie night"} lede={date} />
+      {liveNight ? <LiveNightLink night={liveNight} primary /> : null}
       <WinnerCard night={night} compact />
       <YourNight night={night} current={current} />
       <section aria-labelledby="family-picks" className="flex flex-col gap-3">

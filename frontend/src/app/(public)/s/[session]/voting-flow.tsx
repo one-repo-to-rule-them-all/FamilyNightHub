@@ -38,7 +38,6 @@ const ballotsKey = (sessionId: string) => [...nightKey(sessionId), "ballots", "m
 /** The ballot leaves the nav out (its sticky Done owns the bottom) and links back Home instead. */
 const BALLOT_SHELL = {
   hideNav: true,
-  handoff: "none",
   back: { href: "/", label: "Home" },
 } as const;
 
@@ -134,7 +133,7 @@ export function VotingFlow({
     const titles = new Map(night.options.map((o) => [o.id, o.title]));
     const voted = voters.data?.length ?? votedIds.size;
     return (
-      <GuestShell screen="picks-in" handoff="none">
+      <GuestShell screen="picks-in">
         <ScreenTitle title={`Thanks, ${current.name}!`} lede="Your picks are in." />
         {chip}
         {here()}
