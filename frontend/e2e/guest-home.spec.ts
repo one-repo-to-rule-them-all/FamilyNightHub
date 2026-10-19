@@ -110,8 +110,18 @@ async function hostClosesWhenSettled(request: APIRequestContext, night: SeededNi
 const screen = (page: Page, id: string) => page.locator(`[data-screen="${id}"]`);
 const primary = (page: Page) => page.getByTestId("primary-action");
 const tonightCard = (page: Page) => page.getByTestId("tonight-card");
+// The new-night hand-off. Issue #70 turns the in-page card into a toast (`night-toast`, join
+// button `toast-join`): switch these locators, and `joinFromHandoff`, in this one place.
 const handoff = (page: Page) => page.getByTestId("live-handoff");
+const handoffJoin = (page: Page) =>
+  handoff(page).getByRole("link", { name: "Go to tonight's movie night" });
+const handoffStay = (page: Page) => page.getByTestId("handoff-stay");
 const countdown = (page: Page) => page.getByTestId("handoff-countdown");
+
+/** Taps the hand-off's join (Go) button. */
+async function joinFromHandoff(page: Page) {
+  await handoffJoin(page).click();
+}
 
 /** The phone's own id for `name` (GET /people as this phone). */
 async function personId(page: Page, name: string): Promise<string> {
@@ -397,10 +407,10 @@ test.describe("guest home (#58)", () => {
     await stepUntil(page, isVisible(handoff(page)), { timeout: HANDOFF_WAIT + 5_000 });
     await expect(primary(page)).toHaveCount(1);
     await expect(primary(page)).toHaveText("Go to tonight's movie night");
-    await expect(handoff(page).getByTestId("primary-action")).toBeVisible();
+    await expect(handoffJoin(page)).toHaveAttribute("data-testid", "primary-action");
     await expect(countdown(page)).toHaveAttribute("data-seconds", "60");
     await expect(countdown(page)).toHaveText("Taking you there in 60s");
-    const stay = page.getByTestId("handoff-stay");
+    const stay = handoffStay(page);
     await expect(stay).toHaveText("Stay here");
     await expect(stay).toBeVisible();
 
@@ -468,7 +478,7 @@ test.describe("guest home (#58)", () => {
     // AC-H3.1: tapping Go takes the phone to that night's screen.
     await backTo(page, `/s/${night.sessionId}`);
     await stepUntil(page, isVisible(handoff(page)));
-    await primary(page).click();
+    await joinFromHandoff(page);
     await stepUntil(page, isVisible(screen(page, "almost-ready")));
     expect(new URL(page.url()).pathname).toBe(`/s/${live}`);
   });
@@ -561,9 +571,10 @@ test.describe("guest home (#58)", () => {
     await stepUntil(page, isVisible(countdown(page)), { timeout: HANDOFF_WAIT + 5_000 });
     await page.clock.runFor(20_000);
     expect(await secondsLeft(page)).toBe(40);
-    await page.getByTestId("handoff-stay").click();
+    await handoffStay(page).click();
     await expect(countdown(page)).toHaveCount(0);
     await expect(handoff(page)).toBeVisible();
+    await expect(handoffJoin(page)).toBeVisible();
     await expect(primary(page)).toHaveText("Go to tonight's movie night");
     await page.clock.runFor(120_000);
     await expect(screen(page, "wrap")).toBeVisible();
@@ -587,7 +598,7 @@ test.describe("guest home (#58)", () => {
     await expect(handoff(page)).toHaveAttribute("data-night", d);
     await expect(countdown(page)).toHaveAttribute("data-seconds", "60");
     await expect(countdown(page)).toHaveText("Taking you there in 60s");
-    await expect(page.getByTestId("handoff-stay")).toBeVisible();
+    await expect(handoffStay(page)).toBeVisible();
     await expect(primary(page)).toHaveCount(1);
     await page.clock.runFor(60_000);
     await stepUntil(page, isVisible(screen(page, "almost-ready")));
@@ -625,7 +636,7 @@ test.describe("guest home (#58)", () => {
       await expect(screen(page, id)).toBeVisible();
       await expect(handoff(page)).toBeVisible();
       await expect(countdown(page)).toHaveCount(0);
-      await expect(page.getByTestId("handoff-stay")).toHaveCount(0);
+      await expect(handoffStay(page)).toHaveCount(0);
       if (id !== "album") await expectBottomNav(page, tab);
       await letTimePass(page, 120_000);
       expect(new URL(page.url()).pathname).toBe(path);
