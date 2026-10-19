@@ -265,6 +265,18 @@ describe("NightToast for a night still in draft (the #70 Join bug)", () => {
     expect(q("toast-join")).not.toBeNull();
   });
 
+  it("once the phone has been to the night, a draft seen earlier no longer brings the toast back", () => {
+    render(draft(), { pathname: "/s/old" });
+    navigate(voting(), { pathname: "/s/old", isNew: false });
+    act(() => q("toast-join")?.click());
+    expect(push).toHaveBeenCalledExactlyOnceWith("/s/n2");
+    // Back on the wrap (isNew is false: the night is seen).
+    navigate(voting(), { pathname: "/s/old", isNew: false });
+    expect(q("night-toast")).toBeNull();
+    advance(120);
+    expect(push).toHaveBeenCalledTimes(1);
+  });
+
   it("shows no setup toast for an old draft this page load never saw", () => {
     render(draft(), { isNew: false });
     expect(q("night-toast")).toBeNull();

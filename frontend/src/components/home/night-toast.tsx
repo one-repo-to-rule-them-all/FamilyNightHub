@@ -12,6 +12,7 @@ import {
   countdownAnnouncement,
   HOME_COPY,
   isOwnNightPath,
+  readSeenNight,
   toastTitle,
   toastVisible,
 } from "@/lib/home";
@@ -79,7 +80,10 @@ export function NightToast({
   );
   const own = night !== undefined && isOwnNightPath(pathname, night.id);
   const draft = night?.status === "draft";
-  const eligible = isNew || (night !== undefined && setupSeen.has(night.id));
+  // A draft seen here keeps it "new" past the 10-minute window, but never once the phone has been
+  // to the night (joined, moved, or opened it): `fnh.seenNight` always wins.
+  const eligible =
+    isNew || (night !== undefined && setupSeen.has(night.id) && readSeenNight() !== night.id);
   const move = useAutoMoveCountdown(night?.id, eligible && !own && !draft);
   const { cancel } = move;
 
