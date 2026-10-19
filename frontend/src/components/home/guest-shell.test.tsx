@@ -96,7 +96,7 @@ describe("GuestShell (§5 H0)", () => {
     render(<GuestShell screen="me">x</GuestShell>);
     expect(q("household-name")?.textContent).toBe("The Baez Family");
     const person = q("app-bar-person");
-    expect(person?.getAttribute("aria-label")).toBe("Switch person (now RooDog)");
+    expect(person?.getAttribute("aria-label")).toBe("Switch person, now RooDog");
     act(() => person?.click());
     expect(q("switch-sheet")).not.toBeNull();
   });
