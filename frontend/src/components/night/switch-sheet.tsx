@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Lock, Plus } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
@@ -42,6 +43,7 @@ export function SwitchSheet({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [step, setStep] = useState<Step>({ kind: "list" });
   const [removing, setRemoving] = useState<string | null>(null);
   const remove = useMutation<void, ApiError, string>({
@@ -79,8 +81,10 @@ export function SwitchSheet({
         currentName={current.name}
         onOutcome={(outcome) => {
           refresh();
-          if (outcome === "done") onClose();
-          else if (outcome === "locked") setStep({ kind: "locked", personId: person.id });
+          if (outcome === "done") {
+            onClose();
+            router.replace("/?arrive=1");
+          } else if (outcome === "locked") setStep({ kind: "locked", personId: person.id });
           else if (outcome === "reset-asked") setStep({ kind: "reset", personId: person.id });
           else if (outcome === "slow") setStep({ kind: "list", notice: PIN_SLOW_COPY });
         }}

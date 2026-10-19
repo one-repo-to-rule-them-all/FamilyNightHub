@@ -42,7 +42,7 @@ export function JoinForm({ slug }: { slug: string }) {
   const expired = isDeviceExpired(probe.error);
 
   useEffect(() => {
-    if (joined) router.replace("/");
+    if (joined) router.replace("/?arrive=1");
   }, [joined, router]);
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export function JoinForm({ slug }: { slug: string }) {
         queryFn: () => api.night(result.session_id),
       });
       await queryClient.invalidateQueries({ queryKey: PEOPLE_KEY });
-      router.replace("/");
+      router.replace("/?arrive=1");
     },
     onError: (error) => {
       if (!isWrongCode(error)) return;
