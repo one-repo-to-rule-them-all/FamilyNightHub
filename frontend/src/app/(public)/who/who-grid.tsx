@@ -152,7 +152,7 @@ export function WhoGrid() {
             person={person}
             notice={view.notice}
             onAsked={() => finish("reset-asked", person.id)}
-            wayOut={pickElse}
+            onBack={() => setView({ kind: "grid" })}
           />
         )}
       </PhoneScreen>

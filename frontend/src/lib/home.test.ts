@@ -17,6 +17,8 @@ import {
   readStayNight,
   readWrapNight,
   stillToVote,
+  toastTitle,
+  toastVisible,
   tonightState,
   withinNewWindow,
   writeSeenNight,
@@ -248,6 +250,32 @@ describe("the shell (§5 H0)", () => {
     expect(handoffLine("voting")).toBe(HOME_COPY.handoff.voting);
     expect(handoffLine("revealed")).toBe(HOME_COPY.handoff.revealed);
     expect(handoffLine("tonight")).toBe(HOME_COPY.handoff.tonight);
+  });
+
+  it("titles the toast with the night's name, else tonight's winner once it is in", () => {
+    const winner = { title: "Coco", poster_path: null } as never;
+    expect(toastTitle({ status: "draft", title: "Spooky", winner: null })).toBe("Spooky");
+    expect(toastTitle({ status: "voting", title: null, winner })).toBeNull();
+    expect(toastTitle({ status: "revealed", title: null, winner })).toBe("Coco");
+    expect(toastTitle({ status: "tonight", title: null, winner })).toBe("Coco");
+    expect(toastTitle({ status: "tonight", title: null, winner: null })).toBeNull();
+  });
+
+  it("shows the toast for a new or already-counting night, never on its own screens", () => {
+    const base = {
+      pathname: "/history",
+      nightId: "n2",
+      isNew: true,
+      stayed: false,
+      counting: false,
+    };
+    expect(toastVisible(base)).toBe(true);
+    expect(toastVisible({ ...base, nightId: undefined })).toBe(false);
+    expect(toastVisible({ ...base, isNew: false })).toBe(false);
+    expect(toastVisible({ ...base, isNew: false, counting: true })).toBe(true);
+    expect(toastVisible({ ...base, stayed: true, counting: true })).toBe(false);
+    expect(toastVisible({ ...base, pathname: "/s/n2" })).toBe(false);
+    expect(toastVisible({ ...base, pathname: "/" })).toBe(true);
   });
 
   it("announces the countdown at 60, 30 and 10 s and once on pause", () => {

@@ -190,7 +190,7 @@ test.describe("sign-off", () => {
     await wrongPins(phoneB, "Ava", 5);
     await expect(phoneB.locator('[data-screen="locked"]')).toBeVisible();
     await expectNoAxeViolations(phoneB);
-    await phoneB.getByRole("button", { name: "Ask the family admin to reset your PIN" }).click();
+    await phoneB.getByRole("button", { name: "Forgot PIN" }).click();
     await expect(phoneB.locator('[data-screen="reset-pending"]')).toBeVisible();
     // Ava's own phone keeps working while she is locked.
     await page.reload();

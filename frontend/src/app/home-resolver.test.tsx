@@ -83,18 +83,8 @@ vi.mock("@/components/night/rate-prompt-card", () => ({
   ),
 }));
 vi.mock("@/components/home/guest-shell", () => ({
-  GuestShell: ({
-    screen,
-    handoff,
-    children,
-  }: {
-    screen: string;
-    handoff?: string;
-    children: React.ReactNode;
-  }) => (
-    <main data-screen={screen} data-handoff={handoff}>
-      {children}
-    </main>
+  GuestShell: ({ screen, children }: { screen: string; children: React.ReactNode }) => (
+    <main data-screen={screen}>{children}</main>
   ),
 }));
 vi.mock("@/components/home/tonight-card", async () => {
@@ -156,7 +146,7 @@ describe("Home (§5 H1)", () => {
   it("renders Home in the shell with no hand-off, and stays without a live night (AC-H1.1)", () => {
     mount();
     const main = host.querySelector<HTMLElement>("[data-screen=home]");
-    expect(main?.dataset.handoff).toBe("none");
+    expect(main).not.toBeNull();
     expect(host.textContent).toContain("Hi, RooDog");
     expect(host.querySelector('[data-testid="tonight-card"]')).not.toBeNull();
     expect(replace).not.toHaveBeenCalled();

@@ -55,6 +55,14 @@ export const HOME_COPY = {
     paused: "Paused while you finish up",
     stay: "Stay here",
   },
+  toast: {
+    started: "Movie night started",
+    join: "Join",
+    label: "New movie night",
+    setup: "Movie night is being set up",
+    setupBody: "We'll tell you when voting opens.",
+    ok: "OK",
+  },
   wrap: { title: "That's a wrap", lede: "Thanks for movie night.", home: "Back to Home" },
   recap: {
     yours: "Your night",
@@ -294,6 +302,35 @@ export function handoffLine(status: NightStatus): string {
   if (status === "revealed") return HOME_COPY.handoff.revealed;
   if (status === "tonight") return HOME_COPY.handoff.tonight;
   return HOME_COPY.handoff.draft;
+}
+
+/**
+ * The toast's headline (guest-home §5 H0c): "Movie night started · {title}". The title is the
+ * night's own, else tonight's winner once it is in (never while voting), else just the headline.
+ */
+export function toastTitle(
+  night: Pick<NightSummary, "status" | "title" | "winner">,
+): string | null {
+  if (night.title) return night.title;
+  if (night.status === "revealed" || night.status === "tonight") return night.winner?.title ?? null;
+  return null;
+}
+
+/**
+ * Whether the new-night toast shows (§5 H0c): a live night that isn't this screen's own, that this
+ * tab hasn't shown or dismissed (`isNew`, `stayed`), or whose countdown is already under way in
+ * this page load (so it follows the phone from screen to screen until joined, dismissed or moved).
+ */
+export function toastVisible(input: {
+  pathname: string;
+  nightId: string | undefined;
+  isNew: boolean;
+  stayed: boolean;
+  counting: boolean;
+}): boolean {
+  const { pathname, nightId, isNew, stayed, counting } = input;
+  if (nightId === undefined || stayed || isOwnNightPath(pathname, nightId)) return false;
+  return isNew || counting;
 }
 
 /**

@@ -1,5 +1,7 @@
 "use client";
 
+import { Clapperboard } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
@@ -9,16 +11,21 @@ import { HereTonight } from "@/components/night/here-tonight";
 import { RatingPanel } from "@/components/night/rating-panel";
 import { PhoneScreen } from "@/components/phone-screen";
 import { PhotoAlbum } from "@/components/photos/photo-album";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useLiveSession } from "@/hooks/use-live-session";
 import { usePhonePeople } from "@/hooks/use-phone";
 import type { Night, PersonTile } from "@/lib/api";
+import { HOME_COPY } from "@/lib/home";
 import type { LiveState } from "@/lib/live";
+import { cn } from "@/lib/utils";
 
 import { PastNight } from "./past-night";
 import { ScreenTitle } from "./screen-title";
 import { VotingFlow } from "./voting-flow";
 import { Results, WinnerCard } from "./winner";
+
+/** S9's second line: the phone needn't wait here (guest-home §5 H0c). */
+const DRAFT_WAIT = "Voting opens here by itself. You can leave this screen: we'll tell you.";
 
 /**
  * /s/[session]: the phone's view of one night, driven by the snapshot's `status`
@@ -102,26 +109,41 @@ function NightState({
 
   // S9, S12 and S13 sit in the shell (nav, Home's live dot); the app bar's person button replaces
   // the CurrentChip, which stays only on the ballot and picks-in (guest-home §5 "Live-night
-  // screens"). No hand-off: these are the live night's own screens.
+  // screens"). The new-night toast never shows here: these are the live night's own screens.
   switch (night.status) {
     case "draft":
       return (
-        <GuestShell screen="almost-ready" handoff="none">
-          <ScreenTitle title="Almost ready" />
-          {here()}
-          <div data-testid="waiting">
-            <p aria-live="polite" className="text-lg text-muted-foreground">
-              The host is picking movies ({night.options.length} so far). Voting starts here by
-              itself.
-            </p>
+        <GuestShell screen="almost-ready">
+          <ScreenTitle title="Almost ready" lede={HOME_COPY.toast.setup} />
+          {/* A draft has nothing to do yet (the #70 Join bug), so say what's happening and that
+              the phone can wait anywhere: the toast brings it back when voting opens. */}
+          <div
+            data-testid="waiting"
+            className="flex items-start gap-4 rounded-2xl bg-card p-5 ring-1 ring-foreground/10"
+          >
+            <Clapperboard aria-hidden className="mt-1 size-7 shrink-0 text-cinema" />
+            <div className="flex flex-col gap-2">
+              <p aria-live="polite" className="text-lg">
+                {HOME_COPY.t1.body(night.options.length)}
+              </p>
+              <p className="text-base text-muted-foreground">{DRAFT_WAIT}</p>
+            </div>
           </div>
+          {here()}
+          <Link
+            href="/"
+            data-testid="draft-home"
+            className={cn(buttonVariants({ variant: "secondary", size: "tap" }), "w-full")}
+          >
+            {HOME_COPY.wrap.home}
+          </Link>
         </GuestShell>
       );
     case "voting":
       return <VotingFlow night={night} live={live} people={people} current={current} here={here} />;
     case "revealed":
       return (
-        <GuestShell screen="winner" handoff="none">
+        <GuestShell screen="winner">
           <ScreenTitle title="The winner is…" />
           <div data-testid="waiting" className="flex flex-col gap-6">
             {closedNotice ? (
@@ -139,7 +161,7 @@ function NightState({
       );
     case "tonight":
       return (
-        <GuestShell screen="tonight" handoff="none">
+        <GuestShell screen="tonight">
           <ScreenTitle title="Tonight" />
           <WinnerCard night={night} compact />
           {here()}

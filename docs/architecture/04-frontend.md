@@ -182,19 +182,26 @@ A signed-in phone has three places, Home (`/`), History (`/history`) and Me (`/m
   56px links with `aria-current="page"` (`activeTab()`: `/s/*` and albums count as Home, profiles as
   History), and a cinema dot on Home (`aria-label="Movie night is on"`) while a night is live.
   Never the primary. Hidden with `hideNav` (the ballot).
-- **Live hand-off** (`live-handoff.tsx`, `data-testid="live-handoff"`): at the top of the content
-  whenever the household has a live night and the page isn't that night's own `/s/{id}`. Its
-  **Go to tonight's movie night** is the screen's `primary-action`. `handoff="none"` on Home (the
-  Tonight card does this job) and on the night's own screens.
-- **Auto-move** (`handoff="countdown"`, That's a wrap and the recap only; owner decision §11.2):
-  the hand-off counts down from 60 s (`handoff-countdown`, `data-seconds`) with a `secondary`
-  **Stay here** (`handoff-stay`). `useAutoMoveCountdown` ticks once a second and pauses, holding
-  the number, while `src/lib/auto-move.ts`'s hold is taken (the upload queue in
-  `use-photo-uploads.ts` holds it while any job is processing/queued/uploading/waiting), while any
-  `dialog[open]` exists (every modal here is a native `<dialog>`), or while the page is hidden. At 0
-  it marks the night seen and `router.push`es to it (Back returns). **Stay here** writes
-  `sessionStorage["fnh.stayNight"]`: no countdown for that night again in this tab. A polite,
-  visually hidden live region announces 60/30/10 s and the pause, not every second.
+- **New-night toast** (`night-toast.tsx`, `data-testid="night-toast"`, issue #70): mounted once
+  in `GuestShell`, fixed just above the bottom nav (never over it), on every signed-in screen
+  except the live night's own `/s/{id}` screens (`toastVisible()`). It shows for a night this tab
+  hasn't seen (`useHouseholdNight().isNew`) and that **Stay here** wasn't tapped for: "Movie night
+  started · {title}" (`toastTitle()`), **Join** (`toast-join`, marks the night seen and
+  `router.push`es), a 60 s countdown (`handoff-countdown`, `data-seconds`) and **Stay here**
+  (`handoff-stay`, writes `sessionStorage["fnh.stayNight"]`, gone for that night in this tab). It
+  is a notification, not the screen's `primary-action`.
+- **Auto-move** (`useAutoMoveCountdown`): the running countdown lives in a module store, so each
+  page's shell picks it up at the same second and the toast follows the phone across screens until
+  joined, dismissed or moved. It ticks once a second and pauses, holding the number, while
+  `src/lib/auto-move.ts`'s hold is taken (the upload queue in `use-photo-uploads.ts` holds it while
+  any job is processing/queued/uploading/waiting), while any `dialog[open]` exists (every modal
+  here is a native `<dialog>`), or while the page is hidden. At 0 it marks the night seen and
+  `router.push`es to it (Back returns). Being on the night's own screen marks it seen and ends the
+  countdown. A polite, visually hidden live region announces the toast, then 60/30/10 s and the
+  pause, not every second.
+- **Live-night link** (`live-night-link.tsx`): That's a wrap and the recap keep a small inline
+  **Go to tonight's movie night** link while a newer night is live (their `primary-action`), so the
+  past night still points at it after the toast is gone.
 
 **Data.** The shell mounts `useHouseholdNight()` (`src/hooks/use-household-night.ts`), which is the
 `["nights","live"]` query (`useLiveNight`: 5 s while visible, never in the background, on focus)

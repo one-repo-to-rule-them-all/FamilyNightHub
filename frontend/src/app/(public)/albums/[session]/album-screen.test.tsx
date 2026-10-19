@@ -15,16 +15,14 @@ vi.mock("next/link", () => ({
 vi.mock("@/components/home/guest-shell", () => ({
   GuestShell: ({
     screen,
-    handoff = "plain",
     back,
     children,
   }: {
     screen: string;
-    handoff?: string;
     back?: { href: string; label: string };
     children: React.ReactNode;
   }) => (
-    <main data-shell data-screen={screen} data-handoff={handoff} data-back={back?.href}>
+    <main data-shell data-screen={screen} data-back={back?.href}>
       {children}
     </main>
   ),
@@ -71,7 +69,6 @@ describe("AlbumScreen (guest-home §5 H6)", () => {
     act(() => root.render(<AlbumScreen sessionId="n1" />));
     expect(main()?.dataset.screen).toBe("album");
     expect(main()?.dataset.back).toBe("/s/n1");
-    expect(main()?.dataset.handoff).toBe("plain");
     expect(host.querySelector('[data-testid="photo-album"]')).not.toBeNull();
   });
 

@@ -17,15 +17,15 @@ import { castPhoneBallot } from "./support/host";
 import { expect, type SeededNight, seedNight, test } from "./support/seed";
 
 /**
- * Guest experience v2 (#58): the phone's Home, History, Me, the bottom nav and the live hand-off
- * with its 60 s auto-move, as proposals/guest-home.md §12 (AC-H0–H5) at 360×640.
+ * Guest experience v2 (#58): the phone's Home, History, Me, the bottom nav and the new-night toast
+ * with its 60 s auto-move (#70), as proposals/guest-home.md §12 (AC-H0–H5) at 360×640.
  *
  * Every countdown AC runs on Playwright's clock: `page.clock.install()` before the first load,
  * frozen with `freezeClock` just before the new night is started, then moved by hand. While the
  * clock is frozen nothing timer-driven happens on its own (TanStack Query's polls and even its
  * render notifications sit on `setTimeout`), so `stepUntil` moves it in quarter-second steps until
  * the screen catches up, and no test waits 60 real seconds. A quarter second can't reach the
- * countdown's 1 s tick, so it still reads 60 when the hand-off first shows.
+ * countdown's 1 s tick, so it still reads 60 when the toast first shows.
  *
  * Each test seeds its own household (Ava, Leo, Mia). The host's moves (start a night, add titles,
  * open/close voting, end it) go straight to the API with the seeded admin session, as in
@@ -110,17 +110,21 @@ async function hostClosesWhenSettled(request: APIRequestContext, night: SeededNi
 const screen = (page: Page, id: string) => page.locator(`[data-screen="${id}"]`);
 const primary = (page: Page) => page.getByTestId("primary-action");
 const tonightCard = (page: Page) => page.getByTestId("tonight-card");
-// The new-night hand-off. Issue #70 turns the in-page card into a toast (`night-toast`, join
-// button `toast-join`): switch these locators, and `joinFromHandoff`, in this one place.
-const handoff = (page: Page) => page.getByTestId("live-handoff");
-const handoffJoin = (page: Page) =>
-  handoff(page).getByRole("link", { name: "Go to tonight's movie night" });
+// The new-night toast (issue #70): mounted once in the shell, above the nav. `data-phase` is
+// `setup` while the night is a draft (no Join, no countdown) and `started` once voting is open.
+const toast = (page: Page) => page.getByTestId("night-toast");
+const toastJoin = (page: Page) => page.getByTestId("toast-join");
 const handoffStay = (page: Page) => page.getByTestId("handoff-stay");
 const countdown = (page: Page) => page.getByTestId("handoff-countdown");
+/** That's a wrap's and the recap's small "Go to tonight's movie night" link. */
+const liveLink = (page: Page) => page.locator("[data-live-link]");
 
-/** Taps the hand-off's join (Go) button. */
-async function joinFromHandoff(page: Page) {
-  await handoffJoin(page).click();
+/** The toast sits above the bottom nav, never over it (AC-H3.4). */
+async function expectToastAboveNav(page: Page) {
+  const box = await toast(page).boundingBox();
+  const nav = await page.getByTestId("bottom-nav").boundingBox();
+  expect(box && nav, "toast and nav are on screen").toBeTruthy();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(nav!.y);
 }
 
 /** The phone's own id for `name` (GET /people as this phone). */
@@ -384,7 +388,7 @@ test.describe("guest home (#58)", () => {
     expect(new URL(page.url()).pathname).toBe("/");
   });
 
-  test("That's a wrap hands off to a new night and auto-moves after 60 s, pausing for uploads and dialogs", async ({
+  test("That's a wrap: the setup toast for a draft, then Join and the 60 s countdown once voting opens, pausing for uploads and dialogs", async ({
     page,
     request,
   }) => {
@@ -399,20 +403,36 @@ test.describe("guest home (#58)", () => {
     await expect(primary(page)).toHaveCount(1);
     await expect(primary(page).getByTestId("rating-panel")).toBeVisible();
     await expectBottomNav(page, "Home");
-    await expect(handoff(page)).toHaveCount(0);
+    await expect(toast(page)).toHaveCount(0);
 
-    // AC-H3.1 / AC-H3.5: a new night → the hand-off, its Go the only primary, 60 s on the clock.
+    // AC-H3.12 (the #70 Join bug): a night still in draft only says it is being set up. No Join,
+    // no countdown, and the phone stays put; OK hides it.
     await freezeClock(page);
-    const live = await hostStartsNight(request, night);
-    await stepUntil(page, isVisible(handoff(page)), { timeout: HANDOFF_WAIT + 5_000 });
+    const live = await hostStartsNight(request, night, { movies: ["Coco", "Up", "Moana"] });
+    await stepUntil(page, isVisible(toast(page)), { timeout: HANDOFF_WAIT + 5_000 });
+    await expect(toast(page)).toHaveAttribute("data-phase", "setup");
+    await expect(toast(page)).toContainText("Movie night is being set up");
+    await expect(toastJoin(page)).toHaveCount(0);
+    await expect(countdown(page)).toHaveCount(0);
+    await page.clock.runFor(60_000);
+    expect(new URL(page.url()).pathname).toBe(`/s/${night.sessionId}`);
+    await page.getByTestId("toast-hide").click();
+    await expect(toast(page)).toHaveCount(0);
+
+    // AC-H3.1 / AC-H3.5: voting opens → the full toast, 60 s on the clock, above the nav. The
+    // wrap's own primary is the small live-night link; the toast's buttons are not primaries.
+    await hostOpensVoting(request, night, live);
+    await stepUntil(page, isVisible(toast(page)), { timeout: HANDOFF_WAIT + 5_000 });
+    await expect(toast(page)).toHaveAttribute("data-phase", "started");
+    await expect(toast(page)).toHaveAttribute("data-night", live);
+    await expect(toast(page)).toContainText("Movie night started");
     await expect(primary(page)).toHaveCount(1);
     await expect(primary(page)).toHaveText("Go to tonight's movie night");
-    await expect(handoffJoin(page)).toHaveAttribute("data-testid", "primary-action");
     await expect(countdown(page)).toHaveAttribute("data-seconds", "60");
     await expect(countdown(page)).toHaveText("Taking you there in 60s");
-    const stay = handoffStay(page);
-    await expect(stay).toHaveText("Stay here");
-    await expect(stay).toBeVisible();
+    await expect(handoffStay(page)).toHaveText("Stay here");
+    await expect(toastJoin(page)).toHaveText("Join");
+    await expectToastAboveNav(page);
 
     // AC-H3.9: an upload in flight at 50 s holds the countdown.
     await page.clock.runFor(10_000);
@@ -429,7 +449,7 @@ test.describe("guest home (#58)", () => {
     await page.getByTestId("photo-input").setInputFiles([JPEG_FIXTURE]);
     await stepUntil(page, async () => (await countdown(page).getAttribute("data-paused")) !== null);
     await expect(countdown(page)).toHaveText("Paused while you finish up");
-    await page.clock.runFor(120_000);
+    await page.clock.runFor(60_000);
     await expect(countdown(page)).toHaveAttribute("data-seconds", "50");
     await expect(countdown(page)).toHaveText("Paused while you finish up");
     release();
@@ -444,16 +464,8 @@ test.describe("guest home (#58)", () => {
     const resumed = await secondsLeft(page);
     expect([48, 49]).toContain(resumed);
 
-    // AC-H3.6: no interaction → the phone moves to the new night; Back returns to the wrap.
-    await page.clock.runFor(resumed * 1_000);
-    await stepUntil(page, isVisible(screen(page, "almost-ready")));
-    expect(new URL(page.url()).pathname).toBe(`/s/${live}`);
-    await backTo(page, `/s/${night.sessionId}`);
-    await expect(screen(page, "wrap")).toBeVisible();
-
     // AC-H3.10: the switch sheet (a <dialog>) at 30 s holds it; closing it resumes.
-    await expect(countdown(page)).toBeVisible();
-    await page.clock.runFor((await secondsLeft(page)) * 1_000 - 30_000);
+    await page.clock.runFor((resumed - 30) * 1_000);
     expect(await secondsLeft(page)).toBe(30);
     await page.getByTestId("app-bar-person").click();
     await expect(page.getByTestId("switch-sheet")).toBeVisible();
@@ -471,19 +483,24 @@ test.describe("guest home (#58)", () => {
     expect(await secondsLeft(page)).toBe(20);
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("photo-viewer")).toHaveCount(0);
-    await page.clock.runFor(20_000);
-    await stepUntil(page, isVisible(screen(page, "almost-ready")));
-    expect(new URL(page.url()).pathname).toBe(`/s/${live}`);
 
-    // AC-H3.1: tapping Go takes the phone to that night's screen.
+    // AC-H3.6: no interaction → the phone moves to the new night's ballot; Back returns to the
+    // wrap, where the night now counts as seen: no toast, just the live-night link.
+    await page.clock.runFor(20_000);
+    await stepUntil(page, isVisible(screen(page, "ballot")));
+    expect(new URL(page.url()).pathname).toBe(`/s/${live}`);
     await backTo(page, `/s/${night.sessionId}`);
-    await stepUntil(page, isVisible(handoff(page)));
-    await joinFromHandoff(page);
-    await stepUntil(page, isVisible(screen(page, "almost-ready")));
+    await expect(screen(page, "wrap")).toBeVisible();
+    await page.clock.runFor(5_000);
+    await expect(toast(page)).toHaveCount(0);
+
+    // AC-H3.1: the live-night link takes the phone to that night's screen.
+    await primary(page).click();
+    await stepUntil(page, isVisible(screen(page, "ballot")));
     expect(new URL(page.url()).pathname).toBe(`/s/${live}`);
   });
 
-  test("past nights: recap, History, Stay here, and the recap's own countdown", async ({
+  test("past nights: recap, History, Stay here, and the toast following the phone across screens", async ({
     page,
     request,
   }) => {
@@ -563,69 +580,84 @@ test.describe("guest home (#58)", () => {
     await primary(page).click();
     await expect(screen(page, "home")).toBeVisible();
 
-    // AC-H3.8: Stay here at 40 s cancels the move for that night.
+    // AC-H3.8: Stay here at 40 s dismisses the toast for that night; the wrap keeps its link.
     await page.goto(`/s/${b}`);
     await expect(screen(page, "wrap")).toBeVisible();
     await freezeClock(page);
-    const c = await hostStartsNight(request, night);
+    const c = await hostStartsNight(request, night, { movies: ["Coco", "Up"], openVoting: true });
     await stepUntil(page, isVisible(countdown(page)), { timeout: HANDOFF_WAIT + 5_000 });
     await page.clock.runFor(20_000);
     expect(await secondsLeft(page)).toBe(40);
     await handoffStay(page).click();
-    await expect(countdown(page)).toHaveCount(0);
-    await expect(handoff(page)).toBeVisible();
-    await expect(handoffJoin(page)).toBeVisible();
+    await expect(toast(page)).toHaveCount(0);
     await expect(primary(page)).toHaveText("Go to tonight's movie night");
     await page.clock.runFor(120_000);
     await expect(screen(page, "wrap")).toBeVisible();
     expect(new URL(page.url()).pathname).toBe(`/s/${b}`);
 
-    // …the recap of another past night in the same tab: the hand-off, no countdown.
+    // …the recap of another past night in the same tab: no toast for that night, just the link.
     await page.goto(`/s/${night.sessionId}`);
     await freezeClock(page);
     // Until the latest night is known the page is That's a wrap (pastNightKind), so wait for both.
     await stepUntil(
       page,
-      async () => (await screen(page, "recap").isVisible()) && (await handoff(page).isVisible()),
+      async () => (await screen(page, "recap").isVisible()) && (await liveLink(page).isVisible()),
     );
-    await expect(countdown(page)).toHaveCount(0);
-    await expect(handoff(page)).toHaveAttribute("data-night", c);
+    await expect(toast(page)).toHaveCount(0);
+    await expect(liveLink(page)).toHaveAttribute("data-night", c);
 
-    // AC-H3.7 (+ the last clause of H3.8): a second new night brings a fresh countdown at 60,
-    // on the recap too, and it moves there after 60 s; Back returns to the recap.
-    const d = await hostStartsNight(request, night);
+    // AC-H3.7 (+ the last clause of H3.8): a second new night brings a fresh toast at 60, and it
+    // follows the phone: History and Me carry on from the same second, and the move comes from
+    // wherever the phone is. Back returns there.
+    const d = await hostStartsNight(request, night, { movies: ["Up", "Wall-E"], openVoting: true });
     await stepUntil(page, isVisible(countdown(page)), { timeout: HANDOFF_WAIT + 5_000 });
-    await expect(handoff(page)).toHaveAttribute("data-night", d);
+    await expect(toast(page)).toHaveAttribute("data-night", d);
     await expect(countdown(page)).toHaveAttribute("data-seconds", "60");
-    await expect(countdown(page)).toHaveText("Taking you there in 60s");
-    await expect(handoffStay(page)).toBeVisible();
     await expect(primary(page)).toHaveCount(1);
-    await page.clock.runFor(60_000);
-    await stepUntil(page, isVisible(screen(page, "almost-ready")));
+    await page.clock.runFor(15_000);
+    expect(await secondsLeft(page)).toBe(45);
+    await page.clock.resume();
+    await navLink(page, "history").click();
+    await expect(screen(page, "history")).toBeVisible();
+    await freezeClock(page);
+    await expect(toast(page)).toHaveAttribute("data-night", d);
+    const onHistory = await secondsLeft(page);
+    expect(onHistory).toBeLessThanOrEqual(45);
+    expect(onHistory).toBeGreaterThan(35);
+    await page.clock.resume();
+    await navLink(page, "me").click();
+    await expect(screen(page, "me")).toBeVisible();
+    await freezeClock(page);
+    await expect(toast(page)).toBeVisible();
+    await expectToastAboveNav(page);
+    const onMe = await secondsLeft(page);
+    expect(onMe).toBeLessThanOrEqual(onHistory);
+    expect(onMe).toBeGreaterThan(30);
+    await page.clock.runFor(onMe * 1_000);
+    await stepUntil(page, isVisible(screen(page, "ballot")));
     expect(new URL(page.url()).pathname).toBe(`/s/${d}`);
-    await backTo(page, `/s/${night.sessionId}`);
-    await expect(screen(page, "recap")).toBeVisible();
+    await backTo(page, "/me");
+    await expect(screen(page, "me")).toBeVisible();
   });
 
-  test("browse screens show the hand-off without a countdown and never move by themselves", async ({
+  test("a night this tab has seen shows no toast and nothing moves; a new one follows the phone, and Join goes there", async ({
     page,
+    request,
   }) => {
     const night = seedNight({ movies: 3, tonight: true });
     await page.clock.install();
     await joinAs(page, night, ["Ava"]);
     const leo = await personId(page, "Leo");
 
-    // AC-H3.4: never on the night's own screen, nor on Home.
+    // AC-H3.4: never on the night's own screen.
     await page.goto(`/s/${night.sessionId}`);
     await expect(screen(page, "tonight")).toBeVisible();
-    await expect(handoff(page)).toHaveCount(0);
+    await expect(toast(page)).toHaveCount(0);
     await expectBottomNav(page, "Home");
-    await page.goto("/");
-    await expect(screen(page, "home")).toBeVisible();
-    await expect(handoff(page)).toHaveCount(0);
 
-    // AC-H3.4 / AC-H3.11: history, me, profile, album.
+    // AC-H3.11: the joined night is seen, so no screen shows a toast and none moves by itself.
     const browse: [string, string, "Home" | "History" | "Me"][] = [
+      ["/", "home", "Home"],
       ["/history", "history", "History"],
       ["/me", "me", "Me"],
       [`/people/${leo}`, "profile", "History"],
@@ -634,20 +666,32 @@ test.describe("guest home (#58)", () => {
     for (const [path, id, tab] of browse) {
       await page.goto(path);
       await expect(screen(page, id)).toBeVisible();
-      await expect(handoff(page)).toBeVisible();
-      await expect(countdown(page)).toHaveCount(0);
-      await expect(handoffStay(page)).toHaveCount(0);
+      await expect(toast(page)).toHaveCount(0);
       if (id !== "album") await expectBottomNav(page, tab);
-      await letTimePass(page, 120_000);
+      await letTimePass(page, 30_000);
       expect(new URL(page.url()).pathname).toBe(path);
       await expect(screen(page, id)).toBeVisible();
     }
 
-    // AC-H3.11: Home never auto-moves after its first mount.
-    await page.goto("/");
+    // AC-H3.4: a new night (voting open) → the toast on History, above the nav; the tabs stay
+    // usable and the toast follows to Home. Join goes straight to the night (AC-H3.1, #70).
+    await hostClosesNight(request, night);
+    await page.goto("/history");
+    await expect(screen(page, "history")).toBeVisible();
+    const live = await hostStartsNight(request, night, {
+      movies: ["Coco", "Up"],
+      openVoting: true,
+    });
+    await expect(toast(page)).toBeVisible({ timeout: HANDOFF_WAIT });
+    await expect(toast(page)).toHaveAttribute("data-phase", "started");
+    await expectToastAboveNav(page);
+    await navLink(page, "home").click();
     await expect(screen(page, "home")).toBeVisible();
-    await letTimePass(page, 120_000);
-    expect(new URL(page.url()).pathname).toBe("/");
+    await expect(toast(page)).toHaveAttribute("data-night", live);
+    await toastJoin(page).click();
+    await expect(screen(page, "ballot")).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe(`/s/${live}`);
+    await expect(toast(page)).toHaveCount(0);
   });
 
   test("History with no nights yet says so, and the nav is the way on (AC-H4.3)", async ({

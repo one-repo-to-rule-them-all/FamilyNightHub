@@ -3,9 +3,13 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resetCountdownForTests } from "@/hooks/use-auto-move-countdown";
 import type { NightSummary, PersonTile } from "@/lib/api";
 
-const state: { pathname: string; night?: Partial<NightSummary> } = { pathname: "/history" };
+const state: { pathname: string; night?: Partial<NightSummary>; isNew: boolean } = {
+  pathname: "/history",
+  isNew: false,
+};
 const me: PersonTile = {
   id: "p1",
   name: "RooDog",
@@ -35,7 +39,7 @@ vi.mock("@/hooks/use-phone", () => ({
   usePhonePeople: () => ({ people: { isSuccess: true, data: [me] }, current: me }),
 }));
 vi.mock("@/hooks/use-household-night", () => ({
-  useHouseholdNight: () => ({ night: state.night, isNew: false, markSeen: () => {} }),
+  useHouseholdNight: () => ({ night: state.night, isNew: state.isNew, markSeen: () => {} }),
   markNightSeen: () => {},
 }));
 // The switch sheet pulls in TanStack Query; the shell only needs to know it opens.
@@ -61,6 +65,7 @@ beforeEach(() => {
   sessionStorage.clear();
   state.pathname = "/history";
   state.night = undefined;
+  state.isNew = false;
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -68,6 +73,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount());
+  resetCountdownForTests();
   host.remove();
   vi.useRealTimers();
 });
@@ -85,7 +91,7 @@ describe("GuestShell (§5 H0)", () => {
     expect(links.map((a) => a.textContent)).toEqual(["Home", "History", "Me"]);
     expect(links.map((a) => a.getAttribute("aria-current"))).toEqual([null, "page", null]);
     expect(q("live-dot")).toBeNull();
-    expect(q("live-handoff")).toBeNull();
+    expect(q("night-toast")).toBeNull();
   });
 
   it("reads the household name from the last join and opens the switch sheet", () => {
@@ -110,43 +116,39 @@ describe("GuestShell (§5 H0)", () => {
     expect(q("app-bar-back")?.getAttribute("href")).toBe("/history");
   });
 
-  it("puts the plain hand-off on a browse screen while a night is live, plus the live dot", () => {
-    state.night = { id: "n2", status: "voting", winner: null };
+  it("mounts the new-night toast on any screen for a new night, above the nav (§5 H0c)", () => {
+    state.night = { id: "n2", status: "voting", winner: null, title: null };
+    state.isNew = true;
     render(<GuestShell screen="history">x</GuestShell>);
-    expect(q("live-handoff")).not.toBeNull();
-    expect(q("handoff-countdown")).toBeNull();
-    expect(q("live-dot")?.getAttribute("aria-label")).toBe("Movie night is on");
-  });
-
-  it("carries the countdown when asked (That's a wrap, the recap)", () => {
-    state.pathname = "/s/old";
-    state.night = { id: "n2", status: "draft", winner: null };
-    render(
-      <GuestShell screen="wrap" handoff="countdown">
-        x
-      </GuestShell>,
-    );
+    const toast = q("night-toast");
+    expect(toast?.dataset.night).toBe("n2");
+    expect(toast?.className).toContain("bottom-[calc(3.5rem");
     expect(q("handoff-countdown")?.dataset.seconds).toBe("60");
+    expect(q("live-dot")?.getAttribute("aria-label")).toBe("Movie night is on");
+    // The nav is still there and still a sibling of the toast, not under it.
+    expect(q("bottom-nav")).not.toBeNull();
+    expect(q("live-handoff")).toBeNull();
   });
 
-  it("never shows the hand-off on Home or on the live night's own screen (AC-H3.4)", () => {
-    state.night = { id: "n2", status: "voting", winner: null };
-    state.pathname = "/";
-    render(
-      <GuestShell screen="home" handoff="none">
-        x
-      </GuestShell>,
-    );
-    expect(q("live-handoff")).toBeNull();
+  it("shows no toast for a night this tab has already shown", () => {
+    state.night = { id: "n2", status: "voting", winner: null, title: null };
+    render(<GuestShell screen="me">x</GuestShell>);
+    expect(q("night-toast")).toBeNull();
+    expect(q("live-dot")).not.toBeNull();
+  });
+
+  it("never shows the toast on the live night's own screens", () => {
+    state.night = { id: "n2", status: "voting", winner: null, title: null };
+    state.isNew = true;
     state.pathname = "/s/n2";
     render(<GuestShell screen="almost-ready">x</GuestShell>);
-    expect(q("live-handoff")).toBeNull();
+    expect(q("night-toast")).toBeNull();
   });
 
   it("hides the nav on the ballot (AC-H0.2)", () => {
     state.pathname = "/s/n2";
     render(
-      <GuestShell screen="ballot" hideNav handoff="none">
+      <GuestShell screen="ballot" hideNav>
         x
       </GuestShell>,
     );

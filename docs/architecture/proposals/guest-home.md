@@ -40,11 +40,12 @@ This proposal gives a signed-in phone three places, joined by a light bottom nav
 3. **Me** (`/me`): my picture and name, my stats, change my PIN, and **Switch person** (the existing
    switch sheet, PIN on every switch).
 
-Every past-night screen, including **That's a wrap**, gets the nav and a **live hand-off card**:
-when another night is running, the card says so and its **Go to tonight's movie night** button
-becomes the screen's one primary action. On That's a wrap and a past night's recap, the card also
-counts down: if the guest doesn't tap it or **Stay here**, the phone moves to the new night after
-60 s (paused while a photo uploads or a dialog is open). No screen in the signed-in app can strand
+Every past-night screen, including **That's a wrap**, gets the nav. When a new night starts,
+every signed-in screen shows a **new-night toast** above the nav (issue #70): "Movie night
+started", **Join**, and a countdown that moves the phone there after 60 s unless the guest taps
+**Stay here** (paused while a photo uploads or a dialog is open). It follows the phone from screen
+to screen until it is answered. That's a wrap and the recap also keep a small **Go to tonight's
+movie night** link. No screen in the signed-in app can strand
 the phone again.
 
 The phone still jumps straight into the night at the moments it always did (after joining, after
@@ -131,15 +132,17 @@ decisions live in `src/lib/home.ts` as pure functions, so they're unit-tested in
    replaces itself with `/s/{id}`. Any other status, or a person who already voted, stays on Home.
    Tapping **Home** in the nav or a back link is never a cold open, so the phone stays put
    (AC-H2.3). Guest-flow §6's 12 s returning-phone path is unchanged.
-3. **Past-night screens auto-move after 60 s** (owner decision, §11.2). On That's a wrap (H3w) and
-   the recap (H3r), when the household has a live night that isn't this one, the hand-off card shows
-   a countdown, `copy.h.handoff.countdown` ("Taking you there in 60s"), and a `secondary`
-   **Stay here** button. At 0 the phone navigates to `/s/{id}` (`router.push`, so Back returns to
-   the past night). The full rules are in §5 H0h; in short, the countdown **pauses** while a photo
-   upload is in progress, a `<dialog>` is open, or the page is hidden, and **Stay here** cancels it
-   for that new night in this tab. No other screen auto-moves.
-4. **Everything else updates in place.** Home never redirects away after its first mount. A new
-   night, or a status change, changes the **Tonight card** (and the hand-off card on browse screens)
+3. **A new night shows a toast that moves the phone after 60 s** (owner decision §11.2, widened
+   by issue #70 on 2026-10-18). When the household starts a night this tab hasn't shown, every
+   signed-in screen except that night's own shows the **new-night toast** (§5 H0c): "Movie night
+   started · {title}", **Join**, a countdown (`copy.h.handoff.countdown`, "Taking you there in
+   60s") and **Stay here**. The toast follows the phone from screen to screen, keeping its second.
+   At 0 the phone navigates to `/s/{id}` (`router.push`, so Back returns to where it was). The
+   countdown **pauses** while a photo upload is in progress, a `<dialog>` is open, or the page is
+   hidden, and **Stay here** dismisses it for that night in this tab. Nothing else auto-moves.
+4. **Everything else updates in place.** Home never redirects away after its first mount, except
+   through the toast's countdown (rule 3), which the guest can stop. A new
+   night, or a status change, changes the **Tonight card** (and raises the toast, rule 3)
    within the cadences in §6, with a short vibration (`navigator.vibrate(40)`, where supported) and
    an `aria-live="polite"` announcement. Inside a night (`/s/[id]`, S9→S10→S11→S12→S13), the
    existing auto-advance is unchanged: that is the night's own flow, and the guest chose it.
@@ -160,9 +163,9 @@ flowchart TD
   PAST -- yes --> WRAP["That's a wrap"]
   PAST -- no --> REC["Night recap"]
   S -- "host ends the night" --> WRAP
-  WRAP & REC & HI & ME -. "a new night starts (≤ 5 s)" .-> HAND["Live hand-off card<br/>Go to tonight's movie night"]
-  HAND -- "tap Go" --> S
-  HAND -- "60 s on That's a wrap / recap,<br/>not paused, no Stay here" --> S
+  H & WRAP & REC & HI & ME -. "a new night starts (≤ 5 s)" .-> TOAST["New-night toast<br/>Movie night started · Join"]
+  TOAST -- "tap Join" --> S
+  TOAST -- "60 s, not paused, no Stay here<br/>(follows the phone across screens)" --> S
   H -. "a new night starts (≤ 5 s)" .-> H
 ```
 
@@ -188,17 +191,17 @@ dead ends, live not refreshed). This proposal adds:
 
 1. **Two kinds of screen.** *Task screens* (Home, That's a wrap, every live-night screen) have
    exactly one primary or one announced `waiting` state, as before. *Browse screens* (History, Night
-   recap, Me, a profile, an album) have **at most one** primary, and it is the live hand-off card's
-   button when a night is running. Without a live night they have none: the nav is the way on.
+   recap, Me, a profile, an album) have **at most one** primary: on the recap, the inline live-night link when a night is
+   running; otherwise none, and the nav is the way on. The new-night toast is a notification
+   above the nav, not a primary.
 2. **The nav is never the primary.** Tabs are links styled as nav (icon + label, no cinema fill).
    The active tab has `aria-current="page"`. A live dot on **Home** (cinema colour, with
    `aria-label="Movie night is on"`) shows while a night is live; it says *something is happening*,
    not *you must act*.
-3. **The live hand-off is the same component everywhere** (`data-testid="live-handoff"`), at the
-   top of the content, under the app bar. It never covers content and has no ✕: it stays while the
-   night is live. On That's a wrap and the recap it carries the countdown and **Stay here** (rule 3
-   of §3.3); **Stay here** stops the countdown but leaves the card, so the night is still one tap
-   away.
+3. **The new-night toast is one component, mounted once** (`data-testid="night-toast"`, in
+   `GuestShell`), fixed just above the nav, never over it. It has no ✕: **Stay here** dismisses it
+   for that night, **Join** goes there, and the countdown moves the phone (§3.3 rule 3, §5 H0c).
+
 4. **The primary sits above the nav.** A sticky primary (the ballot's Done, a long recap) is placed
    at `bottom: nav height + 12px`; the last content row scrolls fully above both.
 5. **Copy says "movie night", never "session"**, and never "device", "binding" or "profile"
@@ -220,37 +223,62 @@ Copy is in §7, keyed by `copy.h.*`.
   before the household name (History ‹ Home, recap ‹ History, album ‹ the night).
 - **Bottom nav** (`nav aria-label="Main"`, `data-testid="bottom-nav"`): Home, History, Me. 56px tall
   plus `env(safe-area-inset-bottom)`. Hidden on `/j`, `/who`, the PIN sheet and the ballot.
-- **Live hand-off** (H0h): shows on every shell screen **except Home** (Home has the Tonight card)
-  and **except the live night's own screens**, whenever the household has a live night. One row:
-  the night's poster (or the clapperboard while `draft`), `copy.h.handoff.<status>` and a full-width
-  button `copy.h.handoff.go` (→ `/s/{id}`). On browse screens it is the one primary; on That's a
-  wrap it replaces the rating as the primary (H3w).
-- **Auto-move countdown** (H0c, only on That's a wrap and the recap, owner decision §11.2). When the
-  hand-off appears on one of those two screens, it adds a countdown line and a **Stay here** button
-  (`secondary`, `data-testid="handoff-stay"`) under **Go**:
-  - **Starts** at 60 s when the hand-off first renders on the screen (`data-testid="handoff-countdown"`,
-    text `copy.h.handoff.countdown` with the seconds left, `data-seconds` carrying the number for
-    tests). Each fresh mount of a wrap/recap screen starts again at 60.
-  - **Pauses** (the line reads `copy.h.handoff.paused`, the number holds) while any of these is
-    true, and resumes from the same second when none is:
-    1. a photo upload on this phone is in progress (any upload-queue job in `processing`, `queued`,
-       `uploading` or `waiting`), signalled through the `autoMoveHold` store (§6);
-    2. a `<dialog>` is open (`document.querySelector("dialog[open]")`: `ModalDialog`, the PIN and
-       switch sheets, `PhotoViewer`, `PhoneSlideshow` all use native dialogs);
-    3. the page is hidden (`document.visibilityState === "hidden"`).
-  - **At 0** it navigates with `router.push("/s/{id}")` and records the night as seen. If the
-    hand-off's night changed during the countdown (rare: two nights back to back), it restarts at 60
-    for the new one.
-  - **Stay here** cancels the countdown for **that** night in this tab (`sessionStorage["fnh.stayNight"]
-    = id`, guarded with try/catch). The card stays, with **Go** still the primary, and no countdown
-    appears again for that night on any wrap/recap screen in this tab. A different new night starts a
-    fresh countdown.
-  - **Tapping Go** navigates at once; there is no countdown on the night's own screens.
-  - **Announcements:** the countdown line is not a live region every second. A visually hidden
-    `aria-live="polite"` span announces `copy.h.handoff.countdown` at 60, 30 and 10 seconds, and
-    `copy.h.handoff.paused` once when a pause starts. `prefers-reduced-motion` drops the progress
-    ring animation, not the countdown.
-  - **Not on** Home, History, Me, a profile or an album. Those keep the plain hand-off card.
+- **New-night toast** (H0c, issue #70; it replaces the in-page live hand-off card of the first
+  build). Mounted **once** in `GuestShell` (`components/home/night-toast.tsx`), so it is on every
+  signed-in screen: Home, History, Me, a profile, an album, That's a wrap and the recap. It never
+  shows on the live night's **own** screens (`/s/{id}`, including the ballot); being on one counts
+  as having seen the night.
+  - **When:** the household's live night is *new* for this tab (`useHouseholdNight().isNew`: not
+    in `fnh.seenNight`, created under 10 minutes ago), and **Stay here** wasn't tapped for it
+    (`fnh.stayNight`). Once its countdown is running it stays up on every screen until the phone
+    joins, stays, or is moved, even if the night stops being "new" in between (`toastVisible()`).
+  - **Looks:** a compact card fixed just **above the bottom nav** (56px + the safe area + 8px; on a
+    screen without the nav, the safe area + 12px). It never covers the nav, so the tabs stay
+    usable, and `<main>` gets extra bottom padding while it shows so the last row scrolls clear of
+    it. `data-testid="night-toast"`, `data-night` = the night's id. Content: the clapperboard,
+    `copy.h.toast.started` ("Movie night started") and, when known, ` · {title}` in bold (the
+    night's title, else tonight's winner once revealed, never during voting: `toastTitle()`),
+    then the countdown line, a thin progress bar, and two buttons: **Stay here** (`secondary`,
+    `handoff-stay`) and **Join** (`default`, `toast-join`). The toast is a notification, not the
+    screen's primary, so neither button is a `primary-action`.
+  - **Join** records the night as seen and `router.push`es to `/s/{id}` at once.
+  - **While the night is a `draft`** (the host is still building the shortlist) there is nothing to
+    join, so the toast is the *setup* toast (`data-phase="setup"`): `copy.h.toast.setup` ("Movie
+    night is being set up") over `copy.h.toast.setupBody` ("We'll tell you when voting opens."),
+    and one `secondary` **OK** (`toast-hide`). No Join, no countdown, no auto-move. **OK** hides it
+    for the setup phase only (in this page load; it never writes `fnh.stayNight`). When voting
+    opens it becomes the full toast (`data-phase="started"`) with a fresh 60 s countdown, even if
+    setup outlasted the 10-minute "new" window, because this page load saw the draft. *This is the
+    #70 Join bug: the owner started a night from the portal and tapped Join on That's a wrap while
+    the night was still a draft. The phone landed on a screen with nothing to do and "didn't go".*
+  - **Countdown** (only once voting is open; `data-testid="handoff-countdown"`, text `copy.h.handoff.countdown` with the
+    seconds left, `data-seconds` for tests, `data-paused` while paused):
+    - **Starts** at 60 s when the toast first appears. It is kept outside React
+      (`useAutoMoveCountdown`'s module store), so moving between screens carries on from the same
+      second. A full page load starts again at 60.
+    - **Pauses** (the line reads `copy.h.handoff.paused`, the number holds) while any of these is
+      true, and resumes from the same second when none is:
+      1. a photo upload on this phone is in progress (any upload-queue job in `processing`,
+         `queued`, `uploading` or `waiting`), signalled through the `autoMoveHold` store (§6);
+      2. a `<dialog>` is open (`document.querySelector("dialog[open]")`: `ModalDialog`, the PIN and
+         switch sheets, `PhotoViewer`, `PhoneSlideshow` all use native dialogs);
+      3. the page is hidden (`document.visibilityState === "hidden"`).
+    - **At 0** it navigates with `router.push("/s/{id}")` and records the night as seen. If the
+      night changed during the countdown (rare: two nights back to back), it restarts at 60 for the
+      new one. Reaching the night any other way (the Tonight card, a link) ends it.
+  - **Stay here** dismisses the toast for **that** night in this tab
+    (`sessionStorage["fnh.stayNight"] = id`, guarded with try/catch); it doesn't come back on any
+    screen. A different new night brings a fresh toast.
+  - **Announcements:** a visually hidden `aria-live="polite"` span (`handoff-announce`, always
+    mounted) says "Movie night started · {title}" when the toast appears, plus
+    `copy.h.handoff.countdown` at 60, 30 and 10 seconds and `copy.h.handoff.paused` once when a
+    pause starts. The countdown line itself is not a live region, and focus never moves to the
+    toast. `prefers-reduced-motion` drops the slide-in and the progress animation, not the
+    countdown.
+- **Live-night link** (H3w, H3r): That's a wrap and the recap keep a small inline
+  **Go to tonight's movie night** link (`LiveNightLink`) under the title whenever a newer night is
+  live, so a past night still points at it after the toast is gone. Browse screens have no in-page
+  hand-off; Home's nav tab carries the live dot.
 
 ### H1 — Home (`/`, `data-screen="home"`)
 
@@ -311,7 +339,7 @@ A segmented control (`role="tablist"`, two tabs, 48px) under the title. The tab 
     until then).
   - Empty: `copy.h.empty.family`.
 - Tapping a row → `/s/{id}`, which renders That's a wrap or the recap (H3).
-- **Primary:** none, except the live hand-off.
+- **Primary:** none. A new night shows the toast (H0c).
 
 ### H3 — Past nights (`/s/[id]` when `closed`)
 
@@ -321,13 +349,13 @@ live-night poll's sibling query; see §6).
 
 #### H3w — That's a wrap (`data-screen="wrap"`, the latest night, just ended)
 
-Top to bottom: the live hand-off (when a newer night is running), the compact winner card,
+Top to bottom: the live-night link (when a newer night is running), the compact winner card,
 **How was *Movie*?** stars (`RatingPanel`), the family results (collapsed, **See all results**),
 the album with **Add photos** (`secondary`), the nav.
 
 | Situation | Primary |
 |---|---|
-| A newer night is live | The hand-off's **Go to tonight's movie night**, with the 60 s countdown and **Stay here** (H0c) |
+| A newer night is live | The inline **Go to tonight's movie night** link (the toast, H0c, carries the countdown) |
 | No live night, this person hasn't rated | The star row (as S14) |
 | No live night, rated | **Back to Home** (`copy.h.wrap.home`) |
 
@@ -340,7 +368,8 @@ A browse screen for remembering a night: the date and title as the heading, the 
 **Your night** (my picks with the winner marked, my rating as stars, editable while ratings are
 open), **The family's picks** (results, expanded), **Who came** (Here tonight row for that night,
 from `/present`), and the album grid with **See all photos** (→ `/albums/{id}`). Primary: none,
-except the live hand-off, which here carries the 60 s countdown and **Stay here** (H0c).
+except the inline **Go to tonight's movie night** link while a newer night is live (the toast, H0c,
+carries the countdown).
 
 ### H4 — Me (`/me`, `data-screen="me"`)
 
@@ -357,7 +386,7 @@ except the live hand-off, which here carries the 60 s countdown and **Stay here*
 5. **Change my PIN** (`secondary`, as built: current PIN, new PIN, again).
 6. Footer: `copy.common.hostSignIn` (text link).
 
-Primary: none, except the live hand-off. **Change picture** (G10) opens a sheet with the 8
+Primary: none (a new night shows the toast, H0c). **Change picture** (G10) opens a sheet with the 8
 `GUEST_EMOJI` plus the avatar colours; tapping saves immediately and closes the sheet. Pictures can
 be changed **any number of times** (owner decision §11.3); only the name is rename-once, so
 `copy.h.me.renameHelp` sits under **Change my name** and nothing like it sits under the picture.
@@ -374,6 +403,12 @@ Unchanged content, inside the shell with **‹** back to the night (`/s/{id}`). 
 to add photos" link goes through `/` (as guest-flow §5 S13 says).
 
 ### Live-night screens (S9–S13) changes
+
+- **S9 Almost ready (a `draft` night):** a proper waiting screen. The title stays "Almost ready",
+  with `copy.h.toast.setup` as its lede, then a card with `copy.h.t1.body` (the shortlist count,
+  `aria-live="polite"`) and "Voting opens here by itself. You can leave this screen: we'll tell
+  you." Then Here tonight and a `secondary` **Back to Home** (`draft-home`). There is no primary:
+  it is a waiting state.
 
 - S9, S11, S12, S13 render inside the shell (app bar + nav, Home with the live dot). The night's own
   `CurrentChip` stays only on S10 and S11 ("Voting as **RooDog** · Switch"), where voting is the
@@ -408,7 +443,9 @@ foregrounded) this matches the cost guest-flow already accepted for S8.
 to pause the countdown: `holdAutoMove(): () => void` (returns its release) and
 `useAutoMoveHeld(): boolean` (`useSyncExternalStore`). The upload queue (the module-level `UploadQueue` in `src/hooks/use-photo-uploads.ts`, which keeps running when `PhotoDrop` unmounts) holds it while any job is
 `processing`, `queued`, `uploading` or `waiting`, and releases when none is. The countdown hook
-(`useAutoMoveCountdown(nightId, enabled)`) ticks once a second and pauses when the store is held,
+(`useAutoMoveCountdown(nightId, enabled)`) keeps the running countdown in a module store, so the
+toast that every page's `GuestShell` mounts carries on from the same second after a navigation; it
+ticks once a second and pauses when the store is held,
 when `document.querySelector("dialog[open]")` is non-null (checked each tick; no component changes
 needed because every modal in the app is a native `<dialog>`), or when the page is hidden. The
 countdown arithmetic (`nextCountdown(state, {held, now})`) is a pure function in the same file, so
@@ -526,7 +563,7 @@ open on `closed` nights, so the recap's stars are editable; `ballots/mine` answe
 | D17 | History rows have no "mine" view; `/me` shows the nights list. | History has Mine and Family; Me keeps stats and settings and links to Mine. |
 | D18 | `RatePromptCard` appears on S8 only. | Home shows T7 or the card; Mine rows offer **Rate it**. |
 | D19 | No nav anywhere on the phone. | App bar + bottom nav on Home, History, Me, profiles, albums, past nights and S9/S11–S13. |
-| D20 | A past night never moves the phone. | That's a wrap and the recap move to a newly started night after a 60 s countdown, unless paused or cancelled with **Stay here** (H0c). |
+| D20 | A past night never moves the phone. | A newly started night shows the new-night toast on every signed-in screen, which moves the phone there after a 60 s countdown unless paused or dismissed with **Stay here** (H0c, issue #70). |
 
 Acceptance criteria superseded (any spec asserting the old behaviour changes in piece F, §10):
 
@@ -569,7 +606,9 @@ No full suite, no Playwright runs, no deploys.
    hand-off card shows at once with **Go to tonight's movie night** as the primary. If the guest
    doesn't tap it, the phone moves to the new night after 60 s, with a visible countdown ("Taking you
    there in 60s") and **Stay here**, which cancels it for that night. The countdown pauses while a
-   photo upload is in progress or a dialog is open, so nobody is moved mid-upload. Specified in §3.3
+   photo upload is in progress or a dialog is open, so nobody is moved mid-upload. *Widened on
+   2026-10-18 (issue #70): the hand-off card became a toast on every signed-in screen, with the
+   same countdown, that follows the phone until answered.* Specified in §3.3
    rule 3 and §5 H0c; AC-H3.5–3.11.
 3. **Pictures: change anytime.** The name stays rename-once. Specified in §5 H4 and G10; AC-H5.3,
    AC-H5.5.
@@ -625,31 +664,38 @@ RooDog" has RooDog current with a PIN.
 - AC-H2.6 (cold open, other statuses): `page.goto("/")` with the night in `draft`, `revealed` or
   `tonight` → `screen(home)` with the matching Tonight state (T1, T5, T6); no redirect.
 
-**Past nights and the hand-off**
+**Past nights and the new-night toast**
 - AC-H3.1 (the staging bug): on `screen(wrap)` for the latest night, create a new night through the
-  API → within 7 s `live-handoff` is visible and is the only `primary-action` ("Go to tonight's
-  movie night"); tapping it → that night's screen.
+  API → within 7 s `night-toast` is visible, and the inline live-night link is the only
+  `primary-action` ("Go to tonight's movie night"); tapping either it or the toast's **Join**
+  (`toast-join`) → that night's screen, and the toast is gone.
 - AC-H3.2: `screen(wrap)` with no live night: unrated → the star row is the primary; rated → "Back
   to Home" is the primary and goes to `screen(home)`.
 - AC-H3.3: Opening an older closed night from History → `screen(recap)` with zero `primary-action`
   (no live night), the person's picks with the winner marked, and the album link.
-- AC-H3.4: `live-handoff` appears on `history`, `me`, `recap`, `profile` and `album` whenever a night
-  is live, and never on `home` or that night's own screens.
+- AC-H3.4: with a new night, `night-toast` appears on `home`, `history`, `me`, `recap`, `profile`
+  and `album`, fixed above `bottom-nav` (its bottom edge above the nav's top; every nav tab still
+  tappable), and never on that night's own screens. There is no in-page `live-handoff` card.
 
-**Auto-move countdown (H0c).** These use Playwright's clock (`page.clock.install()` before load,
-then `page.clock.runFor()`), so no test waits 60 real seconds. "The hand-off appears" means after
-creating a new night through the API and waiting for `live-handoff` (≤ 7 s, AC-H3.1).
-- AC-H3.5 (shows): when the hand-off appears on `wrap`, `handoff-countdown` is visible with
-  `data-seconds="60"` and the text "Taking you there in 60s", and `handoff-stay` ("Stay here") is a
-  `secondary` button. **Go** is still the only `primary-action`.
+**New-night toast and countdown (H0c, issue #70).** These use Playwright's clock
+(`page.clock.install()` before load, then `page.clock.runFor()`), so no test waits 60 real
+seconds. "The toast appears" means after creating a new night through the API, **opening
+voting** on it (a draft only gets the setup toast, AC-H3.12), and waiting for
+`night-toast[data-phase=started]` (≤ 7 s, AC-H3.1).
+- AC-H3.5 (shows): the toast reads "Movie night started · {title}" (title given at creation),
+  `handoff-countdown` has `data-seconds="60"` and the text "Taking you there in 60s", and it has
+  `handoff-stay` ("Stay here", `secondary`) and `toast-join` ("Join"). Neither is a
+  `primary-action`. `handoff-announce` contains "Movie night started".
 - AC-H3.6 (moves): advancing the clock 60 s with no interaction → the URL is `/s/{new id}` and the
-  new night's screen shows (e.g. `screen(almost-ready)` for a `draft` night). Going **Back** returns
-  to `screen(wrap)` for the old night.
-- AC-H3.7 (recap too): the same as AC-H3.5–3.6 on `screen(recap)`.
-- AC-H3.8 (Stay here): tapping **Stay here** at 40 s left → `handoff-countdown` disappears,
-  `live-handoff` and **Go** remain, and advancing the clock 120 s leaves the phone on `screen(wrap)`.
-  Opening another past night (`recap`) in the same tab shows the hand-off with **no** countdown for
-  that night. Starting a second new night through the API brings a fresh countdown at 60.
+  new night's screen shows (`screen(ballot)`). Going **Back**
+  returns to the screen the phone was on, with no toast (the night is now seen).
+- AC-H3.7 (follows navigation): with the toast at 45 s on `wrap`, tap **History** then **Me** in the
+  nav → the toast is still there on each, `data-seconds` carries on from 45 (not 60), and the phone
+  moves 45 s after the toast showed, from wherever it is.
+- AC-H3.8 (Stay here): tapping **Stay here** at 40 s left → `night-toast` disappears, and advancing
+  the clock 120 s leaves the phone where it is. Going to another screen (or another past night) in
+  the same tab shows no toast for that night. Starting a second new night through the API brings a
+  fresh toast at 60.
 - AC-H3.9 (paused by an upload): start a photo upload on `screen(wrap)` (route the upload request so
   it stays pending) at 50 s left → the countdown text becomes "Paused while you finish up" and
   `data-seconds` holds at 50 while the clock advances 120 s; fulfilling the upload resumes from 50,
@@ -657,9 +703,19 @@ creating a new night through the API and waiting for `live-handoff` (≤ 7 s, AC
 - AC-H3.10 (paused by a dialog): open the switch sheet (a `<dialog>`) at 30 s left → the countdown
   holds at 30 while the clock advances 90 s; closing it resumes, and the phone moves 30 s later.
   The same holds for `PhotoViewer` (tap a photo in the album).
-- AC-H3.11 (never elsewhere): with a live night, `history`, `me`, `profile` and `album` show
-  `live-handoff` without `handoff-countdown`, and advancing the clock 120 s leaves the phone where it
-  is. `home` never auto-moves after its first mount.
+- AC-H3.11 (a night this tab has seen): after joining, being moved, or opening the night's own
+  screen, leaving it for `home`, `history` or `me` shows no toast, and the clock advancing 120 s
+  leaves the phone where it is. A cold open more than 10 minutes after the night started shows no
+  toast (the Tonight card and the live dot carry it).
+- AC-H3.12 (a draft night, the #70 Join bug): on `screen(wrap)`, create a night through the API
+  and leave it in `draft` → within 7 s `night-toast[data-phase=setup]` reads "Movie night is being
+  set up", with no `toast-join` and no `handoff-countdown`. Advancing the clock 120 s leaves the
+  phone on `wrap`. Tapping **OK** (`toast-hide`) hides it, and it stays hidden on `history`. Opening
+  voting → within 7 s `night-toast[data-phase=started]` with `toast-join` and
+  `handoff-countdown[data-seconds=60]`, and tapping **Join** → `screen(ballot)` for that night.
+- AC-H3.13 (the draft screen): opening a `draft` night's `/s/{id}` (from the Tonight card or the
+  wrap's live-night link) → `screen(almost-ready)` with "Movie night is being set up", the
+  shortlist count in `waiting`, and `draft-home` ("Back to Home") → `screen(home)`.
 
 **History**
 - AC-H4.1: `/history` opens on **Mine** (`data-tab=mine`); rows show the person's picks in rank
