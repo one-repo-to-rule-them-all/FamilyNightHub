@@ -15,9 +15,16 @@ import { linkSpent, passwordProblem } from "@/lib/password";
 /**
  * The emailed "forgot password" link (ADR-0014): it sets a new password and signs in, in one
  * step. The link is consumed only on submit, and the server checks the password before it spends
- * the link, so a rejected password can be fixed and sent again.
+ * the link, so a rejected password can be fixed and sent again. An emailed invite (issue #71) is the
+ * same link; `invited` only changes the words.
  */
-export function VerifyLink({ token }: { token: string | null }) {
+export function VerifyLink({
+  token,
+  invited = false,
+}: {
+  token: string | null;
+  invited?: boolean;
+}) {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -64,8 +71,13 @@ export function VerifyLink({ token }: { token: string | null }) {
       }}
     >
       <div className="flex flex-col gap-3">
+        {invited ? (
+          <p className="text-base text-muted-foreground">
+            You&apos;ve been invited to run family movie nights. Choose a password to finish.
+          </p>
+        ) : null}
         <Label htmlFor="new-password" className="text-base">
-          New password
+          {invited ? "Choose a password" : "New password"}
         </Label>
         <Input
           id="new-password"

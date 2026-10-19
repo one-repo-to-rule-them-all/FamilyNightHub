@@ -43,6 +43,9 @@ class Settings(BaseSettings):
 
     # --- Accounts (ADR-0014: username/email + password; the magic link resets it) ---
     MAGIC_LINK_TTL_MINUTES: int = 15
+    # An invite link (issue #71) is the same single-use link with a longer life: the invitee
+    # may not read the email for a day or two.
+    INVITE_LINK_TTL_HOURS: int = 72
     # Signed, stateless session cookie (03-backend.md "Account sessions").
     ACCOUNT_SESSION_MAX_AGE_DAYS: int = 30
     # Where the emailed link points: the frontend's /auth/callback page.
@@ -81,6 +84,11 @@ class Settings(BaseSettings):
     # Self-created guest profiles per device (every request counts).
     SELF_CREATE_LIMIT: int = 5
     SELF_CREATE_WINDOW_SECONDS: int = 3600
+    # Account invites and resends (issue #71), per inviting account and per invited email.
+    # Every request counts. Identities only, never IP, like every budget here.
+    INVITE_ACCOUNT_LIMIT: int = 10
+    INVITE_EMAIL_LIMIT: int = 3
+    INVITE_WINDOW_SECONDS: int = 3600
 
     # --- TMDB (03-backend.md "Candidates") ---
     # Server-only. Unset token = TMDB off: search answers 503 and the shortlist takes typed

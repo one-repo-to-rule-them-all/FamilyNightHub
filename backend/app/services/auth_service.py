@@ -273,6 +273,12 @@ async def verify_magic_link(token: str, new_password: str) -> SignedIn:
         if consumed is None:
             raise InvalidLink
         signed_in = SignedIn(account_id=found.account_id, household_id=found.household_id)
-        await _store_password(db, found.household_id, found.account_id, new_password, "reset")
+        # An invited account (issue #71) sets its first password here: audited as "invite".
+        had_password = await db.scalar(
+            text("SELECT password_hash IS NOT NULL FROM accounts WHERE id = :a"),
+            {"a": found.account_id},
+        )
+        via = "reset" if had_password else "invite"
+        await _store_password(db, found.household_id, found.account_id, new_password, via)
         await _audit_sign_in(db, signed_in, "magic_link")
     return signed_in

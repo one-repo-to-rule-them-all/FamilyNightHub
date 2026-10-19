@@ -14,13 +14,15 @@ import type { VotingMethod } from "@/lib/api";
 import { passwordProblem } from "@/lib/password";
 
 export type Role = "admin" | "host";
-export type GroupId = "joining" | "nights" | "streaming" | "account" | "browser";
+export type GroupId = "joining" | "nights" | "streaming" | "accounts" | "account" | "browser";
 export type Group = { id: GroupId; label: string; adminOnly: boolean };
 
 export const SETTINGS_GROUPS: readonly Group[] = [
   { id: "joining", label: "Joining", adminOnly: true },
   { id: "nights", label: "Movie nights", adminOnly: true },
   { id: "streaming", label: "Streaming", adminOnly: true },
+  // Issue #71: invite another adult as host or admin.
+  { id: "accounts", label: "Hosts & admins", adminOnly: true },
   { id: "account", label: "Your account", adminOnly: false },
   { id: "browser", label: "This browser", adminOnly: false },
 ];

@@ -279,6 +279,15 @@ secret just turns that feature off. Leaving out a required one stops the app boo
 
       It prints the fridge-QR URL (`https://fnh-web-staging.fly.dev/j/<join-slug>`). Choose
       the slug carefully: rotating it later (admin settings) means reprinting the QR.
+- [ ] 🌐 **Invite the second adult as host** ([ADR-0015](../architecture/decisions/ADR-0015-inviting-hosts-and-admins.md),
+      issue #71). After step 12's first sign-in, open **Settings → Hosts & admins → Invite a host
+      or admin…** and invite `rbaez0995@gmail.com` with the role **Host**. They get an email with
+      a link that works once for 72 hours and choose their own password from it. Nobody else
+      (not the owner, not Claude, not the CLI) sets or sees that password. The row shows
+      **Invited** until they finish, then **Active**; use **Resend invite** if the link expires.
+      The bootstrap account (`rbjengineeringservices.llc@gmail.com`) stays the family admin;
+      the platform-owner role is a separate, not-yet-approved decision
+      ([ADR-0016](../architecture/decisions/ADR-0016-platform-owner.md)).
 
 ## 12. Smoke checks on staging (🌐 on a phone)
 
@@ -313,6 +322,8 @@ secret just turns that feature off. Leaving out a required one stops the app boo
       digests** staging just ran.
 - [ ] ⌨️ Step 10's checks and step 11's bootstrap against `fnh-*`. The production QR URL is
       `https://fnh-web.fly.dev/j/<join-slug>`.
+- [ ] 🌐 Step 11's host invite again, from the **production** portal: invite
+      `rbaez0995@gmail.com` as **Host**. Staging accounts and passwords don't carry over.
 - [ ] 🌐 Uptime monitor (e.g. UptimeRobot): `https://fnh-web.fly.dev/api/health` every 5 min,
       alert on non-200.
 
