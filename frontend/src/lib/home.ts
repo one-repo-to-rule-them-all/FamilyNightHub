@@ -16,7 +16,7 @@ import { currentPerson } from "@/lib/who";
 export const HOME_COPY = {
   bar: {
     fallback: "Family Night",
-    switch: (name: string) => `Switch person (now ${name})`,
+    switch: (name: string) => `Switch person, now ${name}`,
   },
   nav: { home: "Home", history: "History", me: "Me", live: "Movie night is on" },
   home: { hi: "Hi," },
@@ -176,9 +176,18 @@ export function coldOpenTarget(input: {
 /**
  * §5 H3: a closed night is That's a wrap when it is the household's latest night, else the recap.
  * While the latest night is unknown (loading) it stays That's a wrap, which has a way Home.
+ *
+ * A night this tab already showed as the wrap stays the wrap while the newer night is still live
+ * (`shownAsWrap` + `latestLive`): Back after the auto-move, or after **Go**, returns to the screen
+ * the guest left (AC-H3.6). Once that newer night closes, the older one is a recap.
  */
-export function pastNightKind(nightId: string, latestId: string | undefined): "wrap" | "recap" {
-  return latestId === undefined || latestId === nightId ? "wrap" : "recap";
+export function pastNightKind(
+  nightId: string,
+  latestId: string | undefined,
+  { shownAsWrap = false, latestLive = false }: { shownAsWrap?: boolean; latestLive?: boolean } = {},
+): "wrap" | "recap" {
+  if (latestId === undefined || latestId === nightId) return "wrap";
+  return shownAsWrap && latestLive ? "wrap" : "recap";
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -203,6 +212,7 @@ export function withinNewWindow(createdAt: string, now: number): boolean {
 
 export const SEEN_NIGHT_KEY = "fnh.seenNight";
 export const STAY_NIGHT_KEY = "fnh.stayNight";
+export const WRAP_NIGHT_KEY = "fnh.wrapNight";
 
 function storage(): Storage | null {
   try {
@@ -235,6 +245,15 @@ export function readSeenNight(): string | null {
 
 export function writeSeenNight(id: string): void {
   write(SEEN_NIGHT_KEY, id);
+}
+
+/** The closed night this tab last showed as That's a wrap (`pastNightKind`'s `shownAsWrap`). */
+export function readWrapNight(): string | null {
+  return read(WRAP_NIGHT_KEY);
+}
+
+export function writeWrapNight(id: string): void {
+  write(WRAP_NIGHT_KEY, id);
 }
 
 /** The night **Stay here** was tapped for: no countdown again for it in this tab (§5 H0c). */

@@ -106,11 +106,11 @@ test.describe("phone voting", () => {
     }
     await expectNoAxeViolations(phoneB);
 
-    // History lists the night with its winner and turnout.
-    await phoneB.goto("/history");
+    // History → Family lists the night with its winner and turnout (guest-home §5 H2).
+    await phoneB.goto("/history?tab=family");
     const entry = phoneB.getByTestId("history-list").getByRole("listitem").first();
     await expect(entry.getByTestId("history-winner")).toHaveText(spirited);
-    await expect(entry.getByTestId("history-turnout")).toHaveText("3 people voted");
+    await expect(entry.getByTestId("history-turnout")).toHaveText("3 voted");
     await expectNoAxeViolations(phoneB);
 
     await phoneB.context().close();

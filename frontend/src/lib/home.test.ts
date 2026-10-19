@@ -15,6 +15,7 @@ import {
   pastNightKind,
   readSeenNight,
   readStayNight,
+  readWrapNight,
   stillToVote,
   toastTitle,
   toastVisible,
@@ -22,6 +23,7 @@ import {
   withinNewWindow,
   writeSeenNight,
   writeStayNight,
+  writeWrapNight,
 } from "./home";
 
 function tile(overrides: Partial<PersonTile> = {}): PersonTile {
@@ -147,6 +149,12 @@ describe("pastNightKind (§5 H3)", () => {
     expect(pastNightKind("n1", undefined)).toBe("wrap");
     expect(pastNightKind("n1", "n2")).toBe("recap");
   });
+
+  it("stays the wrap this tab showed while the newer night is live (AC-H3.6 Back)", () => {
+    expect(pastNightKind("n1", "n2", { shownAsWrap: true, latestLive: true })).toBe("wrap");
+    expect(pastNightKind("n1", "n2", { shownAsWrap: true, latestLive: false })).toBe("recap");
+    expect(pastNightKind("n1", "n2", { shownAsWrap: false, latestLive: true })).toBe("recap");
+  });
 });
 
 describe("what's new (§3.4)", () => {
@@ -185,6 +193,10 @@ describe("tab memory (sessionStorage)", () => {
     expect(store.get("fnh.stayNight")).toBe("n2");
     expect(readSeenNight()).toBe("n1");
     expect(readStayNight()).toBe("n2");
+    expect(readWrapNight()).toBeNull();
+    writeWrapNight("n3");
+    expect(store.get("fnh.wrapNight")).toBe("n3");
+    expect(readWrapNight()).toBe("n3");
   });
 
   it("does nothing on the server", () => {
@@ -278,7 +290,7 @@ describe("the shell (§5 H0)", () => {
   });
 
   it("has the copy deck's parametrised strings", () => {
-    expect(HOME_COPY.bar.switch("RooDog")).toBe("Switch person (now RooDog)");
+    expect(HOME_COPY.bar.switch("RooDog")).toBe("Switch person, now RooDog");
     expect(HOME_COPY.t1.body(3)).toBe("The host is picking movies (3 so far).");
     expect(HOME_COPY.badge.rated(4)).toBe("You rated ★4");
     expect(HOME_COPY.me.shared("Bea, Cy")).toBe("Also on this phone: Bea, Cy");

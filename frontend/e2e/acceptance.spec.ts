@@ -251,7 +251,10 @@ test.describe("Phase 1 acceptance", () => {
 
     // Two phones add photos as their current person: phone A as Mia (the GPS JPEG), phone B as
     // Leo (the GPS HEIC).
-    await expect(phoneA.getByTestId("voting-as")).toHaveText("Mia");
+    // (On `tonight` the app bar's person button says who the phone is acting as, guest-home §5.)
+    await expect(phoneA.getByTestId("app-bar-person")).toHaveAccessibleName(
+      "Switch person, now Mia",
+    );
     await addPhotos(phoneA, [JPEG_FIXTURE]);
     await addPhotos(phoneB, [HEIC_FIXTURE]);
 
@@ -317,11 +320,12 @@ test.describe("Phase 1 acceptance", () => {
     expect(answers.length).toBeGreaterThan(0);
     expect(answers.filter((answer) => PRESIGNED.test(answer))).toEqual([]);
 
-    // --- History lists the night with its winner and turnout.
-    await phoneD.goto("/history");
+    // --- History → Family lists the night with its winner and turnout (guest-home §5 H2: `/history`
+    // opens on Mine, which has no turnout; Family's copy is "{n} voted").
+    await phoneD.goto("/history?tab=family");
     const entry = phoneD.getByTestId("history-list").getByRole("listitem").first();
     await expect(entry.getByTestId("history-winner")).toHaveText(SPIRITED);
-    await expect(entry.getByTestId("history-turnout")).toHaveText(`${EVERYONE} people voted`);
+    await expect(entry.getByTestId("history-turnout")).toHaveText(`${EVERYONE} voted`);
     await expectNoAxeViolations(phoneD);
 
     for (const context of contexts) await context.close();

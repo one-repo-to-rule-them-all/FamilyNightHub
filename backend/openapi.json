@@ -5717,7 +5717,7 @@
     },
     "/api/v1/sessions/{session_id}/close": {
       "post": {
-        "description": "tonight -> closed: the night code stops joining. Idempotent.",
+        "description": "revealed/tonight -> closed: the night code stops joining. Idempotent.",
         "operationId": "close_night_api_v1_sessions__session_id__close_post",
         "parameters": [
           {

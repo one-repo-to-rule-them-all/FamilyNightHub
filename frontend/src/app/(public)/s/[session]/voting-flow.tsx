@@ -238,10 +238,14 @@ function BallotForm({
       ranks: readBallotDraft(night.id, personId) ?? savedRanks,
     }),
   );
-  // Every change is kept for this tab, so ‹ Home and back restores it (cleared once saved).
+  // Every change is kept for this tab, so ‹ Home and back restores it (cleared once saved). Only
+  // a ballot that differs from the saved picks is a draft: an untouched one written on mount would
+  // later "differ" from a vote cast on another phone and reopen an empty ballot over it.
   useEffect(() => {
-    writeBallotDraft(night.id, personId, toRanks(ballot));
-  }, [ballot, night.id, personId]);
+    const ranks = toRanks(ballot);
+    if (draftDiffers(ranks, savedRanks)) writeBallotDraft(night.id, personId, ranks);
+    else clearBallotDraft(night.id, personId);
+  }, [ballot, night.id, personId, savedRanks]);
   const options = [...night.options].sort((a, b) => a.position - b.position);
   const prompt = ballotPrompt(ballot);
 

@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Check, Trophy } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { GuestShell } from "@/components/home/guest-shell";
 import { LiveNightLink } from "@/components/home/live-night-link";
@@ -23,7 +23,7 @@ import {
   type PersonTile,
 } from "@/lib/api";
 import { hereTonight } from "@/lib/here-tonight";
-import { HOME_COPY, pastNightKind } from "@/lib/home";
+import { HOME_COPY, pastNightKind, readWrapNight, writeWrapNight } from "@/lib/home";
 import type { LiveState } from "@/lib/live";
 import { cn } from "@/lib/utils";
 
@@ -51,13 +51,27 @@ export function wrapPrimary(input: {
 }
 
 /**
+ * Whether `personId` has rated, from `GET /sessions/{id}/ratings/mine`. That lists every person
+ * this phone holds, with `score: null` until they rate, so a row alone doesn't mean rated.
+ * `undefined` while the ratings are loading.
+ */
+export function hasRated(
+  ratings: readonly Pick<OwnRating, "person_id" | "score">[] | undefined,
+  personId: string,
+): boolean | undefined {
+  if (!ratings) return undefined;
+  return ratings.some((r) => r.person_id === personId && r.score !== null);
+}
+
+/**
  * A closed night (guest-home §5 H3): That's a wrap for the household's latest night, the recap for
  * an older one (`pastNightKind`). Both sit in the shell, whose new-night toast carries the 60 s
  * auto-move (H0c, issue #70); here a newer live night only adds the small `LiveNightLink`.
  *
  * The kind is settled once the latest night is known and then kept for this visit: when a new
  * night starts, the 30 s latest-night poll would otherwise turn That's a wrap into the recap under
- * the guest.
+ * the guest. A wrap is remembered for the tab, so coming Back to it while the newer night is live
+ * is still the wrap (AC-H3.6), not the recap.
  */
 export function PastNight(props: {
   night: Night;
@@ -66,12 +80,20 @@ export function PastNight(props: {
   current: PersonTile;
 }) {
   const latest = useLatestNight(true);
-  const latestId = latest.data?.[0]?.id;
+  const newest = latest.data?.[0];
   const [settled, setSettled] = useState<"wrap" | "recap" | null>(null);
   if (settled === null && latest.data !== undefined) {
-    setSettled(pastNightKind(props.night.id, latestId));
+    setSettled(
+      pastNightKind(props.night.id, newest?.id, {
+        shownAsWrap: readWrapNight() === props.night.id,
+        latestLive: newest !== undefined && newest.status !== "closed",
+      }),
+    );
   }
-  const kind = settled ?? pastNightKind(props.night.id, latestId);
+  const kind = settled ?? pastNightKind(props.night.id, newest?.id);
+  useEffect(() => {
+    if (settled === "wrap") writeWrapNight(props.night.id);
+  }, [settled, props.night.id]);
 
   return (
     <GuestShell screen={kind} back={HISTORY_BACK}>
@@ -94,7 +116,7 @@ function ThatsAWrap({
     queryKey: myRatingsKey(night.id),
     queryFn: () => api.myRatings(night.id),
   });
-  const rated = ratings.data ? ratings.data.some((r) => r.person_id === current.id) : undefined;
+  const rated = hasRated(ratings.data, current.id);
   const primary = wrapPrimary({ liveNight: liveNight !== undefined, rated });
 
   return (

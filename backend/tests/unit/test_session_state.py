@@ -20,6 +20,7 @@ NOW = datetime(2026, 10, 15, 20, 0, tzinfo=UTC)
         ("voting", "close_voting", "revealed"),
         ("revealed", "settle", "tonight"),
         ("tonight", "close", "closed"),
+        ("revealed", "close", "closed"),
     ],
 )
 def test_the_happy_path(status: str, action: ss.Action, expected: str) -> None:
@@ -181,12 +182,20 @@ def test_close_voting_is_idempotent() -> None:
         ss.close_voting("draft")
 
 
-def test_close_night_from_tonight_only() -> None:
+def test_close_night_from_revealed_or_tonight() -> None:
     assert ss.close_night("tonight") == "closed"
     assert ss.close_night("closed") is None
-    for status in ("draft", "voting", "revealed"):
+    for status in ("draft", "voting"):
         with pytest.raises(SessionRuleError):
             ss.close_night(status)
+
+
+def test_a_fresh_reveal_ends_in_one_tap() -> None:
+    """Issue #69: End the night right after the reveal, before the lazy settle, used to be
+    refused ("Cannot close while revealed") and only a later tap worked."""
+    just_revealed = NOW - ss.REVEAL_SETTLE / 2
+    assert ss.settle("revealed", just_revealed, NOW) is None  # nothing settles it first
+    assert ss.close_night("revealed") == "closed"
 
 
 @pytest.mark.parametrize("status", ["tonight", "closed"])

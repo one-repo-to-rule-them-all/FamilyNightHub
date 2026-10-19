@@ -109,6 +109,7 @@ export function UpNextCard({
             </Link>
             {tvButton(state.nightId)}
           </div>
+          <OneAtATime />
         </>
       ) : state.kind === "voting" ? (
         <Voting nightId={state.nightId} title={current?.title ?? null} />
@@ -122,6 +123,15 @@ export function UpNextCard({
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">{children}</p>
+  );
+}
+
+/** While a night is open there is no Start button: say how to get to the next one (issue #69). */
+function OneAtATime() {
+  return (
+    <p className="text-sm text-muted-foreground" data-testid="finish-first">
+      One night at a time: finish this one to start the next.
+    </p>
   );
 }
 
@@ -238,6 +248,7 @@ function Voting({ nightId, title }: { nightId: string; title: string | null }) {
       >
         See votes
       </Link>
+      <OneAtATime />
     </>
   );
 }
@@ -271,6 +282,10 @@ function Tonight({ night }: { night: NightSummary }) {
         </h2>
         <p className="text-muted-foreground">
           Picked by <strong className="text-foreground">{night.turnout}</strong> · photos are open
+        </p>
+        <p className="text-sm text-muted-foreground" data-testid="finish-first">
+          <strong className="text-foreground">Finish tonight first.</strong> End the night to start
+          a new one.
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <Button

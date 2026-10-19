@@ -420,7 +420,7 @@ async def close_voting(
     responses=EDIT,
 )
 async def close_night(session_id: uuid.UUID, account: CanRun, db: AccountDb) -> SessionOut:
-    """tonight -> closed: the night code stops joining. Idempotent."""
+    """revealed/tonight -> closed: the night code stops joining. Idempotent."""
     try:
         await session_service.close(db, account.household_id, account.account_id, session_id)
     except ServiceError as err:

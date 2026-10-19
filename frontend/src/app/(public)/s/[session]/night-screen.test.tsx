@@ -136,7 +136,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 const { NightScreen } = await import("./night-screen");
-const { wrapPrimary } = await import("./past-night");
+const { hasRated, wrapPrimary } = await import("./past-night");
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 // TanStack batches notifications on a timer; microtasks let `act` flush them without sleeping.
@@ -188,6 +188,16 @@ describe("wrapPrimary (§5 H3w)", () => {
     expect(wrapPrimary({ liveNight: false, rated: undefined })).toBeNull();
     expect(wrapPrimary({ liveNight: false, rated: false })).toBe("stars");
     expect(wrapPrimary({ liveNight: false, rated: true })).toBe("home");
+  });
+});
+
+describe("hasRated (§5 H3w)", () => {
+  it("counts a score, not the null row /ratings/mine lists for everyone the phone holds", () => {
+    expect(hasRated(undefined, "ava")).toBeUndefined();
+    expect(hasRated([], "ava")).toBe(false);
+    expect(hasRated([{ person_id: "ava", score: null }], "ava")).toBe(false);
+    expect(hasRated([{ person_id: "leo", score: 4 }], "ava")).toBe(false);
+    expect(hasRated([{ person_id: "ava", score: 5 }], "ava")).toBe(true);
   });
 });
 
@@ -263,6 +273,21 @@ describe("live-night screens in the shell (§5 S9–S13)", () => {
       { option_id: "o2", rank: 1 },
       { option_id: "o3", rank: 2 },
     ]);
+  });
+});
+
+describe("ballot drafts", () => {
+  it("an untouched ballot keeps no draft, so a vote cast on another phone shows as picks-in", async () => {
+    await show(makeNight("voting"));
+    expect(main()?.dataset.screen).toBe("ballot");
+    expect(sessionStorage.getItem(ballotDraftKey("n1", "p1"))).toBeNull();
+
+    // The same person votes on another phone; this phone re-renders with the saved picks.
+    act(() => root.unmount());
+    root = createRoot(host);
+    state.ballots = [{ person_id: "p1", ranks: [{ option_id: "o1", rank: 1 }] }];
+    await show(makeNight("voting"));
+    expect(main()?.dataset.screen).toBe("picks-in");
   });
 });
 

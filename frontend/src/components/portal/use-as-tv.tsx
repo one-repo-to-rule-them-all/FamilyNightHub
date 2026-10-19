@@ -11,9 +11,16 @@ import { ModalDialog } from "@/components/ui/modal-dialog";
 import { type ApiError, enrollDevice } from "@/lib/api";
 import { handNightCodeTo } from "@/lib/night-code-handoff";
 
-/** One named window, so a second tap reuses the TV window instead of stacking new ones. */
+/** One named tab, so a second tap reuses the TV tab instead of stacking new ones. */
 export const TV_WINDOW_NAME = "fnh-tv";
-const TV_WINDOW_FEATURES = "popup,width=1280,height=720";
+
+/**
+ * Opens the blank TV tab. No features string: any features ask the browser for a sized popup
+ * window, and the host wants an ordinary new tab they can drag to the TV (issue #69).
+ */
+export function openTvTab(open: Window["open"] = window.open.bind(window)): Window | null {
+  return open("", TV_WINDOW_NAME);
+}
 
 type Opened = { win: Window | null; sessionId: string };
 
@@ -38,9 +45,9 @@ export function sendTvWindowTo(win: Window | null, sessionId: string): string | 
 
 /**
  * ADR-0002 amendment 2026-10-18 "Open TV window": the host's laptop drives the living-room TV
- * from a second window and stays signed in in this one.
+ * from a second tab and stays signed in in this one.
  *
- * The window is opened synchronously inside the click (a popup blocker only allows that), on a
+ * The tab is opened synchronously inside the click (a popup blocker only allows that), on a
  * blank page; then this browser is enrolled as the TV with `keep_session`, and only then does the
  * window navigate to `/tv/{night}`, so the TV never flashes "not paired". The TV screens send
  * the device-only header (lib/api.ts), so that window runs on the TV device even though the
@@ -58,7 +65,7 @@ export function useTvWindow() {
 
   const open = (sessionId: string) => {
     setFallbackHref(null);
-    const win = window.open("", TV_WINDOW_NAME, TV_WINDOW_FEATURES);
+    const win = openTvTab();
     enroll.mutate({ win, sessionId });
   };
 
@@ -86,7 +93,7 @@ export function OpenTvWindowButton({ sessionId }: { sessionId: string }) {
       <ApiErrorNotice error={tv.error} />
       {tv.fallbackHref ? (
         <p className="text-sm" role="status" data-testid="tv-window-blocked">
-          Your browser blocked the new window.{" "}
+          Your browser blocked the new tab.{" "}
           <a
             href={tv.fallbackHref}
             target={TV_WINDOW_NAME}

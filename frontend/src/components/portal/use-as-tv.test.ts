@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { sendTvWindowTo, tvHref } from "./use-as-tv";
+import { openTvTab, sendTvWindowTo, TV_WINDOW_NAME, tvHref } from "./use-as-tv";
 
 /** A stand-in for the blank window `window.open` returned. */
 function fakeWindow({ closed = false } = {}) {
@@ -27,6 +27,19 @@ function withThisTab(entries: Record<string, string>) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Open TV window (ADR-0002 amendment 2026-10-18)", () => {
+  it("opens a named tab, never a sized popup window (issue #69)", () => {
+    const tab = fakeWindow();
+    const open = vi.fn(() => tab as unknown as Window);
+    expect(openTvTab(open)).toBe(tab);
+    // A third (features) argument makes browsers open a popup window instead of a tab.
+    expect(open).toHaveBeenCalledWith("", TV_WINDOW_NAME);
+    expect(open.mock.calls[0]).toHaveLength(2);
+  });
+
+  it("returns null when the popup blocker ate the tab", () => {
+    expect(openTvTab(vi.fn(() => null))).toBeNull();
+  });
+
   it("points the opened window at the night's TV screen and hands it the night code", () => {
     withThisTab({ "fnh.nightCode.n1": "ABC234" });
     const win = fakeWindow();
