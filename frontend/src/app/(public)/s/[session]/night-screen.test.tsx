@@ -203,6 +203,19 @@ describe("live-night screens in the shell (§5 S9–S13)", () => {
     expect(host.querySelector('[data-testid="current-chip"]')).toBeNull();
   });
 
+  it("a draft is a proper waiting screen: what's happening, no primary, a way Home (#70)", async () => {
+    await show(makeNight("draft"));
+    expect(main()?.dataset.screen).toBe("almost-ready");
+    expect(host.querySelector("h1")?.textContent).toBe("Almost ready");
+    expect(host.textContent).toContain("Movie night is being set up");
+    expect(host.querySelector('[data-testid="waiting"]')?.textContent).toContain(
+      "The host is picking movies",
+    );
+    expect(host.textContent).toContain("You can leave this screen");
+    expect(primaries()).toHaveLength(0);
+    expect(host.querySelector('[data-testid="draft-home"]')?.getAttribute("href")).toBe("/");
+  });
+
   it("the ballot hides the nav, links ‹ Home and keeps the chip (AC-H0.2)", async () => {
     await show(makeNight("voting"));
     expect(main()?.dataset.screen).toBe("ballot");

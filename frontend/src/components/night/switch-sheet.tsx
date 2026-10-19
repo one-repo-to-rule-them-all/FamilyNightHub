@@ -105,7 +105,7 @@ export function SwitchSheet({
               refresh();
               setStep({ kind: "reset", personId: person.id });
             }}
-            wayOut={backTo}
+            onBack={() => setStep({ kind: "list" })}
           />
         ) : (
           <ResetPendingState person={person} wayOut={backTo} />

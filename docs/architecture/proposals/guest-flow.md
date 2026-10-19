@@ -159,7 +159,8 @@ flowchart TD
   S3E -- "wrong (tries left)" --> S3E
   S3E -- "5th wrong / locked" --> S5["S5 Locked"]
   S3E -- "Forgot PIN" --> S6["S6 Asked the family admin"]
-  S5 -- "Ask the family admin" --> S6
+  S5 -- "Forgot PIN" --> S6
+  S5 -- "Back to everyone" --> S2
   S6 -- "admin approved, this phone" --> S3C
   S6 -- "admin dismissed" --> S5
   S3C -- "PIN set" --> RES
@@ -175,7 +176,7 @@ flowchart TD
   SWP -- "wrong (tries left)" --> SWP
   SWP -- "5th wrong / locked" --> S5
   SWP -- "close" --> SW
-  S5 -- "Back to {current} (switch only)" --> RES
+  S5 -- "Back to everyone (switch only: the sheet's list)" --> SW
   RES -- "N = revealed" --> S12["S12 The winner"]
   RES -- "N = tonight" --> S13["S13 Tonight: add photos"]
   RES -- "closed, not rated" --> S14["S14 How was it?"]
@@ -318,9 +319,14 @@ action** and there is no OK button. A close ✕ returns to S2.
 
 ### S5 — Locked
 - **When:** a 423, or a `locked` tile tapped.
-- **Primary:** **Ask the family admin** → `POST …/forgot-pin` → S6. Only admins can reset a PIN
-  (owner decision); hosts can't, so the copy never says "ask the host" here.
-- **Way out:** **Pick someone else**.
+- **Primary:** **Forgot PIN** (`copy.s5.button`) → `POST …/forgot-pin` → S6, with
+  `copy.s5.helper` ("We'll ask the family admin to reset it.") on the line under it and tied to it
+  with `aria-describedby`. Only admins can reset a PIN (owner decision); hosts can't, so the copy
+  never says "ask the host" here. *Changed 2026-10-18 (issue #70): the owner didn't recognise
+  "Ask the family admin to reset your PIN" as Forgot PIN.*
+- **Way out:** **‹ Back to everyone** (`copy.s5.back`, `data-testid="locked-back"`), the first
+  thing on the screen, above the person, so it is in the viewport at 360×640 without scrolling.
+  On /who it returns to S2; in the switch sheet, to the sheet's list of people.
 - Copy says what happened without blame (`copy.s5.*`) and that nothing else changes. Phones
   already set to them keep working, as ADR-0014 decides.
 
@@ -388,9 +394,10 @@ like the TV's turnout tiles. **It never shows how anyone voted.**
     current person does not change**: `copy.s3s.still` stays under the dots ("Still set to
     RooDog"). Closing the sheet returns to the switch sheet with RooDog still current, so a
     wrong PIN never leaves the phone set to nobody.
-  - **5th wrong PIN (423)** → S5 for **that** person (`copy.s5.*`, primary **Ask the family
-    admin**). Its way out is `copy.switch.backTo` ("Back to RooDog"), which returns to RooDog's
-    screen, not to S2. The previous person stays current throughout. The locked person keeps
+  - **5th wrong PIN (423)** → S5 for **that** person (`copy.s5.*`, primary **Forgot PIN**). Its
+    way out is `copy.s5.back` ("Back to everyone"), which returns to the switch sheet's list, not
+    to S2; closing the sheet returns to RooDog's screen. The previous person stays current
+    throughout. The locked person keeps
     their 🔒 tile on the sheet. Tapping it later goes straight to S5, or to S6 if a request is
     already open (G2).
   - **Per-device budget (429)** → `copy.s3.slow`. The sheet closes back to the switch sheet,
@@ -574,8 +581,10 @@ waiting screens.
 | `copy.s4.rejected` | The host said no for **{name}** on this phone. Pick who you are. |
 | `copy.common.pickElse` | Pick someone else |
 | `copy.s5.title` | **{name}** is locked |
-| `copy.s5.body` | Too many wrong PINs. Only the family admin can reset it. Phones already set to {name} still work. |
-| `copy.s5.button` | Ask the family admin to reset your PIN |
+| `copy.s5.body` | Too many wrong PINs. Phones already set to {name} still work. |
+| `copy.s5.button` | Forgot PIN |
+| `copy.s5.helper` | We'll ask the family admin to reset it. |
+| `copy.s5.back` | Back to everyone |
 | `copy.s6.title` | We asked the family admin |
 | `copy.s6.body` | The family admin will see your request. When they reset your PIN, you'll pick a new one right here. |
 | `copy.s6.dismissed` | The family admin didn't reset **{name}**'s PIN this time. Ask them in person. |
@@ -701,7 +710,8 @@ Conventions: `screen(x)` means `[data-screen="x"]` is visible. `primary` is
 - AC-0.1: On every screen below, `expectOneNextStep` passes: exactly one `primary-action`, or zero
   plus one `waiting` with an `aria-live` status, and at least one way-out control (except S0, S1,
   S10 and S13, where the way out is the primary itself).
-- AC-0.2: The primary action is inside the viewport without scrolling at 360×640.
+- AC-0.2: The primary action is inside the viewport without scrolling at 360×640. On
+  `screen(locked)` the way out (`locked-back`, "Back to everyone") is in the viewport too.
 - AC-0.3: Every button and tile has a bounding box ≥ 56px tall, and keypad keys ≥ 64px.
 
 **S0/S1 — join**
@@ -755,8 +765,11 @@ Conventions: `screen(x)` means `[data-screen="x"]` is visible. `primary` is
 - AC-4.3: **Pick someone else** → `screen(who)`, and the claim still appears in `GET /devices/claims`.
 
 **S5/S6 — locked and reset**
-- AC-5.1: `screen(locked)` primary **Ask the family admin to reset your PIN** → `POST …/forgot-pin` (202) →
-  `screen(reset-pending)` (waiting).
+- AC-5.1: `screen(locked)` primary **Forgot PIN**, with "We'll ask the family admin to reset it."
+  under it → `POST …/forgot-pin` (202) → `screen(reset-pending)` (waiting).
+- AC-5.1b: On `screen(locked)` at 360×640, **Back to everyone** (`locked-back`) and **Forgot PIN**
+  are both in the viewport without scrolling. Back to everyone → `screen(who)` on /who, or the
+  switch sheet's list in the sheet, with nothing asked.
 - AC-5.2: Reloading on `screen(reset-pending)` returns to `screen(reset-pending)`, not `locked`
   (G2).
 - AC-5.3: An admin approves through the API → within 7 s `screen(pin-create)` for that person.
@@ -783,8 +796,8 @@ Conventions: `screen(x)` means `[data-screen="x"]` is visible. `primary` is
   left and `copy.s3s.still` naming A. Closing the sheet → the switch sheet, and `GET /people` still
   reports A as `current`. The chip reads "Voting as A".
 - AC-8.5 (lock during switch): the 5th wrong PIN for B → `screen(locked)` for B with the primary
-  **Ask the family admin to reset your PIN** and the way out **Back to A**. Back → A's night
-  screen (not `who`), with A still `current`. B's tile on the switch sheet shows "Locked", and
+  **Forgot PIN** and the way out **Back to everyone** at the top. Back → the switch sheet's list
+  (not `who`); closing the sheet → A's night screen, with A still `current`. B's tile on the switch sheet shows "Locked", and
   tapping it opens `screen(locked)` with no keypad.
 - AC-8.6: a 429 per-device budget during a switch → `copy.s3.slow`, back to the switch sheet,
   and A is still `current`.

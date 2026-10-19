@@ -242,7 +242,16 @@ Copy is in §7, keyed by `copy.h.*`.
     `handoff-stay`) and **Join** (`default`, `toast-join`). The toast is a notification, not the
     screen's primary, so neither button is a `primary-action`.
   - **Join** records the night as seen and `router.push`es to `/s/{id}` at once.
-  - **Countdown** (`data-testid="handoff-countdown"`, text `copy.h.handoff.countdown` with the
+  - **While the night is a `draft`** (the host is still building the shortlist) there is nothing to
+    join, so the toast is the *setup* toast (`data-phase="setup"`): `copy.h.toast.setup` ("Movie
+    night is being set up") over `copy.h.toast.setupBody` ("We'll tell you when voting opens."),
+    and one `secondary` **OK** (`toast-hide`). No Join, no countdown, no auto-move. **OK** hides it
+    for the setup phase only (in this page load; it never writes `fnh.stayNight`). When voting
+    opens it becomes the full toast (`data-phase="started"`) with a fresh 60 s countdown, even if
+    setup outlasted the 10-minute "new" window, because this page load saw the draft. *This is the
+    #70 Join bug: the owner started a night from the portal and tapped Join on That's a wrap while
+    the night was still a draft. The phone landed on a screen with nothing to do and "didn't go".*
+  - **Countdown** (only once voting is open; `data-testid="handoff-countdown"`, text `copy.h.handoff.countdown` with the
     seconds left, `data-seconds` for tests, `data-paused` while paused):
     - **Starts** at 60 s when the toast first appears. It is kept outside React
       (`useAutoMoveCountdown`'s module store), so moving between screens carries on from the same
@@ -394,6 +403,12 @@ Unchanged content, inside the shell with **‹** back to the night (`/s/{id}`). 
 to add photos" link goes through `/` (as guest-flow §5 S13 says).
 
 ### Live-night screens (S9–S13) changes
+
+- **S9 Almost ready (a `draft` night):** a proper waiting screen. The title stays "Almost ready",
+  with `copy.h.toast.setup` as its lede, then a card with `copy.h.t1.body` (the shortlist count,
+  `aria-live="polite"`) and "Voting opens here by itself. You can leave this screen: we'll tell
+  you." Then Here tonight and a `secondary` **Back to Home** (`draft-home`). There is no primary:
+  it is a waiting state.
 
 - S9, S11, S12, S13 render inside the shell (app bar + nav, Home with the live dot). The night's own
   `CurrentChip` stays only on S10 and S11 ("Voting as **RooDog** · Switch"), where voting is the
@@ -664,14 +679,15 @@ RooDog" has RooDog current with a PIN.
 
 **New-night toast and countdown (H0c, issue #70).** These use Playwright's clock
 (`page.clock.install()` before load, then `page.clock.runFor()`), so no test waits 60 real
-seconds. "The toast appears" means after creating a new night through the API and waiting for
-`night-toast` (≤ 7 s, AC-H3.1).
+seconds. "The toast appears" means after creating a new night through the API, **opening
+voting** on it (a draft only gets the setup toast, AC-H3.12), and waiting for
+`night-toast[data-phase=started]` (≤ 7 s, AC-H3.1).
 - AC-H3.5 (shows): the toast reads "Movie night started · {title}" (title given at creation),
   `handoff-countdown` has `data-seconds="60"` and the text "Taking you there in 60s", and it has
   `handoff-stay` ("Stay here", `secondary`) and `toast-join` ("Join"). Neither is a
   `primary-action`. `handoff-announce` contains "Movie night started".
 - AC-H3.6 (moves): advancing the clock 60 s with no interaction → the URL is `/s/{new id}` and the
-  new night's screen shows (e.g. `screen(almost-ready)` for a `draft` night). Going **Back**
+  new night's screen shows (`screen(ballot)`). Going **Back**
   returns to the screen the phone was on, with no toast (the night is now seen).
 - AC-H3.7 (follows navigation): with the toast at 45 s on `wrap`, tap **History** then **Me** in the
   nav → the toast is still there on each, `data-seconds` carries on from 45 (not 60), and the phone
@@ -691,6 +707,15 @@ seconds. "The toast appears" means after creating a new night through the API an
   screen, leaving it for `home`, `history` or `me` shows no toast, and the clock advancing 120 s
   leaves the phone where it is. A cold open more than 10 minutes after the night started shows no
   toast (the Tonight card and the live dot carry it).
+- AC-H3.12 (a draft night, the #70 Join bug): on `screen(wrap)`, create a night through the API
+  and leave it in `draft` → within 7 s `night-toast[data-phase=setup]` reads "Movie night is being
+  set up", with no `toast-join` and no `handoff-countdown`. Advancing the clock 120 s leaves the
+  phone on `wrap`. Tapping **OK** (`toast-hide`) hides it, and it stays hidden on `history`. Opening
+  voting → within 7 s `night-toast[data-phase=started]` with `toast-join` and
+  `handoff-countdown[data-seconds=60]`, and tapping **Join** → `screen(ballot)` for that night.
+- AC-H3.13 (the draft screen): opening a `draft` night's `/s/{id}` (from the Tonight card or the
+  wrap's live-night link) → `screen(almost-ready)` with "Movie night is being set up", the
+  shortlist count in `waiting`, and `draft-home` ("Back to Home") → `screen(home)`.
 
 **History**
 - AC-H4.1: `/history` opens on **Mine** (`data-tab=mine`); rows show the person's picks in rank

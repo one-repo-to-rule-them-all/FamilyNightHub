@@ -59,6 +59,9 @@ export const HOME_COPY = {
     started: "Movie night started",
     join: "Join",
     label: "New movie night",
+    setup: "Movie night is being set up",
+    setupBody: "We'll tell you when voting opens.",
+    ok: "OK",
   },
   wrap: { title: "That's a wrap", lede: "Thanks for movie night.", home: "Back to Home" },
   recap: {
