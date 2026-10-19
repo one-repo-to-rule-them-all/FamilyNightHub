@@ -427,7 +427,7 @@ Rules as guest-flow §7: second person, short sentences, no jargon, no blame; na
 | Id | Text |
 |---|---|
 | `copy.h.bar.fallback` | Family Night |
-| `copy.h.bar.switch` | Switch person (now **{name}**) |
+| `copy.h.bar.switch` | Switch person, now **{name}** (no parentheses: axe drops a parenthetical from the accessible name, which then fails label-in-name) |
 | `copy.h.nav.home` / `.history` / `.me` | Home / History / Me |
 | `copy.h.nav.live` | Movie night is on |
 | `copy.h.home.hi` | Hi, **{name}** |
