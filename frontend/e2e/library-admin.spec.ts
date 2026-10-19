@@ -93,6 +93,7 @@ test("an admin corrects a winner and /history shows it", async ({ page, context,
   );
   await expect(winnerCell).toHaveText(corrected);
 
-  await page.goto("/history");
+  // The family's list (guest-home §5 H2: `/history` opens on the phone person's own nights).
+  await page.goto("/history?tab=family");
   await expect(page.getByTestId("history-winner")).toHaveText([corrected]);
 });
