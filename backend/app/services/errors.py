@@ -81,3 +81,14 @@ class ConsentRequired(ServiceError):
 MESSAGE_CONSENT_REQUIRED = (
     "An admin needs to accept the Terms and Privacy Policy before anyone can be added."
 )
+
+
+class HouseholdDisabled(ServiceError):
+    """ADR-0016: the platform operator switched the household off. Sign-ins and joins are
+    refused (403 `household_disabled`, mapped once in app/main.py); nothing is deleted. Only
+    raised after the caller proved a credential, so it reveals nothing to a stranger."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "This household is switched off. Contact the person who runs Family Night."
+        )

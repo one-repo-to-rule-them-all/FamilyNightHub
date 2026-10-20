@@ -33,6 +33,7 @@ import {
 } from "@/lib/portal-shell";
 
 import { ConsentGate } from "./consent-gate";
+import { PlatformBanner } from "./platform-banner";
 import { PortalSidebar, PortalTabBar } from "./portal-nav";
 
 function readHiddenRaw(): string | null {
@@ -177,6 +178,9 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
         />
       ) : null}
       <div className="flex min-w-0 flex-1 flex-col">
+        {me.data?.platform_access ? (
+          <PlatformBanner householdName={me.data.household_name} />
+        ) : null}
         <header className="flex h-14 items-center justify-between gap-3 border-b border-foreground/10 px-4 md:hidden">
           <span className="truncate font-heading font-semibold">
             {me.data?.household_name ?? "Family Night"}

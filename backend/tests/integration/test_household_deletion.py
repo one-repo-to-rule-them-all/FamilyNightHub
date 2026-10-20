@@ -14,7 +14,11 @@ from sqlalchemy import text
 from app.core import hashing
 from app.core.database import household_session
 from app.core.security import CSRF_HEADER
-from app.workers.tasks import HouseholdTaskError, purge_deleted_households
+from app.workers.tasks import (
+    HouseholdTaskError,
+    purge_deleted_households,
+    remind_disabled_households,
+)
 from tests.integration.phones import Phone, add_account, phone
 from tests.integration.seed import SeededHousehold
 from tests.integration.test_auth import Outbox, outbox
@@ -154,3 +158,24 @@ async def test_a_storage_outage_keeps_the_household_for_the_next_tick(
     with pytest.raises(HouseholdTaskError):
         await purge_deleted_households({"storage": RecordingStore(fail=True)})
     assert await _households(a) == 1
+
+
+async def test_a_household_off_for_a_year_reminds_its_admins_once_a_year(
+    two_households: Pair,
+) -> None:
+    a, b = two_households
+    async with household_session(a.household_id) as db:
+        await db.execute(
+            text("UPDATE households SET disabled_at = now() - make_interval(days => 400)")
+        )
+    async with household_session(b.household_id) as db:
+        await db.execute(
+            text("UPDATE households SET disabled_at = now() - make_interval(days => 30)")
+        )
+    box = Outbox()
+    first = await remind_disabled_households({"email": box})
+    assert first["reminded"] >= 1
+    assert [m.to for m in box.sent if "still kept" in m.subject] == [a.account_email]
+    again = Outbox()
+    await remind_disabled_households({"email": again})
+    assert not [m for m in again.sent if m.to in (a.account_email, b.account_email)]

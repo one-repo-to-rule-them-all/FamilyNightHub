@@ -194,3 +194,35 @@ async def purge_if_due(db: AsyncSession, household_id: uuid.UUID, store: ObjectS
         await store.delete_objects(keys)
     await db.execute(text("DELETE FROM households WHERE id = :h"), {"h": household_id})
     return len(rows)
+
+
+REMIND_AFTER = timedelta(days=365)
+
+
+async def disabled_reminder(db: AsyncSession) -> list[Email]:
+    """ADR-0017 §4: a household switched off for a year (and not reminded in the last year)
+    reminds its admins that its data is still kept, and how to get it deleted."""
+    row = (
+        await db.execute(
+            text(
+                "SELECT name FROM households WHERE disabled_at <= :cutoff "
+                "AND (disable_reminded_at IS NULL OR disable_reminded_at <= :cutoff) FOR UPDATE"
+            ),
+            {"cutoff": datetime.now(UTC) - REMIND_AFTER},
+        )
+    ).first()
+    if row is None:
+        return []
+    await db.execute(text("UPDATE households SET disable_reminded_at = now()"))
+    return [
+        Email(
+            to=address,
+            subject=f"{row.name} is still kept on Family Night",
+            text=(
+                f"{row.name} has been switched off for over a year. Its people, nights and "
+                "photos are still kept. To have them deleted, or to get a copy first, reply to "
+                "this email."
+            ),
+        )
+        for address in await _admin_emails(db)
+    ]

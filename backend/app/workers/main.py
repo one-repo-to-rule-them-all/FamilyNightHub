@@ -39,6 +39,7 @@ from app.integrations.storage import NoopObjectStore, configured_storage
 from app.workers.tasks import (
     auto_close_stale_sessions,
     purge_deleted_households,
+    remind_disabled_households,
     sweep_orphan_uploads,
 )
 
@@ -209,6 +210,7 @@ class WorkerSettings:
         auto_close_stale_sessions,
         sweep_orphan_uploads,
         purge_deleted_households,
+        remind_disabled_households,
     ]
 
     # Minutes are staggered so the hourly jobs never share a tick. unique=True keeps a
@@ -217,6 +219,7 @@ class WorkerSettings:
         cron(auto_close_stale_sessions, minute=10, unique=True),
         cron(sweep_orphan_uploads, minute=40, unique=True),
         cron(purge_deleted_households, minute=25, unique=True),
+        cron(remind_disabled_households, hour=10, minute=5, unique=True),
     ]
     timezone = CRON_TIMEZONE
 

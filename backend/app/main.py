@@ -28,7 +28,7 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.core.redis import close_redis
-from app.services.errors import ConsentRequired
+from app.services.errors import ConsentRequired, HouseholdDisabled
 
 log = structlog.get_logger()
 
@@ -153,6 +153,13 @@ def create_app() -> FastAPI:
         # ADR-0017 §2: raised from services on every path that would store a child's data.
         rid = getattr(request.state, "request_id", None)
         return JSONResponse(status_code=409, content=_error_body("consent_required", str(exc), rid))
+
+    @app.exception_handler(HouseholdDisabled)
+    async def _disabled_handler(request: Request, exc: HouseholdDisabled) -> JSONResponse:
+        rid = getattr(request.state, "request_id", None)
+        return JSONResponse(
+            status_code=403, content=_error_body("household_disabled", str(exc), rid)
+        )
 
     @app.exception_handler(Exception)
     async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:

@@ -20,7 +20,14 @@ from app.models.movie_night import (
     Session,
     SessionAttendance,
 )
-from app.models.ops import AuditEvent, BackupRun, FailedJob, TmdbCache
+from app.models.ops import (
+    AuditEvent,
+    BackupRun,
+    FailedJob,
+    PlatformAuditEvent,
+    PlatformOperator,
+    TmdbCache,
+)
 from app.models.photos import Photo, PhotoDeletion, PhotoReaction
 
 __all__ = [
@@ -43,6 +50,8 @@ __all__ = [
     "PhotoDeletion",
     "PhotoReaction",
     "PinResetRequest",
+    "PlatformAuditEvent",
+    "PlatformOperator",
     "Rating",
     "Session",
     "SessionAttendance",

@@ -18,7 +18,7 @@ from app.core.database import AsyncSessionLocal, household_session
 from app.core.dependencies import resolve_device_token
 from app.core.security import hash_device_token, hash_night_code, new_token
 from app.domain import night_code
-from app.services import consent_service, device_idle
+from app.services import auth_service, consent_service, device_idle
 from app.services.errors import InvalidJoin
 
 
@@ -64,6 +64,7 @@ async def join(
         )
         if session_id is None:
             raise InvalidJoin
+        await auth_service.require_enabled(db)
 
         token: str | None = None
         if existing is not None and existing[1] == household_id:

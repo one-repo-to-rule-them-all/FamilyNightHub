@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted (owner decision 2026-10-19, issue #77): option A**, designed after the super user in qrMemorial's ADR-0006 (separate private repo
+**Accepted (owner decision 2026-10-19, issue #77): option A. Built 2026-10-19**, designed after the super user in qrMemorial's ADR-0006 (separate private repo
 `one-repo-to-rule-them-all/qrMemorial`,
 `docs/architecture/decisions/ADR-0006-family-admin-and-super-user-role-model.md`). Amends [ADR-0003](ADR-0003-household-scoping-app-plus-rls.md) (a third credential can
 bind the household) and [ADR-0009](ADR-0009-pre-auth-lookups-via-definer-functions.md) (one more
@@ -95,6 +95,30 @@ session, never a request parameter, exactly as ADR-0003 requires.
 10. **No migration of household data.** No household table, policy or permission changes. New:
     `platform_operators`, `platform_audit_events`, `households.disabled_at`, the `fnh_platform`
     role and one function.
+
+## As built (2026-10-19)
+
+Built as decided, with these refinements found while building; [03-backend.md](../03-backend.md)
+"Platform owner" has the detail.
+
+- **§5 is narrower.** Besides account writes, platform access can't run nights or cast proxy
+  votes (`PLATFORM_DENIED`), and can't set a password, accept the Terms or resolve a PIN reset
+  (`HouseholdAccount`). Those writes name the acting account in a household-scoped foreign key
+  (`sessions.host_account_id`, `ballot_ranks.cast_by_account_id`,
+  `pin_reset_requests.resolved_by_account_id`, `household_consents.account_id`), which an account
+  from another household can't satisfy, and consent is the family's own answer.
+- **§6 tagging is a trigger.** The API sets `app.platform_account` for a platform transaction, and
+  `audit_tag_platform` adds `"via": "platform"` to every `audit_events` row written in it. Writes
+  that have no audit row of their own (a photo reaction, say) aren't tagged; entries, exits and
+  every audited change are.
+- **The CLI writes as the owner.** `fnh_app` can only read `platform_operators`, so
+  `grant-platform` finds the account through the ADR-0009 resolver and writes over
+  `MIGRATION_DATABASE_URL`.
+- **`fnh_platform`** is created by migration 0008 when provisioning hasn't (it needs CREATEROLE,
+  which the owner has), as well as by `00-init-app-role.sql`.
+- **A disabled household** refuses password sign-in, magic-link verify and joins with 403
+  `household_disabled`, only after the credential checks out, and its accounts' existing sessions
+  stop on their next request. Devices already in keep working until they expire.
 
 ## Options considered
 

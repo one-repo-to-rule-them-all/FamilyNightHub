@@ -24,6 +24,8 @@ export type JoinResult = Schemas["JoinOut"];
 export type Account = Schemas["AccountOut"];
 export type Consent = Schemas["ConsentOut"];
 export type HouseholdDeletion = Schemas["HouseholdDeletionOut"];
+export type PlatformMe = Schemas["PlatformMeOut"];
+export type PlatformHousehold = Schemas["PlatformHouseholdOut"];
 export type Night = Schemas["SessionOut"];
 export type NightOption = Schemas["OptionOut"];
 export type NightStatus = Night["status"];
@@ -368,6 +370,31 @@ export const api = {
     request<AdminPerson>("PATCH", `/admin/people/${encodeURIComponent(personId)}`, body),
   convertToMember: (personId: string) =>
     request<AdminPerson>("POST", `/admin/people/${encodeURIComponent(personId)}/convert-to-member`),
+  /** Platform owner (ADR-0016): its own sign-in and `fnh_platform` cookie. */
+  platformLogin: (body: Schemas["PlatformLoginIn"]) =>
+    request<PlatformMe>("POST", "/platform/login", body),
+  platformLogout: () => request<void>("POST", "/platform/logout"),
+  platformMe: () => request<PlatformMe>("GET", "/platform/me"),
+  platformHouseholds: () => request<PlatformHousehold[]>("GET", "/platform/households"),
+  createHousehold: (body: Schemas["PlatformHouseholdIn"]) =>
+    request<PlatformHousehold>("POST", "/platform/households", body),
+  /** Bind the platform session to a household: the portal then acts as its admin. */
+  enterHousehold: (householdId: string) =>
+    request<PlatformMe>("POST", `/platform/households/${encodeURIComponent(householdId)}/enter`),
+  exitHousehold: () => request<PlatformMe>("POST", "/platform/exit"),
+  disableHousehold: (householdId: string, body: Schemas["PlatformDisableIn"]) =>
+    request<PlatformHousehold>(
+      "POST",
+      `/platform/households/${encodeURIComponent(householdId)}/disable`,
+      body,
+    ),
+  enableHousehold: (householdId: string) =>
+    request<PlatformHousehold>(
+      "POST",
+      `/platform/households/${encodeURIComponent(householdId)}/enable`,
+    ),
+  rotateHouseholdSlug: (householdId: string) =>
+    request<void>("POST", `/platform/households/${encodeURIComponent(householdId)}/rotate-slug`),
   /** The household's scheduled deletion, if any (ADR-0017 §4). */
   householdDeletion: () => request<HouseholdDeletion>("GET", "/admin/household/deletion"),
   /** Schedules the delete 7 days out and emails every admin. */

@@ -6,14 +6,22 @@ import time
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import household_session
-from app.core.dependencies import AccountDb, CsrfProtected, CurrentAccount
+from app.core.dependencies import (
+    AccountDb,
+    CsrfProtected,
+    CurrentAccount,
+    HouseholdAccount,
+    resolve_platform,
+)
 from app.core.rate_limit import Budget, retry_after, spend
 from app.core.security import clear_account_cookie, set_account_cookie, sign_account_session
+from app.domain.legal import PRIVACY_VERSION, TERMS_VERSION
 from app.integrations.email import EmailSender, email_sender, send_safely
 from app.schemas.identity import (
     AccountOut,
@@ -116,7 +124,7 @@ async def login(body: LoginIn, response: Response) -> AccountOut:
         429: {"description": "Too many failed password checks for this account"},
     },
 )
-async def set_password(body: PasswordIn, account: CurrentAccount, db: AccountDb) -> None:
+async def set_password(body: PasswordIn, account: HouseholdAccount, db: AccountDb) -> None:
     """Set a first password, or change it (the current one is required then). Other signed-in
     browsers stay signed in (stateless sessions, 03-backend.md)."""
     by_account = login_account_budget()
@@ -193,7 +201,32 @@ async def verify(body: VerifyIn, response: Response) -> AccountOut:
 
 
 @router.get("/me", response_model=AccountOut)
-async def me(account: CurrentAccount, db: AccountDb) -> AccountOut:
+async def me(request: Request, account: CurrentAccount, db: AccountDb) -> AccountOut:
+    """The signed-in account. For a platform operator inside a household (ADR-0016), the
+    operator as that household's admin, with `platform_access` set so the portal shows the
+    banner; they never see the consent screen, which is the family's to answer."""
+    if account.via_platform:
+        platform = await resolve_platform(request)
+        if platform is None:  # pragma: no cover - current_account just resolved it
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in required")
+        household = await db.scalar(text("SELECT name FROM households"))
+        household_ok = await consent_service.household_accepted(db)
+        return AccountOut(
+            id=platform.account_id,
+            email=platform.email,
+            username=None,
+            has_password=True,
+            display_name=platform.display_name,
+            role="admin",
+            household_name=household,
+            consent=ConsentOut(
+                terms_version=TERMS_VERSION,
+                privacy_version=PRIVACY_VERSION,
+                account_accepted=True,
+                household_accepted=household_ok,
+            ),
+            platform_access=True,
+        )
     return await _account_out(db, account.account_id)
 
 
@@ -203,7 +236,7 @@ async def me(account: CurrentAccount, db: AccountDb) -> AccountOut:
     dependencies=[CsrfProtected],
     responses={422: {"description": "Stale versions, or an admin without `guardian`"}},
 )
-async def consent(body: ConsentIn, account: CurrentAccount, db: AccountDb) -> ConsentOut:
+async def consent(body: ConsentIn, account: HouseholdAccount, db: AccountDb) -> ConsentOut:
     """Accept the current Terms and Privacy Policy (ADR-0017 §2). An admin's acceptance,
     with `guardian`, opens the household's consent gate."""
     try:

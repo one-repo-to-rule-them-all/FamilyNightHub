@@ -598,7 +598,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Me */
+        /**
+         * Me
+         * @description The signed-in account. For a platform operator inside a household (ADR-0016), the
+         *     operator as that household's admin, with `platform_access` set so the portal shows the
+         *     banner; they never see the consent screen, which is the family's to answer.
+         */
         get: operations["me_api_v1_auth_me_get"];
         put?: never;
         post?: never;
@@ -959,6 +964,178 @@ export interface paths {
          *     before the reveal (ADR-0006).
          */
         get: operations["person_profile_api_v1_people__person_id__profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/exit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Exit Household */
+        post: operations["exit_household_api_v1_platform_exit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/households": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Households */
+        get: operations["households_api_v1_platform_households_get"];
+        put?: never;
+        /**
+         * Create Household
+         * @description A new household and its first admin's invite (ADR-0016 §7, ADR-0017 §1).
+         */
+        post: operations["create_household_api_v1_platform_households_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/households/{household_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable
+         * @description Sign-ins and joins refused, nothing deleted; the admins are emailed the reason.
+         */
+        post: operations["disable_api_v1_platform_households__household_id__disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/households/{household_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enable */
+        post: operations["enable_api_v1_platform_households__household_id__enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/households/{household_id}/enter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enter
+         * @description Bind the platform session to this household (ADR-0016 §4). The family portal then acts
+         *     as its admin, minus account management, nights and proxy votes, until exit. Entering
+         *     another household replaces the binding; the session's clock never resets.
+         */
+        post: operations["enter_api_v1_platform_households__household_id__enter_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/households/{household_id}/rotate-slug": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Slug
+         * @description On the family's request: their printed fridge QR stops working.
+         */
+        post: operations["rotate_slug_api_v1_platform_households__household_id__rotate_slug_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login
+         * @description A separate sign-in even with a family session (ADR-0016 §2). Shares the ADR-0014 login
+         *     budgets, so the platform door is no softer than the family one.
+         */
+        post: operations["login_api_v1_platform_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_api_v1_platform_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["me_api_v1_platform_me_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1598,6 +1775,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Platform Access
+             * @default false
+             */
+            platform_access: boolean;
             /**
              * Role
              * @enum {string}
@@ -2571,6 +2753,86 @@ export interface components {
             place: number;
             /** Score */
             score: number;
+        };
+        /**
+         * PlatformDisableIn
+         * @description Why, in words the household's admins are emailed.
+         */
+        PlatformDisableIn: {
+            /** Reason */
+            reason: string;
+        };
+        /** PlatformHouseholdIn */
+        PlatformHouseholdIn: {
+            /** Admin Email */
+            admin_email: string;
+            /** Admin Name */
+            admin_name: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * PlatformHouseholdOut
+         * @description ADR-0017 §6: metadata and counts only.
+         */
+        PlatformHouseholdOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Delete After */
+            delete_after: string | null;
+            /** Devices */
+            devices: number;
+            /** Disabled At */
+            disabled_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Activity */
+            last_activity: string | null;
+            /** Name */
+            name: string;
+            /** Nights */
+            nights: number;
+            /** People */
+            people: number;
+            /** Photos */
+            photos: number;
+        };
+        /** PlatformLoginIn */
+        PlatformLoginIn: {
+            /** Password */
+            password: string;
+            /** Username Or Email */
+            username_or_email: string;
+        };
+        /**
+         * PlatformMeOut
+         * @description The operator, and the household they're inside, if any.
+         */
+        PlatformMeOut: {
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email: string;
+            /** Entered Household Id */
+            entered_household_id: string | null;
+            /** Entered Household Name */
+            entered_household_name: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
         };
         /**
          * PresenceOut
@@ -5036,6 +5298,339 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    exit_household_api_v1_platform_exit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformMeOut"];
+                };
+            };
+        };
+    };
+    households_api_v1_platform_households_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformHouseholdOut"][];
+                };
+            };
+        };
+    };
+    create_household_api_v1_platform_households_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformHouseholdIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformHouseholdOut"];
+                };
+            };
+            /** @description The admin's email already has an account */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_api_v1_platform_households__household_id__disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformDisableIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformHouseholdOut"];
+                };
+            };
+            /** @description No such household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Already off */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enable_api_v1_platform_households__household_id__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformHouseholdOut"];
+                };
+            };
+            /** @description No such household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Already on */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enter_api_v1_platform_households__household_id__enter_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformMeOut"];
+                };
+            };
+            /** @description No such household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_slug_api_v1_platform_households__household_id__rotate_slug_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_api_v1_platform_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformLoginIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformMeOut"];
+                };
+            };
+            /** @description Wrong credentials, or not a platform operator (one answer) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many failed sign-ins */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    logout_api_v1_platform_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    me_api_v1_platform_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformMeOut"];
                 };
             };
         };

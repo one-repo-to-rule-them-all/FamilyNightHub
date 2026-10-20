@@ -127,6 +127,8 @@ class AccountOut(BaseModel):
     role: Literal["admin", "host"]
     household_name: str
     consent: ConsentOut
+    # ADR-0016: true while a platform operator is inside this household (the portal's banner).
+    platform_access: bool = False
 
 
 class EnrollIn(BaseModel):

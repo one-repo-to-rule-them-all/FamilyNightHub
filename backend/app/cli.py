@@ -3,6 +3,8 @@
     python -m app.cli bootstrap --household "The Baez Family" --slug baez \\
         --email you@example.com --name "Rodolfo" [--username rodolfo]
     python -m app.cli set-password --email you@example.com [--username rodolfo]
+    python -m app.cli grant-platform --email you@example.com --by "Rodolfo, 2026-10-19"
+    python -m app.cli revoke-platform --email you@example.com
 
 `set-password` (ADR-0014) reads the password from stdin when piped, else from a hidden
 prompt (twice). Never from argv: arguments land in shell history and `ps`.
@@ -10,6 +12,11 @@ prompt (twice). Never from argv: arguments land in shell history and `ps`.
 On Fly: `fly ssh console -a fnh-api -C "python -m app.cli bootstrap ..."`. It runs as the
 app role through RLS like everything else: the new household's id is set as the GUC
 before its row is written, which is exactly what the households policy's WITH CHECK allows.
+
+`grant-platform` / `revoke-platform` (ADR-0016) are the only writers of `platform_operators`:
+the account is found through the ADR-0009 resolver as the app role, and the row is written
+over MIGRATION_DATABASE_URL as the owner, because `fnh_app` can only read that table. The API
+can never make an operator.
 """
 
 from __future__ import annotations
@@ -24,7 +31,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TextIO
 
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 
 from app.core import hashing
@@ -159,6 +166,65 @@ async def set_password(email: str, password: str, username: str | None = None) -
     return account_id
 
 
+async def _account_for(email: str) -> uuid.UUID:
+    if not EMAIL.match(email.strip()):
+        raise BootstrapError("email does not look like an email address")
+    async with AsyncSessionLocal() as session, session.begin():
+        account_id: uuid.UUID | None = await session.scalar(
+            text("SELECT account_id FROM auth_resolve_account_by_email(:e)"),
+            {"e": email.strip().lower()},
+        )
+    if account_id is None:
+        raise BootstrapError(f"no live account has the email {email!r}")
+    return account_id
+
+
+def _owner_execute(sql: str, params: dict[str, object]) -> int:
+    """One statement as the owner role, committed; returns the rows it touched."""
+    engine = create_engine(settings.MIGRATION_DATABASE_URL)
+    try:
+        with engine.begin() as conn:
+            return conn.execute(text(sql), params).rowcount
+    finally:
+        engine.dispose()
+
+
+async def grant_platform(email: str, granted_by: str) -> uuid.UUID:
+    """Make the live account with this email a platform operator (idempotent)."""
+    if not granted_by.strip():
+        raise BootstrapError("--by is required: who granted it, and when")
+    account_id = await _account_for(email)
+    await asyncio.to_thread(
+        _owner_execute,
+        "INSERT INTO platform_operators (account_id, granted_by) VALUES (:a, :b) "
+        "ON CONFLICT (account_id) DO UPDATE SET granted_by = EXCLUDED.granted_by",
+        {"a": account_id, "b": granted_by.strip()[:120]},
+    )
+    await asyncio.to_thread(
+        _owner_execute,
+        "INSERT INTO platform_audit_events (account_id, action, data) "
+        "VALUES (:a, 'platform.granted', jsonb_build_object('by', CAST(:b AS text)))",
+        {"a": account_id, "b": granted_by.strip()[:120]},
+    )
+    return account_id
+
+
+async def revoke_platform(email: str) -> uuid.UUID:
+    """Remove the operator row. Their platform session dies on its next request."""
+    account_id = await _account_for(email)
+    removed = await asyncio.to_thread(
+        _owner_execute, "DELETE FROM platform_operators WHERE account_id = :a", {"a": account_id}
+    )
+    if not removed:
+        raise BootstrapError(f"{email!r} is not a platform operator")
+    await asyncio.to_thread(
+        _owner_execute,
+        "INSERT INTO platform_audit_events (account_id, action) VALUES (:a, 'platform.revoked')",
+        {"a": account_id},
+    )
+    return account_id
+
+
 def read_password(stdin: TextIO | None = None) -> str:
     """One line from stdin when it is piped (`... set-password < file`), else a hidden
     prompt entered twice. Raises BootstrapError if the two prompts differ."""
@@ -185,9 +251,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     pw.add_argument("--email", required=True, help="the account's email")
     pw.add_argument("--username", help="also set the sign-in username")
+    grant = commands.add_parser(
+        "grant-platform", help="make an account a platform operator (ADR-0016)"
+    )
+    grant.add_argument("--email", required=True, help="the operator's account email")
+    grant.add_argument("--by", required=True, help='who granted it, e.g. "Rodolfo, 2026-10-19"')
+    revoke = commands.add_parser("revoke-platform", help="remove a platform operator")
+    revoke.add_argument("--email", required=True, help="the operator's account email")
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "grant-platform":
+            account_id = asyncio.run(grant_platform(args.email, args.by))
+            print(f"platform operator: account {account_id} ({args.email})")
+            return 0
+        if args.command == "revoke-platform":
+            account_id = asyncio.run(revoke_platform(args.email))
+            print(f"no longer a platform operator: account {account_id} ({args.email})")
+            return 0
         if args.command == "set-password":
             account_id = asyncio.run(set_password(args.email, read_password(), args.username))
             print(f"password set for account {account_id} ({args.email})")

@@ -14,6 +14,7 @@ const admin: Account = {
   display_name: "Parent",
   role: "admin",
   household_name: "The Test Family",
+  platform_access: false,
   consent: {
     terms_version: "2026-10-19",
     privacy_version: "2026-10-19",

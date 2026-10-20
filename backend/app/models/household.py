@@ -37,6 +37,10 @@ class Household(Base):
     deletion_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deletion_requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     delete_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # ADR-0016: switched off by the platform operator. Sign-ins and joins are refused; nothing
+    # is deleted. Admins are reminded yearly (ADR-0017 §4).
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    disable_reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Account(Base):
