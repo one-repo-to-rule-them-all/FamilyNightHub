@@ -12,10 +12,10 @@ mechanisms by design:
 
 The stream forwards `{type, session_id, version}` as unnamed `data:` frames (the browser's
 `onmessage` sees them all), rebuilt from those three fields only, so nothing else a
-publisher put on the channel could reach a phone. It sends a comment right after
-subscribing (so `onopen` fires and proxies flush), a heartbeat comment every 15s, and
-ends after 30 minutes so the client re-tickets. If Redis fails it sends a `degraded`
-frame and ends; clients poll the snapshot until they reconnect.
+publisher put on the channel could reach a phone. It sends a comment once Redis confirms
+the subscription (so `onopen` fires only when no hint can be missed, and proxies flush), a
+heartbeat comment every 15s, and ends after 30 minutes so the client re-tickets. If Redis
+fails it sends a `degraded` frame and ends; clients poll the snapshot until they reconnect.
 
 Disconnects must not leak the Redis subscription (phones drop streams constantly).
 Starlette either cancels the generator mid-await (ASGI < 2.4) or abandons it after a
@@ -102,6 +102,13 @@ async def event_stream(
     try:
         try:
             await pubsub.subscribe(channel)
+            # subscribe() only sends SUBSCRIBE. Until Redis confirms it, a hint published
+            # from another connection can reach no subscriber, so ": connected" (the
+            # client's "ready") waits for the confirmation (#82).
+            while True:
+                message = await pubsub.get_message(timeout=poll)
+                if message is not None and message["type"] == "subscribe":
+                    break
             yield ": connected\n\n"
             last_sent = clock()
             while (now := clock()) < deadline:
