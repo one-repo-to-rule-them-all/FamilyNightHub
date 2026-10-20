@@ -8,8 +8,10 @@ from app.api.v1 import (
     ballots,
     device_admin,
     join,
+    legal,
     people,
     photos,
+    platform,
     ratings,
     sessions,
     stream,
@@ -22,8 +24,10 @@ api_router.include_router(auth.router)
 api_router.include_router(ballots.router)
 api_router.include_router(device_admin.router)
 api_router.include_router(join.router)
+api_router.include_router(legal.router)
 api_router.include_router(people.router)
 api_router.include_router(photos.router)
+api_router.include_router(platform.router)
 api_router.include_router(ratings.router)
 api_router.include_router(sessions.router)
 api_router.include_router(stream.router)

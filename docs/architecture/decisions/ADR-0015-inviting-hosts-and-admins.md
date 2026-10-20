@@ -6,8 +6,8 @@ Accepted (owner request 2026-10-18, issue #71). Amends
 [ADR-0014](ADR-0014-passwords-and-person-pins.md) (accounts) and
 [ADR-0002](ADR-0002-device-identity-and-join-flow.md) ("sign-up is invite-only", which until
 now meant only the `bootstrap` CLI). ADR-0002 and ADR-0014 stay as accepted. The
-**platform owner** half of issue #71 is a separate, *Proposed* decision:
-[ADR-0016](ADR-0016-platform-owner.md).
+**platform owner** half of issue #71 is a separate decision,
+[ADR-0016](ADR-0016-platform-owner.md) (accepted 2026-10-19, built after ADR-0017).
 
 ## Context
 
@@ -53,7 +53,7 @@ Constraints from the owner and earlier ADRs:
 - **Uniqueness.** Email and username stay unique across households (ADR-0014: login must be
   unambiguous). An address used by any account is 409. With one household this reveals nothing;
   with several it would let one family's admin learn that an address is in use elsewhere, which is
-  one of the reasons ADR-0016 keeps multi-household behind its own decision.
+  one of the reasons multi-household waits on its own decision ([ADR-0017](ADR-0017-consent-and-multi-household.md)).
 - **Throttling.** Invites and resends are budgeted per inviting account (`INVITE_ACCOUNT_LIMIT`,
   10 per hour) and per invited address (`INVITE_EMAIL_LIMIT`, 3 per hour). Every request counts,
   since each one sends an email. A spent budget is 429 with `Retry-After` before anything is

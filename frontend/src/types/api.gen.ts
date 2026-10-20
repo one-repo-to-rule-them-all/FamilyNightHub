@@ -152,6 +152,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export
+         * @description A zip of every table (credential hashes removed) and every photo original. The rows
+         *     are read, and the export audited, before the first byte goes out; photos stream after.
+         */
+        get: operations["export_api_v1_admin_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/household/deletion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Deletion Status */
+        get: operations["deletion_status_api_v1_admin_household_deletion_get"];
+        put?: never;
+        /**
+         * Request Deletion
+         * @description Schedule the delete HOUSEHOLD_DELETE_GRACE_DAYS ahead and email every admin. A wrong
+         *     password spends the account's sign-in budget, like changing a password does.
+         */
+        post: operations["request_deletion_api_v1_admin_household_deletion_post"];
+        /** Cancel Deletion */
+        delete: operations["cancel_deletion_api_v1_admin_household_deletion_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/join-slug/rotate": {
         parameters: {
             query?: never;
@@ -388,7 +432,12 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Person
+         * @description Erase a person and everything that names them, photos included (ADR-0017 §4). Not
+         *     undoable. People merged into them go too.
+         */
+        delete: operations["delete_person_api_v1_admin_people__person_id__delete"];
         options?: never;
         head?: never;
         /**
@@ -462,6 +511,27 @@ export interface paths {
         patch: operations["update_settings_api_v1_admin_settings_patch"];
         trace?: never;
     };
+    "/api/v1/auth/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Consent
+         * @description Accept the current Terms and Privacy Policy (ADR-0017 §2). An admin's acceptance,
+         *     with `guardian`, opens the household's consent gate.
+         */
+        post: operations["consent_api_v1_auth_consent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -528,7 +598,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Me */
+        /**
+         * Me
+         * @description The signed-in account. For a platform operator inside a household (ADR-0016), the
+         *     operator as that household's admin, with `platform_access` set so the portal shows the
+         *     banner; they never see the consent screen, which is the family's to answer.
+         */
         get: operations["me_api_v1_auth_me_get"];
         put?: never;
         post?: never;
@@ -842,6 +917,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/legal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Versions */
+        get: operations["versions_api_v1_legal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/people": {
         parameters: {
             query?: never;
@@ -872,6 +964,178 @@ export interface paths {
          *     before the reveal (ADR-0006).
          */
         get: operations["person_profile_api_v1_people__person_id__profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/exit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Exit Household */
+        post: operations["exit_household_api_v1_platform_exit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/households": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Households */
+        get: operations["households_api_v1_platform_households_get"];
+        put?: never;
+        /**
+         * Create Household
+         * @description A new household and its first admin's invite (ADR-0016 §7, ADR-0017 §1).
+         */
+        post: operations["create_household_api_v1_platform_households_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/households/{household_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable
+         * @description Sign-ins and joins refused, nothing deleted; the admins are emailed the reason.
+         */
+        post: operations["disable_api_v1_platform_households__household_id__disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/households/{household_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enable */
+        post: operations["enable_api_v1_platform_households__household_id__enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/households/{household_id}/enter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enter
+         * @description Bind the platform session to this household (ADR-0016 §4). The family portal then acts
+         *     as its admin, minus account management, nights and proxy votes, until exit. Entering
+         *     another household replaces the binding; the session's clock never resets.
+         */
+        post: operations["enter_api_v1_platform_households__household_id__enter_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/households/{household_id}/rotate-slug": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Slug
+         * @description On the family's request: their printed fridge QR stops working.
+         */
+        post: operations["rotate_slug_api_v1_platform_households__household_id__rotate_slug_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login
+         * @description A separate sign-in even with a family session (ADR-0016 §2). Shares the ADR-0014 login
+         *     budgets, so the platform door is no softer than the family one.
+         */
+        post: operations["login_api_v1_platform_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_api_v1_platform_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["me_api_v1_platform_me_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1497,6 +1761,7 @@ export interface components {
         };
         /** AccountOut */
         AccountOut: {
+            consent: components["schemas"]["ConsentOut"];
             /** Display Name */
             display_name: string;
             /** Email */
@@ -1510,6 +1775,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Platform Access
+             * @default false
+             */
+            platform_access: boolean;
             /**
              * Role
              * @enum {string}
@@ -1786,6 +2056,37 @@ export interface components {
              */
             requested_at: string;
         };
+        /**
+         * ConsentIn
+         * @description The versions the page showed; a stale page is 422. Admins must set `guardian`.
+         */
+        ConsentIn: {
+            /**
+             * Guardian
+             * @default false
+             */
+            guardian: boolean;
+            /** Privacy Version */
+            privacy_version: string;
+            /** Terms Version */
+            terms_version: string;
+        };
+        /**
+         * ConsentOut
+         * @description ADR-0017 §2. `account_accepted` false: show the consent screen to this account.
+         *     `household_accepted` false: new people, phones and photos are refused (409
+         *     `consent_required`) until an admin accepts.
+         */
+        ConsentOut: {
+            /** Account Accepted */
+            account_accepted: boolean;
+            /** Household Accepted */
+            household_accepted: boolean;
+            /** Privacy Version */
+            privacy_version: string;
+            /** Terms Version */
+            terms_version: string;
+        };
         /** CorrectWinnerIn */
         CorrectWinnerIn: {
             /**
@@ -1921,6 +2222,30 @@ export interface components {
             /** First Name */
             first_name: string | null;
         };
+        /**
+         * HouseholdDeletionIn
+         * @description The requesting admin's own password, and the household's name typed out.
+         */
+        HouseholdDeletionIn: {
+            /** Household Name */
+            household_name: string;
+            /** Password */
+            password: string;
+        };
+        /**
+         * HouseholdDeletionOut
+         * @description ADR-0017 §4. `delete_after` null: nothing scheduled.
+         */
+        HouseholdDeletionOut: {
+            /** Delete After */
+            delete_after: string | null;
+            /** Household Name */
+            household_name: string;
+            /** Requested At */
+            requested_at: string | null;
+            /** Requested By */
+            requested_by: string | null;
+        };
         /** JoinIn */
         JoinIn: {
             /** Device Label */
@@ -1961,6 +2286,13 @@ export interface components {
         JoinSlugOut: {
             /** Join Slug */
             join_slug: string;
+        };
+        /** LegalOut */
+        LegalOut: {
+            /** Privacy Version */
+            privacy_version: string;
+            /** Terms Version */
+            terms_version: string;
         };
         /** LoginIn */
         LoginIn: {
@@ -2174,6 +2506,23 @@ export interface components {
             is_guest: boolean;
             /** Name */
             name: string;
+        };
+        /**
+         * PersonDeletedOut
+         * @description ADR-0017 §4: what went with the person (anyone merged into them went too).
+         */
+        PersonDeletedOut: {
+            /** Ballot Ranks */
+            ballot_ranks: number;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Photos */
+            photos: number;
+            /** Ratings */
+            ratings: number;
         };
         /** PersonOut */
         PersonOut: {
@@ -2404,6 +2753,86 @@ export interface components {
             place: number;
             /** Score */
             score: number;
+        };
+        /**
+         * PlatformDisableIn
+         * @description Why, in words the household's admins are emailed.
+         */
+        PlatformDisableIn: {
+            /** Reason */
+            reason: string;
+        };
+        /** PlatformHouseholdIn */
+        PlatformHouseholdIn: {
+            /** Admin Email */
+            admin_email: string;
+            /** Admin Name */
+            admin_name: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * PlatformHouseholdOut
+         * @description ADR-0017 §6: metadata and counts only.
+         */
+        PlatformHouseholdOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Delete After */
+            delete_after: string | null;
+            /** Devices */
+            devices: number;
+            /** Disabled At */
+            disabled_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Last Activity */
+            last_activity: string | null;
+            /** Name */
+            name: string;
+            /** Nights */
+            nights: number;
+            /** People */
+            people: number;
+            /** Photos */
+            photos: number;
+        };
+        /** PlatformLoginIn */
+        PlatformLoginIn: {
+            /** Password */
+            password: string;
+            /** Username Or Email */
+            username_or_email: string;
+        };
+        /**
+         * PlatformMeOut
+         * @description The operator, and the household they're inside, if any.
+         */
+        PlatformMeOut: {
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
+            /** Display Name */
+            display_name: string;
+            /** Email */
+            email: string;
+            /** Entered Household Id */
+            entered_household_id: string | null;
+            /** Entered Household Name */
+            entered_household_name: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
         };
         /**
          * PresenceOut
@@ -3222,6 +3651,125 @@ export interface operations {
             };
         };
     };
+    export_api_v1_admin_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The export zip */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": unknown;
+                };
+            };
+        };
+    };
+    deletion_status_api_v1_admin_household_deletion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDeletionOut"];
+                };
+            };
+        };
+    };
+    request_deletion_api_v1_admin_household_deletion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HouseholdDeletionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDeletionOut"];
+                };
+            };
+            /** @description Wrong password */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Already scheduled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The typed name doesn't match */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many wrong passwords for this account */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    cancel_deletion_api_v1_admin_household_deletion_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDeletionOut"];
+                };
+            };
+            /** @description Nothing is scheduled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     rotate_join_slug_api_v1_admin_join_slug_rotate_post: {
         parameters: {
             query?: never;
@@ -3641,6 +4189,51 @@ export interface operations {
             };
         };
     };
+    delete_person_api_v1_admin_people__person_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDeletedOut"];
+                };
+            };
+            /** @description No such (unmerged) person in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage is down; nothing was deleted, try again */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     update_person_api_v1_admin_people__person_id__patch: {
         parameters: {
             query?: never;
@@ -3827,6 +4420,37 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    consent_api_v1_auth_consent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentOut"];
+                };
+            };
+            /** @description Stale versions, or an admin without `guardian` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -4600,6 +5224,26 @@ export interface operations {
             };
         };
     };
+    versions_api_v1_legal_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegalOut"];
+                };
+            };
+        };
+    };
     list_people_api_v1_people_get: {
         parameters: {
             query?: never;
@@ -4654,6 +5298,339 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    exit_household_api_v1_platform_exit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformMeOut"];
+                };
+            };
+        };
+    };
+    households_api_v1_platform_households_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformHouseholdOut"][];
+                };
+            };
+        };
+    };
+    create_household_api_v1_platform_households_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformHouseholdIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformHouseholdOut"];
+                };
+            };
+            /** @description The admin's email already has an account */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_api_v1_platform_households__household_id__disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformDisableIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformHouseholdOut"];
+                };
+            };
+            /** @description No such household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Already off */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enable_api_v1_platform_households__household_id__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformHouseholdOut"];
+                };
+            };
+            /** @description No such household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Already on */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enter_api_v1_platform_households__household_id__enter_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformMeOut"];
+                };
+            };
+            /** @description No such household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_slug_api_v1_platform_households__household_id__rotate_slug_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                household_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_api_v1_platform_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformLoginIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformMeOut"];
+                };
+            };
+            /** @description Wrong credentials, or not a platform operator (one answer) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many failed sign-ins */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    logout_api_v1_platform_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    me_api_v1_platform_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformMeOut"];
                 };
             };
         };

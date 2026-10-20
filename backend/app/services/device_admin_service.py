@@ -12,7 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_device_token, new_token
-from app.services import device_idle
+from app.services import consent_service, device_idle
 from app.services.errors import NotFound
 
 
@@ -81,6 +81,8 @@ async def enroll(
         await _audit(db, household_id, account_id, "device.enrolled", "device", existing_device_id)
         return Enrolled(existing_device_id, is_tv, None)
 
+    # ADR-0017: no new device until an admin has accepted the Terms as a guardian.
+    await consent_service.require_household_consent(db)
     token = new_token()
     device_id: uuid.UUID = (
         await db.execute(

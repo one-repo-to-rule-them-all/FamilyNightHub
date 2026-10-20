@@ -22,7 +22,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, household_session
+from app.integrations.email import EmailSender, email_sender, send_safely
 from app.integrations.storage import NoopObjectStore, ObjectStore
+from app.services import household_deletion_service
 
 log = structlog.get_logger()
 
@@ -146,6 +148,53 @@ async def sweep_orphan_uploads(ctx: dict[str, Any]) -> dict[str, int]:
     swept = await for_each_household("sweep_orphan_uploads", _sweeper(store))
     log.info("sweep_orphan_uploads_done", swept=swept)
     return {"swept": swept}
+
+
+# --------------------------------------------------------------------------- #
+# purge_deleted_households (hourly, ADR-0017 §4)
+# --------------------------------------------------------------------------- #
+
+
+def _purger(store: ObjectStore) -> HouseholdWork:
+    async def purge(session: AsyncSession, hid: uuid.UUID) -> int:
+        photos = await household_deletion_service.purge_if_due(session, hid, store)
+        if photos is None:
+            return 0
+        # Ids and counts only: the household's name is gone with it.
+        log.info("household_purged", household_id=str(hid), photos=photos)
+        return photos
+
+    return purge
+
+
+async def purge_deleted_households(ctx: dict[str, Any]) -> dict[str, int]:
+    store: ObjectStore = ctx.get("storage") or NoopObjectStore()
+    photos = await for_each_household("purge_deleted_households", _purger(store))
+    log.info("purge_deleted_households_done", photos=photos)
+    return {"photos": photos}
+
+
+# --------------------------------------------------------------------------- #
+# remind_disabled_households (daily, ADR-0017 §4)
+# --------------------------------------------------------------------------- #
+
+
+def _reminder(sender: EmailSender) -> HouseholdWork:
+    async def remind(session: AsyncSession, hid: uuid.UUID) -> int:
+        emails = await household_deletion_service.disabled_reminder(session)
+        for message in emails:
+            await send_safely(sender, message)
+        return 1 if emails else 0
+
+    return remind
+
+
+async def remind_disabled_households(ctx: dict[str, Any]) -> dict[str, int]:
+    """Sends through EMAIL_MODE: the worker needs the email secrets for these to leave."""
+    sender: EmailSender = ctx.get("email") or email_sender()
+    reminded = await for_each_household("remind_disabled_households", _reminder(sender))
+    log.info("remind_disabled_households_done", reminded=reminded)
+    return {"reminded": reminded}
 
 
 # --------------------------------------------------------------------------- #

@@ -45,6 +45,9 @@
       },
       "AccountOut": {
         "properties": {
+          "consent": {
+            "$ref": "#/components/schemas/ConsentOut"
+          },
           "display_name": {
             "title": "Display Name",
             "type": "string"
@@ -65,6 +68,11 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "platform_access": {
+            "default": false,
+            "title": "Platform Access",
+            "type": "boolean"
           },
           "role": {
             "enum": [
@@ -93,7 +101,8 @@
           "has_password",
           "display_name",
           "role",
-          "household_name"
+          "household_name",
+          "consent"
         ],
         "title": "AccountOut",
         "type": "object"
@@ -807,6 +816,61 @@
         "title": "ClaimOut",
         "type": "object"
       },
+      "ConsentIn": {
+        "description": "The versions the page showed; a stale page is 422. Admins must set `guardian`.",
+        "properties": {
+          "guardian": {
+            "default": false,
+            "title": "Guardian",
+            "type": "boolean"
+          },
+          "privacy_version": {
+            "maxLength": 32,
+            "title": "Privacy Version",
+            "type": "string"
+          },
+          "terms_version": {
+            "maxLength": 32,
+            "title": "Terms Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "terms_version",
+          "privacy_version"
+        ],
+        "title": "ConsentIn",
+        "type": "object"
+      },
+      "ConsentOut": {
+        "description": "ADR-0017 \u00a72. `account_accepted` false: show the consent screen to this account.\n`household_accepted` false: new people, phones and photos are refused (409\n`consent_required`) until an admin accepts.",
+        "properties": {
+          "account_accepted": {
+            "title": "Account Accepted",
+            "type": "boolean"
+          },
+          "household_accepted": {
+            "title": "Household Accepted",
+            "type": "boolean"
+          },
+          "privacy_version": {
+            "title": "Privacy Version",
+            "type": "string"
+          },
+          "terms_version": {
+            "title": "Terms Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "terms_version",
+          "privacy_version",
+          "account_accepted",
+          "household_accepted"
+        ],
+        "title": "ConsentOut",
+        "type": "object"
+      },
       "CorrectWinnerIn": {
         "properties": {
           "option_id": {
@@ -1163,6 +1227,81 @@
         "title": "HelpCountOut",
         "type": "object"
       },
+      "HouseholdDeletionIn": {
+        "description": "The requesting admin's own password, and the household's name typed out.",
+        "properties": {
+          "household_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Household Name",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password",
+          "household_name"
+        ],
+        "title": "HouseholdDeletionIn",
+        "type": "object"
+      },
+      "HouseholdDeletionOut": {
+        "description": "ADR-0017 \u00a74. `delete_after` null: nothing scheduled.",
+        "properties": {
+          "delete_after": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delete After"
+          },
+          "household_name": {
+            "title": "Household Name",
+            "type": "string"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By"
+          }
+        },
+        "required": [
+          "household_name",
+          "requested_at",
+          "requested_by",
+          "delete_after"
+        ],
+        "title": "HouseholdDeletionOut",
+        "type": "object"
+      },
       "JoinIn": {
         "properties": {
           "device_label": {
@@ -1252,6 +1391,24 @@
           "join_slug"
         ],
         "title": "JoinSlugOut",
+        "type": "object"
+      },
+      "LegalOut": {
+        "properties": {
+          "privacy_version": {
+            "title": "Privacy Version",
+            "type": "string"
+          },
+          "terms_version": {
+            "title": "Terms Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "terms_version",
+          "privacy_version"
+        ],
+        "title": "LegalOut",
         "type": "object"
       },
       "LoginIn": {
@@ -1828,6 +1985,36 @@
         "title": "PersonCreateIn",
         "type": "object"
       },
+      "PersonDeletedOut": {
+        "description": "ADR-0017 \u00a74: what went with the person (anyone merged into them went too).",
+        "properties": {
+          "ballot_ranks": {
+            "title": "Ballot Ranks",
+            "type": "integer"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "photos": {
+            "title": "Photos",
+            "type": "integer"
+          },
+          "ratings": {
+            "title": "Ratings",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "person_id",
+          "photos",
+          "ballot_ranks",
+          "ratings"
+        ],
+        "title": "PersonDeletedOut",
+        "type": "object"
+      },
       "PersonOut": {
         "properties": {
           "avatar_emoji": {
@@ -2307,6 +2494,214 @@
           "first_places"
         ],
         "title": "PlacementOut",
+        "type": "object"
+      },
+      "PlatformDisableIn": {
+        "description": "Why, in words the household's admins are emailed.",
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "PlatformDisableIn",
+        "type": "object"
+      },
+      "PlatformHouseholdIn": {
+        "properties": {
+          "admin_email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Admin Email",
+            "type": "string"
+          },
+          "admin_name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Admin Name",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "admin_email",
+          "admin_name"
+        ],
+        "title": "PlatformHouseholdIn",
+        "type": "object"
+      },
+      "PlatformHouseholdOut": {
+        "description": "ADR-0017 \u00a76: metadata and counts only.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "delete_after": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delete After"
+          },
+          "devices": {
+            "title": "Devices",
+            "type": "integer"
+          },
+          "disabled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_activity": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Activity"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "nights": {
+            "title": "Nights",
+            "type": "integer"
+          },
+          "people": {
+            "title": "People",
+            "type": "integer"
+          },
+          "photos": {
+            "title": "Photos",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "disabled_at",
+          "delete_after",
+          "people",
+          "devices",
+          "nights",
+          "photos",
+          "last_activity"
+        ],
+        "title": "PlatformHouseholdOut",
+        "type": "object"
+      },
+      "PlatformLoginIn": {
+        "properties": {
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "username_or_email": {
+            "maxLength": 320,
+            "minLength": 1,
+            "title": "Username Or Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username_or_email",
+          "password"
+        ],
+        "title": "PlatformLoginIn",
+        "type": "object"
+      },
+      "PlatformMeOut": {
+        "description": "The operator, and the household they're inside, if any.",
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "entered_household_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entered Household Id"
+          },
+          "entered_household_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entered Household Name"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "email",
+          "display_name",
+          "entered_household_id",
+          "entered_household_name",
+          "expires_at"
+        ],
+        "title": "PlatformMeOut",
         "type": "object"
       },
       "PresenceOut": {
@@ -4001,6 +4396,109 @@
         ]
       }
     },
+    "/api/v1/admin/export": {
+      "get": {
+        "description": "A zip of every table (credential hashes removed) and every photo original. The rows\nare read, and the export audited, before the first byte goes out; photos stream after.",
+        "operationId": "export_api_v1_admin_export_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/zip": {}
+            },
+            "description": "The export zip"
+          }
+        },
+        "summary": "Export",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/household/deletion": {
+      "delete": {
+        "operationId": "cancel_deletion_api_v1_admin_household_deletion_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseholdDeletionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Nothing is scheduled"
+          }
+        },
+        "summary": "Cancel Deletion",
+        "tags": [
+          "admin"
+        ]
+      },
+      "get": {
+        "operationId": "deletion_status_api_v1_admin_household_deletion_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseholdDeletionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Deletion Status",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Schedule the delete HOUSEHOLD_DELETE_GRACE_DAYS ahead and email every admin. A wrong\npassword spends the account's sign-in budget, like changing a password does.",
+        "operationId": "request_deletion_api_v1_admin_household_deletion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HouseholdDeletionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseholdDeletionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Wrong password"
+          },
+          "409": {
+            "description": "Already scheduled"
+          },
+          "422": {
+            "description": "The typed name doesn't match"
+          },
+          "429": {
+            "description": "Too many wrong passwords for this account"
+          }
+        },
+        "summary": "Request Deletion",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/join-slug/rotate": {
       "post": {
         "description": "New fridge-QR slug; `/j/{old}` stops resolving immediately. Reprint the QR.",
@@ -4576,6 +5074,54 @@
       }
     },
     "/api/v1/admin/people/{person_id}": {
+      "delete": {
+        "description": "Erase a person and everything that names them, photos included (ADR-0017 \u00a74). Not\nundoable. People merged into them go too.",
+        "operationId": "delete_person_api_v1_admin_people__person_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such (unmerged) person in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage is down; nothing was deleted, try again"
+          }
+        },
+        "summary": "Delete Person",
+        "tags": [
+          "admin"
+        ]
+      },
       "patch": {
         "description": "Rename / re-avatar / recolour; fields left out are unchanged.",
         "operationId": "update_person_api_v1_admin_people__person_id__patch",
@@ -4803,6 +5349,41 @@
         ]
       }
     },
+    "/api/v1/auth/consent": {
+      "post": {
+        "description": "Accept the current Terms and Privacy Policy (ADR-0017 \u00a72). An admin's acceptance,\nwith `guardian`, opens the household's consent gate.",
+        "operationId": "consent_api_v1_auth_consent_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Stale versions, or an admin without `guardian`"
+          }
+        },
+        "summary": "Consent",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "description": "Sets the `fnh_session` cookie. Every failure looks the same: no user enumeration.\nA spent budget is refused before the password is checked.",
@@ -4912,6 +5493,7 @@
     },
     "/api/v1/auth/me": {
       "get": {
+        "description": "The signed-in account. For a platform operator inside a household (ADR-0016), the\noperator as that household's admin, with `platform_access` set so the portal shows the\nbanner; they never see the consent screen, which is the family's to answer.",
         "operationId": "me_api_v1_auth_me_get",
         "responses": {
           "200": {
@@ -5637,6 +6219,27 @@
         ]
       }
     },
+    "/api/v1/legal": {
+      "get": {
+        "operationId": "versions_api_v1_legal_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Versions",
+        "tags": [
+          "legal"
+        ]
+      }
+    },
     "/api/v1/people": {
       "get": {
         "operationId": "list_people_api_v1_people_get",
@@ -5706,6 +6309,374 @@
         "summary": "Person Profile",
         "tags": [
           "people"
+        ]
+      }
+    },
+    "/api/v1/platform/exit": {
+      "post": {
+        "operationId": "exit_household_api_v1_platform_exit_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Exit Household",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/households": {
+      "get": {
+        "operationId": "households_api_v1_platform_households_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformHouseholdOut"
+                  },
+                  "title": "Response Households Api V1 Platform Households Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Households",
+        "tags": [
+          "platform"
+        ]
+      },
+      "post": {
+        "description": "A new household and its first admin's invite (ADR-0016 \u00a77, ADR-0017 \u00a71).",
+        "operationId": "create_household_api_v1_platform_households_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformHouseholdIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformHouseholdOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "The admin's email already has an account"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Household",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/households/{household_id}/disable": {
+      "post": {
+        "description": "Sign-ins and joins refused, nothing deleted; the admins are emailed the reason.",
+        "operationId": "disable_api_v1_platform_households__household_id__disable_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Household Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformDisableIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformHouseholdOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such household"
+          },
+          "409": {
+            "description": "Already off"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disable",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/households/{household_id}/enable": {
+      "post": {
+        "operationId": "enable_api_v1_platform_households__household_id__enable_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Household Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformHouseholdOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such household"
+          },
+          "409": {
+            "description": "Already on"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enable",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/households/{household_id}/enter": {
+      "post": {
+        "description": "Bind the platform session to this household (ADR-0016 \u00a74). The family portal then acts\nas its admin, minus account management, nights and proxy votes, until exit. Entering\nanother household replaces the binding; the session's clock never resets.",
+        "operationId": "enter_api_v1_platform_households__household_id__enter_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Household Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enter",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/households/{household_id}/rotate-slug": {
+      "post": {
+        "description": "On the family's request: their printed fridge QR stops working.",
+        "operationId": "rotate_slug_api_v1_platform_households__household_id__rotate_slug_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "household_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Household Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rotate Slug",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/login": {
+      "post": {
+        "description": "A separate sign-in even with a family session (ADR-0016 \u00a72). Shares the ADR-0014 login\nbudgets, so the platform door is no softer than the family one.",
+        "operationId": "login_api_v1_platform_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformLoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Wrong credentials, or not a platform operator (one answer)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many failed sign-ins"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/logout": {
+      "post": {
+        "operationId": "logout_api_v1_platform_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/v1/platform/me": {
+      "get": {
+        "operationId": "me_api_v1_platform_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Me",
+        "tags": [
+          "platform"
         ]
       }
     },

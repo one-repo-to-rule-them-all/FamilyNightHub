@@ -1,8 +1,10 @@
-"""Admin side of people (ADR-0002, 05-data.md "Conventions"): add, edit, guests, merge.
+"""Admin side of people (ADR-0002, 05-data.md "Conventions"): add, edit, guests, merge, delete.
 
-People are never deleted. A merge repoints every row that names the source person to the
-target, in the request's one transaction, then sets `merged_into_id` on the source so it
-drops out of every list (`merged_into_id IS NULL` is the "live person" filter everywhere).
+A merge repoints every row that names the source person to the target, in the request's one
+transaction, then sets `merged_into_id` on the source so it drops out of every list
+(`merged_into_id IS NULL` is the "live person" filter everywhere). A **delete** (ADR-0017 §4)
+is the other way out: it erases the person, everyone already merged into them, and every row
+that names them, photos included (objects deleted from the bucket in the same transaction).
 
 Names are unique per household among live people, case-insensitively ("Sam" and "sam"
 are one avatar tile to a five-year-old). The check runs under a per-household advisory
@@ -20,7 +22,9 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.errors import Conflict, NotFound
+from app.integrations.storage import PhotoStorage, StorageUnavailable
+from app.services import consent_service
+from app.services.errors import Conflict, NotFound, Unavailable
 
 
 @dataclass(frozen=True)
@@ -159,6 +163,7 @@ async def create(
     color: str,
     is_guest: bool,
 ) -> Person:
+    await consent_service.require_household_consent(db)
     await lock_names(db, household_id)
     await require_unique_name(db, name)
     row = (
@@ -375,6 +380,104 @@ async def merge(
         },
     )
     return result
+
+
+@dataclass(frozen=True)
+class DeletedPerson:
+    person_id: uuid.UUID
+    photos: int
+    ballot_ranks: int
+    ratings: int
+
+
+async def delete(
+    db: AsyncSession,
+    storage: PhotoStorage | None,
+    household_id: uuid.UUID,
+    account_id: uuid.UUID,
+    person_id: uuid.UUID,
+) -> DeletedPerson:
+    """Erase a person (ADR-0017 §4): their photos (tombstoned for the backup purge, objects
+    deleted last so a storage outage rolls everything back), reactions, ballots, ratings,
+    attendance, phone bindings and PIN resets; anyone merged into them; and the names in their
+    audit rows. The audit keeps that a person was deleted and the counts, never who.
+
+    Ballots go too, so a past night's tally can change; its recorded winner doesn't."""
+    await _get_live(db, person_id, lock=True)
+    ids = [
+        r.id
+        for r in await db.execute(
+            text("SELECT id FROM people WHERE id = :p OR merged_into_id = :p ORDER BY id"),
+            {"p": person_id},
+        )
+    ]
+    params: dict[str, Any] = {"ids": ids, "h": household_id}
+    photos = (
+        await db.execute(
+            text(
+                "SELECT id, object_key, thumb_key FROM photos WHERE person_id = ANY(:ids) "
+                "ORDER BY id FOR UPDATE"
+            ),
+            params,
+        )
+    ).all()
+    if photos and storage is None:
+        raise Unavailable("Photo storage is unavailable; try again shortly")
+    for photo in photos:
+        await db.execute(
+            text(
+                "INSERT INTO photo_deletions (household_id, photo_id, object_key, thumb_key) "
+                "VALUES (:h, :p, :k, :tk)"
+            ),
+            {"h": household_id, "p": photo.id, "k": photo.object_key, "tk": photo.thumb_key},
+        )
+
+    async def erase(table: str) -> int:
+        result = await db.execute(
+            text(f"DELETE FROM {table} WHERE person_id = ANY(:ids) RETURNING id"), params
+        )
+        return len(result.all())
+
+    # Photos first: their reactions (anyone's) cascade with them.
+    photo_count = await erase("photos")
+    await erase("photo_reactions")
+    ballot_ranks = await erase("ballot_ranks")
+    ratings = await erase("ratings")
+    await erase("session_attendance")
+    await erase("device_people")
+    await erase("pin_reset_requests")
+    await db.execute(text("DELETE FROM people WHERE merged_into_id = :p"), {"p": person_id})
+    await db.execute(text("DELETE FROM people WHERE id = :p"), {"p": person_id})
+    # Names and renames live in `data`; the rows themselves stay as a record of what happened.
+    await db.execute(
+        text(
+            "UPDATE audit_events SET data = '{\"redacted\": true}'::jsonb "
+            "WHERE target_id = ANY(:ids)"
+        ),
+        params,
+    )
+    await _audit(
+        db,
+        household_id,
+        account_id,
+        "person.deleted",
+        person_id,
+        {
+            "photos": photo_count,
+            "ballot_ranks": ballot_ranks,
+            "ratings": ratings,
+            "merged": len(ids) - 1,
+        },
+    )
+    if photos and storage is not None:
+        await db.flush()
+        try:
+            for photo in photos:
+                await storage.delete(photo.object_key)
+                await storage.delete(photo.thumb_key)
+        except StorageUnavailable:
+            raise Unavailable("Photo storage is unavailable; try again shortly") from None
+    return DeletedPerson(person_id, photo_count, ballot_ranks, ratings)
 
 
 # --- PIN resets (ADR-0014) ---------------------------------------------------------

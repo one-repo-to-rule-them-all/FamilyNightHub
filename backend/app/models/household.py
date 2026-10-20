@@ -32,6 +32,15 @@ class Household(Base):
     # Rotatable (ADR-0002): rotating invalidates the printed fridge QR.
     join_slug: Mapped[str] = mapped_column(String(64), unique=True)
     created_at: Mapped[datetime] = created_at()
+    # ADR-0017 §4: an admin asked for the household to be deleted. The worker erases it (rows
+    # and bucket objects) once `delete_after` passes; until then any admin can cancel.
+    deletion_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deletion_requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    delete_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # ADR-0016: switched off by the platform operator. Sign-ins and joins are refused; nothing
+    # is deleted. Admins are reminded yearly (ADR-0017 §4).
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    disable_reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Account(Base):
@@ -171,6 +180,29 @@ class PinResetRequest(Base):
     created_at: Mapped[datetime] = created_at()
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolved_by_account_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+
+
+class HouseholdConsent(Base):
+    """ADR-0017 §2: one row per acceptance of the Terms and Privacy Policy. Append-only: a new
+    version or a correction is a new row. The household's gate is open while some admin row
+    with `guardian` names the current versions."""
+
+    __tablename__ = "household_consents"
+    __table_args__ = (
+        CheckConstraint("role IN ('admin', 'host')", name="role"),
+        scoped_fk("account_id", "accounts"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    household_id: Mapped[uuid.UUID] = household_fk()
+    account_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    # The role at acceptance: only an admin's consent opens the household's gate.
+    role: Mapped[str] = mapped_column(String(16))
+    terms_version: Mapped[str] = mapped_column(String(32))
+    privacy_version: Mapped[str] = mapped_column(String(32))
+    # "I am a parent or legal guardian of the children I add." Admins only.
+    guardian: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    accepted_at: Mapped[datetime] = created_at()
 
 
 class HouseholdSettings(Base):

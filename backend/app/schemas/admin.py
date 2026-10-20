@@ -100,6 +100,15 @@ class PinResetOut(BaseModel):
     resolved_at: datetime | None
 
 
+class PersonDeletedOut(BaseModel):
+    """ADR-0017 §4: what went with the person (anyone merged into them went too)."""
+
+    person_id: uuid.UUID
+    photos: int
+    ballot_ranks: int
+    ratings: int
+
+
 class MergeOut(BaseModel):
     """What moved. `dropped_*` rows collided with the target's own and were discarded."""
 
@@ -281,3 +290,19 @@ class AdminAccountOut(BaseModel):
     # The newest unused invite/reset link's expiry while `invited`, else null.
     invite_expires_at: datetime | None
     created_at: datetime
+
+
+class HouseholdDeletionOut(BaseModel):
+    """ADR-0017 §4. `delete_after` null: nothing scheduled."""
+
+    household_name: str
+    requested_at: datetime | None
+    requested_by: str | None
+    delete_after: datetime | None
+
+
+class HouseholdDeletionIn(BaseModel):
+    """The requesting admin's own password, and the household's name typed out."""
+
+    password: str = Field(min_length=1, max_length=256)
+    household_name: str = Field(min_length=1, max_length=120)

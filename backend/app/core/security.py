@@ -19,6 +19,7 @@ from app.core.config import settings
 
 DEVICE_COOKIE = "fnh_device"
 ACCOUNT_COOKIE = "fnh_session"
+PLATFORM_COOKIE = "fnh_platform"
 CSRF_COOKIE = "fnh_csrf"
 CSRF_HEADER = "X-FNH-CSRF"
 # Sent by the TV screens (ADR-0002 amendment 2026-10-18): this request runs on the device
@@ -113,6 +114,74 @@ def set_account_cookie(response: Response, value: str) -> None:
 
 def clear_account_cookie(response: Response) -> None:
     response.delete_cookie(ACCOUNT_COOKIE, path="/", secure=True, httponly=True, samesite="lax")
+
+
+# --- Platform sessions (ADR-0016) ---------------------------------------------------
+#
+# `{account_id}.{home_household_id}.{entered_household_id or "-"}.{issued_at}`, HMAC-SHA256
+# under PLATFORM_SESSION_SECRET with its own prefix, so an account cookie can never pass as
+# one. `home` is the operator's own household, needed to re-read their account under RLS.
+# Entering a household re-signs with the same `issued_at`: the session never outlives
+# PLATFORM_SESSION_HOURS from sign-in.
+
+
+@dataclass(frozen=True)
+class PlatformClaims:
+    account_id: uuid.UUID
+    home_household_id: uuid.UUID
+    entered_household_id: uuid.UUID | None
+    issued_at: int
+
+
+def _platform_mac(payload: str) -> str:
+    return hmac.new(
+        settings.PLATFORM_SESSION_SECRET.encode(), f"platform:{payload}".encode(), hashlib.sha256
+    ).hexdigest()
+
+
+def sign_platform_session(claims: PlatformClaims) -> str:
+    entered = str(claims.entered_household_id) if claims.entered_household_id else "-"
+    payload = f"{claims.account_id}.{claims.home_household_id}.{entered}.{claims.issued_at}"
+    return f"{payload}.{_platform_mac(payload)}"
+
+
+def verify_platform_session(value: str, now: int) -> PlatformClaims | None:
+    parts = value.split(".")
+    if len(parts) != 5:
+        return None
+    payload, mac = ".".join(parts[:4]), parts[4]
+    if not hmac.compare_digest(mac.encode(), _platform_mac(payload).encode()):
+        return None
+    try:
+        claims = PlatformClaims(
+            uuid.UUID(parts[0]),
+            uuid.UUID(parts[1]),
+            None if parts[2] == "-" else uuid.UUID(parts[2]),
+            int(parts[3]),
+        )
+    except ValueError:
+        return None
+    if not (claims.issued_at <= now < claims.issued_at + settings.PLATFORM_SESSION_HOURS * 3600):
+        return None
+    return claims
+
+
+def set_platform_cookie(response: Response, claims: PlatformClaims, now: int) -> None:
+    """Strict: the cookie never rides a cross-site navigation. Max-age is what's left."""
+    remaining = claims.issued_at + settings.PLATFORM_SESSION_HOURS * 3600 - now
+    response.set_cookie(
+        PLATFORM_COOKIE,
+        sign_platform_session(claims),
+        max_age=max(remaining, 0),
+        path="/",
+        secure=True,
+        httponly=True,
+        samesite="strict",
+    )
+
+
+def clear_platform_cookie(response: Response) -> None:
+    response.delete_cookie(PLATFORM_COOKIE, path="/", secure=True, httponly=True, samesite="strict")
 
 
 def set_device_cookie(response: Response, token: str) -> None:

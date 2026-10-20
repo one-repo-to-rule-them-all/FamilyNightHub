@@ -22,6 +22,10 @@ export type Binding = Schemas["BindingOut"];
 export type Device = Schemas["DeviceOut"];
 export type JoinResult = Schemas["JoinOut"];
 export type Account = Schemas["AccountOut"];
+export type Consent = Schemas["ConsentOut"];
+export type HouseholdDeletion = Schemas["HouseholdDeletionOut"];
+export type PlatformMe = Schemas["PlatformMeOut"];
+export type PlatformHousehold = Schemas["PlatformHouseholdOut"];
 export type Night = Schemas["SessionOut"];
 export type NightOption = Schemas["OptionOut"];
 export type NightStatus = Night["status"];
@@ -250,6 +254,8 @@ export const api = {
   /** Consumes the emailed link: sets `new_password` and signs in. */
   verifyMagicLink: (body: Schemas["VerifyIn"]) => request<Account>("POST", "/auth/verify", body),
   me: () => request<Account>("GET", "/auth/me"),
+  /** Accept the current Terms and Privacy Policy (ADR-0017); admins also confirm guardianship. */
+  consent: (body: Schemas["ConsentIn"]) => request<Consent>("POST", "/auth/consent", body),
   logout: () => request<void>("POST", "/auth/logout"),
   /** The night as every screen sees it (no ballots; `result` only from reveal on). */
   night: (sessionId: string) => request<Night>("GET", `/sessions/${encodeURIComponent(sessionId)}`),
@@ -364,7 +370,41 @@ export const api = {
     request<AdminPerson>("PATCH", `/admin/people/${encodeURIComponent(personId)}`, body),
   convertToMember: (personId: string) =>
     request<AdminPerson>("POST", `/admin/people/${encodeURIComponent(personId)}/convert-to-member`),
-  /** Folds `from` into `into`; the source is hidden (merged_into_id), never deleted. */
+  /** Platform owner (ADR-0016): its own sign-in and `fnh_platform` cookie. */
+  platformLogin: (body: Schemas["PlatformLoginIn"]) =>
+    request<PlatformMe>("POST", "/platform/login", body),
+  platformLogout: () => request<void>("POST", "/platform/logout"),
+  platformMe: () => request<PlatformMe>("GET", "/platform/me"),
+  platformHouseholds: () => request<PlatformHousehold[]>("GET", "/platform/households"),
+  createHousehold: (body: Schemas["PlatformHouseholdIn"]) =>
+    request<PlatformHousehold>("POST", "/platform/households", body),
+  /** Bind the platform session to a household: the portal then acts as its admin. */
+  enterHousehold: (householdId: string) =>
+    request<PlatformMe>("POST", `/platform/households/${encodeURIComponent(householdId)}/enter`),
+  exitHousehold: () => request<PlatformMe>("POST", "/platform/exit"),
+  disableHousehold: (householdId: string, body: Schemas["PlatformDisableIn"]) =>
+    request<PlatformHousehold>(
+      "POST",
+      `/platform/households/${encodeURIComponent(householdId)}/disable`,
+      body,
+    ),
+  enableHousehold: (householdId: string) =>
+    request<PlatformHousehold>(
+      "POST",
+      `/platform/households/${encodeURIComponent(householdId)}/enable`,
+    ),
+  rotateHouseholdSlug: (householdId: string) =>
+    request<void>("POST", `/platform/households/${encodeURIComponent(householdId)}/rotate-slug`),
+  /** The household's scheduled deletion, if any (ADR-0017 §4). */
+  householdDeletion: () => request<HouseholdDeletion>("GET", "/admin/household/deletion"),
+  /** Schedules the delete 7 days out and emails every admin. */
+  scheduleHouseholdDeletion: (body: Schemas["HouseholdDeletionIn"]) =>
+    request<HouseholdDeletion>("POST", "/admin/household/deletion", body),
+  cancelHouseholdDeletion: () => request<HouseholdDeletion>("DELETE", "/admin/household/deletion"),
+  /** Erases a person and everything naming them, photos included (ADR-0017 §4). */
+  deletePerson: (personId: string) =>
+    request<Schemas["PersonDeletedOut"]>("DELETE", `/admin/people/${encodeURIComponent(personId)}`),
+  /** Folds `from` into `into`; the source is hidden (merged_into_id), nothing is deleted. */
   mergePeople: (body: Schemas["MergeIn"]) =>
     request<MergeResult>("POST", "/admin/people/merge", body),
   /** Open "Forgot PIN" requests, oldest first (`admin:people`; hosts get 403). */

@@ -19,11 +19,19 @@ class FakeStorage:
 
     def __init__(self) -> None:
         self.objects: dict[str, ObjectInfo] = {}
+        self.data: dict[str, bytes] = {}
         self.deleted: list[str] = []
 
-    def put(self, key: str, size: int = 500_000, content_type: str | None = "image/jpeg") -> None:
+    def put(
+        self,
+        key: str,
+        size: int = 500_000,
+        content_type: str | None = "image/jpeg",
+        data: bytes | None = None,
+    ) -> None:
         """What the phone's presigned PUT would have done."""
         self.objects[key] = ObjectInfo(size=size, content_type=content_type)
+        self.data[key] = data if data is not None else key.encode()
 
     def presign_put(self, key: str) -> str:
         return f"{FAKE_HOST}/{quote(key)}?op=put&X-Amz-Expires=300"
@@ -36,7 +44,11 @@ class FakeStorage:
 
     async def delete(self, key: str) -> None:
         self.objects.pop(key, None)
+        self.data.pop(key, None)
         self.deleted.append(key)
+
+    async def get(self, key: str) -> bytes | None:
+        return self.data.get(key) if key in self.objects else None
 
 
 class DownStorage(FakeStorage):
@@ -44,6 +56,9 @@ class DownStorage(FakeStorage):
         raise StorageUnavailable("down")
 
     async def delete(self, key: str) -> None:
+        raise StorageUnavailable("down")
+
+    async def get(self, key: str) -> bytes | None:
         raise StorageUnavailable("down")
 
 

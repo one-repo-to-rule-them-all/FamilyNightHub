@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # --- Auth secrets (dev placeholders; real values are fly secrets) ---
     SESSION_SECRET: str = "dev-insecure-session-secret"
     DEVICE_TOKEN_PEPPER: str = "dev-insecure-device-pepper"
+    # ADR-0016: signs the `fnh_platform` cookie. Its own secret, so rotating it signs out the
+    # operator without touching anyone's family session.
+    PLATFORM_SESSION_SECRET: str = "dev-insecure-platform-secret"
 
     # --- Devices (ADR-0002) ---
     # A device unused this long must enter a night code again (401 `device_expired`, issue
@@ -90,6 +93,14 @@ class Settings(BaseSettings):
     INVITE_EMAIL_LIMIT: int = 3
     INVITE_WINDOW_SECONDS: int = 3600
 
+    # --- Platform owner (ADR-0016) ---
+    # Absolute life of a platform session: entering a household never extends it.
+    PLATFORM_SESSION_HOURS: int = 4
+
+    # --- Household deletion (ADR-0017 §4) ---
+    # The wait between an admin asking and the worker erasing; any admin can cancel meanwhile.
+    HOUSEHOLD_DELETE_GRACE_DAYS: int = 7
+
     # --- TMDB (03-backend.md "Candidates") ---
     # Server-only. Unset token = TMDB off: search answers 503 and the shortlist takes typed
     # titles. Locally and in CI the base URL points at the tmdb-fake service.
@@ -135,7 +146,7 @@ class Settings(BaseSettings):
         if self.ENVIRONMENT in ("staging", "production"):
             insecure = [
                 name
-                for name in ("SESSION_SECRET", "DEVICE_TOKEN_PEPPER")
+                for name in ("SESSION_SECRET", "DEVICE_TOKEN_PEPPER", "PLATFORM_SESSION_SECRET")
                 if getattr(self, name).startswith("dev-insecure")
             ]
             if insecure:

@@ -25,6 +25,9 @@ backend/app/
 |---|---|---|
 | Join | `GET /api/v1/csrf`, `POST /api/v1/join` | Issue the CSRF cookie; validate slug + night code, mint the device cookie (failure-budgeted) |
 | Auth | `/api/v1/auth/{login,password,magic-link,verify,me,logout}` | Password sign-in for admins and hosts, set/change password, forgot password (the magic link sets a new one), current account, logout ([ADR-0014](decisions/ADR-0014-passwords-and-person-pins.md)) |
+| Consent | `GET /api/v1/legal`, `POST /api/v1/auth/consent` | Current Terms/Privacy versions (public); accept them. `GET /auth/me` carries `consent`. See "Consent, export and deletion" ([ADR-0017](decisions/ADR-0017-consent-and-multi-household.md)) |
+| Household data | `GET /api/v1/admin/export`, `GET/POST/DELETE /api/v1/admin/household/deletion`, `DELETE /api/v1/admin/people/{id}` | Download everything (zip); schedule or cancel the household's deletion; erase a person (`admin:settings`, `admin:people`) |
+| Platform | `/api/v1/platform/{login,logout,me,households,exit}`, `POST …/households/{id}/{enter,disable,enable,rotate-slug}` | The platform owner ([ADR-0016](decisions/ADR-0016-platform-owner.md)): own cookie, metadata-only list, enter one household at a time. See "Platform owner" |
 | People/devices | `/api/v1/people`, `/api/v1/devices/me`, `POST /api/v1/devices/me/people`, `PUT/PATCH/DELETE /api/v1/devices/me/people/{id}`, `POST …/{id}/pin`, `POST …/{id}/forgot-pin` | Avatar grid with each tile's binding and PIN state; self-create a guest; claim or switch with the PIN; rename once; set/change PIN; ask for a PIN reset; unbind. See "People and PINs" |
 | Here tonight | `GET /api/v1/sessions/{id}/present` | Who's here (attendance plus anyone with a ballot), each with `voted`; avatars only, never ranks (any device or account). See "Here tonight" |
 | TV help count | `GET /api/v1/devices/me/help-count` | The TV (`is_tv`) only: `{count, first_name}` of pending person claims (never PIN resets); other phones 403 |
@@ -654,6 +657,71 @@ and pages over 500 fail with TMDB's error. It wants a Bearer token and 404s unkn
 TMDB. Tests mount it in-process
 via `httpx.ASGITransport` (`tests/integration/tmdb_doubles.py`, which also has "down" and
 "unconfigured" doubles). CI never calls the real API.
+
+## Consent, export and deletion
+
+[ADR-0017](decisions/ADR-0017-consent-and-multi-household.md); `services/consent_service.py`,
+`export_service.py`, `household_deletion_service.py`, `people_admin_service.delete`.
+
+**Consent.** `household_consents` is append-only (the migration revokes UPDATE/DELETE from
+`fnh_app`). Versions live in `domain/legal.py` and `frontend/src/lib/legal.ts`, pinned equal by
+`tests/unit/test_legal.py`; the pages are `/legal/terms` and `/legal/privacy`. `POST
+/auth/consent {terms_version, privacy_version, guardian}` refuses stale versions (422) and an
+admin without `guardian` (422); a host's `guardian` is ignored. **The gate:** until some admin row
+with `guardian` names the current versions, `consent_service.require_household_consent` raises
+`ConsentRequired` (409 `consent_required`, one handler in `main.py`) from every path that stores
+a child's data: admin and self-created people, new devices (join, enroll) and photo uploads.
+Everything already stored keeps working. The portal shows a consent screen in place of every
+page while `consent.account_accepted` is false. Bumping a version closes the gate until an admin
+accepts again.
+
+**Person delete.** `DELETE /admin/people/{id}` erases the person, anyone merged into them, their
+photos (tombstoned; objects deleted after the rows, inside the transaction, so a storage outage
+is 503 and rolls back), reactions, ballots, ratings, attendance, bindings and PIN resets, and
+replaces their audit rows' `data` with `{"redacted": true}`. A past night's recorded winner
+stays; its tally may change.
+
+**Export.** `GET /admin/export` (`admin:settings`) reads every household table in the request
+transaction (credential hashes dropped; `magic_links` and `photo_deletions` excluded, pinned
+against the catalog in `test_export.py`), audits `household.exported`, then streams the zip:
+one JSON file per table, then each photo original fetched one at a time (`PhotoStorage.get`).
+An object missing from the bucket is listed in `MISSING.txt`.
+
+**Household delete.** `POST /admin/household/deletion {password, household_name}` (wrong password
+403 and spends the account's login budget; wrong name 422; already scheduled 409) sets
+`delete_after` `HOUSEHOLD_DELETE_GRACE_DAYS` (7) ahead and emails every admin; `DELETE` cancels
+and emails them again. Nights keep running meanwhile. The worker's `purge_deleted_households`
+deletes the bucket objects, then the household row, whose cascade empties every household table.
+
+## Platform owner
+
+[ADR-0016](decisions/ADR-0016-platform-owner.md) option A; `services/platform_service.py`,
+`api/v1/platform.py`, `core/dependencies.py` (`resolve_platform`, `CurrentPlatform`).
+
+- **Operators** are rows in `platform_operators`, which `fnh_app` can only read.
+  `python -m app.cli grant-platform --email … --by "…"` / `revoke-platform` find the account with
+  the ADR-0009 resolver and write the row over `MIGRATION_DATABASE_URL` as the owner.
+- **Sign-in** (`POST /platform/login`) always asks for the password; unknown, not an operator,
+  disabled and wrong password are one 401, on the ADR-0014 login budgets. It sets `fnh_platform`
+  (`{account}.{home household}.{entered or -}.{issued_at}` + HMAC under
+  `PLATFORM_SESSION_SECRET`, `SameSite=Strict`, `PLATFORM_SESSION_HOURS` = 4 absolute; entering
+  re-signs with the same `issued_at`). Every request re-reads the account and the operator row.
+- **List**: `platform_list_households()` (owner `fnh_platform`, column grants, metadata and counts
+  only) is the platform's only cross-household read.
+- **Enter / exit** bind or drop one household in the cookie and audit `platform.entered` /
+  `platform.exited` in it. While bound, `current_account` returns `AccountContext(…, role="admin",
+  via_platform=True)` for that household and the ordinary admin routes run under its GUC.
+  `PLATFORM_DENIED` (`admin:accounts`, `sessions:run`, `ballots:proxy`) and `HouseholdAccount`
+  (own password, consent, resolving PIN resets) are 403: they would name the operator in a
+  household-scoped FK, or answer for the family. `account_db` sets `app.platform_account`, and
+  the `audit_tag_platform` trigger adds `"via": "platform"` to every audit row written in that
+  transaction. `/auth/me` returns `platform_access: true`; the portal shows a fixed banner with
+  Exit.
+- **Households**: create (household, settings, admin with no password, 72-hour invite link;
+  the gate starts closed), disable/enable (reason required and emailed; a disabled household's
+  sign-ins, magic-link verifies and joins are 403 `household_disabled` after the credential
+  checks out, and its accounts' sessions stop on their next request), rotate the join slug.
+  Every action writes a global `platform_audit_events` row.
 
 ## Where business logic belongs
 

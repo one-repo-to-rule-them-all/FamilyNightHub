@@ -3,25 +3,37 @@
 from __future__ import annotations
 
 import time
+import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import household_session
-from app.core.dependencies import AccountDb, CsrfProtected, CurrentAccount
+from app.core.dependencies import (
+    AccountDb,
+    CsrfProtected,
+    CurrentAccount,
+    HouseholdAccount,
+    resolve_platform,
+)
 from app.core.rate_limit import Budget, retry_after, spend
 from app.core.security import clear_account_cookie, set_account_cookie, sign_account_session
+from app.domain.legal import PRIVACY_VERSION, TERMS_VERSION
 from app.integrations.email import EmailSender, email_sender, send_safely
 from app.schemas.identity import (
     AccountOut,
+    ConsentIn,
+    ConsentOut,
     LoginIn,
     MagicLinkIn,
     MagicLinkOut,
     PasswordIn,
     VerifyIn,
 )
-from app.services import auth_service
+from app.services import auth_service, consent_service
 from app.services.errors import Invalid
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -99,8 +111,7 @@ async def login(body: LoginIn, response: Response) -> AccountOut:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, BAD_LOGIN) from None
     _sign_in(response, signed_in)
     async with household_session(signed_in.household_id) as db:
-        summary = await auth_service.account_summary(db, signed_in.account_id)
-    return _account_out(summary)
+        return await _account_out(db, signed_in.account_id)
 
 
 @router.post(
@@ -113,7 +124,7 @@ async def login(body: LoginIn, response: Response) -> AccountOut:
         429: {"description": "Too many failed password checks for this account"},
     },
 )
-async def set_password(body: PasswordIn, account: CurrentAccount, db: AccountDb) -> None:
+async def set_password(body: PasswordIn, account: HouseholdAccount, db: AccountDb) -> None:
     """Set a first password, or change it (the current one is required then). Other signed-in
     browsers stay signed in (stateless sessions, 03-backend.md)."""
     by_account = login_account_budget()
@@ -186,13 +197,61 @@ async def verify(body: VerifyIn, response: Response) -> AccountOut:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, err.reason) from None
     _sign_in(response, signed_in)
     async with household_session(signed_in.household_id) as db:
-        summary = await auth_service.account_summary(db, signed_in.account_id)
-    return _account_out(summary)
+        return await _account_out(db, signed_in.account_id)
 
 
 @router.get("/me", response_model=AccountOut)
-async def me(account: CurrentAccount, db: AccountDb) -> AccountOut:
-    return _account_out(await auth_service.account_summary(db, account.account_id))
+async def me(request: Request, account: CurrentAccount, db: AccountDb) -> AccountOut:
+    """The signed-in account. For a platform operator inside a household (ADR-0016), the
+    operator as that household's admin, with `platform_access` set so the portal shows the
+    banner; they never see the consent screen, which is the family's to answer."""
+    if account.via_platform:
+        platform = await resolve_platform(request)
+        if platform is None:  # pragma: no cover - current_account just resolved it
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in required")
+        household = await db.scalar(text("SELECT name FROM households"))
+        household_ok = await consent_service.household_accepted(db)
+        return AccountOut(
+            id=platform.account_id,
+            email=platform.email,
+            username=None,
+            has_password=True,
+            display_name=platform.display_name,
+            role="admin",
+            household_name=household,
+            consent=ConsentOut(
+                terms_version=TERMS_VERSION,
+                privacy_version=PRIVACY_VERSION,
+                account_accepted=True,
+                household_accepted=household_ok,
+            ),
+            platform_access=True,
+        )
+    return await _account_out(db, account.account_id)
+
+
+@router.post(
+    "/consent",
+    response_model=ConsentOut,
+    dependencies=[CsrfProtected],
+    responses={422: {"description": "Stale versions, or an admin without `guardian`"}},
+)
+async def consent(body: ConsentIn, account: HouseholdAccount, db: AccountDb) -> ConsentOut:
+    """Accept the current Terms and Privacy Policy (ADR-0017 §2). An admin's acceptance,
+    with `guardian`, opens the household's consent gate."""
+    try:
+        result = await consent_service.accept(
+            db,
+            account.household_id,
+            account.account_id,
+            account.role,
+            terms_version=body.terms_version,
+            privacy_version=body.privacy_version,
+            guardian=body.guardian,
+        )
+    except Invalid as err:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, err.reason) from None
+    return _consent_out(result)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, dependencies=[CsrfProtected])
@@ -200,7 +259,18 @@ async def logout(response: Response) -> None:
     clear_account_cookie(response)
 
 
-def _account_out(summary: auth_service.AccountSummary) -> AccountOut:
+def _consent_out(c: consent_service.ConsentStatus) -> ConsentOut:
+    return ConsentOut(
+        terms_version=c.terms_version,
+        privacy_version=c.privacy_version,
+        account_accepted=c.account_accepted,
+        household_accepted=c.household_accepted,
+    )
+
+
+async def _account_out(db: AsyncSession, account_id: uuid.UUID) -> AccountOut:
+    summary = await auth_service.account_summary(db, account_id)
+    consent = await consent_service.status(db, account_id, summary.role)
     return AccountOut(
         id=summary.id,
         email=summary.email,
@@ -209,4 +279,5 @@ def _account_out(summary: auth_service.AccountSummary) -> AccountOut:
         display_name=summary.display_name,
         role=summary.role,  # validated by AccountOut; DB check constraint is admin/host
         household_name=summary.household_name,
+        consent=_consent_out(consent),
     )

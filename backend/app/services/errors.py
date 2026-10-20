@@ -67,3 +67,28 @@ class PinLocked(ServiceError):
     def __init__(self, name: str) -> None:
         super().__init__(name)
         self.name = name
+
+
+class ConsentRequired(ServiceError):
+    """ADR-0017 §2: the household has no admin's acceptance of the current Terms and Privacy
+    Policy, so nothing that stores a child's data may run (new people, joins, photos). 409
+    `consent_required`, mapped once in app/main.py."""
+
+    def __init__(self) -> None:
+        super().__init__(MESSAGE_CONSENT_REQUIRED)
+
+
+MESSAGE_CONSENT_REQUIRED = (
+    "An admin needs to accept the Terms and Privacy Policy before anyone can be added."
+)
+
+
+class HouseholdDisabled(ServiceError):
+    """ADR-0016: the platform operator switched the household off. Sign-ins and joins are
+    refused (403 `household_disabled`, mapped once in app/main.py); nothing is deleted. Only
+    raised after the caller proved a credential, so it reveals nothing to a stranger."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "This household is switched off. Contact the person who runs Family Night."
+        )

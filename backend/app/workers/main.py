@@ -36,7 +36,12 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.logging import configure_logging
 from app.integrations.storage import NoopObjectStore, configured_storage
-from app.workers.tasks import auto_close_stale_sessions, sweep_orphan_uploads
+from app.workers.tasks import (
+    auto_close_stale_sessions,
+    purge_deleted_households,
+    remind_disabled_households,
+    sweep_orphan_uploads,
+)
 
 if TYPE_CHECKING:
     from arq.typing import WorkerSettingsType
@@ -201,13 +206,20 @@ async def after_job_end(ctx: dict[str, Any]) -> None:
 class WorkerSettings:
     """Discovered by `arq`. ARQ shares Upstash DB 0 with SSE under its `arq:` prefix (06)."""
 
-    functions: ClassVar[list[Any]] = [auto_close_stale_sessions, sweep_orphan_uploads]
+    functions: ClassVar[list[Any]] = [
+        auto_close_stale_sessions,
+        sweep_orphan_uploads,
+        purge_deleted_households,
+        remind_disabled_households,
+    ]
 
     # Minutes are staggered so the hourly jobs never share a tick. unique=True keeps a
     # second worker replica (none planned) from running the same tick twice.
     cron_jobs: ClassVar[list[Any]] = [
         cron(auto_close_stale_sessions, minute=10, unique=True),
         cron(sweep_orphan_uploads, minute=40, unique=True),
+        cron(purge_deleted_households, minute=25, unique=True),
+        cron(remind_disabled_households, hour=10, minute=5, unique=True),
     ]
     timezone = CRON_TIMEZONE
 
