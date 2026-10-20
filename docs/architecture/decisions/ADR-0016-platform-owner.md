@@ -1,132 +1,162 @@
-# ADR-0016: Platform owner: an operator over the deployment, not a super-admin over families
+# ADR-0016: Platform owner: a super-admin who enters one household at a time, never bypassing RLS
 
 ## Status
 
-**Proposed: needs the owner's approval before anything is built** (issue #71, part 2). Nothing
-in the code implements this ADR. It also opens, without deciding, the multi-household and
-consent topic that [ADR-0003](ADR-0003-household-scoping-app-plus-rls.md) and
-[BUILD-PROMPT](../BUILD-PROMPT.md) defer ("multi-household needs a consent/COPPA ADR first").
+**Accepted (owner decision 2026-10-19, issue #77): option A**, designed after the super user in qrMemorial's ADR-0006 (separate private repo
+`one-repo-to-rule-them-all/qrMemorial`,
+`docs/architecture/decisions/ADR-0006-family-admin-and-super-user-role-model.md`). Amends [ADR-0003](ADR-0003-household-scoping-app-plus-rls.md) (a third credential can
+bind the household) and [ADR-0009](ADR-0009-pre-auth-lookups-via-definer-functions.md) (one more
+definer function and role).
+
+**Not built yet, by the owner's sequencing:** nothing here is built until the consent and
+multi-household ADR, [ADR-0017](ADR-0017-consent-and-multi-household.md), is accepted. The
+platform owner's first feature, creating a household, *is* multi-household, and a family has to be
+told that the operator can open its household before the operator can.
+
+The earlier draft of this ADR recommended option B (a content-blind operator). The owner chose A.
+Both options and the trade-off are kept below so the reasoning stays on record.
 
 ## Context
 
 The owner wants `rbjengineeringservices.llc@gmail.com` to be the **platform owner** and to stay
-the Baez Family **admin**. Today there is no such thing as a platform:
+the Baez Family **admin**. Today there is no platform:
 
 - One deployment serves exactly one household, created by `python -m app.cli bootstrap` over
   `fly ssh console`. Whoever can SSH into the API machine is, in practice, the operator.
 - Every request is scoped to one household: the credential names it, `SET LOCAL
-  app.household_id` binds it, FORCE RLS enforces it (ADR-0003). There is no code path that reads
-  across households except the ADR-0009 definer functions, which return ids only, and the
-  worker's `worker_list_household_ids()`.
-- What the app holds is a family's private life: children's names and faces, photos, who voted
-  for what, nights at home. A role that can read across families is the most dangerous thing this
-  system could add.
+  app.household_id` binds it, FORCE RLS enforces it (ADR-0003). Nothing reads across households
+  except the ADR-0009 definer functions (ids only) and the worker's `worker_list_household_ids()`.
+- What the app holds is a family's private life: children's names and faces, photos, ballots,
+  nights at home.
 
-So "platform owner" has to answer two questions: **what can it do**, and **what can it see**.
+qrMemorial answered the same question with a super user: a flag granted outside the app, an
+explicit `{ superUser: true }` scope on every repository call (never an implicit unfiltered
+default), and a visually separate surface. The owner wants the same capability here: to support
+any family directly, without asking that family's admin to look.
 
-## Options
+The difference that shapes the design: qrMemorial scopes in application code, so a super user is
+one more argument. FamilyNight scopes in **Postgres** (FORCE RLS, no `BYPASSRLS` anywhere). A
+super user here must work *with* RLS, not around it.
 
-### A. Super-admin: a global role that can act as admin in every household
+## Decision
 
-One flag on an account (or a new role) bypasses the household check, so the platform owner can
-open any family's portal.
+A **platform operator** can act as an admin in any household, **one household at a time**, by
+explicitly entering it. RLS is never bypassed. The household comes from a signed server-side
+session, never a request parameter, exactly as ADR-0003 requires.
 
-- ✅ Simplest to build: one permission check.
-- ❌ Defeats ADR-0003: either RLS gets a bypass (a `BYPASSRLS` path or a policy exception), or the
-  app switches the GUC to any household on request. One bug or one stolen session then reads
-  every family's photos, ballots and children.
-- ❌ It's the opposite of what a family would consent to. It can't be squared with a consent ADR.
+1. **Who.** A table `platform_operators (account_id PK → accounts.id, granted_at, granted_by)`.
+   It holds no household data, so no RLS; `fnh_app` has `SELECT` only. Rows are written **only**
+   by the CLI (`python -m app.cli grant-platform --email …` / `revoke-platform --email …`) over
+   `fly ssh`, never by the API. This is qrMemorial's "rare, auditable, platform-operator action":
+   "who has platform power" is one query.
+2. **A separate sign-in.** `POST /api/v1/platform/login {email, password}` asks for the password
+   again even when a family-portal session exists, so a stolen `fnh_session` is never a platform
+   session. It issues a separate cookie, `fnh_platform`, signed with its own
+   `PLATFORM_SESSION_SECRET`, `HttpOnly; Secure; SameSite=Strict`, **4 hours** absolute
+   (`PLATFORM_SESSION_HOURS`). Failures share the ADR-0014 login budgets. Each request re-reads
+   both the account and the `platform_operators` row, so `revoke-platform` or disabling the
+   account takes effect on the next request.
+3. **The household list.** `GET /api/v1/platform/households` runs with **no household GUC** and
+   reads through one new ADR-0009-style definer function, `platform_list_households()`, owned by
+   a new `NOLOGIN` role `fnh_platform` with column-level grants. It returns metadata only: id,
+   name, created, disabled, counts of people, devices, nights and photos, and last activity. It
+   has the same rules as the resolvers: pinned `search_path`, `STABLE`, `EXECUTE` for `fnh_app`
+   only, and pinned by `test_rls_coverage.py`. This listing is the only cross-household read.
+4. **Entering a household.** `POST /api/v1/platform/households/{id}/enter` re-checks the operator
+   row, writes the audit rows (6), and re-signs `fnh_platform` bound to that household
+   (`{account}.{household}.{issued_at}`). From then on, the ordinary admin endpoints accept that
+   cookie: the household is taken from the signature, `SET LOCAL app.household_id` binds it, and
+   RLS returns that household and nothing else. Entering another household replaces the binding.
+   `POST /api/v1/platform/exit` drops it. The cookie never names two households, and there is no
+   "all households" mode.
+5. **What it can do inside.** Everything an `admin` can (`core/permissions.py`), with one
+   exception: it **cannot create, re-role or remove accounts** in the household (`admin:accounts`
+   writes). Platform access ends when the platform session ends, and the operator can't leave a
+   standing admin behind. The household's first admin is the one exception, created by
+   `POST /api/v1/platform/households` (7).
+6. **Audit, visible to the family.** Every enter and exit, and every write made through a
+   platform session, writes a household `audit_events` row with `via: "platform"` and the
+   operator's account, plus a `platform_audit_events (account_id, household_id, action,
+   created_at)` row outside RLS. The household's admins see platform entries in their activity
+   view. ADR-0017 makes that disclosure part of what a family agrees to.
+7. **Households.** `POST /api/v1/platform/households {name, first_admin_email,
+   first_admin_display_name}` creates the household and sends its first admin the ADR-0015 invite
+   (72-hour link, they choose their own password). This replaces `bootstrap` for every household
+   after the first. `POST …/{id}/disable` and `…/enable` refuse sign-ins and joins without
+   deleting anything. `POST …/{id}/rotate-slug` rotates the join slug.
+8. **Surface.** A separate `/platform` area lists households. While a household is entered, the
+   family portal shows a fixed banner that can't be dismissed ("Platform access: *Household
+   name*. Exit"), in a color no household theme uses, so the operator always knows "mine or
+   theirs" (qrMemorial's rule).
+9. **The owner's own family.** `rbjengineeringservices.llc@gmail.com` is a platform operator
+   *and* the Baez Family admin through its ordinary `accounts` row. For the Baez Family it uses
+   the ordinary `fnh_session`, so the family's audit doesn't fill with platform entries for their
+   own admin.
+10. **No migration of household data.** No household table, policy or permission changes. New:
+    `platform_operators`, `platform_audit_events`, `households.disabled_at`, the `fnh_platform`
+    role and one function.
 
-### B. Operator over the deployment, content-blind (**recommended**)
+## Options considered
 
-A **platform** role, separate from household roles, that manages *households*, never their
-*contents*:
+### A. Super-admin (**chosen**)
 
-- **Can:** create a household and assign its **first admin** (today's `bootstrap`, as an
-  invite: the first admin gets the ADR-0015 invite email and chooses their own password); list
-  households with **metadata only** (name, slug, created, admin emails, counts of people, devices,
-  nights and photos, storage used, last activity); see **health and usage** (the `/api/health`
-  data, worker job results, rate-limit hits, error rates); disable or re-enable a household
-  (sign-ins and joins refused, nothing deleted); rotate a household's join slug on request.
-- **Cannot:** read any family's people, photos, ballots, ratings, devices or audit-event
-  details, or act as its admin. **Unless it is also that family's admin**, in which case it uses
-  the ordinary household session like any admin. The owner's own account would hold both: platform
-  owner, and Baez Family admin through its normal `accounts` row.
-- **How it stays content-blind:** the platform API runs with **no household GUC at all**, so RLS
-  returns nothing from any household table. Everything it needs comes through new
-  ADR-0009-style `SECURITY DEFINER` functions owned by a dedicated role (e.g. `fnh_platform`) that
-  return **aggregates and metadata only** (counts, sizes, timestamps, the admin emails it needs
-  to assign). This is the same pattern as the existing six resolver functions, with the same
-  rules: pinned `search_path`, column-level grants, `EXECUTE` for the app role only, and a test
-  that pins the exact set.
-- **Identity:** a separate table, `platform_operators (account_id, granted_at, granted_by)`,
-  outside RLS, written only by a CLI command (`python -m app.cli grant-platform --email …`), never
-  by the API. A platform session is a **separate cookie and sign-in step** (re-enter the
-  password), so a stolen family-portal session is not a platform session. Every platform action
-  writes a `platform_audit_events` row.
-- **Surface:** a separate `/platform` area (not a tab in the family portal), so the two never
-  share a screen or a query key.
+As above.
 
-- ✅ Keeps ADR-0003 intact: no RLS bypass, no GUC switching. A platform bug leaks counts, not
-  photos.
-- ✅ Matches what a family can consent to: "the operator knows you exist and how much storage you
-  use; they can't see your photos."
-- ❌ More to build: a definer-function set, a table, a second session type, a new area.
-- ❌ Support cases ("my photo is missing") need the family's admin to look, or the family to grant
-  access, not the operator. That is the intended cost.
+- ✅ The operator can resolve any support case ("my photo is missing") directly, as qrMemorial's
+  super user does.
+- ✅ No RLS bypass: one household per session, bound server-side, same isolation tests.
+- ❌ **Highest blast radius in the system.** An operator's password plus one 4-hour cookie reads
+  one family's photos, ballots and children per entry, and any family on demand. A bug in the
+  enter path or in cookie verification reaches every household. Mitigations: CLI-only grant, a
+  separate sign-in, short absolute sessions, a per-request operator re-check, an audit the family
+  can see. A second factor on platform sign-in (below) is strongly advised.
+- ❌ The promise to families gets weaker: "the operator can open your household, and you'll see
+  when they do", not "the operator can't see your photos." ADR-0017 has to say so plainly.
 
-### C. Status quo: keep the operator as "whoever has `fly ssh`"
+### B. Operator over the deployment, content-blind (rejected by the owner)
 
-No platform role in the app. New households are created with the CLI; health comes from Fly,
-UptimeRobot and Sentry.
+A platform role that manages households (create, list metadata, health, disable) through
+metadata-only definer functions and **never** enters one. It can't read people, photos or ballots
+unless it is also that family's admin.
 
-- ✅ Nothing to build, nothing new to secure. Correct for **one** household, which is today.
-- ❌ Doesn't scale past a handful of households, and SSH access *is* full database access, which
-  is a broader power than option B grants, just unlogged by the app.
+- ✅ A platform bug leaks counts, not photos. The strongest consent story.
+- ❌ Support cases need the family's admin to look. The owner judged that cost too high.
 
-## Recommendation
+Most of B survives inside A: the metadata-only listing, CLI-granted identity, separate session,
+separate surface and its own audit trail.
 
-**Adopt B as the target, and stay on C until there is a second household.**
+### C. Status quo: the operator is "whoever has `fly ssh`" (rejected as the end state)
 
-1. Now (no code): the owner is the operator via `fly ssh` and the CLI (C), and is the Baez Family
-   admin through the ordinary account. ADR-0015 already covers adding the host.
-2. Before any second household exists, write the **consent and multi-household ADR** (below) and
-   get it approved. Option B is built only after that, because its first feature (create a
-   household) *is* multi-household.
-3. Build B as described: content-blind by construction (no GUC, metadata-only definer functions),
-   a CLI-granted operator table, a separate session and area, and its own audit trail.
+- ✅ Nothing to build. Still correct while there is one household, which is today.
+- ❌ SSH is full database access, broader than A and unlogged by the app. Doesn't scale past a
+  handful of households.
 
-Option A is rejected outright.
+C stays in force until ADR-0017 is accepted and A is built.
 
-## What the consent / multi-household ADR must decide first
+## Consequences
 
-Raised here so the owner sees the whole cost; **not decided by this ADR**:
+- **Sequencing:** ADR-0017 (consent and multi-household) is accepted first, then A is built.
+  Until then the owner is the operator through `fly ssh` and the CLI, and the Baez admin through
+  the ordinary account.
+- ADR-0003 now reads: the household comes from the device, the account session, **or a platform
+  session bound by an explicit, audited enter**. Never from a client parameter. Cross-household
+  is still 404.
+- ADR-0009's pre-auth surface grows by one function and one role. `test_rls_coverage.py` pins
+  both.
+- 03-backend.md "Auth & authorization" gains a third principal (`fnh_platform` cookie, resolved
+  by a `CurrentPlatformOperator` dependency) and a "Platform" section.
+- **Tests** (when built): an operator entered in household A reads and writes A, and gets 404 for
+  every B resource. The list returns metadata only (the function's exact columns pinned). A family
+  session gets 401 on `/platform`. A revoked operator's cookie dies on the next request. Platform
+  writes are audited `via: "platform"`. Account writes are 403 through a platform session. A
+  disabled household refuses sign-in and join.
+- **Recommended hardening, owner to decide before the second household:** TOTP on platform
+  sign-in. A's blast radius is the reason. It isn't part of this decision.
+- `bootstrap` remains only for the very first household and operator.
 
-- **Who is the customer**, and who consents for the children: the household's first admin, as a
-  parent or guardian, with an explicit consent step and record before any child's profile or photo
-  is stored (COPPA-style verifiable parental consent if the service is offered beyond the owner's
-  own family).
-- **Privacy policy and terms** the first admin accepts at sign-up, versioned.
-- **Retention and deletion:** household export (the deferred zip export), and a household delete
-  that removes rows *and* bucket objects and backups within a stated window.
-- **Cross-household identity:** ADR-0015 keeps emails unique across households, which leaks
-  "this address is in use" across families. Either accept that, or make accounts global with
-  per-household memberships (a bigger change touching ADR-0014's login).
-- **Billing and abuse** if strangers can sign up: none of this exists today.
-- **The platform view's exact fields** (the metadata list in option B), each justified.
+## Owner decision
 
-## Consequences (if B is approved)
-
-- New pre-auth surface: a platform definer-function set (metadata only) and `fnh_platform` role;
-  `test_rls_coverage.py` grows to pin it.
-- A second sign-in path and cookie. 03-backend.md "Auth & authorization" gains a third principal.
-- `bootstrap` becomes "the operator invites a first admin", and the CLI remains for the very
-  first operator.
-- No change to any household's RLS, permissions or data.
-
-## Owner decision needed
-
-- [ ] Approve option **B** as the platform-owner model (and reject A).
-- [ ] Confirm "stay on C until a second household", and that the consent / multi-household ADR
-      comes before any B code.
-- [ ] Or: choose differently, with reasons recorded here.
+- [x] **Option A**, the qrMemorial super-user model adapted to RLS (2026-10-19). B and C are
+      recorded above as rejected.
+- [x] The consent / multi-household ADR ([ADR-0017](ADR-0017-consent-and-multi-household.md))
+      comes before any A code.
