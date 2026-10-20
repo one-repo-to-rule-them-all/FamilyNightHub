@@ -1905,6 +1905,36 @@
         "title": "PersonCreateIn",
         "type": "object"
       },
+      "PersonDeletedOut": {
+        "description": "ADR-0017 \u00a74: what went with the person (anyone merged into them went too).",
+        "properties": {
+          "ballot_ranks": {
+            "title": "Ballot Ranks",
+            "type": "integer"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "photos": {
+            "title": "Photos",
+            "type": "integer"
+          },
+          "ratings": {
+            "title": "Ratings",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "person_id",
+          "photos",
+          "ballot_ranks",
+          "ratings"
+        ],
+        "title": "PersonDeletedOut",
+        "type": "object"
+      },
       "PersonOut": {
         "properties": {
           "avatar_emoji": {
@@ -4653,6 +4683,54 @@
       }
     },
     "/api/v1/admin/people/{person_id}": {
+      "delete": {
+        "description": "Erase a person and everything that names them, photos included (ADR-0017 \u00a74). Not\nundoable. People merged into them go too.",
+        "operationId": "delete_person_api_v1_admin_people__person_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such (unmerged) person in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage is down; nothing was deleted, try again"
+          }
+        },
+        "summary": "Delete Person",
+        "tags": [
+          "admin"
+        ]
+      },
       "patch": {
         "description": "Rename / re-avatar / recolour; fields left out are unchanged.",
         "operationId": "update_person_api_v1_admin_people__person_id__patch",

@@ -100,6 +100,15 @@ class PinResetOut(BaseModel):
     resolved_at: datetime | None
 
 
+class PersonDeletedOut(BaseModel):
+    """ADR-0017 §4: what went with the person (anyone merged into them went too)."""
+
+    person_id: uuid.UUID
+    photos: int
+    ballot_ranks: int
+    ratings: int
+
+
 class MergeOut(BaseModel):
     """What moved. `dropped_*` rows collided with the target's own and were discarded."""
 

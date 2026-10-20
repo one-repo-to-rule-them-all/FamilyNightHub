@@ -388,7 +388,12 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Person
+         * @description Erase a person and everything that names them, photos included (ADR-0017 §4). Not
+         *     undoable. People merged into them go too.
+         */
+        delete: operations["delete_person_api_v1_admin_people__person_id__delete"];
         options?: never;
         head?: never;
         /**
@@ -2252,6 +2257,23 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * PersonDeletedOut
+         * @description ADR-0017 §4: what went with the person (anyone merged into them went too).
+         */
+        PersonDeletedOut: {
+            /** Ballot Ranks */
+            ballot_ranks: number;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Photos */
+            photos: number;
+            /** Ratings */
+            ratings: number;
+        };
         /** PersonOut */
         PersonOut: {
             /** Avatar Emoji */
@@ -3715,6 +3737,51 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    delete_person_api_v1_admin_people__person_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDeletedOut"];
+                };
+            };
+            /** @description No such (unmerged) person in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage is down; nothing was deleted, try again */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

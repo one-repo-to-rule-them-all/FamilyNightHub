@@ -367,7 +367,10 @@ export const api = {
     request<AdminPerson>("PATCH", `/admin/people/${encodeURIComponent(personId)}`, body),
   convertToMember: (personId: string) =>
     request<AdminPerson>("POST", `/admin/people/${encodeURIComponent(personId)}/convert-to-member`),
-  /** Folds `from` into `into`; the source is hidden (merged_into_id), never deleted. */
+  /** Erases a person and everything naming them, photos included (ADR-0017 §4). */
+  deletePerson: (personId: string) =>
+    request<Schemas["PersonDeletedOut"]>("DELETE", `/admin/people/${encodeURIComponent(personId)}`),
+  /** Folds `from` into `into`; the source is hidden (merged_into_id), nothing is deleted. */
   mergePeople: (body: Schemas["MergeIn"]) =>
     request<MergeResult>("POST", "/admin/people/merge", body),
   /** Open "Forgot PIN" requests, oldest first (`admin:people`; hosts get 403). */

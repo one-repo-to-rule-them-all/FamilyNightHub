@@ -8,6 +8,7 @@ import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
 import { type Column, DataTable } from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import {
@@ -123,6 +124,10 @@ export function PeopleAdmin() {
           onDone={(saved) => {
             setEditing(null);
             if (saved) setNotice(`Saved ${saved.name}.`);
+          }}
+          onDeleted={(name) => {
+            setEditing(null);
+            setNotice(`Deleted ${name} and everything about them.`);
           }}
         />
       ) : null}
@@ -337,11 +342,14 @@ function PeopleTable({
 function EditPerson({
   person,
   onDone,
+  onDeleted,
 }: {
   person: AdminPerson;
   onDone: (saved: AdminPerson | null) => void;
+  onDeleted: (name: string) => void;
 }) {
   const queryClient = useQueryClient();
+  const [deleting, setDeleting] = useState(false);
   const save = useMutation<AdminPerson | null, ApiError, PersonDraft>({
     mutationFn: async (draft) => {
       const changes = personChanges(person, draft);
@@ -362,10 +370,91 @@ function EditPerson({
         onSubmit={(draft) => save.mutate(draft)}
       >
         <ApiErrorNotice error={save.error} />
-        <Button type="button" variant="ghost" className="self-start" onClick={() => onDone(null)}>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="ghost" onClick={() => onDone(null)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-destructive"
+            onClick={() => setDeleting(true)}
+            data-testid="delete-person"
+          >
+            Delete…
+          </Button>
+        </div>
+      </PersonForm>
+      {deleting ? (
+        <DeletePerson
+          person={person}
+          onCancel={() => setDeleting(false)}
+          onDeleted={() => onDeleted(person.name)}
+        />
+      ) : null}
+    </ModalDialog>
+  );
+}
+
+/**
+ * ADR-0017 §4: erases the person and everything that names them (photos, votes, ratings, phone
+ * bindings), plus anyone merged into them. Typing the name is the confirmation: there is no undo.
+ */
+function DeletePerson({
+  person,
+  onCancel,
+  onDeleted,
+}: {
+  person: AdminPerson;
+  onCancel: () => void;
+  onDeleted: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [typed, setTyped] = useState("");
+  const remove = useMutation<unknown, ApiError, void>({
+    mutationFn: () => api.deletePerson(person.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: PEOPLE_KEY });
+      onDeleted();
+    },
+  });
+  const ready = typed.trim().toLowerCase() === person.name.toLowerCase();
+
+  return (
+    <ModalDialog title={`Delete ${person.name}?`} onClose={onCancel} testId="delete-person-confirm">
+      <div className="flex flex-col gap-2 text-sm">
+        <p>
+          This erases {person.name} for good: their photos, votes, ratings and phone bindings, and
+          anyone merged into them. Past winners stay as they were.
+        </p>
+        <p className="text-muted-foreground">
+          To keep their history under someone else instead, merge them.
+        </p>
+      </div>
+      <label className="flex flex-col gap-2 text-sm">
+        Type {person.name} to confirm
+        <Input
+          value={typed}
+          onChange={(event) => setTyped(event.target.value)}
+          autoComplete="off"
+          data-testid="delete-person-name"
+        />
+      </label>
+      <ApiErrorNotice error={remove.error} />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="destructive"
+          size="lg"
+          className="px-4"
+          disabled={!ready || remove.isPending}
+          onClick={() => remove.mutate()}
+        >
+          {remove.isPending ? "Deleting…" : `Delete ${person.name}`}
+        </Button>
+        <Button variant="ghost" size="lg" onClick={onCancel}>
           Cancel
         </Button>
-      </PersonForm>
+      </div>
     </ModalDialog>
   );
 }
@@ -467,7 +556,7 @@ function MergePeople({
               photos, photo reactions and phone bindings.
             </p>
             <p>
-              {from.name} is then hidden from every list. Nobody is ever deleted, but there is no
+              {from.name} is then hidden from every list. Merging deletes nothing, but there is no
               un-merge here.
             </p>
             <p className="text-muted-foreground">

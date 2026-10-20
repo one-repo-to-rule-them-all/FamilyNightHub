@@ -1,4 +1,4 @@
-"""Add, edit, convert and merge people (`admin:people`; hosts may add guests)."""
+"""Add, edit, convert, merge and delete people (`admin:people`; hosts may add guests)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import Annotated, Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.api.v1.photos import photo_storage
 from app.core.dependencies import (
     AccountContext,
     AccountDb,
@@ -15,15 +16,17 @@ from app.core.dependencies import (
     require_permission,
 )
 from app.core.permissions import has_permission
+from app.integrations.storage import PhotoStorage
 from app.schemas.admin import (
     AdminPersonOut,
     MergeIn,
     MergeOut,
     PersonCreateIn,
+    PersonDeletedOut,
     PersonUpdateIn,
 )
 from app.services import people_admin_service
-from app.services.errors import Conflict, NotFound, ServiceError
+from app.services.errors import Conflict, NotFound, ServiceError, Unavailable
 
 router = APIRouter(prefix="/people", tags=["admin"])
 
@@ -42,6 +45,8 @@ def _raise(err: ServiceError) -> NoReturn:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Person not found") from None
     if isinstance(err, Conflict):
         raise HTTPException(status.HTTP_409_CONFLICT, err.reason) from None
+    if isinstance(err, Unavailable):
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, err.reason) from None
     raise err  # pragma: no cover
 
 
@@ -173,3 +178,34 @@ async def convert_to_member(
     except ServiceError as err:
         _raise(err)
     return _out(person)
+
+
+@router.delete(
+    "/{person_id}",
+    response_model=PersonDeletedOut,
+    dependencies=[CsrfProtected],
+    responses={
+        **NOT_FOUND,
+        503: {"description": "Photo storage is down; nothing was deleted, try again"},
+    },
+)
+async def delete_person(
+    person_id: uuid.UUID,
+    account: CanManagePeople,
+    db: AccountDb,
+    storage: Annotated[PhotoStorage | None, Depends(photo_storage)],
+) -> PersonDeletedOut:
+    """Erase a person and everything that names them, photos included (ADR-0017 §4). Not
+    undoable. People merged into them go too."""
+    try:
+        deleted = await people_admin_service.delete(
+            db, storage, account.household_id, account.account_id, person_id
+        )
+    except ServiceError as err:
+        _raise(err)
+    return PersonDeletedOut(
+        person_id=deleted.person_id,
+        photos=deleted.photos,
+        ballot_ranks=deleted.ballot_ranks,
+        ratings=deleted.ratings,
+    )
