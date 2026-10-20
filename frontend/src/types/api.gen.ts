@@ -152,6 +152,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export
+         * @description A zip of every table (credential hashes removed) and every photo original. The rows
+         *     are read, and the export audited, before the first byte goes out; photos stream after.
+         */
+        get: operations["export_api_v1_admin_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/household/deletion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Deletion Status */
+        get: operations["deletion_status_api_v1_admin_household_deletion_get"];
+        put?: never;
+        /**
+         * Request Deletion
+         * @description Schedule the delete HOUSEHOLD_DELETE_GRACE_DAYS ahead and email every admin. A wrong
+         *     password spends the account's sign-in budget, like changing a password does.
+         */
+        post: operations["request_deletion_api_v1_admin_household_deletion_post"];
+        /** Cancel Deletion */
+        delete: operations["cancel_deletion_api_v1_admin_household_deletion_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/join-slug/rotate": {
         parameters: {
             query?: never;
@@ -1996,6 +2040,30 @@ export interface components {
             /** First Name */
             first_name: string | null;
         };
+        /**
+         * HouseholdDeletionIn
+         * @description The requesting admin's own password, and the household's name typed out.
+         */
+        HouseholdDeletionIn: {
+            /** Household Name */
+            household_name: string;
+            /** Password */
+            password: string;
+        };
+        /**
+         * HouseholdDeletionOut
+         * @description ADR-0017 §4. `delete_after` null: nothing scheduled.
+         */
+        HouseholdDeletionOut: {
+            /** Delete After */
+            delete_after: string | null;
+            /** Household Name */
+            household_name: string;
+            /** Requested At */
+            requested_at: string | null;
+            /** Requested By */
+            requested_by: string | null;
+        };
         /** JoinIn */
         JoinIn: {
             /** Device Label */
@@ -3318,6 +3386,125 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    export_api_v1_admin_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The export zip */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": unknown;
+                };
+            };
+        };
+    };
+    deletion_status_api_v1_admin_household_deletion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDeletionOut"];
+                };
+            };
+        };
+    };
+    request_deletion_api_v1_admin_household_deletion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HouseholdDeletionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDeletionOut"];
+                };
+            };
+            /** @description Wrong password */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Already scheduled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The typed name doesn't match */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Too many wrong passwords for this account */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    cancel_deletion_api_v1_admin_household_deletion_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdDeletionOut"];
+                };
+            };
+            /** @description Nothing is scheduled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

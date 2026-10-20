@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     INVITE_EMAIL_LIMIT: int = 3
     INVITE_WINDOW_SECONDS: int = 3600
 
+    # --- Household deletion (ADR-0017 §4) ---
+    # The wait between an admin asking and the worker erasing; any admin can cancel meanwhile.
+    HOUSEHOLD_DELETE_GRACE_DAYS: int = 7
+
     # --- TMDB (03-backend.md "Candidates") ---
     # Server-only. Unset token = TMDB off: search answers 503 and the shortlist takes typed
     # titles. Locally and in CI the base URL points at the tmdb-fake service.

@@ -14,7 +14,8 @@ import type { VotingMethod } from "@/lib/api";
 import { passwordProblem } from "@/lib/password";
 
 export type Role = "admin" | "host";
-export type GroupId = "joining" | "nights" | "streaming" | "accounts" | "account" | "browser";
+export type GroupId =
+  "joining" | "nights" | "streaming" | "accounts" | "data" | "account" | "browser";
 export type Group = { id: GroupId; label: string; adminOnly: boolean };
 
 export const SETTINGS_GROUPS: readonly Group[] = [
@@ -23,6 +24,8 @@ export const SETTINGS_GROUPS: readonly Group[] = [
   { id: "streaming", label: "Streaming", adminOnly: true },
   // Issue #71: invite another adult as host or admin.
   { id: "accounts", label: "Hosts & admins", adminOnly: true },
+  // ADR-0017 §4: download everything, or delete the household.
+  { id: "data", label: "Your household's data", adminOnly: true },
   { id: "account", label: "Your account", adminOnly: false },
   { id: "browser", label: "This browser", adminOnly: false },
 ];

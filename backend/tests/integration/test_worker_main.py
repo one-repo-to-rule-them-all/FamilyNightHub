@@ -212,10 +212,15 @@ async def test_startup_and_shutdown(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_worker_settings_registers_only_built_tasks_on_central_time() -> None:
     names = {f.__name__ for f in WorkerSettings.functions}
-    assert names == {"auto_close_stale_sessions", "sweep_orphan_uploads"}
+    assert names == {
+        "auto_close_stale_sessions",
+        "sweep_orphan_uploads",
+        "purge_deleted_households",  # ADR-0017 §4
+    }
     assert {c.name for c in WorkerSettings.cron_jobs} == {
         "cron:auto_close_stale_sessions",
         "cron:sweep_orphan_uploads",
+        "cron:purge_deleted_households",
     }
     assert all(c.unique for c in WorkerSettings.cron_jobs)
     assert str(WorkerSettings.timezone) == "America/Chicago"

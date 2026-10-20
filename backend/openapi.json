@@ -1222,6 +1222,81 @@
         "title": "HelpCountOut",
         "type": "object"
       },
+      "HouseholdDeletionIn": {
+        "description": "The requesting admin's own password, and the household's name typed out.",
+        "properties": {
+          "household_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Household Name",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password",
+          "household_name"
+        ],
+        "title": "HouseholdDeletionIn",
+        "type": "object"
+      },
+      "HouseholdDeletionOut": {
+        "description": "ADR-0017 \u00a74. `delete_after` null: nothing scheduled.",
+        "properties": {
+          "delete_after": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delete After"
+          },
+          "household_name": {
+            "title": "Household Name",
+            "type": "string"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By"
+          }
+        },
+        "required": [
+          "household_name",
+          "requested_at",
+          "requested_by",
+          "delete_after"
+        ],
+        "title": "HouseholdDeletionOut",
+        "type": "object"
+      },
       "JoinIn": {
         "properties": {
           "device_label": {
@@ -4103,6 +4178,109 @@
           }
         },
         "summary": "Revoke Device",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/export": {
+      "get": {
+        "description": "A zip of every table (credential hashes removed) and every photo original. The rows\nare read, and the export audited, before the first byte goes out; photos stream after.",
+        "operationId": "export_api_v1_admin_export_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/zip": {}
+            },
+            "description": "The export zip"
+          }
+        },
+        "summary": "Export",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/household/deletion": {
+      "delete": {
+        "operationId": "cancel_deletion_api_v1_admin_household_deletion_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseholdDeletionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Nothing is scheduled"
+          }
+        },
+        "summary": "Cancel Deletion",
+        "tags": [
+          "admin"
+        ]
+      },
+      "get": {
+        "operationId": "deletion_status_api_v1_admin_household_deletion_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseholdDeletionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Deletion Status",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Schedule the delete HOUSEHOLD_DELETE_GRACE_DAYS ahead and email every admin. A wrong\npassword spends the account's sign-in budget, like changing a password does.",
+        "operationId": "request_deletion_api_v1_admin_household_deletion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HouseholdDeletionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseholdDeletionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Wrong password"
+          },
+          "409": {
+            "description": "Already scheduled"
+          },
+          "422": {
+            "description": "The typed name doesn't match"
+          },
+          "429": {
+            "description": "Too many wrong passwords for this account"
+          }
+        },
+        "summary": "Request Deletion",
         "tags": [
           "admin"
         ]

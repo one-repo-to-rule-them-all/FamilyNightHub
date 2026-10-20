@@ -23,6 +23,7 @@ export type Device = Schemas["DeviceOut"];
 export type JoinResult = Schemas["JoinOut"];
 export type Account = Schemas["AccountOut"];
 export type Consent = Schemas["ConsentOut"];
+export type HouseholdDeletion = Schemas["HouseholdDeletionOut"];
 export type Night = Schemas["SessionOut"];
 export type NightOption = Schemas["OptionOut"];
 export type NightStatus = Night["status"];
@@ -367,6 +368,12 @@ export const api = {
     request<AdminPerson>("PATCH", `/admin/people/${encodeURIComponent(personId)}`, body),
   convertToMember: (personId: string) =>
     request<AdminPerson>("POST", `/admin/people/${encodeURIComponent(personId)}/convert-to-member`),
+  /** The household's scheduled deletion, if any (ADR-0017 §4). */
+  householdDeletion: () => request<HouseholdDeletion>("GET", "/admin/household/deletion"),
+  /** Schedules the delete 7 days out and emails every admin. */
+  scheduleHouseholdDeletion: (body: Schemas["HouseholdDeletionIn"]) =>
+    request<HouseholdDeletion>("POST", "/admin/household/deletion", body),
+  cancelHouseholdDeletion: () => request<HouseholdDeletion>("DELETE", "/admin/household/deletion"),
   /** Erases a person and everything naming them, photos included (ADR-0017 §4). */
   deletePerson: (personId: string) =>
     request<Schemas["PersonDeletedOut"]>("DELETE", `/admin/people/${encodeURIComponent(personId)}`),

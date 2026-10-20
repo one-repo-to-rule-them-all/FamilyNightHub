@@ -32,6 +32,11 @@ class Household(Base):
     # Rotatable (ADR-0002): rotating invalidates the printed fridge QR.
     join_slug: Mapped[str] = mapped_column(String(64), unique=True)
     created_at: Mapped[datetime] = created_at()
+    # ADR-0017 §4: an admin asked for the household to be deleted. The worker erases it (rows
+    # and bucket objects) once `delete_after` passes; until then any admin can cancel.
+    deletion_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deletion_requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    delete_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Account(Base):
