@@ -546,9 +546,10 @@ consumed with `GETDEL`, so it opens exactly one stream.
 response starts; a missing, used, expired or other-night ticket is 401 (and is burned). The
 channel comes from the ticket's night only. The response is `text/event-stream` with
 `Cache-Control: no-cache, no-transform` (keeps the Next proxy from gzip-buffering it, see
-02-environments) and `X-Accel-Buffering: no`. It sends `: connected` right after
-subscribing, `: heartbeat` after 15s of quiet, and ends after 30 minutes so the client
-re-tickets. If Redis fails it sends a `degraded` frame and ends.
+02-environments) and `X-Accel-Buffering: no`. It sends `: connected` once Redis has
+confirmed the SUBSCRIBE (redis-py's `subscribe()` only sends it, and a hint published before
+the confirmation reaches nobody, #82), so the client's `ready` means no hint can be missed;
+then `: heartbeat` after 15s of quiet, and ends after 30 minutes so the client re-tickets. If Redis fails it sends a `degraded` frame and ends.
 
 **Events.** Unnamed `data:` frames, so `EventSource.onmessage` sees all of them:
 `{"type", "session_id", "version"}` and nothing else. The stream rebuilds each frame from

@@ -181,13 +181,19 @@ async def test_after_commit_hooks_run_in_order_and_a_failing_one_does_not_stop_t
 
 
 class FakePubSub:
-    def __init__(self, messages: list[Any]) -> None:
+    """Like redis-py: subscribe() only sends, and the confirmation arrives as a message
+    (after `slow_confirm` empty polls) ahead of anything published."""
+
+    def __init__(self, messages: list[Any], slow_confirm: int = 0) -> None:
         self.messages = messages
+        self.slow_confirm = slow_confirm
         self.subscribed: list[str] = []
         self.closed = False
 
     async def subscribe(self, channel: str) -> None:
         self.subscribed.append(channel)
+        confirm = {"type": "subscribe", "channel": channel, "data": 1}
+        self.messages[:0] = [None] * self.slow_confirm + [confirm]
 
     async def unsubscribe(self, channel: str) -> None:
         self.subscribed.remove(channel)
@@ -195,14 +201,15 @@ class FakePubSub:
     async def aclose(self) -> None:
         self.closed = True
 
-    async def get_message(self, *, ignore_subscribe_messages: bool, timeout: float) -> Any:  # noqa: ASYNC109 - mirrors redis-py
-        assert ignore_subscribe_messages
+    async def get_message(self, *, ignore_subscribe_messages: bool = False, timeout: float) -> Any:  # noqa: ASYNC109 - mirrors redis-py
         assert timeout >= 0
         if not self.messages:
             return None
         item = self.messages.pop(0)
         if isinstance(item, BaseException):
             raise item
+        if ignore_subscribe_messages and item is not None and item["type"] == "subscribe":
+            return None
         return item
 
 
@@ -290,5 +297,31 @@ async def test_closing_the_generator_early_unsubscribes() -> None:
     gen = _gen(pubsub, uuid.uuid4(), FakeClock(step=0.0), heartbeat=100.0, max_seconds=60.0)
     assert await anext(gen) == ": connected\n\n"
     await gen.aclose()
+    assert pubsub.subscribed == []
+    assert pubsub.closed
+
+
+async def test_connected_waits_for_redis_to_confirm_the_subscription() -> None:
+    # A hint published before Redis confirms SUBSCRIBE reaches nobody (#82); ": connected"
+    # is the client's "ready", so it must not go out until the confirmation is read.
+    sid = uuid.uuid4()
+    pubsub = FakePubSub([_published(sid, "status_changed", 1)], slow_confirm=3)
+    gen = _gen(pubsub, sid, FakeClock(step=0.0), heartbeat=100.0, max_seconds=60.0)
+    assert await anext(gen) == ": connected\n\n"
+    assert pubsub.messages == [_published(sid, "status_changed", 1)]  # confirmation consumed
+    assert json.loads((await anext(gen)).removeprefix("data: "))["version"] == 1
+    await gen.aclose()
+
+
+async def test_a_redis_failure_before_confirmation_degrades_the_stream() -> None:
+    class Unconfirmed(FakePubSub):
+        async def subscribe(self, channel: str) -> None:
+            self.subscribed.append(channel)
+            self.messages[:0] = [None, ConnectionError("gone")]
+
+    sid = uuid.uuid4()
+    pubsub = Unconfirmed([])
+    frames = await _drain(_gen(pubsub, sid, FakeClock(step=1.0), max_seconds=60.0))
+    assert frames == [f'data: {{"type": "degraded", "session_id": "{sid}", "version": null}}\n\n']
     assert pubsub.subscribed == []
     assert pubsub.closed

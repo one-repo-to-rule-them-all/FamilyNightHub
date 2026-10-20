@@ -190,6 +190,28 @@ async def test_mutations_reach_an_open_stream_as_hints(two_households: Pair) -> 
             await live.hang_up()
 
 
+async def test_a_hint_published_the_moment_the_stream_connects_arrives(
+    two_households: Pair,
+) -> None:
+    # ": connected" is the client's "ready" (onopen). Before #82 it went out once SUBSCRIBE
+    # was sent, not confirmed, and a publish on another connection could beat it to Redis.
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        sid, _, _ = await _night(host, 2, open_voting=False)
+        ticket = await _ticket(host, sid)
+    channel = publisher.session_channel(uuid.UUID(sid))
+    live = await _open(sid, ticket)
+    try:
+        assert await live.frame() == ": connected\n\n"
+        ((_, count),) = await get_redis().pubsub_numsub(channel)
+        assert count == 1
+        await publisher.publish_session_event(uuid.UUID(sid), "status_changed")
+        assert (await live.event())["type"] == "status_changed"
+    finally:
+        await live.hang_up()
+
+
 async def test_ballots_publish_a_count_hint_with_no_ballot_data(two_households: Pair) -> None:
     a, _ = two_households
     person = await _person(a)
