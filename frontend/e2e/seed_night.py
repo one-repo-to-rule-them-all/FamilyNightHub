@@ -41,12 +41,14 @@ import uuid
 sys.path.insert(0, os.getcwd())
 
 from sqlalchemy import text  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 from app.cli import Bootstrapped, bootstrap, set_password  # noqa: E402
 from app.core.database import household_session  # noqa: E402
 from app.core.hashing import hash_pin  # noqa: E402
 from app.core.security import hash_night_code, sign_account_session  # noqa: E402
 from app.domain import night_code  # noqa: E402
+from app.domain.legal import PRIVACY_VERSION, TERMS_VERSION  # noqa: E402
 from app.services import session_service  # noqa: E402
 
 PEOPLE = [
@@ -79,6 +81,25 @@ MOVIES = [
 ]
 
 
+async def _accept_terms(
+    db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, role: str
+) -> None:
+    await db.execute(
+        text(
+            "INSERT INTO household_consents (household_id, account_id, role, terms_version, "
+            "privacy_version, guardian) VALUES (:h, :a, :r, :t, :p, :g)"
+        ),
+        {
+            "h": household_id,
+            "a": account_id,
+            "r": role,
+            "t": TERMS_VERSION,
+            "p": PRIVACY_VERSION,
+            "g": role == "admin",
+        },
+    )
+
+
 async def seed(
     slug: str,
     movies: int,
@@ -97,6 +118,9 @@ async def seed(
     session_id = None
     titles = MOVIES[:movies]
     async with household_session(created.household_id) as db:
+        # ADR-0017: the admin has accepted the current Terms as a guardian, so the consent
+        # screen and gate stay out of the way of every spec but the one that tests them.
+        await _accept_terms(db, created.household_id, created.account_id, "admin")
         for name, emoji, color in PEOPLE:
             person_id = (
                 await db.execute(
@@ -123,6 +147,7 @@ async def seed(
                     {"h": created.household_id, "e": f"helper-{slug}@e2e.test"},
                 )
             ).scalar_one()
+            await _accept_terms(db, created.household_id, host_id, "host")
         for title, tmdb_id, year, poster, genres in OWNED[:owned]:
             await db.execute(
                 text(

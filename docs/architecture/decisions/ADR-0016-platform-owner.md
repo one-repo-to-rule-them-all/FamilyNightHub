@@ -8,8 +8,8 @@
 bind the household) and [ADR-0009](ADR-0009-pre-auth-lookups-via-definer-functions.md) (one more
 definer function and role).
 
-**Not built yet, by the owner's sequencing:** nothing here is built until the consent and
-multi-household ADR, [ADR-0017](ADR-0017-consent-and-multi-household.md), is accepted. The
+**Sequencing:** built after the consent and multi-household ADR,
+[ADR-0017](ADR-0017-consent-and-multi-household.md) (accepted 2026-10-19), and its prerequisites. The
 platform owner's first feature, creating a household, *is* multi-household, and a family has to be
 told that the operator can open its household before the operator can.
 
@@ -109,7 +109,7 @@ As above.
   one family's photos, ballots and children per entry, and any family on demand. A bug in the
   enter path or in cookie verification reaches every household. Mitigations: CLI-only grant, a
   separate sign-in, short absolute sessions, a per-request operator re-check, an audit the family
-  can see. A second factor on platform sign-in (below) is strongly advised.
+  can see. A second factor on platform sign-in was considered and declined (below).
 - ❌ The promise to families gets weaker: "the operator can open your household, and you'll see
   when they do", not "the operator can't see your photos." ADR-0017 has to say so plainly.
 
@@ -150,8 +150,9 @@ C stays in force until ADR-0017 is accepted and A is built.
   session gets 401 on `/platform`. A revoked operator's cookie dies on the next request. Platform
   writes are audited `via: "platform"`. Account writes are 403 through a platform session. A
   disabled household refuses sign-in and join.
-- **Recommended hardening, owner to decide before the second household:** TOTP on platform
-  sign-in. A's blast radius is the reason. It isn't part of this decision.
+- **TOTP on platform sign-in: declined by the owner (2026-10-19).** The password re-entry,
+  4-hour absolute session, CLI-only grant and family-visible audit are the controls. Revisit if
+  the platform ever has more than one operator.
 - `bootstrap` remains only for the very first household and operator.
 
 ## Owner decision

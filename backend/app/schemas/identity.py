@@ -94,6 +94,30 @@ class PasswordIn(BaseModel):
     new_password: Password
 
 
+class ConsentOut(BaseModel):
+    """ADR-0017 §2. `account_accepted` false: show the consent screen to this account.
+    `household_accepted` false: new people, phones and photos are refused (409
+    `consent_required`) until an admin accepts."""
+
+    terms_version: str
+    privacy_version: str
+    account_accepted: bool
+    household_accepted: bool
+
+
+class ConsentIn(BaseModel):
+    """The versions the page showed; a stale page is 422. Admins must set `guardian`."""
+
+    terms_version: str = Field(max_length=32)
+    privacy_version: str = Field(max_length=32)
+    guardian: bool = False
+
+
+class LegalOut(BaseModel):
+    terms_version: str
+    privacy_version: str
+
+
 class AccountOut(BaseModel):
     id: uuid.UUID
     email: str
@@ -102,6 +126,7 @@ class AccountOut(BaseModel):
     display_name: str
     role: Literal["admin", "host"]
     household_name: str
+    consent: ConsentOut
 
 
 class EnrollIn(BaseModel):

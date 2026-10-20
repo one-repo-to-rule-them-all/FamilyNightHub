@@ -2,11 +2,12 @@
 
 ## Status
 
-**Proposed: needs the owner's approval** (issue #77). This is the ADR that
-[ADR-0003](ADR-0003-household-scoping-app-plus-rls.md) ("multi-household requires a new ADR
-covering parental consent, privacy policy, retention and deletion"),
+**Accepted (owner decision 2026-10-19, issue #77), all six sections as drafted.** This is the
+ADR that [ADR-0003](ADR-0003-household-scoping-app-plus-rls.md) ("multi-household requires a new
+ADR covering parental consent, privacy policy, retention and deletion"),
 [BUILD-PROMPT](../BUILD-PROMPT.md) Phase 3+ and [ADR-0016](ADR-0016-platform-owner.md) wait on.
-Nothing in the code implements it, and ADR-0016's platform owner isn't built until it is accepted.
+Built in the order under Consequences; [03-backend.md](../03-backend.md) "Consent" and
+"Household deletion" describe what landed.
 
 Not legal advice. The COPPA points below are a cautious engineering reading. A short legal review
 is a precondition of step 2 (below), not something this ADR can replace.
@@ -44,9 +45,12 @@ first admin. There's no signup page, billing or self-serve onboarding.
 
 ### 2. The first admin consents, as parent or guardian, before any child data exists
 
-- Accepting the ADR-0015 invite as a **household's first admin** adds a required consent step
-  before the password is set. The first admin confirms they are a parent or legal guardian of the
-  children they'll add and accepts the current **Terms** and **Privacy Policy**.
+- Every account's first visit to the portal (right after the ADR-0015 invite sets its password,
+  or the next sign-in after a version change) shows a consent screen in place of every portal
+  page. An admin confirms they are a parent or legal guardian of the children they'll add and
+  accepts the current **Terms** and **Privacy Policy**; a host accepts the documents only. The
+  screen sits after the password rather than inside the invite form so it can also catch version
+  changes; the gate below holds in between.
 - A new table `household_consents (household_id, account_id, terms_version, privacy_version,
   accepted_at)` is under RLS, and rows are never updated or deleted (corrections are new rows).
 - **Gate:** until the household has a consent row for the current versions, the API refuses to
@@ -127,13 +131,14 @@ ADR-0003 named consent as the condition.
 - 05-data.md gains `household_consents`, and 03-backend.md gains "Consent" and "Household
   deletion".
 
-## Owner decision needed
+## Owner decision
 
-- [ ] §1 Operator-created households only, no public signup.
-- [ ] §2 First-admin consent with a hard gate, plus a legal review before any family outside the
+- [x] §1 Operator-created households only, no public signup.
+- [x] §2 First-admin consent with a hard gate, plus a legal review before any family outside the
       owner's own.
-- [ ] §3 Terms and Privacy items, including the operator-access disclosure.
-- [ ] §4 Export, household delete (7 days live, 60 days backups), person delete.
-- [ ] §5 Accept the email-uniqueness leak until public signup.
-- [ ] §6 Platform view fields as listed.
-- [ ] Or: change any of the above, with reasons recorded here.
+- [x] §3 Terms and Privacy items, including the operator-access disclosure.
+- [x] §4 Export, household delete (7 days live, 60 days backups), person delete.
+- [x] §5 Accept the email-uniqueness leak until public signup.
+- [x] §6 Platform view fields as listed.
+
+All accepted as drafted on 2026-10-19.

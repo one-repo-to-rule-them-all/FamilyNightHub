@@ -22,6 +22,7 @@ export type Binding = Schemas["BindingOut"];
 export type Device = Schemas["DeviceOut"];
 export type JoinResult = Schemas["JoinOut"];
 export type Account = Schemas["AccountOut"];
+export type Consent = Schemas["ConsentOut"];
 export type Night = Schemas["SessionOut"];
 export type NightOption = Schemas["OptionOut"];
 export type NightStatus = Night["status"];
@@ -250,6 +251,8 @@ export const api = {
   /** Consumes the emailed link: sets `new_password` and signs in. */
   verifyMagicLink: (body: Schemas["VerifyIn"]) => request<Account>("POST", "/auth/verify", body),
   me: () => request<Account>("GET", "/auth/me"),
+  /** Accept the current Terms and Privacy Policy (ADR-0017); admins also confirm guardianship. */
+  consent: (body: Schemas["ConsentIn"]) => request<Consent>("POST", "/auth/consent", body),
   logout: () => request<void>("POST", "/auth/logout"),
   /** The night as every screen sees it (no ballots; `result` only from reveal on). */
   night: (sessionId: string) => request<Night>("GET", `/sessions/${encodeURIComponent(sessionId)}`),

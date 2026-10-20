@@ -26,7 +26,7 @@ from app.domain.session_state import SessionRuleError
 from app.integrations.storage import JPEG, PUT_TTL_SECONDS, PhotoStorage, StorageUnavailable
 from app.realtime import events
 from app.realtime.publisher import publish_after_commit
-from app.services import people_service
+from app.services import consent_service, people_service
 from app.services.errors import Conflict, Invalid, NotFound, Unavailable
 
 # The photos.bytes check constraint (migration 0001) and ADR-0005.
@@ -153,6 +153,7 @@ async def create(
 ) -> CreatedPhoto:
     status = await _session_status(db, household_id, session_id)
     await people_service.require_can_act_as(db, device_id, person_id)
+    await consent_service.require_household_consent(db)
     try:
         session_state.check_photos_open(status)
     except SessionRuleError as err:

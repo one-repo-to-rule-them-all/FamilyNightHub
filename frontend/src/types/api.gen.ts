@@ -462,6 +462,27 @@ export interface paths {
         patch: operations["update_settings_api_v1_admin_settings_patch"];
         trace?: never;
     };
+    "/api/v1/auth/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Consent
+         * @description Accept the current Terms and Privacy Policy (ADR-0017 §2). An admin's acceptance,
+         *     with `guardian`, opens the household's consent gate.
+         */
+        post: operations["consent_api_v1_auth_consent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -836,6 +857,23 @@ export interface paths {
         put?: never;
         /** Join */
         post: operations["join_api_v1_join_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/legal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Versions */
+        get: operations["versions_api_v1_legal_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1497,6 +1535,7 @@ export interface components {
         };
         /** AccountOut */
         AccountOut: {
+            consent: components["schemas"]["ConsentOut"];
             /** Display Name */
             display_name: string;
             /** Email */
@@ -1786,6 +1825,37 @@ export interface components {
              */
             requested_at: string;
         };
+        /**
+         * ConsentIn
+         * @description The versions the page showed; a stale page is 422. Admins must set `guardian`.
+         */
+        ConsentIn: {
+            /**
+             * Guardian
+             * @default false
+             */
+            guardian: boolean;
+            /** Privacy Version */
+            privacy_version: string;
+            /** Terms Version */
+            terms_version: string;
+        };
+        /**
+         * ConsentOut
+         * @description ADR-0017 §2. `account_accepted` false: show the consent screen to this account.
+         *     `household_accepted` false: new people, phones and photos are refused (409
+         *     `consent_required`) until an admin accepts.
+         */
+        ConsentOut: {
+            /** Account Accepted */
+            account_accepted: boolean;
+            /** Household Accepted */
+            household_accepted: boolean;
+            /** Privacy Version */
+            privacy_version: string;
+            /** Terms Version */
+            terms_version: string;
+        };
         /** CorrectWinnerIn */
         CorrectWinnerIn: {
             /**
@@ -1961,6 +2031,13 @@ export interface components {
         JoinSlugOut: {
             /** Join Slug */
             join_slug: string;
+        };
+        /** LegalOut */
+        LegalOut: {
+            /** Privacy Version */
+            privacy_version: string;
+            /** Terms Version */
+            terms_version: string;
         };
         /** LoginIn */
         LoginIn: {
@@ -3830,6 +3907,37 @@ export interface operations {
             };
         };
     };
+    consent_api_v1_auth_consent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentOut"];
+                };
+            };
+            /** @description Stale versions, or an admin without `guardian` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     login_api_v1_auth_login_post: {
         parameters: {
             query?: never;
@@ -4597,6 +4705,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    versions_api_v1_legal_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegalOut"];
+                };
             };
         };
     };

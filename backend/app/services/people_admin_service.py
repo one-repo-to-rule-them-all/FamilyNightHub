@@ -20,6 +20,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services import consent_service
 from app.services.errors import Conflict, NotFound
 
 
@@ -159,6 +160,7 @@ async def create(
     color: str,
     is_guest: bool,
 ) -> Person:
+    await consent_service.require_household_consent(db)
     await lock_names(db, household_id)
     await require_unique_name(db, name)
     row = (

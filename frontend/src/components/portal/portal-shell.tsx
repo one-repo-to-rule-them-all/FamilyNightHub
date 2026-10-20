@@ -32,6 +32,7 @@ import {
   pastNights,
 } from "@/lib/portal-shell";
 
+import { ConsentGate } from "./consent-gate";
 import { PortalSidebar, PortalTabBar } from "./portal-nav";
 
 function readHiddenRaw(): string | null {
@@ -185,7 +186,11 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           ) : null}
         </header>
         <main className="flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 pt-6 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] sm:px-6 md:px-8 md:pb-8">
-          {children}
+          {me.data && !me.data.consent.account_accepted ? (
+            <ConsentGate account={me.data} />
+          ) : (
+            children
+          )}
         </main>
       </div>
       {me.data ? (

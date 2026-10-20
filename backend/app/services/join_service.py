@@ -18,7 +18,7 @@ from app.core.database import AsyncSessionLocal, household_session
 from app.core.dependencies import resolve_device_token
 from app.core.security import hash_device_token, hash_night_code, new_token
 from app.domain import night_code
-from app.services import device_idle
+from app.services import consent_service, device_idle
 from app.services.errors import InvalidJoin
 
 
@@ -79,6 +79,8 @@ async def join(
                     {"h": household_id, "d": device_id, "s": session_id},
                 )
         else:
+            # ADR-0017: no new phone until an admin has accepted the Terms as a guardian.
+            await consent_service.require_household_consent(db)
             token = new_token()
             device_id = (
                 await db.execute(

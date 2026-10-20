@@ -41,7 +41,7 @@ The numbered docs go **broad → narrow**.
 | Passwords for accounts, a required 6-digit PIN per person, admin-approved PIN resets (supersedes parts of ADR-0002) | [`ADR-0014`](decisions/ADR-0014-passwords-and-person-pins.md) |
 | Admins invite hosts and admins by email; invitees choose their own password; the last admin can't be removed | [`ADR-0015`](decisions/ADR-0015-inviting-hosts-and-admins.md) |
 | Platform owner: a super-admin who enters one household at a time, never bypassing RLS (accepted; built after ADR-0017) | [`ADR-0016`](decisions/ADR-0016-platform-owner.md) |
-| **Proposed, awaiting owner approval:** consent, privacy and deletion before a second household | [`ADR-0017`](decisions/ADR-0017-consent-and-multi-household.md) |
+| Consent, privacy and deletion before a second household: operator-created households, a consent gate, export and delete | [`ADR-0017`](decisions/ADR-0017-consent-and-multi-household.md) |
 
 ## The 30-second mental model
 

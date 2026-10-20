@@ -45,6 +45,9 @@
       },
       "AccountOut": {
         "properties": {
+          "consent": {
+            "$ref": "#/components/schemas/ConsentOut"
+          },
           "display_name": {
             "title": "Display Name",
             "type": "string"
@@ -93,7 +96,8 @@
           "has_password",
           "display_name",
           "role",
-          "household_name"
+          "household_name",
+          "consent"
         ],
         "title": "AccountOut",
         "type": "object"
@@ -807,6 +811,61 @@
         "title": "ClaimOut",
         "type": "object"
       },
+      "ConsentIn": {
+        "description": "The versions the page showed; a stale page is 422. Admins must set `guardian`.",
+        "properties": {
+          "guardian": {
+            "default": false,
+            "title": "Guardian",
+            "type": "boolean"
+          },
+          "privacy_version": {
+            "maxLength": 32,
+            "title": "Privacy Version",
+            "type": "string"
+          },
+          "terms_version": {
+            "maxLength": 32,
+            "title": "Terms Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "terms_version",
+          "privacy_version"
+        ],
+        "title": "ConsentIn",
+        "type": "object"
+      },
+      "ConsentOut": {
+        "description": "ADR-0017 \u00a72. `account_accepted` false: show the consent screen to this account.\n`household_accepted` false: new people, phones and photos are refused (409\n`consent_required`) until an admin accepts.",
+        "properties": {
+          "account_accepted": {
+            "title": "Account Accepted",
+            "type": "boolean"
+          },
+          "household_accepted": {
+            "title": "Household Accepted",
+            "type": "boolean"
+          },
+          "privacy_version": {
+            "title": "Privacy Version",
+            "type": "string"
+          },
+          "terms_version": {
+            "title": "Terms Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "terms_version",
+          "privacy_version",
+          "account_accepted",
+          "household_accepted"
+        ],
+        "title": "ConsentOut",
+        "type": "object"
+      },
       "CorrectWinnerIn": {
         "properties": {
           "option_id": {
@@ -1252,6 +1311,24 @@
           "join_slug"
         ],
         "title": "JoinSlugOut",
+        "type": "object"
+      },
+      "LegalOut": {
+        "properties": {
+          "privacy_version": {
+            "title": "Privacy Version",
+            "type": "string"
+          },
+          "terms_version": {
+            "title": "Terms Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "terms_version",
+          "privacy_version"
+        ],
+        "title": "LegalOut",
         "type": "object"
       },
       "LoginIn": {
@@ -4803,6 +4880,41 @@
         ]
       }
     },
+    "/api/v1/auth/consent": {
+      "post": {
+        "description": "Accept the current Terms and Privacy Policy (ADR-0017 \u00a72). An admin's acceptance,\nwith `guardian`, opens the household's consent gate.",
+        "operationId": "consent_api_v1_auth_consent_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Stale versions, or an admin without `guardian`"
+          }
+        },
+        "summary": "Consent",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "description": "Sets the `fnh_session` cookie. Every failure looks the same: no user enumeration.\nA spent budget is refused before the password is checked.",
@@ -5634,6 +5746,27 @@
         "summary": "Join",
         "tags": [
           "join"
+        ]
+      }
+    },
+    "/api/v1/legal": {
+      "get": {
+        "operationId": "versions_api_v1_legal_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Versions",
+        "tags": [
+          "legal"
         ]
       }
     },

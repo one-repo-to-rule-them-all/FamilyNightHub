@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import time
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import household_session
@@ -15,13 +17,15 @@ from app.core.security import clear_account_cookie, set_account_cookie, sign_acc
 from app.integrations.email import EmailSender, email_sender, send_safely
 from app.schemas.identity import (
     AccountOut,
+    ConsentIn,
+    ConsentOut,
     LoginIn,
     MagicLinkIn,
     MagicLinkOut,
     PasswordIn,
     VerifyIn,
 )
-from app.services import auth_service
+from app.services import auth_service, consent_service
 from app.services.errors import Invalid
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -99,8 +103,7 @@ async def login(body: LoginIn, response: Response) -> AccountOut:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, BAD_LOGIN) from None
     _sign_in(response, signed_in)
     async with household_session(signed_in.household_id) as db:
-        summary = await auth_service.account_summary(db, signed_in.account_id)
-    return _account_out(summary)
+        return await _account_out(db, signed_in.account_id)
 
 
 @router.post(
@@ -186,13 +189,36 @@ async def verify(body: VerifyIn, response: Response) -> AccountOut:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, err.reason) from None
     _sign_in(response, signed_in)
     async with household_session(signed_in.household_id) as db:
-        summary = await auth_service.account_summary(db, signed_in.account_id)
-    return _account_out(summary)
+        return await _account_out(db, signed_in.account_id)
 
 
 @router.get("/me", response_model=AccountOut)
 async def me(account: CurrentAccount, db: AccountDb) -> AccountOut:
-    return _account_out(await auth_service.account_summary(db, account.account_id))
+    return await _account_out(db, account.account_id)
+
+
+@router.post(
+    "/consent",
+    response_model=ConsentOut,
+    dependencies=[CsrfProtected],
+    responses={422: {"description": "Stale versions, or an admin without `guardian`"}},
+)
+async def consent(body: ConsentIn, account: CurrentAccount, db: AccountDb) -> ConsentOut:
+    """Accept the current Terms and Privacy Policy (ADR-0017 §2). An admin's acceptance,
+    with `guardian`, opens the household's consent gate."""
+    try:
+        result = await consent_service.accept(
+            db,
+            account.household_id,
+            account.account_id,
+            account.role,
+            terms_version=body.terms_version,
+            privacy_version=body.privacy_version,
+            guardian=body.guardian,
+        )
+    except Invalid as err:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, err.reason) from None
+    return _consent_out(result)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, dependencies=[CsrfProtected])
@@ -200,7 +226,18 @@ async def logout(response: Response) -> None:
     clear_account_cookie(response)
 
 
-def _account_out(summary: auth_service.AccountSummary) -> AccountOut:
+def _consent_out(c: consent_service.ConsentStatus) -> ConsentOut:
+    return ConsentOut(
+        terms_version=c.terms_version,
+        privacy_version=c.privacy_version,
+        account_accepted=c.account_accepted,
+        household_accepted=c.household_accepted,
+    )
+
+
+async def _account_out(db: AsyncSession, account_id: uuid.UUID) -> AccountOut:
+    summary = await auth_service.account_summary(db, account_id)
+    consent = await consent_service.status(db, account_id, summary.role)
     return AccountOut(
         id=summary.id,
         email=summary.email,
@@ -209,4 +246,5 @@ def _account_out(summary: auth_service.AccountSummary) -> AccountOut:
         display_name=summary.display_name,
         role=summary.role,  # validated by AccountOut; DB check constraint is admin/host
         household_name=summary.household_name,
+        consent=_consent_out(consent),
     )
