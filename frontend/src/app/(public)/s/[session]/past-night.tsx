@@ -25,6 +25,7 @@ import {
 import { hereTonight } from "@/lib/here-tonight";
 import { HOME_COPY, pastNightKind, readWrapNight, writeWrapNight } from "@/lib/home";
 import type { LiveState } from "@/lib/live";
+import { mayRate } from "@/lib/rating";
 import { cn } from "@/lib/utils";
 
 import { ScreenTitle } from "./screen-title";
@@ -39,15 +40,17 @@ const HISTORY_BACK = { href: "/history", label: HOME_COPY.hist.title };
 /**
  * That's a wrap's one primary (guest-home §5 H3w): the inline **Go to tonight's movie night** link
  * when a newer night is on, else the star row while this person hasn't rated, else **Back to
- * Home**. `null` while the rating is still loading, so nothing is marked primary twice.
+ * Home**. Someone who wasn't part of the night has no stars to give (issue #91), so it's Back to
+ * Home. `null` while the rating is still loading, so nothing is marked primary twice.
  */
 export function wrapPrimary(input: {
   liveNight: boolean;
   rated: boolean | undefined;
+  attended: boolean | undefined;
 }): "handoff" | "stars" | "home" | null {
   if (input.liveNight) return "handoff";
-  if (input.rated === undefined) return null;
-  return input.rated ? "home" : "stars";
+  if (input.rated === undefined || input.attended === undefined) return null;
+  return input.rated || !input.attended ? "home" : "stars";
 }
 
 /**
@@ -117,7 +120,8 @@ function ThatsAWrap({
     queryFn: () => api.myRatings(night.id),
   });
   const rated = hasRated(ratings.data, current.id);
-  const primary = wrapPrimary({ liveNight: liveNight !== undefined, rated });
+  const attended = mayRate(ratings.data, current.id);
+  const primary = wrapPrimary({ liveNight: liveNight !== undefined, rated, attended });
 
   return (
     <>

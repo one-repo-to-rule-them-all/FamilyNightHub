@@ -243,7 +243,7 @@ test.describe("guest home (#58)", () => {
     browser,
     request,
   }) => {
-    const night = seedNight({ movies: 3, tonight: true });
+    const night = seedNight({ movies: 3, tonight: true, attended: true });
     await page.clock.install();
     await joinAs(page, night, ["Ava"]);
     const mia = await newPhone(browser);
@@ -518,6 +518,11 @@ test.describe("guest home (#58)", () => {
       openVoting: true,
     });
     await hostClosesVoting(request, other(night, b));
+    // Ava was at B too (G8): opening it while it's on records her, so she may rate it (#91).
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/sse-tickets") && r.ok()),
+      page.goto(`/s/${b}`),
+    ]);
     await hostClosesWhenSettled(request, night, night.sessionId);
     await hostClosesWhenSettled(request, night, b);
 

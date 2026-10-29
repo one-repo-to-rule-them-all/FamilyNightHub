@@ -59,12 +59,15 @@ describe("picksLine", () => {
 });
 
 describe("canRate", () => {
-  it("offers Rate it on an unrated tonight or closed night", () => {
-    expect(canRate({ status: "tonight", rating: null })).toBe(true);
-    expect(canRate({ status: "closed", rating: null })).toBe(true);
+  it("offers Rate it on an unrated tonight or closed night they took part in", () => {
+    expect(canRate({ status: "tonight", rating: null, attended: true })).toBe(true);
+    expect(canRate({ status: "closed", rating: null, attended: true })).toBe(true);
   });
   it("not once rated, nor before tonight", () => {
-    expect(canRate({ status: "closed", rating: 4 })).toBe(false);
-    expect(canRate({ status: "revealed", rating: null })).toBe(false);
+    expect(canRate({ status: "closed", rating: 4, attended: true })).toBe(false);
+    expect(canRate({ status: "revealed", rating: null, attended: true })).toBe(false);
+  });
+  it("not for a night they weren't part of (issue #91)", () => {
+    expect(canRate({ status: "closed", rating: null, attended: false })).toBe(false);
   });
 });

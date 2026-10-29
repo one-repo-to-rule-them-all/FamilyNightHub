@@ -8,6 +8,9 @@ owner decided a person's picks and ratings are family history.
 
 "Picked the winner": for `top3` and `pick_one`, the winner was their rank 1; for
 `approval` (whose ordinals mean nothing, ADR-0010), the winner was among their approvals.
+
+A night is listed if they took part in it (`attendance_service.attended_sql`: present or voted,
+issue #91), or rated or uploaded to it. `attended` says which: only those may be rated.
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain import session_state
+from app.services.attendance_service import attended_sql
 from app.services.errors import NotFound
 
 
@@ -52,6 +56,8 @@ class Night:
     picked_winner: bool
     rating: int | None
     photo_count: int
+    # Took part (present or voted): only then may they rate it.
+    attended: bool
 
 
 @dataclass(frozen=True)
@@ -110,9 +116,10 @@ async def profile(db: AsyncSession, person_id: uuid.UUID) -> Profile:
     nights = (
         await db.execute(
             text(
-                """
+                f"""
                 WITH joined AS (
-                    SELECT session_id FROM ballot_ranks WHERE person_id = :p
+                    SELECT session_id FROM session_attendance WHERE person_id = :p
+                    UNION SELECT session_id FROM ballot_ranks WHERE person_id = :p
                     UNION SELECT session_id FROM ratings WHERE person_id = :p
                     UNION SELECT session_id FROM photos WHERE person_id = :p AND status = 'ready'
                 )
@@ -120,7 +127,8 @@ async def profile(db: AsyncSession, person_id: uuid.UUID) -> Profile:
                        s.winner_option_id, wm.id AS winner_movie_id, wm.title AS winner_title,
                        wm.year AS winner_year, wm.poster_path AS winner_poster, r.score,
                        (SELECT count(*) FROM photos ph WHERE ph.session_id = s.id
-                          AND ph.person_id = :p AND ph.status = 'ready') AS photo_count
+                          AND ph.person_id = :p AND ph.status = 'ready') AS photo_count,
+                       {attended_sql("s.id", ":p")} AS attended
                 FROM sessions s
                 JOIN joined j ON j.session_id = s.id
                 LEFT JOIN options wo ON wo.id = s.winner_option_id AND wo.session_id = s.id
@@ -173,6 +181,7 @@ async def profile(db: AsyncSession, person_id: uuid.UUID) -> Profile:
                 picked_winner=picked,
                 rating=n.score,
                 photo_count=n.photo_count,
+                attended=n.attended,
             )
         )
 

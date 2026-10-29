@@ -50,7 +50,14 @@ export function picksLine(night: Pick<ProfileNight, "picks" | "voting_method">):
   return HISTORY_COPY.picks(titles.join(", "));
 }
 
-/** A **Rate it** button shows while the night can be rated (`tonight`/`closed`) and isn't yet. */
-export function canRate(night: Pick<ProfileNight, "status" | "rating">): boolean {
-  return night.rating === null && (night.status === "tonight" || night.status === "closed");
+/**
+ * A **Rate it** button shows while the night can be rated (`tonight`/`closed`), they took part in
+ * it (present or voted, issue #91) and haven't rated it yet.
+ */
+export function canRate(night: Pick<ProfileNight, "status" | "rating" | "attended">): boolean {
+  return (
+    night.attended &&
+    night.rating === null &&
+    (night.status === "tonight" || night.status === "closed")
+  );
 }

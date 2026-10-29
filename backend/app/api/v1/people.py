@@ -407,6 +407,7 @@ async def person_profile(person_id: uuid.UUID, db: ViewerDb) -> ProfileOut:
                 picked_winner=n.picked_winner,
                 rating=n.rating,
                 photo_count=n.photo_count,
+                attended=n.attended,
             )
             for n in p.nights
         ],

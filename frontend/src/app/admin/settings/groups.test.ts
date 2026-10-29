@@ -22,6 +22,7 @@ describe("visibleGroups", () => {
       "accounts",
       "account",
       "browser",
+      "fresh",
     ]);
     expect(visibleGroups("admin")).toEqual(SETTINGS_GROUPS);
   });

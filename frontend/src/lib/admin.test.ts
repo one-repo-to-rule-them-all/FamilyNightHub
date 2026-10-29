@@ -11,6 +11,9 @@ import {
   cleanName,
   colorChoices,
   describeMerge,
+  describeRemoval,
+  describeStartFresh,
+  startFreshArmed,
   filterPeople,
   deviceName,
   lastSeen,
@@ -307,5 +310,41 @@ describe("reset PIN (#88)", () => {
 
   it("tells the admin who picks the new PIN", () => {
     expect(RESET_PIN_NOTE).toBe("They'll choose a new one on their phone.");
+  });
+});
+
+describe("describeRemoval (#94)", () => {
+  it("lists only what the person has", () => {
+    expect(
+      describeRemoval("Leo", { nights_voted: 2, ratings: 1, photos: 3, reactions: 0, phones: 1 }),
+    ).toBe(
+      "This also deletes their votes on 2 nights, 1 rating, 3 photos they shared and their link to 1 phone. Past winners stay. This can't be undone.",
+    );
+  });
+  it("says so when there is nothing yet", () => {
+    expect(
+      describeRemoval("Typo", { nights_voted: 0, ratings: 0, photos: 0, reactions: 0, phones: 0 }),
+    ).toBe(
+      "Typo hasn't voted, rated or shared anything yet. Past winners stay. This can't be undone.",
+    );
+  });
+});
+
+describe("startFreshArmed (#94)", () => {
+  it("matches the family name ignoring case and outer spaces", () => {
+    expect(startFreshArmed("  the baez family ", "The Baez Family")).toBe(true);
+    expect(startFreshArmed("Baez", "The Baez Family")).toBe(false);
+    expect(startFreshArmed("   ", "  ")).toBe(false);
+  });
+});
+
+describe("describeStartFresh (#94)", () => {
+  it("names what was cleared", () => {
+    expect(describeStartFresh({ people: 4, phones: 6, nights: 5, photos: 0 })).toBe(
+      "Cleared 4 people, 6 phones and 5 nights. Add people on People to start again.",
+    );
+    expect(describeStartFresh({ people: 1, phones: 0, nights: 1, photos: 2 })).toBe(
+      "Cleared 1 person, 0 phones, 1 night and 2 photos. Add people on People to start again.",
+    );
   });
 });

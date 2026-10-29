@@ -388,7 +388,13 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Remove Person
+         * @description Delete a person and everything that is theirs: phone links, PIN requests, attendance,
+         *     votes, ratings, reactions and the photos they shared (issue #84). A night keeps its
+         *     winner. Audited. Can't be undone.
+         */
+        delete: operations["remove_person_api_v1_admin_people__person_id__delete"];
         options?: never;
         head?: never;
         /**
@@ -412,6 +418,26 @@ export interface paths {
          * @description A guest becomes a family member (`is_guest = false`). Idempotent.
          */
         post: operations["convert_to_member_api_v1_admin_people__person_id__convert_to_member_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/people/{person_id}/removal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Removal Preview
+         * @description What removing this person would delete, for the confirm dialog.
+         */
+        get: operations["removal_preview_api_v1_admin_people__person_id__removal_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -482,6 +508,28 @@ export interface paths {
          *     with; `default_age_cap: null` means no cap.
          */
         patch: operations["update_settings_api_v1_admin_settings_patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/start-fresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Fresh
+         * @description Clear every person, phone/TV and night (with their votes, ratings, attendance and
+         *     photos). The household, accounts, settings and movie library stay. The admin types the
+         *     family name to confirm. Audited. Can't be undone (issue #84).
+         */
+        post: operations["start_fresh_api_v1_admin_start_fresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/auth/login": {
@@ -1347,7 +1395,8 @@ export interface paths {
         };
         /**
          * My Ratings
-         * @description Scores of the people actively bound to this phone (null until each has rated).
+         * @description Scores of the people actively bound to this phone (null until each has rated), and
+         *     whether each took part in the night (`attended`: only they may rate it).
          */
         get: operations["my_ratings_api_v1_sessions__session_id__ratings_mine_get"];
         put?: never;
@@ -2165,6 +2214,8 @@ export interface components {
         };
         /** OwnRatingOut */
         OwnRatingOut: {
+            /** Attended */
+            attended: boolean;
             /**
              * Person Id
              * Format: uuid
@@ -2480,6 +2531,8 @@ export interface components {
         };
         /** ProfileNightOut */
         ProfileNightOut: {
+            /** Attended */
+            attended: boolean;
             /**
              * Date
              * Format: date-time
@@ -2629,6 +2682,23 @@ export interface components {
             count: number;
             /** Emoji */
             emoji: string;
+        };
+        /**
+         * RemovalOut
+         * @description What removing a person deletes (issue #84): shown in the confirm dialog, and returned
+         *     by the delete.
+         */
+        RemovalOut: {
+            /** Nights Voted */
+            nights_voted: number;
+            /** Phones */
+            phones: number;
+            /** Photos */
+            photos: number;
+            /** Ratings */
+            ratings: number;
+            /** Reactions */
+            reactions: number;
         };
         /** ReorderIn */
         ReorderIn: {
@@ -2789,6 +2859,22 @@ export interface components {
             expires_in: number;
             /** Ticket */
             ticket: string;
+        };
+        /** StartFreshIn */
+        StartFreshIn: {
+            /** Confirm Name */
+            confirm_name: string;
+        };
+        /** StartFreshOut */
+        StartFreshOut: {
+            /** Nights */
+            nights: number;
+            /** People */
+            people: number;
+            /** Phones */
+            phones: number;
+            /** Photos */
+            photos: number;
         };
         /** TmdbResultOut */
         TmdbResultOut: {
@@ -3663,6 +3749,51 @@ export interface operations {
             };
         };
     };
+    remove_person_api_v1_admin_people__person_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemovalOut"];
+                };
+            };
+            /** @description No such (unmerged) person in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Their photos can't be deleted right now */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     update_person_api_v1_admin_people__person_id__patch: {
         parameters: {
             query?: never;
@@ -3730,6 +3861,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminPersonOut"];
+                };
+            };
+            /** @description No such (unmerged) person in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    removal_preview_api_v1_admin_people__person_id__removal_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemovalOut"];
                 };
             };
             /** @description No such (unmerged) person in this household */
@@ -3887,6 +4056,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    start_fresh_api_v1_admin_start_fresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartFreshIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartFreshOut"];
+                };
+            };
+            /** @description The typed family name doesn't match */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Photos can't be deleted right now */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -5830,7 +6037,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description This phone isn't (actively) bound to that person */
+            /** @description This phone isn't (actively) bound to that person, or (code `not_attended`) that person didn't take part in the night */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5922,7 +6129,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description This phone isn't (actively) bound to that person */
+            /** @description This phone isn't (actively) bound to that person, or (code `not_attended`) that person didn't take part in the night */
             403: {
                 headers: {
                     [name: string]: unknown;

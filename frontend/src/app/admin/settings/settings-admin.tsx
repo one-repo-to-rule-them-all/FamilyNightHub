@@ -10,7 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ModalDialog } from "@/components/ui/modal-dialog";
-import { AGE_CAPS, MAX_STREAMING_PROVIDERS, NO_AGE_CAP, toggleProvider } from "@/lib/admin";
+import {
+  AGE_CAPS,
+  describeStartFresh,
+  MAX_STREAMING_PROVIDERS,
+  NO_AGE_CAP,
+  startFreshArmed,
+  toggleProvider,
+} from "@/lib/admin";
 import {
   type Account,
   type ApiError,
@@ -18,6 +25,7 @@ import {
   type Schemas,
   type VotingMethod,
   api,
+  type StartFreshResult,
 } from "@/lib/api";
 import { joinUrl } from "@/lib/join-link";
 import { PASSWORD_MIN } from "@/lib/password";
@@ -94,6 +102,7 @@ export function SettingsAdmin() {
     accounts: isAdmin ? <HostsAdmins /> : null,
     account: <YourAccount account={me.data} look={look("account")} onDirty={onDirty} />,
     browser: <ThisBrowser />,
+    fresh: isAdmin ? <StartFresh familyName={me.data.household_name} /> : null,
   };
 
   return (
@@ -702,5 +711,60 @@ function ThisBrowser() {
         </Button>
       </div>
     </>
+  );
+}
+
+/** #94: clear every person, phone and night. The admin types the family name to arm it. */
+function StartFresh({ familyName }: { familyName: string }) {
+  const queryClient = useQueryClient();
+  const id = useId();
+  const [typed, setTyped] = useState("");
+  const [done, setDone] = useState<string | null>(null);
+  const fresh = useMutation<StartFreshResult, ApiError>({
+    mutationFn: () => api.startFresh(typed),
+    onSuccess: (result) => {
+      setTyped("");
+      setDone(describeStartFresh(result));
+      void queryClient.invalidateQueries();
+    },
+  });
+  const armed = startFreshArmed(typed, familyName);
+  return (
+    <div className="flex flex-col gap-3" data-testid="start-fresh">
+      <p className="text-sm text-muted-foreground">
+        Clears every person, phone, TV and night, with their votes, ratings and photos. Your family,
+        accounts, settings and movie library stay. Every phone joins again with tonight&apos;s code.
+        This can&apos;t be undone.
+      </p>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`${id}-name`}>
+          Type <strong>{familyName}</strong> to confirm
+        </Label>
+        <Input
+          id={`${id}-name`}
+          value={typed}
+          autoComplete="off"
+          onChange={(e) => {
+            setTyped(e.target.value);
+            setDone(null);
+          }}
+        />
+      </div>
+      <ApiErrorNotice error={fresh.error} />
+      <div>
+        <Button
+          variant="destructive"
+          size="lg"
+          className="px-4"
+          disabled={!armed || fresh.isPending}
+          onClick={() => fresh.mutate()}
+        >
+          {fresh.isPending ? "Clearing…" : "Start fresh"}
+        </Button>
+      </div>
+      <p aria-live="polite" className="text-sm empty:hidden" data-testid="start-fresh-done">
+        {done}
+      </p>
+    </div>
   );
 }
