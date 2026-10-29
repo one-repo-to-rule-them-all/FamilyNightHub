@@ -183,11 +183,13 @@ afterEach(() => {
 
 describe("wrapPrimary (§5 H3w)", () => {
   it("is the hand-off while a night is live, else stars until rated, then Back to Home", () => {
-    expect(wrapPrimary({ liveNight: true, rated: false })).toBe("handoff");
-    expect(wrapPrimary({ liveNight: true, rated: undefined })).toBe("handoff");
-    expect(wrapPrimary({ liveNight: false, rated: undefined })).toBeNull();
-    expect(wrapPrimary({ liveNight: false, rated: false })).toBe("stars");
-    expect(wrapPrimary({ liveNight: false, rated: true })).toBe("home");
+    expect(wrapPrimary({ liveNight: true, rated: false, attended: true })).toBe("handoff");
+    expect(wrapPrimary({ liveNight: true, rated: undefined, attended: undefined })).toBe("handoff");
+    expect(wrapPrimary({ liveNight: false, rated: undefined, attended: undefined })).toBeNull();
+    expect(wrapPrimary({ liveNight: false, rated: false, attended: true })).toBe("stars");
+    expect(wrapPrimary({ liveNight: false, rated: true, attended: true })).toBe("home");
+    // Issue #91: not part of the night, so no stars to give.
+    expect(wrapPrimary({ liveNight: false, rated: false, attended: false })).toBe("home");
   });
 });
 
@@ -308,6 +310,7 @@ describe("past nights (§5 H3)", () => {
 
   it("wrap, no live night, unrated: the star row is the one primary (AC-H3.2)", async () => {
     state.latestId = "n1";
+    state.ratings = [{ person_id: "p1", score: null, attended: true }];
     await show(makeNight("closed"));
     expect(primaries()).toHaveLength(1);
     expect(primaries()[0].querySelector('[data-testid="rating-panel"]')).not.toBeNull();
@@ -315,11 +318,19 @@ describe("past nights (§5 H3)", () => {
 
   it("wrap, no live night, rated: Back to Home is the one primary (AC-H3.2)", async () => {
     state.latestId = "n1";
-    state.ratings = [{ person_id: "p1", score: 4 } as OwnRating];
+    state.ratings = [{ person_id: "p1", score: 4, attended: true }];
     await show(makeNight("closed"));
     expect(primaries()).toHaveLength(1);
     expect(primaries()[0].textContent).toBe("Back to Home");
     expect(primaries()[0].getAttribute("href")).toBe("/");
+  });
+
+  it("wrap, not part of the night: Back to Home is the one primary (issue #91)", async () => {
+    state.latestId = "n1";
+    state.ratings = [{ person_id: "p1", score: null, attended: false }];
+    await show(makeNight("closed"));
+    expect(primaries()).toHaveLength(1);
+    expect(primaries()[0].textContent).toBe("Back to Home");
   });
 
   it("wrap with a newer night live: the small live-night link is the one primary (AC-H3.1)", async () => {

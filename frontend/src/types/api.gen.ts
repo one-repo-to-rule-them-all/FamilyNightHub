@@ -1395,7 +1395,8 @@ export interface paths {
         };
         /**
          * My Ratings
-         * @description Scores of the people actively bound to this phone (null until each has rated).
+         * @description Scores of the people actively bound to this phone (null until each has rated), and
+         *     whether each took part in the night (`attended`: only they may rate it).
          */
         get: operations["my_ratings_api_v1_sessions__session_id__ratings_mine_get"];
         put?: never;
@@ -2213,6 +2214,8 @@ export interface components {
         };
         /** OwnRatingOut */
         OwnRatingOut: {
+            /** Attended */
+            attended: boolean;
             /**
              * Person Id
              * Format: uuid
@@ -2528,6 +2531,8 @@ export interface components {
         };
         /** ProfileNightOut */
         ProfileNightOut: {
+            /** Attended */
+            attended: boolean;
             /**
              * Date
              * Format: date-time
@@ -6032,7 +6037,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description This phone isn't (actively) bound to that person */
+            /** @description This phone isn't (actively) bound to that person, or (code `not_attended`) that person didn't take part in the night */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6124,7 +6129,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description This phone isn't (actively) bound to that person */
+            /** @description This phone isn't (actively) bound to that person, or (code `not_attended`) that person didn't take part in the night */
             403: {
                 headers: {
                     [name: string]: unknown;

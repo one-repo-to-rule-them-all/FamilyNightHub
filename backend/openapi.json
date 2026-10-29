@@ -1749,6 +1749,10 @@
       },
       "OwnRatingOut": {
         "properties": {
+          "attended": {
+            "title": "Attended",
+            "type": "boolean"
+          },
           "person_id": {
             "format": "uuid",
             "title": "Person Id",
@@ -1768,7 +1772,8 @@
         },
         "required": [
           "person_id",
-          "score"
+          "score",
+          "attended"
         ],
         "title": "OwnRatingOut",
         "type": "object"
@@ -2436,6 +2441,10 @@
       },
       "ProfileNightOut": {
         "properties": {
+          "attended": {
+            "title": "Attended",
+            "type": "boolean"
+          },
           "date": {
             "format": "date-time",
             "title": "Date",
@@ -2522,7 +2531,8 @@
           "picks",
           "picked_winner",
           "rating",
-          "photo_count"
+          "photo_count",
+          "attended"
         ],
         "title": "ProfileNightOut",
         "type": "object"
@@ -7339,7 +7349,7 @@
             "description": "Successful Response"
           },
           "403": {
-            "description": "This phone isn't (actively) bound to that person"
+            "description": "This phone isn't (actively) bound to that person, or (code `not_attended`) that person didn't take part in the night"
           },
           "404": {
             "description": "No such night (or person) in this household"
@@ -7366,7 +7376,7 @@
     },
     "/api/v1/sessions/{session_id}/ratings/mine": {
       "get": {
-        "description": "Scores of the people actively bound to this phone (null until each has rated).",
+        "description": "Scores of the people actively bound to this phone (null until each has rated), and\nwhether each took part in the night (`attended`: only they may rate it).",
         "operationId": "my_ratings_api_v1_sessions__session_id__ratings_mine_get",
         "parameters": [
           {
@@ -7446,7 +7456,7 @@
             "description": "Successful Response"
           },
           "403": {
-            "description": "This phone isn't (actively) bound to that person"
+            "description": "This phone isn't (actively) bound to that person, or (code `not_attended`) that person didn't take part in the night"
           },
           "404": {
             "description": "No such night (or person) in this household"

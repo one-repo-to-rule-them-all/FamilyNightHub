@@ -19,6 +19,13 @@ class Forbidden(ServiceError):
         self.reason = reason
 
 
+class NotAttended(Forbidden):
+    """403 `not_attended`: rating a night the person didn't take part in (issue #91)."""
+
+    def __init__(self) -> None:
+        super().__init__("You weren't at this one.")
+
+
 class InvalidJoin(ServiceError):
     """Unknown slug, malformed code, wrong code or closed night: one answer for all, so
     the endpoint is not an oracle for which household slugs exist."""

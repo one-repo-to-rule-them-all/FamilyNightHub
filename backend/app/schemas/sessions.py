@@ -307,6 +307,8 @@ class OwnRatingOut(BaseModel):
     person_id: uuid.UUID
     # Null until this person has rated.
     score: int | None
+    # Took part in the night (present or voted): only then may they rate it (issue #91).
+    attended: bool
 
 
 class RatingSummaryOut(BaseModel):
