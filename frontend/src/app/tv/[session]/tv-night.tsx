@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useLiveSession } from "@/hooks/use-live-session";
 import { useVoters } from "@/hooks/use-voters";
 import { useWakeLock } from "@/hooks/use-wake-lock";
+import { fitAvatars, TV_TURNOUT_STEPS, type TvTileSize } from "@/lib/avatar-fit";
 import { api, ApiError, type JoinLink, type Night, type Person, type Schemas } from "@/lib/api";
 import { DEVICE_EXPIRED_COPY, isDeviceExpired } from "@/lib/device-idle";
 import { qrShape, tvJoinUrl } from "@/lib/join-link";
@@ -87,20 +88,31 @@ export function TvNight({ sessionId }: { sessionId: string }) {
   const votedIds = new Set((voters.data ?? []).map((v) => v.person_id));
 
   return (
-    <div className="flex flex-1 flex-col gap-[2em]" data-live={live} data-status={data.status}>
-      <header className="flex items-baseline justify-between gap-[1em]">
-        <h1 className="tv-title">{data.title || "Movie night"}</h1>
-        {live === "reconnecting" ? (
-          <p className="tv-body text-muted-foreground" role="status" data-testid="tv-live-status">
-            Reconnecting…
-          </p>
-        ) : null}
+    <div
+      className="flex min-h-0 flex-1 flex-col gap-[1.5em]"
+      data-live={live}
+      data-status={data.status}
+    >
+      <header className="tv-clear-corner flex min-w-0 items-baseline justify-between gap-[1em]">
+        <h1 className="tv-title min-w-[20%] truncate">{data.title || "Movie night"}</h1>
+        <div className="flex shrink-0 items-baseline gap-[1em]">
+          {data.status === "draft" || data.status === "voting" ? <HelpNudge /> : null}
+          {live === "reconnecting" ? (
+            <p
+              className="tv-body shrink-0 text-muted-foreground"
+              role="status"
+              data-testid="tv-live-status"
+            >
+              Reconnecting…
+            </p>
+          ) : null}
+        </div>
       </header>
 
       {data.status === "draft" || data.status === "voting" ? (
-        <div className="grid flex-1 grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-[2.5em]">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,2fr)_minmax(0,3fr)] grid-rows-[minmax(0,1fr)] gap-[2.5em]">
           <JoinPanel sessionId={data.id} />
-          <div className="flex flex-col gap-[1.5em]">
+          <div className="flex min-h-0 flex-col gap-[1.5em]">
             <Headline night={data} voted={votedIds.size} total={people.data?.length ?? 0} />
             <Turnout
               people={people.data ?? []}
@@ -108,7 +120,6 @@ export function TvNight({ sessionId }: { sessionId: string }) {
               voting={data.status === "voting"}
             />
           </div>
-          <HelpNudge />
         </div>
       ) : null}
 
@@ -132,7 +143,7 @@ function Headline({ night, voted, total }: { night: Night; voted: number; total:
     const n = night.options.length;
     return (
       <div className="flex flex-col gap-[0.5em]">
-        <p className="tv-display">Get comfy</p>
+        <p className="tv-display tv-headline">Get comfy</p>
         <p className="tv-body text-muted-foreground" data-testid="tv-headline">
           The host is picking the shortlist{n > 0 ? ` (${n} so far)` : ""}. Join now so you&apos;re
           ready to vote.
@@ -142,7 +153,7 @@ function Headline({ night, voted, total }: { night: Night; voted: number; total:
   }
   return (
     <div className="flex flex-col gap-[0.5em]">
-      <p className="tv-display">Vote on your phone</p>
+      <p className="tv-display tv-headline">Vote on your phone</p>
       <p className="tv-body text-muted-foreground" data-testid="tv-headline" aria-live="polite">
         {voted} of {total} voted
       </p>
@@ -151,7 +162,8 @@ function Headline({ night, voted, total }: { night: Night; voted: number; total:
 }
 
 /**
- * The lobby's corner line while a phone's person claim waits for the host (spec §5 TV, G4).
+ * The lobby's header line while a phone's person claim waits for the host (spec §5 TV, G4). In
+ * the header, not floating, so it never covers the turnout tiles (issue #90).
  * Pending claims only: PIN resets are admin-only and never reach the TV. A 403 (this device
  * isn't the household's TV) stops the polling and shows nothing.
  */
@@ -166,7 +178,7 @@ function HelpNudge() {
   return (
     <p
       role="status"
-      className="tv-body fixed right-[1.5em] bottom-[1.5em] max-w-[24em] rounded-2xl bg-card px-[1em] py-[0.6em] ring-1 ring-foreground/10 empty:hidden"
+      className="tv-small max-w-[20em] truncate rounded-full bg-card px-[0.9em] py-[0.3em] ring-1 ring-foreground/10 empty:hidden"
       data-testid="tv-help"
     >
       {name ? (
@@ -178,7 +190,49 @@ function HelpNudge() {
   );
 }
 
-/** Turnout tiles: one per person, lit once their ballot is in. Never what they picked. */
+/**
+ * Each tile size with its column count (lib/avatar-fit.ts picks one from the head count), sized
+ * to fit the lobby's right column at 16:9 without scrolling: about 37em × 21em (issue #90). The
+ * avatar's box is 1.6 of its own font size, so `avatar` sets the whole avatar.
+ */
+const TILE: Record<
+  TvTileSize,
+  { grid: string; tile: string; avatar: string; name: string; check: string }
+> = {
+  xl: {
+    grid: "grid-cols-3 gap-[1em]",
+    tile: "gap-[0.3em] p-[0.8em]",
+    avatar: "text-[3.1em]",
+    name: "text-[1.5em]",
+    check: "size-[1.4em]",
+  },
+  lg: {
+    grid: "grid-cols-4 gap-[0.8em]",
+    tile: "gap-[0.3em] p-[0.5em]",
+    avatar: "text-[2.1em]",
+    name: "text-[1.15em]",
+    check: "size-[1.2em]",
+  },
+  md: {
+    grid: "grid-cols-5 gap-[0.6em]",
+    tile: "gap-[0.2em] p-[0.4em]",
+    avatar: "text-[1.6em]",
+    name: "text-[0.95em]",
+    check: "size-[1em]",
+  },
+  sm: {
+    grid: "grid-cols-6 gap-[0.5em]",
+    tile: "gap-[0.15em] p-[0.3em]",
+    avatar: "text-[1.25em]",
+    name: "text-[0.8em]",
+    check: "size-[0.9em]",
+  },
+};
+
+/**
+ * Turnout tiles: one per person, lit once their ballot is in. Never what they picked. As the
+ * household grows the tiles shrink, and past 30 the rest fold into a "+N" tile.
+ */
 function Turnout({
   people,
   voted,
@@ -188,12 +242,15 @@ function Turnout({
   voted: Set<string>;
   voting: boolean;
 }) {
+  const fit = fitAvatars(people.length, TV_TURNOUT_STEPS);
+  const t = TILE[fit.size];
   return (
     <ul
-      className="grid grid-cols-[repeat(auto-fill,minmax(7.5em,1fr))] gap-[1em]"
+      className={cn("grid min-h-0 content-start", t.grid)}
       aria-label="Turnout"
+      data-size={fit.size}
     >
-      {people.map((person) => {
+      {people.slice(0, fit.shown).map((person) => {
         const done = voting && voted.has(person.id);
         return (
           <li
@@ -203,7 +260,8 @@ function Turnout({
             data-voted={done}
             aria-label={done ? `${person.name} has voted` : person.name}
             className={cn(
-              "tv-tile relative flex flex-col items-center gap-[0.4em] rounded-2xl bg-card p-[0.8em] ring-1 ring-foreground/10",
+              "tv-tile relative flex min-w-0 flex-col items-center rounded-2xl bg-card ring-1 ring-foreground/10",
+              t.tile,
               voting && !done && "opacity-45",
               done && "marquee-glow",
             )}
@@ -211,20 +269,34 @@ function Turnout({
             <Avatar
               emoji={person.avatar_emoji}
               color={person.color}
-              className="size-[3.6em] text-[2.2em]"
+              className={cn("size-[1.6em] shrink-0", t.avatar)}
             />
-            <span aria-hidden className="tv-body leading-tight">
+            <span aria-hidden className={cn("w-full truncate text-center leading-tight", t.name)}>
               {person.name}
             </span>
             {done ? (
               <Check
                 aria-hidden
-                className="absolute top-[0.4em] right-[0.4em] size-[1.4em] text-cinema"
+                className={cn("absolute top-[0.3em] right-[0.3em] text-cinema", t.check)}
               />
             ) : null}
           </li>
         );
       })}
+      {fit.more > 0 ? (
+        <li
+          data-testid="tv-tile-more"
+          aria-label={`and ${fit.more} more`}
+          className={cn(
+            "flex min-w-0 flex-col items-center justify-center rounded-2xl bg-card text-muted-foreground ring-1 ring-foreground/10",
+            t.tile,
+          )}
+        >
+          <span aria-hidden className="text-[1.5em] font-semibold tabular-nums">
+            +{fit.more}
+          </span>
+        </li>
+      ) : null}
     </ul>
   );
 }
@@ -258,7 +330,7 @@ function JoinPanel({ sessionId }: { sessionId: string }) {
   return (
     <section
       aria-labelledby="tv-join"
-      className="flex flex-col items-center justify-center gap-[1.2em] rounded-3xl bg-card p-[1.5em] text-center ring-1 ring-foreground/10"
+      className="flex min-h-0 flex-col items-center justify-center gap-[1em] rounded-3xl bg-card p-[1.2em] text-center ring-1 ring-foreground/10"
     >
       <h2 id="tv-join" className="tv-body text-muted-foreground">
         {!url
@@ -267,7 +339,12 @@ function JoinPanel({ sessionId }: { sessionId: string }) {
             ? "Scan to join"
             : "Scan, then type the code"}
       </h2>
-      {url ? <JoinQr url={url} /> : null}
+      {url ? (
+        // The QR takes the height left over, up to 14em: it gives way before anything scrolls.
+        <div className="flex min-h-[6em] w-full flex-1 items-center justify-center">
+          <JoinQr url={url} />
+        </div>
+      ) : null}
       {code ? (
         <>
           <p className="tv-body text-muted-foreground">{codeInQr ? "or type" : "then enter"}</p>
@@ -296,7 +373,7 @@ function CodeEntry({ onCode }: { onCode: (code: string) => void }) {
   const complete = completeNightCode(value);
   return (
     <form
-      className="flex w-full flex-col gap-[0.6em]"
+      className="flex w-full shrink-0 flex-col gap-[0.6em]"
       onSubmit={(event) => {
         event.preventDefault();
         if (complete) onCode(complete);
@@ -329,7 +406,7 @@ function JoinQr({ url }: { url: string }) {
       role="img"
       aria-label={`QR code for ${url}`}
       viewBox={`${-quiet} ${-quiet} ${size + quiet * 2} ${size + quiet * 2}`}
-      className="size-[14em] rounded-xl bg-white"
+      className="aspect-square h-full max-h-[14em] w-auto max-w-full rounded-xl bg-white"
       shapeRendering="crispEdges"
     >
       <path d={path} fill="#000" />

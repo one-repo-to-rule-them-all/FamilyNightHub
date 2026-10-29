@@ -103,7 +103,7 @@ export function TvSlideshow({ night, live }: { night: Night; live: LiveState }) 
         <p
           role="status"
           data-testid="tv-paused"
-          className="tv-body absolute top-[1.2em] right-[1.2em] z-[3] flex items-center gap-[0.4em] rounded-full bg-black/70 px-[0.9em] py-[0.35em] text-white"
+          className="tv-body absolute top-[1.2em] left-[1.2em] z-[3] flex items-center gap-[0.4em] rounded-full bg-black/70 px-[0.9em] py-[0.35em] text-white"
         >
           <Pause aria-hidden className="size-[1em] fill-current" />
           Paused
@@ -168,7 +168,7 @@ export function DropPrompt({
       aria-labelledby="tv-drop"
       data-testid="tv-photo-idle"
       data-held={held}
-      className="flex flex-1 flex-col items-center justify-center gap-[1.2em] text-center"
+      className="flex min-h-0 flex-1 flex-col items-center justify-center gap-[1.2em] text-center"
     >
       <h2 id="tv-drop" className="tv-display">
         Drop your photos from your phone
