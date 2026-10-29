@@ -40,7 +40,7 @@ The numbered docs go **broad → narrow**.
 | Hosting cost correction: self-operated Postgres, staging scaled to zero | [`ADR-0013`](decisions/ADR-0013-hosting-cost-correction.md) |
 | Passwords for accounts, a required 6-digit PIN per person, admin-approved PIN resets (supersedes parts of ADR-0002) | [`ADR-0014`](decisions/ADR-0014-passwords-and-person-pins.md) |
 | Admins invite hosts and admins by email; invitees choose their own password; the last admin can't be removed | [`ADR-0015`](decisions/ADR-0015-inviting-hosts-and-admins.md) |
-| **Proposed, awaiting owner approval:** platform owner as a content-blind operator over the deployment | [`ADR-0016`](decisions/ADR-0016-platform-owner.md) |
+| Platform owner as a super-admin over every household, with guardrails (owner chose option A, 2026-10-28) | [`ADR-0016`](decisions/ADR-0016-platform-owner.md) |
 
 ## The 30-second mental model
 
