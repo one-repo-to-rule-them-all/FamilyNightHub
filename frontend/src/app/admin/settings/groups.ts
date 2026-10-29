@@ -14,7 +14,8 @@ import type { VotingMethod } from "@/lib/api";
 import { passwordProblem } from "@/lib/password";
 
 export type Role = "admin" | "host";
-export type GroupId = "joining" | "nights" | "streaming" | "accounts" | "account" | "browser";
+export type GroupId =
+  "joining" | "nights" | "streaming" | "accounts" | "account" | "browser" | "fresh";
 export type Group = { id: GroupId; label: string; adminOnly: boolean };
 
 export const SETTINGS_GROUPS: readonly Group[] = [
@@ -25,6 +26,8 @@ export const SETTINGS_GROUPS: readonly Group[] = [
   { id: "accounts", label: "Hosts & admins", adminOnly: true },
   { id: "account", label: "Your account", adminOnly: false },
   { id: "browser", label: "This browser", adminOnly: false },
+  // Issue #94: clear people, phones and nights. Last, so it's never the first thing in reach.
+  { id: "fresh", label: "Start fresh", adminOnly: true },
 ];
 
 /** A host sees only the groups that don't need `admin:settings`. */

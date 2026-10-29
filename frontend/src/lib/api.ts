@@ -36,6 +36,8 @@ export type Claim = Schemas["ClaimOut"];
 export type AdminPerson = Schemas["AdminPersonOut"];
 export type AdminDevice = Schemas["AdminDeviceOut"];
 export type MergeResult = Schemas["MergeOut"];
+export type Removal = Schemas["RemovalOut"];
+export type StartFreshResult = Schemas["StartFreshOut"];
 export type HouseholdSettings = Schemas["SettingsOut"];
 export type AgeCap = NonNullable<HouseholdSettings["default_age_cap"]>;
 export type StreamingProvider = Schemas["ProviderOut"];
@@ -368,6 +370,15 @@ export const api = {
    *  No PIN is set or shown: the person picks a new one on their phone (`admin:people`). */
   resetPin: (personId: string) =>
     request<AdminPerson>("POST", `/admin/people/${encodeURIComponent(personId)}/reset-pin`),
+  /** What removing this person would delete (#94), for the confirm dialog. */
+  removalPreview: (personId: string) =>
+    request<Removal>("GET", `/admin/people/${encodeURIComponent(personId)}/removal`),
+  /** Deletes the person and everything that is theirs (#94). Past winners stay. Can't be undone. */
+  removePerson: (personId: string) =>
+    request<Removal>("DELETE", `/admin/people/${encodeURIComponent(personId)}`),
+  /** Clears every person, phone/TV and night (#94); the admin types the family name to confirm. */
+  startFresh: (confirmName: string) =>
+    request<StartFreshResult>("POST", "/admin/start-fresh", { confirm_name: confirmName }),
   /** Folds `from` into `into`; the source is hidden (merged_into_id), never deleted. */
   mergePeople: (body: Schemas["MergeIn"]) =>
     request<MergeResult>("POST", "/admin/people/merge", body),
