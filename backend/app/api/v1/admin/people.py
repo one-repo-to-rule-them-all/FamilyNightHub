@@ -7,6 +7,7 @@ from typing import Annotated, Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.api.v1.photos import photo_storage
 from app.core.dependencies import (
     AccountContext,
     AccountDb,
@@ -15,15 +16,17 @@ from app.core.dependencies import (
     require_permission,
 )
 from app.core.permissions import has_permission
+from app.integrations.storage import PhotoStorage
 from app.schemas.admin import (
     AdminPersonOut,
     MergeIn,
     MergeOut,
     PersonCreateIn,
     PersonUpdateIn,
+    RemovalOut,
 )
-from app.services import people_admin_service
-from app.services.errors import Conflict, NotFound, ServiceError
+from app.services import people_admin_service, removal_service
+from app.services.errors import Conflict, NotFound, ServiceError, Unavailable
 
 router = APIRouter(prefix="/people", tags=["admin"])
 
@@ -42,6 +45,8 @@ def _raise(err: ServiceError) -> NoReturn:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Person not found") from None
     if isinstance(err, Conflict):
         raise HTTPException(status.HTTP_409_CONFLICT, err.reason) from None
+    if isinstance(err, Unavailable):
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, err.reason) from None
     raise err  # pragma: no cover
 
 
@@ -194,3 +199,48 @@ async def reset_pin(
     except ServiceError as err:
         _raise(err)
     return _out(person)
+
+
+def _removal(c: removal_service.RemovalCounts) -> RemovalOut:
+    return RemovalOut(
+        nights_voted=c.nights_voted,
+        ratings=c.ratings,
+        photos=c.photos,
+        reactions=c.reactions,
+        phones=c.phones,
+    )
+
+
+@router.get("/{person_id}/removal", response_model=RemovalOut, responses=NOT_FOUND)
+async def removal_preview(
+    person_id: uuid.UUID, account: CanManagePeople, db: AccountDb
+) -> RemovalOut:
+    """What removing this person would delete, for the confirm dialog."""
+    try:
+        return _removal(await removal_service.removal_preview(db, person_id))
+    except ServiceError as err:
+        _raise(err)
+
+
+@router.delete(
+    "/{person_id}",
+    response_model=RemovalOut,
+    dependencies=[CsrfProtected],
+    responses={**NOT_FOUND, 503: {"description": "Their photos can't be deleted right now"}},
+)
+async def remove_person(
+    person_id: uuid.UUID,
+    account: CanManagePeople,
+    db: AccountDb,
+    storage: Annotated[PhotoStorage | None, Depends(photo_storage)],
+) -> RemovalOut:
+    """Delete a person and everything that is theirs: phone links, PIN requests, attendance,
+    votes, ratings, reactions and the photos they shared (issue #94). A night keeps its
+    winner. Audited. Can't be undone."""
+    try:
+        counts = await removal_service.remove_person(
+            db, storage, account.household_id, account.account_id, person_id
+        )
+    except ServiceError as err:
+        _raise(err)
+    return _removal(counts)

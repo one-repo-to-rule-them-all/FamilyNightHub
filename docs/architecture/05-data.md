@@ -119,7 +119,7 @@ UUID primary keys (so sessions and albums are never enumerable), `timestamptz` e
 soft-hide for photos (`status = hidden`) with hard delete reserved for admins. People are merged by
 repointing FKs and setting `merged_into_id`, never by deleting (collision rules in
 [03-backend.md](03-backend.md) "People and devices admin"). Unmerged names are unique per household,
-case-insensitively, enforced by the service rather than an index. Revoked devices are kept, never deleted.
+case-insensitively, enforced by the service rather than an index. Revoked devices are kept, never deleted. People are merged or, since #94, removed (`removal_service`): removal deletes the person and their rows; Start fresh clears a household's people, devices and nights (ADR-0002 amendment).
 
 ## What's intentionally **not** here / **not** built yet
 

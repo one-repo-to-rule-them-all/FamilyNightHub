@@ -85,6 +85,28 @@ class AdminPersonOut(BaseModel):
     locked: bool
 
 
+class RemovalOut(BaseModel):
+    """What removing a person deletes (issue #94): shown in the confirm dialog, and returned
+    by the delete."""
+
+    nights_voted: int
+    ratings: int
+    photos: int
+    reactions: int
+    phones: int
+
+
+class StartFreshIn(BaseModel):
+    confirm_name: Annotated[str, Field(min_length=1, max_length=120)]
+
+
+class StartFreshOut(BaseModel):
+    people: int
+    phones: int
+    nights: int
+    photos: int
+
+
 class PinResetOut(BaseModel):
     """A "forgot PIN" request. Approving clears the PIN; no PIN is ever shown or chosen."""
 

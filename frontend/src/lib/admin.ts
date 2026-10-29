@@ -293,3 +293,52 @@ export function sameIds(a: readonly number[], b: readonly number[]): boolean {
   const set = new Set(a);
   return b.every((id) => set.has(id));
 }
+
+/** What removing a person deletes (#94), as the API previews it. */
+export type RemovalCountsLike = {
+  nights_voted: number;
+  ratings: number;
+  photos: number;
+  reactions: number;
+  phones: number;
+};
+
+/** The Remove dialog's sentence: "This deletes their votes on 2 nights, 1 rating and 3 photos."
+ *  A person with nothing yet gets a plainer line. */
+export function describeRemoval(name: string, c: RemovalCountsLike): string {
+  const parts = [
+    c.nights_voted > 0 ? `their votes on ${count(c.nights_voted, "night", "nights")}` : null,
+    c.ratings > 0 ? count(c.ratings, "rating", "ratings") : null,
+    c.photos > 0 ? count(c.photos, "photo they shared", "photos they shared") : null,
+    c.reactions > 0 ? count(c.reactions, "reaction", "reactions") : null,
+    c.phones > 0 ? `their link to ${count(c.phones, "phone", "phones")}` : null,
+  ].filter((p): p is string => p !== null);
+  const what = parts.length
+    ? `This also deletes ${joinAnd(parts)}.`
+    : `${name} hasn't voted, rated or shared anything yet.`;
+  return `${what} Past winners stay. This can't be undone.`;
+}
+
+/** Start fresh (#94) is armed only when the typed name matches the family's, ignoring case and
+ *  spaces at either end, the same way the API checks it. */
+export function startFreshArmed(typed: string, familyName: string): boolean {
+  return (
+    typed.trim().toLocaleLowerCase() === familyName.trim().toLocaleLowerCase() && !!typed.trim()
+  );
+}
+
+/** "Cleared 4 people, 6 phones and 5 nights." */
+export function describeStartFresh(c: {
+  people: number;
+  phones: number;
+  nights: number;
+  photos: number;
+}): string {
+  const parts = [
+    count(c.people, "person", "people"),
+    count(c.phones, "phone", "phones"),
+    count(c.nights, "night", "nights"),
+  ];
+  if (c.photos > 0) parts.push(count(c.photos, "photo", "photos"));
+  return `Cleared ${joinAnd(parts)}. Add people on People to start again.`;
+}

@@ -11,6 +11,7 @@ import { type Column, DataTable } from "@/components/ui/data-table";
 import { Label } from "@/components/ui/label";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import {
+  describeRemoval,
   PEOPLE_FILTERS,
   PERSON_STATUS_LABEL,
   RESET_PIN_NOTE,
@@ -26,7 +27,7 @@ import {
   personStatus,
   resetPinEmphasis,
 } from "@/lib/admin";
-import { type AdminPerson, type ApiError, type MergeResult, api } from "@/lib/api";
+import { type AdminPerson, type ApiError, type MergeResult, type Removal, api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 import { AdminQueryError } from "../admin-error";
@@ -105,6 +106,7 @@ export function PeopleAdmin() {
             onEdit={setEditing}
             onConverted={(p) => setNotice(`${p.name} is family now.`)}
             onReset={(p) => setNotice(`Reset ${p.name}'s PIN. ${RESET_PIN_NOTE}`)}
+            onRemoved={(p) => setNotice(`Removed ${p.name}.`)}
           />
           {people.data.length > 1 ? (
             <MergePeople people={people.data} onMerged={setNotice} />
@@ -192,11 +194,13 @@ function PeopleTable({
   onEdit,
   onConverted,
   onReset,
+  onRemoved,
 }: {
   people: AdminPerson[];
   onEdit: (person: AdminPerson) => void;
   onConverted: (person: AdminPerson) => void;
   onReset: (person: AdminPerson) => void;
+  onRemoved: (person: AdminPerson) => void;
 }) {
   const queryClient = useQueryClient();
   const hash = useHash();
@@ -235,6 +239,9 @@ function PeopleTable({
       onReset(person);
     },
   });
+
+  // #94: remove a person for good, after a preview of what goes with them.
+  const [removing, setRemoving] = useState<AdminPerson | null>(null);
 
   const columns: Column<AdminPerson>[] = [
     {
@@ -305,6 +312,16 @@ function PeopleTable({
                 Make family member
               </Button>
             ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              data-testid="remove-person"
+              onClick={() => setRemoving(p)}
+              aria-label={`Remove ${p.name}`}
+            >
+              Remove
+            </Button>
           </span>
         );
       },
@@ -369,6 +386,16 @@ function PeopleTable({
               : "Nobody here with this filter."
         }
       />
+      {removing ? (
+        <RemovePerson
+          person={removing}
+          onClose={() => setRemoving(null)}
+          onRemoved={(p) => {
+            setRemoving(null);
+            onRemoved(p);
+          }}
+        />
+      ) : null}
       {confirmReset ? (
         <ModalDialog
           title={
@@ -564,5 +591,69 @@ function MergePeople({
         </ModalDialog>
       ) : null}
     </section>
+  );
+}
+
+/** #94: confirm a removal after showing what goes with the person. */
+function RemovePerson({
+  person,
+  onClose,
+  onRemoved,
+}: {
+  person: AdminPerson;
+  onClose: () => void;
+  onRemoved: (person: AdminPerson) => void;
+}) {
+  const queryClient = useQueryClient();
+  const preview = useQuery<Removal, ApiError>({
+    queryKey: ["admin", "people", person.id, "removal"],
+    queryFn: () => api.removalPreview(person.id),
+    gcTime: 0,
+  });
+  const remove = useMutation<Removal, ApiError>({
+    mutationFn: () => api.removePerson(person.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: PEOPLE_KEY });
+      void queryClient.invalidateQueries({ queryKey: PIN_RESETS_KEY });
+      onRemoved(person);
+    },
+  });
+  return (
+    <ModalDialog
+      title={
+        <>
+          Remove <strong>{person.name}</strong>?
+        </>
+      }
+      onClose={onClose}
+      testId="remove-person-confirm"
+    >
+      {preview.isPending ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Checking what goes with them…
+        </p>
+      ) : preview.isError ? (
+        <ApiErrorNotice error={preview.error} />
+      ) : (
+        <p className="text-sm" data-testid="removal-summary">
+          {describeRemoval(person.name, preview.data)}
+        </p>
+      )}
+      <ApiErrorNotice error={remove.error} />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="destructive"
+          size="lg"
+          className="px-4"
+          disabled={!preview.data || remove.isPending}
+          onClick={() => remove.mutate()}
+        >
+          {remove.isPending ? "Removing…" : `Remove ${person.name}`}
+        </Button>
+        <Button variant="ghost" size="lg" className="px-4" onClick={onClose}>
+          Cancel
+        </Button>
+      </div>
+    </ModalDialog>
   );
 }
