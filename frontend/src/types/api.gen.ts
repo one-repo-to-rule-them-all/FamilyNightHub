@@ -418,6 +418,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/people/{person_id}/reset-pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Pin
+         * @description Clear the person's PIN, failure count and lock, locked or not, and close any open
+         *     forgot-PIN request as approved. No PIN is set or revealed: the person chooses a new one
+         *     on their phone.
+         */
+        post: operations["reset_pin_api_v1_admin_people__person_id__reset_pin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/sessions/{session_id}/correct-winner": {
         parameters: {
             query?: never;
@@ -3691,6 +3713,44 @@ export interface operations {
         };
     };
     convert_to_member_api_v1_admin_people__person_id__convert_to_member_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminPersonOut"];
+                };
+            };
+            /** @description No such (unmerged) person in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_pin_api_v1_admin_people__person_id__reset_pin_post: {
         parameters: {
             query?: never;
             header?: never;

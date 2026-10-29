@@ -332,7 +332,7 @@ Rules: second person, short, no "device"/"binding"/"session" in the UI, names in
 | `copy.inbox.resetMeta` | Asked {time} from {phone} |
 | `copy.inbox.claim` | **{phone}** wants to be **{name}** |
 | `copy.inbox.locked` | **{name}** is locked out after 5 wrong PINs |
-| `copy.inbox.lockedHelp` | They can tap "Ask the family admin" on their phone, then reset it here. |
+| `copy.inbox.lockedHelp` | Reset their PIN and they'll choose a new one on their phone. (Reset PIN, with a confirm, since #88) |
 | `copy.inbox.stale` | **{title}** has been open since {weekday} |
 | `copy.inbox.unrated` | **{n} of {m}** rated **{title}** |
 | `copy.inbox.alreadyDone` | Someone already took care of that. |

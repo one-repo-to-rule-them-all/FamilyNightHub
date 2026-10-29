@@ -234,6 +234,35 @@ export function peopleBadge(items: InboxItem[]): number {
   return items.filter((item) => item.kind === "pin-reset" || item.kind === "locked").length;
 }
 
+export type ResetRow = Extract<InboxItem, { kind: "pin-reset" | "locked" }>;
+
+/**
+ * What a confirmed **Reset PIN** does for an inbox row: approve the phone's Forgot PIN request,
+ * or reset a locked person directly (#88). Both clear the PIN; neither sets or shows one.
+ */
+export type ResetPlan = { rowId: string; name: string; note: string } & (
+  { via: "request"; requestId: string } | { via: "direct"; personId: string }
+);
+
+export function resetPlan(item: ResetRow): ResetPlan {
+  if (item.kind === "pin-reset") {
+    return {
+      rowId: item.id,
+      name: item.reset.person_name,
+      note: "Their old PIN stops working. They'll choose a new one on the phone that asked.",
+      via: "request",
+      requestId: item.reset.id,
+    };
+  }
+  return {
+    rowId: item.id,
+    name: item.person.name,
+    note: "Their old PIN stops working. They'll choose a new one on their phone.",
+    via: "direct",
+    personId: item.person.id,
+  };
+}
+
 export function inboxPreview(items: InboxItem[], showAll: boolean): InboxItem[] {
   return showAll ? items : items.slice(0, INBOX_PREVIEW);
 }

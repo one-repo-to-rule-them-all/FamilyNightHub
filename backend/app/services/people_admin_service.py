@@ -475,6 +475,38 @@ async def approve_pin_reset(
     return await _get_reset(db, request_id)
 
 
+async def reset_pin(
+    db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, person_id: uuid.UUID
+) -> Person:
+    """The admin resets a PIN without a request (ADR-0014 amendment): the same clear as
+    `approve_pin_reset`, locked or not. Any open request for them is closed as approved, so
+    the phone that asked may still set the new PIN."""
+    await _get_live(db, person_id, lock=True)
+    closed = (
+        await db.execute(
+            text(
+                "UPDATE pin_reset_requests SET status = 'approved', resolved_at = now(), "
+                "resolved_by_account_id = :a WHERE person_id = :p AND status = 'open' "
+                "RETURNING id"
+            ),
+            {"a": account_id, "p": person_id},
+        )
+    ).scalars()
+    requests = [str(r) for r in closed]
+    await db.execute(
+        text(
+            "UPDATE people SET pin_hash = NULL, pin_set_at = NULL, pin_failed_attempts = 0, "
+            "pin_locked_at = NULL WHERE id = :p"
+        ),
+        {"p": person_id},
+    )
+    data: dict[str, Any] = {"direct": True}
+    if requests:
+        data["requests"] = requests
+    await _audit(db, household_id, account_id, "person.pin_reset", person_id, data)
+    return await _get_live(db, person_id)
+
+
 async def dismiss_pin_reset(
     db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, request_id: uuid.UUID
 ) -> PinReset:

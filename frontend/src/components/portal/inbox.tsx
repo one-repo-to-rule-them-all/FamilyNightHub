@@ -5,13 +5,14 @@ import { useState } from "react";
 
 import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
-import { ago, type InboxItem, inboxPreview } from "@/lib/portal";
+import { ago, type InboxItem, inboxPreview, type ResetRow } from "@/lib/portal";
 
 /** What each row's buttons do; the dashboard wires them to mutations. */
 export type InboxActions = {
   approveClaim: (item: Extract<InboxItem, { kind: "claim" }>) => void;
   rejectClaim: (item: Extract<InboxItem, { kind: "claim" }>) => void;
-  resetPin: (item: Extract<InboxItem, { kind: "pin-reset" }>) => void;
+  /** A phone's Forgot PIN request, or a locked person reset directly (#88): both confirm first. */
+  resetPin: (item: ResetRow) => void;
   dismissReset: (item: Extract<InboxItem, { kind: "pin-reset" }>) => void;
   seeProfile: (personId: string) => void;
   endNight: (nightId: string) => void;
@@ -184,8 +185,13 @@ function Row({
           <strong>{p.name}</strong> is locked out after 5 wrong PINs
         </>
       );
-      meta = `They can tap "Ask the family admin" on their phone, then reset it here.`;
-      buttons = btn("See profile", () => actions.seeProfile(p.id));
+      meta = "Reset their PIN and they'll choose a new one on their phone.";
+      buttons = (
+        <>
+          {btn("Reset PIN", () => actions.resetPin(item), "secondary", `Reset PIN for ${p.name}`)}
+          {btn("See profile", () => actions.seeProfile(p.id), "ghost")}
+        </>
+      );
       break;
     }
     case "stale-night": {
