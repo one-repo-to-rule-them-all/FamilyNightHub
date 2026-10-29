@@ -391,7 +391,7 @@ export interface paths {
         /**
          * Remove Person
          * @description Delete a person and everything that is theirs: phone links, PIN requests, attendance,
-         *     votes, ratings, reactions and the photos they shared (issue #84). A night keeps its
+         *     votes, ratings, reactions and the photos they shared (issue #94). A night keeps its
          *     winner. Audited. Can't be undone.
          */
         delete: operations["remove_person_api_v1_admin_people__person_id__delete"];
@@ -523,7 +523,7 @@ export interface paths {
          * Start Fresh
          * @description Clear every person, phone/TV and night (with their votes, ratings, attendance and
          *     photos). The household, accounts, settings and movie library stay. The admin types the
-         *     family name to confirm. Audited. Can't be undone (issue #84).
+         *     family name to confirm. Audited. Can't be undone (issue #94).
          */
         post: operations["start_fresh_api_v1_admin_start_fresh_post"];
         delete?: never;
@@ -2685,7 +2685,7 @@ export interface components {
         };
         /**
          * RemovalOut
-         * @description What removing a person deletes (issue #84): shown in the confirm dialog, and returned
+         * @description What removing a person deletes (issue #94): shown in the confirm dialog, and returned
          *     by the delete.
          */
         RemovalOut: {

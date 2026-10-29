@@ -2823,7 +2823,7 @@
         "type": "object"
       },
       "RemovalOut": {
-        "description": "What removing a person deletes (issue #84): shown in the confirm dialog, and returned\nby the delete.",
+        "description": "What removing a person deletes (issue #94): shown in the confirm dialog, and returned\nby the delete.",
         "properties": {
           "nights_voted": {
             "title": "Nights Voted",
@@ -4664,7 +4664,7 @@
     },
     "/api/v1/admin/people/{person_id}": {
       "delete": {
-        "description": "Delete a person and everything that is theirs: phone links, PIN requests, attendance,\nvotes, ratings, reactions and the photos they shared (issue #84). A night keeps its\nwinner. Audited. Can't be undone.",
+        "description": "Delete a person and everything that is theirs: phone links, PIN requests, attendance,\nvotes, ratings, reactions and the photos they shared (issue #94). A night keeps its\nwinner. Audited. Can't be undone.",
         "operationId": "remove_person_api_v1_admin_people__person_id__delete",
         "parameters": [
           {
@@ -5034,7 +5034,7 @@
     },
     "/api/v1/admin/start-fresh": {
       "post": {
-        "description": "Clear every person, phone/TV and night (with their votes, ratings, attendance and\nphotos). The household, accounts, settings and movie library stay. The admin types the\nfamily name to confirm. Audited. Can't be undone (issue #84).",
+        "description": "Clear every person, phone/TV and night (with their votes, ratings, attendance and\nphotos). The household, accounts, settings and movie library stay. The admin types the\nfamily name to confirm. Audited. Can't be undone (issue #94).",
         "operationId": "start_fresh_api_v1_admin_start_fresh_post",
         "requestBody": {
           "content": {

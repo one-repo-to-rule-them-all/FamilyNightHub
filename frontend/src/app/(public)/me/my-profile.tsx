@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import { PEOPLE_KEY, usePhonePeople } from "@/hooks/use-phone";
-import { PERSON_COLORS } from "@/lib/admin";
+import { EMOJI_GROUPS, PERSON_COLORS } from "@/lib/admin";
 import {
   api,
   type ApiError,
@@ -29,7 +29,7 @@ import {
 import { HOME_COPY } from "@/lib/home";
 import { PIN_MISMATCH_COPY, PIN_SLOW_COPY, pinFailure, wrongPinCopy } from "@/lib/pin";
 import { cn } from "@/lib/utils";
-import { cleanGuestName, GUEST_EMOJI, NAME_MAX } from "@/lib/who";
+import { cleanGuestName, NAME_MAX } from "@/lib/who";
 
 import { profileKey } from "../people/[id]/profile-view";
 import { alsoOnPhone, memberSince, meStats, SHARED_LABEL } from "./me";
@@ -209,23 +209,35 @@ function ChangePicture({ person, onClose }: { person: PersonTile; onClose: () =>
     <ModalDialog title="Pick a picture" onClose={onClose} testId="picture-sheet">
       <fieldset className="flex flex-col gap-2" disabled={save.isPending}>
         <legend className="sr-only">Picture</legend>
-        <div className="grid grid-cols-4 gap-3">
-          {GUEST_EMOJI.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              aria-pressed={person.avatar_emoji === emoji}
-              aria-label={`Picture ${emoji}`}
-              onClick={() => pick({ avatar_emoji: emoji })}
-              className={cn(
-                "flex h-16 items-center justify-center rounded-2xl bg-card text-4xl ring-1 ring-foreground/10 outline-none focus-visible:ring-3 focus-visible:ring-ring",
-                person.avatar_emoji === emoji && "ring-3 ring-foreground",
-              )}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
+        {EMOJI_GROUPS.map((group) => (
+          <div
+            key={group.name}
+            role="group"
+            aria-label={group.name}
+            className="flex flex-col gap-1.5"
+          >
+            <p aria-hidden className="text-sm font-medium text-muted-foreground">
+              {group.name}
+            </p>
+            <div className="grid grid-cols-6 gap-2">
+              {group.emoji.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  aria-pressed={person.avatar_emoji === emoji}
+                  aria-label={`Picture ${emoji}`}
+                  onClick={() => pick({ avatar_emoji: emoji })}
+                  className={cn(
+                    "flex h-12 items-center justify-center rounded-xl bg-card text-3xl ring-1 ring-foreground/10 outline-none focus-visible:ring-3 focus-visible:ring-ring",
+                    person.avatar_emoji === emoji && "ring-3 ring-foreground",
+                  )}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </fieldset>
       <fieldset className="flex flex-col gap-2" disabled={save.isPending}>
         <legend className="mb-2 text-base font-medium">Colour</legend>

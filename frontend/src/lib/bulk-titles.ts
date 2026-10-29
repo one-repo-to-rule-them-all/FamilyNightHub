@@ -49,3 +49,52 @@ export function parseBulkTitles(text: string): ParsedBulk {
     overflow: Math.max(0, titles.length - MAX_BULK_LINES),
   };
 }
+
+/** What the summary needs from a server `BulkLineOut`. */
+export type AddedLine = {
+  title: string;
+  year: number | null;
+  status: "matched" | "ambiguous" | "not_found" | "added_manual";
+  already_owned: boolean;
+  movie: { title: string; year: number | null } | null;
+};
+
+function titled(line: AddedLine): string {
+  const found = line.status === "matched" && line.movie ? line.movie : line;
+  return found.year ? `${found.title} (${found.year})` : found.title;
+}
+
+/**
+ * The confirmation after an add (issue #92): one line names the title ("Added Coco to the
+ * library", "Coco is already in the library"); a paste counts ("Added 3, skipped 1"). `isOpen`
+ * says which ambiguous / not-found lines still wait for the admin's choice.
+ */
+export function addSummary(
+  lines: readonly AddedLine[],
+  isOpen: (index: number) => boolean,
+): string {
+  let added = 0;
+  let owned = 0;
+  let skipped = 0;
+  let waiting = 0;
+  lines.forEach((line, index) => {
+    if (line.status === "added_manual" || (line.status === "matched" && !line.already_owned)) {
+      added += 1;
+    } else if (line.status === "matched") owned += 1;
+    else if (isOpen(index)) waiting += 1;
+    else skipped += 1;
+  });
+  const choose =
+    waiting === 1 ? "1 title needs a choice below." : `${waiting} titles need a choice below.`;
+
+  if (lines.length === 1) {
+    const name = titled(lines[0]!);
+    if (added) return `Added ${name} to the library.`;
+    if (owned) return `${name} is already in the library.`;
+    if (waiting) return `Pick which ${name} you meant below.`;
+    return `${name} was not added.`;
+  }
+  const counts = [`Added ${added}`, `skipped ${owned + skipped}`].join(", ");
+  const why = owned ? ` (${owned} already in the library)` : "";
+  return `${counts}${why}.${waiting ? ` ${choose}` : ""}`;
+}
