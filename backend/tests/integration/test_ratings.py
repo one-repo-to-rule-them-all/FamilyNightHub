@@ -1,4 +1,5 @@
-"""Ratings: rate after the movie, proxy for kids, read back your own, family averages."""
+"""Ratings: rate after the movie, proxy for kids, read back your own, family averages.
+Only someone who took part in the night may rate it (issue #91)."""
 
 from __future__ import annotations
 
@@ -62,6 +63,19 @@ async def _tonight(host: Phone, h: SeededHousehold, n: int = 2) -> tuple[str, st
     return sid, code, opts
 
 
+async def _attend(h: SeededHousehold, sid: str, *people: uuid.UUID) -> None:
+    """They were at the night (G8): what opening it on their phone records."""
+    async with household_session(h.household_id) as db:
+        for person in people:
+            await db.execute(
+                text(
+                    "INSERT INTO session_attendance (household_id, session_id, person_id) "
+                    "VALUES (:h, :s, :p)"
+                ),
+                {"h": h.household_id, "s": sid, "p": person},
+            )
+
+
 async def _rate(p: Phone, sid: str, person: uuid.UUID, score: Any) -> Response:
     return await _send(
         p, "PUT", f"{BASE}/{sid}/ratings", {"person_id": str(person), "score": score}
@@ -89,6 +103,7 @@ async def test_two_people_rate_on_a_shared_phone_and_can_change_it(two_household
         sid, code, _ = await _tonight(host, a)
         await _phone_for(shared, a, code, sam)
         assert (await shared.bind(ana)).json()["status"] == "active"
+        await _attend(a, sid, sam, ana)
         before = (await shared.client.get(f"{BASE}/{sid}/ratings/mine")).json()
 
         # ADR-0014: the phone acts as one person at a time; switching takes their PIN.
@@ -102,7 +117,10 @@ async def test_two_people_rate_on_a_shared_phone_and_can_change_it(two_household
         mine = (await shared.client.get(f"{BASE}/{sid}/ratings/mine")).json()
         snap = (await shared.client.get(f"{BASE}/{sid}")).json()
 
-    assert {(r["person_id"], r["score"]) for r in before} == {(str(sam), None), (str(ana), None)}
+    assert {(r["person_id"], r["score"], r["attended"]) for r in before} == {
+        (str(sam), None, True),
+        (str(ana), None, True),
+    }
     assert {(r["person_id"], r["score"]) for r in mine} == {(str(sam), 5), (str(ana), 3)}
     assert await _scores(a, sid) == {sam: 5, ana: 3}
     assert snap["status"] == "tonight"
@@ -217,6 +235,66 @@ async def test_another_households_night_is_404(two_households: Pair) -> None:
     assert await _scores(a, sid_a) == {}
 
 
+# --- Only people who took part (issue #91) ----------------------------------------------
+
+
+async def test_present_or_voted_may_rate_anyone_else_is_not_attended(
+    two_households: Pair,
+) -> None:
+    a, _ = two_households
+    sam, ana, rudy = await _person(a, "Sam"), await _person(a, "Ana"), await _person(a, "Rudy")
+    async with phone() as host, phone() as shared:
+        await _host(host, a)
+        sid, code, opts = await _night(host, 2)
+        assert (await _proxy(host, sid, ana, opts[0])).status_code == 204  # Ana voted
+        assert (await _close_voting(host, sid)).status_code == 200
+        await _settle(a, sid)
+        await _attend(a, sid, sam)  # Sam was there without voting
+        await _phone_for(shared, a, code, rudy)  # Rudy joined later, never took part
+        mine = (await shared.client.get(f"{BASE}/{sid}/ratings/mine")).json()
+        rudys = await _rate(shared, sid, rudy, 5)
+        rudy_by_proxy = await _proxy_rate(host, sid, rudy, 5)
+        sams = await _proxy_rate(host, sid, sam, 4)
+        anas = await _proxy_rate(host, sid, ana, 3)
+
+    assert mine == [{"person_id": str(rudy), "score": None, "attended": False}]
+    for resp in (rudys, rudy_by_proxy):
+        assert resp.status_code == 403
+        assert resp.json()["error"]["code"] == "not_attended"
+        assert resp.json()["error"]["message"] == "You weren't at this one."
+    assert (sams.status_code, anas.status_code) == (204, 204)
+    assert await _scores(a, sid) == {sam: 4, ana: 3}
+
+
+async def test_a_new_person_is_not_offered_an_old_night(two_households: Pair) -> None:
+    """The phone's "How was <movie>?" prompt reads `/ratings/mine` for the newest watched
+    night: someone added after it shows `attended: false`, so nothing is owed (staging,
+    2026-10-28: a brand-new person was asked to rate a night they never saw)."""
+    a, _ = two_households
+    sam = await _person(a, "Sam")
+    async with phone() as host, phone() as sams, phone() as newcomer:
+        await _host(host, a)
+        sid, code, opts = await _night(host, 2)
+        assert (await _proxy(host, sid, sam, opts[0])).status_code == 204
+        assert (await _close_voting(host, sid)).status_code == 200
+        await _settle(a, sid)
+        await _phone_for(sams, a, code, sam)
+        rudy = await _person(a, "Rudy")  # added the next morning, never at the night
+        await _phone_for(newcomer, a, code, rudy)
+        assert (await host.post(f"{BASE}/{sid}/close")).status_code == 200
+        latest = (
+            await newcomer.client.get(BASE, params={"status": ["tonight", "closed"], "limit": 1})
+        ).json()
+        newcomers = (await newcomer.client.get(f"{BASE}/{sid}/ratings/mine")).json()
+        sams_view = (await sams.client.get(f"{BASE}/{sid}/ratings/mine")).json()
+        profile = (await newcomer.client.get(f"/api/v1/people/{rudy}/profile")).json()
+
+    assert [n["id"] for n in latest] == [sid]
+    assert newcomers == [{"person_id": str(rudy), "score": None, "attended": False}]
+    assert sams_view == [{"person_id": str(sam), "score": None, "attended": True}]
+    assert profile["nights"] == []  # Mine agrees: not their night
+
+
 # --- Proxy -----------------------------------------------------------------------------
 
 
@@ -226,6 +304,7 @@ async def test_a_host_proxy_rates_for_a_kid_and_is_audited(two_households: Pair)
     async with phone() as host:
         account = await _host(host, a)
         sid, _code, _ = await _tonight(host, a)
+        await _attend(a, sid, toddler)
         assert (await _proxy_rate(host, sid, toddler, 2)).status_code == 204
         assert (await _proxy_rate(host, sid, toddler, 4)).status_code == 204  # replaceable
         unknown = await _proxy_rate(host, sid, uuid.uuid4(), 3)
@@ -277,6 +356,7 @@ async def test_history_and_snapshot_show_the_family_average_only(two_households:
         voting, _c2, _ = await _night(host, 2)
         await _phone_for(kid, a, code, sam)
         assert (await tv.join(a.slug, code)).status_code == 200
+        await _attend(a, rated, sam, ana, max_)
         assert (await _rate(kid, rated, sam, 5)).status_code == 204
         assert (await _proxy_rate(host, rated, ana, 4)).status_code == 204
         assert (await _proxy_rate(host, rated, max_, 4)).status_code == 204
@@ -306,6 +386,8 @@ async def test_average_rating_for_the_generator(two_households: Pair) -> None:
         await _host(host_b, b)
         old, _c, (o_old, _x) = await _tonight(host, a)
         recent, _c2, (o_recent, _y) = await _tonight(host, a)
+        await _attend(a, old, sam)
+        await _attend(a, recent, sam, ana)
         assert (await _proxy_rate(host, old, sam, 1)).status_code == 204
         assert (await _proxy_rate(host, recent, sam, 5)).status_code == 204
         assert (await _proxy_rate(host, recent, ana, 4)).status_code == 204

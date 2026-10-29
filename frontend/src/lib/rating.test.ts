@@ -6,6 +6,8 @@ import {
   dismissRatePrompt,
   isRatePromptDismissed,
   ratingProgress,
+  mayRate,
+  NOT_ATTENDED,
   unratedPeople,
 } from "./rating";
 
@@ -35,22 +37,50 @@ describe("unratedPeople", () => {
 
   it("lists this phone's people who have no score yet, in order", () => {
     const ratings = [
-      { person_id: "sam", score: 4 },
-      { person_id: "ana", score: null },
+      { person_id: "sam", score: 4, attended: true },
+      { person_id: "ana", score: null, attended: true },
     ];
     expect(unratedPeople(people, ratings).map((p) => p.id)).toEqual(["ana"]);
   });
 
-  it("treats a person missing from the ratings as unrated, and ignores other phones' people", () => {
-    expect(unratedPeople(people, []).map((p) => p.id)).toEqual(["sam", "ana"]);
+  it("owes nothing for a night they weren't part of (issue #91)", () => {
+    const ratings = [
+      { person_id: "sam", score: null, attended: false },
+      { person_id: "ana", score: null, attended: true },
+    ];
+    expect(unratedPeople(people, ratings).map((p) => p.id)).toEqual(["ana"]);
+    expect(unratedPeople(people, [{ person_id: "sam", score: null, attended: false }])).toEqual([]);
+  });
+
+  it("needs a row: a person missing from the ratings owes nothing, nor do other phones' people", () => {
+    expect(unratedPeople(people, [])).toEqual([]);
+    const others = [
+      { person_id: "max", score: null, attended: true },
+      { person_id: "zed", score: null, attended: true },
+    ];
+    expect(unratedPeople(people, others)).toEqual([]);
   });
 
   it("is empty once everyone here has rated", () => {
     const ratings = [
-      { person_id: "sam", score: 1 },
-      { person_id: "ana", score: 5 },
+      { person_id: "sam", score: 1, attended: true },
+      { person_id: "ana", score: 5, attended: true },
     ];
     expect(unratedPeople(people, ratings)).toEqual([]);
+  });
+});
+
+describe("mayRate (issue #91)", () => {
+  it("is undefined while loading, then whether their row says they took part", () => {
+    expect(mayRate(undefined, "sam")).toBeUndefined();
+    expect(mayRate([], "sam")).toBe(false);
+    expect(mayRate([{ person_id: "sam", attended: false }], "sam")).toBe(false);
+    expect(mayRate([{ person_id: "ana", attended: true }], "sam")).toBe(false);
+    expect(mayRate([{ person_id: "sam", attended: true }], "sam")).toBe(true);
+  });
+
+  it("has one line of copy for everyone else", () => {
+    expect(NOT_ATTENDED).toBe("You weren't at this one.");
   });
 });
 

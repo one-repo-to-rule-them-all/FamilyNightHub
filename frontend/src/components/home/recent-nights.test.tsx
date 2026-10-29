@@ -42,6 +42,7 @@ const night = (i: number, extra: Partial<ProfileNight> = {}): ProfileNight => ({
   picked_winner: false,
   rating: null,
   photo_count: 0,
+  attended: true,
   winner: { id: `m${i}`, title: `Movie ${i}`, poster_path: null, year: null },
   ...extra,
 });

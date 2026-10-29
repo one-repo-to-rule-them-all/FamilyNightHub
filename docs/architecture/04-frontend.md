@@ -248,10 +248,13 @@ snapshot and the people list, so a stale screen catches up.
   live event (`rating_count` included) refreshes them along with the snapshot.
 - The landing card (`src/components/night/rate-prompt-card.tsx`, on `/who` and `/`) asks
   "How was *Movie*?" about the most recent `tonight`/`closed` night for as long as someone this
-  phone holds hasn't rated it. **Rate it** links to `/s/{id}#rate` (the hash unfolds a `tonight`
+  phone holds took part in it (`attended` on `/ratings/mine`, issue #91) and hasn't rated it. **Rate it** links to `/s/{id}#rate` (the hash unfolds a `tonight`
   panel). **Not now** (✕) hides the card for that night on this phone (`localStorage`). Without a
   device it renders nothing.
-- `/history` shows each night's family average.
+- `/history` shows each night's family average; Mine's **Rate it** shows only on nights they
+  took part in (`attended`).
+- Only someone who took part in the night (present or voted) gets the stars: everyone else's
+  row in the panel reads "You weren't at this one." and That's a wrap's primary is Back to Home.
 - The pure parts (who still owes a rating, the average line, and the guarded storage) are in
   `src/lib/rating.ts`, gated at 100%.
 - The selected stars use the foreground colour, not the cinema accent, which stays on the winner card.

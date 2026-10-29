@@ -11,6 +11,8 @@ shortlist. `--movies N` adds N typed titles through session_service (the host's 
 `--open-voting` opens voting, so ballot_size = min(3, N - 1) exactly as the API would fix it.
 `--tonight` goes on through the host's close (no ballots, pinned seed) and backdates the reveal
 past REVEAL_SETTLE, so the night is `tonight` and its photo album is open (ADR-0005).
+`--attended` (with `--tonight`) records every seeded person as at the night (G8), since only
+someone who took part may rate it (issue #91).
 `--owned N` puts N owned titles in the library (OWNED: a TMDB one and a home copy, both rated G)
 and `--providers 337,8` sets the household's streaming services, so the candidate generator
 (ADR-0007) rolls owned titles first, then streaming, against tmdb-fake.
@@ -89,6 +91,7 @@ async def seed(
     owned: int = 0,
     providers: list[int] | None = None,
     pins: bool = False,
+    attended: bool = False,
 ) -> dict[str, object]:
     household = f"E2E {slug}"
     email = f"host-{slug}@e2e.test"
@@ -148,6 +151,15 @@ async def seed(
         await set_password(f"helper-{slug}@e2e.test", E2E_PASSWORD, f"helper-{slug}")
     if code is not None:
         session_id = await _seed_night(created, code, titles, open_voting, tonight)
+        if attended:
+            async with household_session(created.household_id) as db:
+                await db.execute(
+                    text(
+                        "INSERT INTO session_attendance (household_id, session_id, person_id) "
+                        "SELECT household_id, :s, id FROM people WHERE household_id = :h"
+                    ),
+                    {"s": session_id, "h": created.household_id},
+                )
     return {
         "slug": slug,
         "nightCode": code,
@@ -223,9 +235,12 @@ def main() -> int:
     parser.add_argument("--owned", type=int, default=0, choices=range(len(OWNED) + 1))
     parser.add_argument("--providers", default="", help="TMDB provider ids, e.g. 337,8")
     parser.add_argument("--pins", action="store_true", help=f"every person's PIN is {E2E_PIN}")
+    parser.add_argument("--attended", action="store_true", help="everyone was at the night")
     args = parser.parse_args()
     if args.tonight and args.movies < 2:
         parser.error("--tonight needs --movies 2 or more")
+    if args.attended and not args.tonight:
+        parser.error("--attended needs --tonight")
     if args.no_night and (args.movies or args.open_voting or args.tonight):
         parser.error("--no-night takes no --movies, --open-voting or --tonight")
     providers = [int(p) for p in args.providers.split(",") if p.strip()]
@@ -239,6 +254,7 @@ def main() -> int:
         args.owned,
         providers,
         args.pins,
+        args.attended,
     )
     print(json.dumps(asyncio.run(seeded)))
     return 0

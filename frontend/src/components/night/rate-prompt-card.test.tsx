@@ -11,13 +11,14 @@ vi.mock("next/link", () => ({
     </a>
   ),
 }));
+const ratings = { attended: true };
 vi.mock("@/lib/api", () => ({
   api: {
     nights: async () => [
       { id: "n1", winner: { title: "Paddington 2", poster_path: null }, status: "closed" },
     ],
     people: async () => [{ id: "p1", name: "RooDog", binding: "mine" }],
-    myRatings: async () => [{ person_id: "p1", score: null }],
+    myRatings: async () => [{ person_id: "p1", score: null, attended: ratings.attended }],
   },
 }));
 
@@ -42,6 +43,7 @@ async function render(ui: React.ReactNode) {
 }
 
 beforeEach(() => {
+  ratings.attended = true;
   localStorage.clear();
   host = document.createElement("div");
   document.body.append(host);
@@ -76,5 +78,23 @@ describe("RatePromptCard", () => {
     expect(host.querySelectorAll('[data-testid="rate-prompt"]')).toHaveLength(2);
     act(() => host.querySelector<HTMLButtonElement>('[aria-label="Not now"]')?.click());
     expect(host.querySelectorAll('[data-testid="rate-prompt"]')).toHaveLength(0);
+  });
+
+  it("asks nobody who wasn't part of the night (issue #91)", async () => {
+    ratings.attended = false;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await act(async () =>
+      root.render(
+        <QueryClientProvider client={client}>
+          <RatePromptCard />
+        </QueryClientProvider>,
+      ),
+    );
+    // Let all three reads settle; the ratings read says not attended, so nothing is owed.
+    await vi.waitFor(() =>
+      expect(client.getQueryState(["night", "n1", "ratings"])?.status).toBe("success"),
+    );
+    await act(async () => {});
+    expect(q("rate-prompt")).toBeNull();
   });
 });
