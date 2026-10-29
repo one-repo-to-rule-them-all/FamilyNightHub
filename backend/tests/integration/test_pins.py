@@ -403,6 +403,79 @@ async def test_only_admins_handle_resets(two_households: Pair) -> None:
     assert device_list.status_code == 401
 
 
+async def test_an_admin_resets_a_locked_pin_directly(two_households: Pair) -> None:
+    a, b = two_households
+    await _night(a)
+    mia = await _person(a, "Mia")
+    host_id = await add_account(a.household_id, "host", f"host.{uuid.uuid4().hex[:8]}@x.test")
+    async with phone() as owner, phone() as kid, phone() as admin, phone() as host:
+        await _joined(owner, a)
+        await _joined(kid, a)
+        admin.sign_in_as(a.ids["account"], a.household_id)
+        host.sign_in_as(host_id, a.household_id)
+        await owner.bind(mia)
+        for _ in range(5):
+            await kid.bind(mia, pin=WRONG)
+        rid = (await _send(kid, "POST", f"{ME}/{mia}/forgot-pin")).json()["id"]
+
+        by_host = await _send(host, "POST", f"/api/v1/admin/people/{mia}/reset-pin")
+        reset = await _send(admin, "POST", f"/api/v1/admin/people/{mia}/reset-pin")
+        queue = (await admin.client.get(RESETS)).json()
+        # The phone that asked may set the new PIN even though the owner's phone holds Mia.
+        claim = await kid.bind(mia, pin="864200")
+        other_household = await _send(
+            admin, "POST", f"/api/v1/admin/people/{b.ids['person']}/reset-pin"
+        )
+
+    assert by_host.status_code == 403
+    assert reset.status_code == 200, reset.text
+    assert reset.json()["locked"] is False and reset.json()["has_pin"] is False
+    assert TEST_PIN not in reset.text and "argon2" not in reset.text
+    assert str(mia) not in {r["person_id"] for r in queue}
+    request = await _row(
+        a, "SELECT status, resolved_by_account_id FROM pin_reset_requests WHERE id = :r", r=rid
+    )
+    assert (request.status, request.resolved_by_account_id) == ("approved", a.ids["account"])
+    assert claim.json() == {"person_id": str(mia), "status": "active", "current": True}
+    row = await _row(
+        a,
+        "SELECT pin_hash IS NOT NULL AS has_pin, pin_failed_attempts, pin_locked_at "
+        "FROM people WHERE id = :p",
+        p=mia,
+    )
+    assert (row.has_pin, row.pin_failed_attempts, row.pin_locked_at) == (True, 0, None)
+    audit = await _row(
+        a,
+        "SELECT actor_account_id, data FROM audit_events "
+        "WHERE action = 'person.pin_reset' AND target_id = :p",
+        p=mia,
+    )
+    assert audit.actor_account_id == a.ids["account"]
+    assert audit.data == {"direct": True, "requests": [rid]}
+    assert other_household.status_code == 404
+
+
+async def test_an_admin_resets_an_unlocked_pin_without_a_request(two_households: Pair) -> None:
+    a, _ = two_households
+    await _night(a)
+    mia = await _person(a, "Mia")
+    async with phone() as owner, phone() as admin:
+        await _joined(owner, a)
+        admin.sign_in_as(a.ids["account"], a.household_id)
+        await owner.bind(mia)
+        reset = await _send(admin, "POST", f"/api/v1/admin/people/{mia}/reset-pin")
+        # The phone that holds Mia sets the new PIN.
+        new_pin = await _send(owner, "POST", f"{ME}/{mia}/pin", {"new_pin": "222222"})
+    assert reset.status_code == 200 and reset.json()["has_pin"] is False
+    assert new_pin.json()["current"] is True
+    audit = await _row(
+        a,
+        "SELECT data FROM audit_events WHERE action = 'person.pin_reset' AND target_id = :p",
+        p=mia,
+    )
+    assert audit.data == {"direct": True}
+
+
 # --- Rename once and self-create ------------------------------------------------------
 
 

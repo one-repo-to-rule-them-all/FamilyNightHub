@@ -33,6 +33,8 @@ import {
   isAlreadyDone,
   parseHidden,
   pastNights,
+  type ResetPlan,
+  resetPlan,
   splitActive,
   stats,
   toggleHidden,
@@ -42,8 +44,6 @@ import {
 import { PIN_RESETS_KEY } from "@/app/admin/people/pin-requests";
 
 import { STATUS_LABEL } from "./status";
-
-type ResetItem = Extract<InboxItem, { kind: "pin-reset" }>;
 
 function readHidden(): string[] {
   try {
@@ -128,7 +128,7 @@ function Dashboard({ me }: { me: Account }) {
   const [hidden, setHidden] = useState<string[]>(readHidden);
   const [resolved, setResolved] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
-  const [confirmReset, setConfirmReset] = useState<ResetItem | null>(null);
+  const [confirmReset, setConfirmReset] = useState<ResetPlan | null>(null);
   const [confirmEnd, setConfirmEnd] = useState<string | null>(null);
 
   const { current, others } = splitActive(active.data ?? []);
@@ -189,7 +189,7 @@ function Dashboard({ me }: { me: Account }) {
   const actions: InboxActions = {
     approveClaim: (item) => decideClaim(item, true),
     rejectClaim: (item) => decideClaim(item, false),
-    resetPin: (item) => setConfirmReset(item),
+    resetPin: (item) => setConfirmReset(resetPlan(item)),
     dismissReset: (item) =>
       resolveRow(item.id, () => api.dismissPinReset(item.reset.id), [
         [...PIN_RESETS_KEY],
@@ -249,26 +249,28 @@ function Dashboard({ me }: { me: Account }) {
         <ModalDialog
           title={
             <>
-              Reset <strong>{confirmReset.reset.person_name}</strong>&apos;s PIN?
+              Reset <strong>{confirmReset.name}</strong>&apos;s PIN?
             </>
           }
           onClose={() => setConfirmReset(null)}
           testId="reset-pin-confirm"
         >
-          <p className="text-sm">
-            Their old PIN stops working. They&apos;ll choose a new one on the phone that asked.
-          </p>
+          <p className="text-sm">{confirmReset.note}</p>
           <div className="flex flex-wrap gap-2">
             <Button
               size="lg"
               className="px-4"
               onClick={() => {
-                const item = confirmReset;
+                const plan = confirmReset;
                 setConfirmReset(null);
-                resolveRow(item.id, () => api.approvePinReset(item.reset.id), [
-                  [...PIN_RESETS_KEY],
-                  ["admin", "people"],
-                ]);
+                resolveRow(
+                  plan.rowId,
+                  (): Promise<unknown> =>
+                    plan.via === "request"
+                      ? api.approvePinReset(plan.requestId)
+                      : api.resetPin(plan.personId),
+                  [[...PIN_RESETS_KEY], ["admin", "people"]],
+                );
               }}
             >
               Reset PIN

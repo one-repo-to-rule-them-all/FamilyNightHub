@@ -149,6 +149,24 @@ export function personStatus(person: PersonStatusLike): PersonStatus {
   return person.has_pin ? "pin-set" : "no-pin";
 }
 
+/**
+ * How a People row offers **Reset PIN** (#88): up front when locked out, quietly when a PIN is
+ * set (a forgotten one), and not at all before anyone chose a PIN (nothing to reset).
+ */
+export function resetPinEmphasis(person: PersonStatusLike): "prominent" | "quiet" | null {
+  switch (personStatus(person)) {
+    case "locked":
+      return "prominent";
+    case "pin-set":
+      return "quiet";
+    default:
+      return null;
+  }
+}
+
+/** Under "Reset {name}'s PIN?" when an admin resets directly, on People and Home (#88). */
+export const RESET_PIN_NOTE = "They'll choose a new one on their phone.";
+
 /** Locked out, or nobody has chosen a PIN yet: the "Needs attention" filter. */
 export function needsAttention(person: PersonStatusLike): boolean {
   return personStatus(person) !== "pin-set";
@@ -200,8 +218,8 @@ export function attentionLine(people: (PersonStatusLike & { name: string })[]): 
   if (locked.length > 0) {
     const verb = locked.length === 1 ? "is" : "are";
     parts.push(
-      `${nameList(locked)} ${verb} locked after 5 wrong PINs. A Forgot PIN request from their ` +
-        "phone shows up under PIN requests.",
+      `${nameList(locked)} ${verb} locked after 5 wrong PINs. Tap Reset PIN on their row, and ` +
+        "they choose a new one on their phone.",
     );
   }
   return parts.length > 0 ? parts.join(" ") : null;

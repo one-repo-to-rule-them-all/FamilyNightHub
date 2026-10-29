@@ -173,3 +173,24 @@ async def convert_to_member(
     except ServiceError as err:
         _raise(err)
     return _out(person)
+
+
+@router.post(
+    "/{person_id}/reset-pin",
+    response_model=AdminPersonOut,
+    dependencies=[CsrfProtected],
+    responses=NOT_FOUND,
+)
+async def reset_pin(
+    person_id: uuid.UUID, account: CanManagePeople, db: AccountDb
+) -> AdminPersonOut:
+    """Clear the person's PIN, failure count and lock, locked or not, and close any open
+    forgot-PIN request as approved. No PIN is set or revealed: the person chooses a new one
+    on their phone."""
+    try:
+        person = await people_admin_service.reset_pin(
+            db, account.household_id, account.account_id, person_id
+        )
+    except ServiceError as err:
+        _raise(err)
+    return _out(person)

@@ -176,6 +176,19 @@ and ratings are family history, visible to the household like the album.
 readable by the resolver: it is read and verified as `fnh_app` under RLS once the household is
 known. `tests/integration/test_rls_coverage.py` pins the new set.
 
+## Amendment 2026-10-28: admins reset a PIN directly (issue #88)
+
+**Context.** A reset could only start from the person's phone ("Ask the family admin"). The
+owner found a locked person on People and in Home → Needs you with nothing to press.
+
+**Decision.** `POST /admin/people/{id}/reset-pin` (`admin:people`, CSRF; hosts 403) does the
+same clear as approving a request: the hash, `pin_set_at`, the count and the lock. It works
+whether or not the person is locked, so an admin can also reset a forgotten PIN. Any open
+request for that person is closed as **approved** (so the phone that asked may still set the
+new PIN), and `person.pin_reset` is audited with `{direct: true}` (plus the closed request
+ids). The admin still never sees or sets a PIN: the person chooses one on their phone, under
+the usual first-claim rules (a phone that already holds them, or nobody else does).
+
 ## Alternatives considered
 
 **Keep magic-link-only accounts.** Rejected by the owner: slow, and an email outage locks the

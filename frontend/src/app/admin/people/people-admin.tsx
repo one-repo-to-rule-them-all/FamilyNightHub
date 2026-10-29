@@ -13,6 +13,7 @@ import { ModalDialog } from "@/components/ui/modal-dialog";
 import {
   PEOPLE_FILTERS,
   PERSON_STATUS_LABEL,
+  RESET_PIN_NOTE,
   type PeopleFilter,
   type PersonDraft,
   attentionLine,
@@ -23,13 +24,14 @@ import {
   personChanges,
   personIdFromHash,
   personStatus,
+  resetPinEmphasis,
 } from "@/lib/admin";
 import { type AdminPerson, type ApiError, type MergeResult, api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 import { AdminQueryError } from "../admin-error";
 import { PersonForm } from "./person-form";
-import { PinRequests } from "./pin-requests";
+import { PIN_RESETS_KEY, PinRequests } from "./pin-requests";
 
 const PEOPLE_KEY = ["admin", "people"] as const;
 
@@ -102,6 +104,7 @@ export function PeopleAdmin() {
             people={people.data}
             onEdit={setEditing}
             onConverted={(p) => setNotice(`${p.name} is family now.`)}
+            onReset={(p) => setNotice(`Reset ${p.name}'s PIN. ${RESET_PIN_NOTE}`)}
           />
           {people.data.length > 1 ? (
             <MergePeople people={people.data} onMerged={setNotice} />
@@ -188,10 +191,12 @@ function PeopleTable({
   people,
   onEdit,
   onConverted,
+  onReset,
 }: {
   people: AdminPerson[];
   onEdit: (person: AdminPerson) => void;
   onConverted: (person: AdminPerson) => void;
+  onReset: (person: AdminPerson) => void;
 }) {
   const queryClient = useQueryClient();
   const hash = useHash();
@@ -216,6 +221,18 @@ function PeopleTable({
     onSuccess: (person) => {
       void queryClient.invalidateQueries({ queryKey: PEOPLE_KEY });
       onConverted(person);
+    },
+  });
+
+  // #88: an admin resets a PIN directly, locked or not; the person picks a new one on their phone.
+  const [confirmReset, setConfirmReset] = useState<AdminPerson | null>(null);
+  const reset = useMutation<AdminPerson, ApiError, string>({
+    mutationFn: api.resetPin,
+    onSuccess: (person) => {
+      setConfirmReset(null);
+      void queryClient.invalidateQueries({ queryKey: PEOPLE_KEY });
+      void queryClient.invalidateQueries({ queryKey: PIN_RESETS_KEY });
+      onReset(person);
     },
   });
 
@@ -251,24 +268,46 @@ function PeopleTable({
       key: "actions",
       header: <span className="sr-only">Actions</span>,
       className: "text-right whitespace-nowrap",
-      cell: (p) => (
-        <span className="inline-flex gap-1">
-          <Button variant="ghost" size="sm" onClick={() => onEdit(p)} aria-label={`Edit ${p.name}`}>
-            Edit
-          </Button>
-          {p.is_guest ? (
+      cell: (p) => {
+        const emphasis = resetPinEmphasis(p);
+        return (
+          <span className="inline-flex gap-1">
+            {emphasis ? (
+              <Button
+                variant={emphasis === "prominent" ? "secondary" : "ghost"}
+                size="sm"
+                data-testid="reset-pin"
+                onClick={() => {
+                  reset.reset();
+                  setConfirmReset(p);
+                }}
+                aria-label={`Reset PIN for ${p.name}`}
+              >
+                Reset PIN
+              </Button>
+            ) : null}
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              disabled={convert.isPending}
-              onClick={() => convert.mutate(p.id)}
-              aria-label={`Make ${p.name} a family member`}
+              onClick={() => onEdit(p)}
+              aria-label={`Edit ${p.name}`}
             >
-              Make family member
+              Edit
             </Button>
-          ) : null}
-        </span>
-      ),
+            {p.is_guest ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={convert.isPending}
+                onClick={() => convert.mutate(p.id)}
+                aria-label={`Make ${p.name} a family member`}
+              >
+                Make family member
+              </Button>
+            ) : null}
+          </span>
+        );
+      },
     },
   ];
 
@@ -330,6 +369,38 @@ function PeopleTable({
               : "Nobody here with this filter."
         }
       />
+      {confirmReset ? (
+        <ModalDialog
+          title={
+            <>
+              Reset <strong>{confirmReset.name}</strong>&apos;s PIN?
+            </>
+          }
+          onClose={() => setConfirmReset(null)}
+          testId="reset-pin-confirm"
+        >
+          <p className="text-sm">{RESET_PIN_NOTE}</p>
+          <ApiErrorNotice error={reset.error} />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="lg"
+              className="px-4"
+              disabled={reset.isPending}
+              onClick={() => reset.mutate(confirmReset.id)}
+            >
+              {reset.isPending ? "Resetting…" : "Reset PIN"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="px-4"
+              onClick={() => setConfirmReset(null)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </ModalDialog>
+      ) : null}
     </section>
   );
 }

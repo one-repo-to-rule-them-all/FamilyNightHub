@@ -364,6 +364,10 @@ export const api = {
     request<AdminPerson>("PATCH", `/admin/people/${encodeURIComponent(personId)}`, body),
   convertToMember: (personId: string) =>
     request<AdminPerson>("POST", `/admin/people/${encodeURIComponent(personId)}/convert-to-member`),
+  /** Clears the PIN, count and lock, locked or not, and closes any open request as approved.
+   *  No PIN is set or shown: the person picks a new one on their phone (`admin:people`). */
+  resetPin: (personId: string) =>
+    request<AdminPerson>("POST", `/admin/people/${encodeURIComponent(personId)}/reset-pin`),
   /** Folds `from` into `into`; the source is hidden (merged_into_id), never deleted. */
   mergePeople: (body: Schemas["MergeIn"]) =>
     request<MergeResult>("POST", "/admin/people/merge", body),

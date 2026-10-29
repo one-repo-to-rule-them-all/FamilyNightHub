@@ -4,6 +4,7 @@ import {
   AGE_CAPS,
   PEOPLE_FILTERS,
   PERSON_STATUS_LABEL,
+  RESET_PIN_NOTE,
   MAX_STREAMING_PROVIDERS,
   PERSON_COLORS,
   ageCapFromSelect,
@@ -20,6 +21,7 @@ import {
   personChanges,
   personIdFromHash,
   personStatus,
+  resetPinEmphasis,
   sameIds,
   toggleProvider,
   validatePerson,
@@ -267,8 +269,8 @@ describe("attentionLine", () => {
 
   it("explains locked people, and counts long lists", () => {
     expect(attentionLine([named("Mia", { locked: true })])).toBe(
-      "Mia is locked after 5 wrong PINs. A Forgot PIN request from their phone shows up under " +
-        "PIN requests.",
+      "Mia is locked after 5 wrong PINs. Tap Reset PIN on their row, and they choose a new one " +
+        "on their phone.",
     );
     const many = ["A", "B", "C", "D"].map((n) => named(n, { locked: true, has_pin: false }));
     expect(attentionLine(many)).toMatch(/^4 people are locked/);
@@ -292,5 +294,18 @@ describe("personIdFromHash", () => {
     expect(personIdFromHash("#person-abc-123")).toBe("abc-123");
     expect(personIdFromHash("#pin-requests")).toBe(null);
     expect(personIdFromHash("")).toBe(null);
+  });
+});
+
+describe("reset PIN (#88)", () => {
+  it("is prominent for a lock, quiet for a set PIN, absent before a PIN exists", () => {
+    expect(resetPinEmphasis(person({ locked: true }))).toBe("prominent");
+    expect(resetPinEmphasis(person({ locked: true, has_pin: false }))).toBe("prominent");
+    expect(resetPinEmphasis(person())).toBe("quiet");
+    expect(resetPinEmphasis(person({ has_pin: false }))).toBeNull();
+  });
+
+  it("tells the admin who picks the new PIN", () => {
+    expect(RESET_PIN_NOTE).toBe("They'll choose a new one on their phone.");
   });
 });
