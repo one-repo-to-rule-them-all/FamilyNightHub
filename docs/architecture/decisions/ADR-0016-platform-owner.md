@@ -1,11 +1,12 @@
-# ADR-0016: Platform owner: an operator over the deployment, not a super-admin over families
+# ADR-0016: Platform owner: a super-admin over every household, with guardrails
 
 ## Status
 
-**Proposed: needs the owner's approval before anything is built** (issue #71, part 2). Nothing
-in the code implements this ADR. It also opens, without deciding, the multi-household and
-consent topic that [ADR-0003](ADR-0003-household-scoping-app-plus-rls.md) and
-[BUILD-PROMPT](../BUILD-PROMPT.md) defer ("multi-household needs a consent/COPPA ADR first").
+**Accepted 2026-10-28: option A, chosen by the owner** (issue #77). This overrides the original
+recommendation (B), which is kept below for the record. Nothing is built yet. The build is issue
+#77, and it adds the guardrails in "Decision" below. Multi-household still needs the consent ADR
+that [ADR-0003](ADR-0003-household-scoping-app-plus-rls.md) and
+[BUILD-PROMPT](../BUILD-PROMPT.md) call for before a **second** family is onboarded.
 
 ## Context
 
@@ -115,7 +116,7 @@ Raised here so the owner sees the whole cost; **not decided by this ADR**:
 - **Billing and abuse** if strangers can sign up: none of this exists today.
 - **The platform view's exact fields** (the metadata list in option B), each justified.
 
-## Consequences (if B is approved)
+## Consequences of B (not chosen, kept for the record)
 
 - New pre-auth surface: a platform definer-function set (metadata only) and `fnh_platform` role;
   `test_rls_coverage.py` grows to pin it.
@@ -124,9 +125,40 @@ Raised here so the owner sees the whole cost; **not decided by this ADR**:
   first operator.
 - No change to any household's RLS, permissions or data.
 
-## Owner decision needed
+## Decision (2026-10-28)
 
-- [ ] Approve option **B** as the platform-owner model (and reject A).
-- [ ] Confirm "stay on C until a second household", and that the consent / multi-household ADR
-      comes before any B code.
-- [ ] Or: choose differently, with reasons recorded here.
+The owner chose **option A**. `rbjengineeringservices.llc@gmail.com` becomes the platform owner:
+a global role that can open and act as admin in any household. It is also the Baez Family admin.
+
+Option A carries the risks listed above: one bug or one stolen platform session reads every
+family's photos, people and ballots. The owner accepted those risks. The build must keep them
+as small as A allows:
+
+1. **No RLS bypass.** The platform owner never gets `BYPASSRLS` and never gets a policy
+   exception. The app enters one chosen household by setting `app.household_id` for that request
+   only, and FORCE RLS still scopes every query to that one family. Nothing reads across
+   households in one query.
+2. **A separate, stronger sign-in.** The platform session uses its own cookie and a short idle
+   timeout (for example 30 minutes). It requires a second factor (TOTP or a passkey) before it can
+   enter a household. The family-admin login keeps working as it does today.
+3. **Every entry is audited.** Entering a household writes an `audit_events` row in that
+   household: actor, time and reason. The owner of that household sees it in the portal under
+   History, or a new "Access log". Every write made while inside also carries the platform actor.
+4. **Visible while inside.** A persistent banner reads "Viewing The {Family} as platform owner"
+   and has an Exit button.
+5. **Tests pin it.** Isolation tests prove a platform session sees only the household it
+   entered. The RLS coverage test still passes with no bypass role. An entry without a second
+   factor gets 403.
+6. **Consent before a second family.** The consent / multi-household ADR (above) is written and
+   accepted before any household other than the owner's own is created. Each new family's admin
+   is told, in plain words, that the platform owner can view their family.
+
+## Consequences
+
+- A new principal (platform owner), a cookie and a second-factor step. 03-backend.md "Auth &
+  authorization" gains a third principal.
+- An "enter household" flow that sets the household per request, plus a platform screen that lists
+  households (ids and names only, through a definer function, as ADR-0009 does).
+- `bootstrap` stays as the first-operator path. The platform owner can also create a household
+  and invite its first admin.
+- No change to any household's RLS policies, and no bypass role.
