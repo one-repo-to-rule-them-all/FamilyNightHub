@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { EMOJI_SUGGESTIONS } from "./admin";
 import type { PersonTile } from "./api";
 import { POLL_MS } from "./live";
 import {
@@ -120,6 +121,7 @@ describe("tiles", () => {
 describe("new guest", () => {
   it("offers eight one-tap pictures and a stable colour per name", () => {
     expect(GUEST_EMOJI).toHaveLength(8);
+    for (const emoji of GUEST_EMOJI) expect(EMOJI_SUGGESTIONS).toContain(emoji);
     expect(colorFor("Abuela")).toBe(colorFor(" abuela "));
     expect(colorFor("Abuela")).toMatch(/^#[0-9a-f]{6}$/);
   });

@@ -36,8 +36,26 @@ export function colorChoices(current?: string | null): ColorChoice[] {
     : [...palette, { name: "Current colour", value }];
 }
 
-/** A few one-tap avatars; any emoji can be typed instead. */
-export const EMOJI_SUGGESTIONS = ["🦄", "🦖", "🐼", "🦊", "🐸", "🐙", "🦁", "🐧", "🌟", "🎸"];
+export type EmojiGroup = { name: string; emoji: readonly string[] };
+
+/**
+ * One-tap avatars by theme (issue #92), for Add person / Edit and the phone's change-picture
+ * sheet. Family-friendly, each a single emoji that renders without a variation selector; any
+ * other emoji can still be typed on the admin form.
+ */
+export const EMOJI_GROUPS: readonly EmojiGroup[] = [
+  {
+    name: "Animals",
+    emoji: ["🐶", "🐱", "🐰", "🦊", "🐼", "🐨", "🦁", "🐯", "🐸", "🐙", "🐧", "🦉"],
+  },
+  { name: "Faces", emoji: ["😀", "😎", "🤓", "🥳", "😇", "🤠", "🤩", "🤪"] },
+  { name: "Food", emoji: ["🍕", "🍩", "🍪", "🍓", "🍉", "🌮", "🧁", "🍿"] },
+  { name: "Sports", emoji: ["⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🛹", "🏆"] },
+  { name: "Fantasy", emoji: ["🦄", "🦖", "🐉", "🧙", "🧚", "🧜", "👻", "👽", "🤖", "🌟"] },
+];
+
+/** Every one-tap avatar, in group order. */
+export const EMOJI_SUGGESTIONS: readonly string[] = EMOJI_GROUPS.flatMap((group) => group.emoji);
 
 const MAX_NAME = 60;
 const MAX_EMOJI = 16;

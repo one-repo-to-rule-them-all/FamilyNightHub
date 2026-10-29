@@ -7,7 +7,7 @@ import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { api, type ApiError, type BulkLine, type BulkPick, type BulkResult } from "@/lib/api";
-import { MAX_BULK_LINES, parseBulkTitles } from "@/lib/bulk-titles";
+import { addSummary, MAX_BULK_LINES, parseBulkTitles } from "@/lib/bulk-titles";
 
 import { LIBRARY_KEY } from "./movie-library";
 
@@ -112,6 +112,17 @@ export function BulkAdd() {
         </Button>
       </form>
       <ApiErrorNotice error={add.error} />
+      {/* Always mounted so screen readers announce each add (issue #92). */}
+      <p
+        role="status"
+        aria-live="polite"
+        data-testid="add-summary"
+        className={lines ? "rounded-xl bg-cinema-muted p-3 text-base font-medium" : "sr-only"}
+      >
+        {lines
+          ? addSummary(lines, (index) => OPEN.has(lines[index]!.status) && !settled.has(index))
+          : ""}
+      </p>
 
       {lines ? (
         <div className="flex flex-col gap-4" data-testid="bulk-results">
