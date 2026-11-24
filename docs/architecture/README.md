@@ -91,7 +91,7 @@ If anything in these docs disagrees with the code below, the code wins. (Paths a
 | Term | What it is |
 |---|---|
 | Fly.io | Container host running our three apps (web, api, worker) as Fly Machines |
-| Fly Postgres / Tigris | Fly's managed Postgres and its S3-compatible object storage |
+| Fly Postgres / Tigris | Postgres we self-operate on Fly (ADR-0013, not Fly's managed MPG), and Tigris, the S3-compatible object storage |
 | Upstash Redis | Hosted Redis used for the ARQ queue and SSE pub/sub |
 | FastAPI / Pydantic / SQLAlchemy / Alembic | Python web framework / validation / ORM / migrations |
 | ARQ | Async Redis job queue for Python (same as FieldPro/OrderUp) |
@@ -111,8 +111,9 @@ If anything in these docs disagrees with the code below, the code wins. (Paths a
 
 ## When this folder goes stale
 
-These docs describe the **intended** system as of **2026-10-15**; code exists for the backend
-skeleton and the Phase 1 schema (migration `0001`). They will rot:
+These docs describe the **intended** system; the code is well past the skeleton — five migrations
+(`0001`–`0005`) and most of Phase 1 are built (voting, photos, SSE, admin; see
+[`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) for the status line). They will rot:
 
 - **Adding a service / environment / background task / CI job** → update the relevant chapter in the same PR.
 - **Renaming a file or moving a route** → keep the Source-of-truth table current first.
