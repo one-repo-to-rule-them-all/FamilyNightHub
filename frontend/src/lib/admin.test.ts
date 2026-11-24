@@ -4,12 +4,16 @@ import {
   AGE_CAPS,
   PEOPLE_FILTERS,
   PERSON_STATUS_LABEL,
+  RESET_PIN_NOTE,
   MAX_STREAMING_PROVIDERS,
   PERSON_COLORS,
   ageCapFromSelect,
   cleanName,
   colorChoices,
   describeMerge,
+  describeRemoval,
+  describeStartFresh,
+  startFreshArmed,
   filterPeople,
   deviceName,
   lastSeen,
@@ -20,6 +24,7 @@ import {
   personChanges,
   personIdFromHash,
   personStatus,
+  resetPinEmphasis,
   sameIds,
   toggleProvider,
   validatePerson,
@@ -267,8 +272,8 @@ describe("attentionLine", () => {
 
   it("explains locked people, and counts long lists", () => {
     expect(attentionLine([named("Mia", { locked: true })])).toBe(
-      "Mia is locked after 5 wrong PINs. A Forgot PIN request from their phone shows up under " +
-        "PIN requests.",
+      "Mia is locked after 5 wrong PINs. Tap Reset PIN on their row, and they choose a new one " +
+        "on their phone.",
     );
     const many = ["A", "B", "C", "D"].map((n) => named(n, { locked: true, has_pin: false }));
     expect(attentionLine(many)).toMatch(/^4 people are locked/);
@@ -292,5 +297,54 @@ describe("personIdFromHash", () => {
     expect(personIdFromHash("#person-abc-123")).toBe("abc-123");
     expect(personIdFromHash("#pin-requests")).toBe(null);
     expect(personIdFromHash("")).toBe(null);
+  });
+});
+
+describe("reset PIN (#88)", () => {
+  it("is prominent for a lock, quiet for a set PIN, absent before a PIN exists", () => {
+    expect(resetPinEmphasis(person({ locked: true }))).toBe("prominent");
+    expect(resetPinEmphasis(person({ locked: true, has_pin: false }))).toBe("prominent");
+    expect(resetPinEmphasis(person())).toBe("quiet");
+    expect(resetPinEmphasis(person({ has_pin: false }))).toBeNull();
+  });
+
+  it("tells the admin who picks the new PIN", () => {
+    expect(RESET_PIN_NOTE).toBe("They'll choose a new one on their phone.");
+  });
+});
+
+describe("describeRemoval (#94)", () => {
+  it("lists only what the person has", () => {
+    expect(
+      describeRemoval("Leo", { nights_voted: 2, ratings: 1, photos: 3, reactions: 0, phones: 1 }),
+    ).toBe(
+      "This also deletes their votes on 2 nights, 1 rating, 3 photos they shared and their link to 1 phone. Past winners stay. This can't be undone.",
+    );
+  });
+  it("says so when there is nothing yet", () => {
+    expect(
+      describeRemoval("Typo", { nights_voted: 0, ratings: 0, photos: 0, reactions: 0, phones: 0 }),
+    ).toBe(
+      "Typo hasn't voted, rated or shared anything yet. Past winners stay. This can't be undone.",
+    );
+  });
+});
+
+describe("startFreshArmed (#94)", () => {
+  it("matches the family name ignoring case and outer spaces", () => {
+    expect(startFreshArmed("  the baez family ", "The Baez Family")).toBe(true);
+    expect(startFreshArmed("Baez", "The Baez Family")).toBe(false);
+    expect(startFreshArmed("   ", "  ")).toBe(false);
+  });
+});
+
+describe("describeStartFresh (#94)", () => {
+  it("names what was cleared", () => {
+    expect(describeStartFresh({ people: 4, phones: 6, nights: 5, photos: 0 })).toBe(
+      "Cleared 4 people, 6 phones and 5 nights. Add people on People to start again.",
+    );
+    expect(describeStartFresh({ people: 1, phones: 0, nights: 1, photos: 2 })).toBe(
+      "Cleared 1 person, 0 phones, 1 night and 2 photos. Add people on People to start again.",
+    );
   });
 });

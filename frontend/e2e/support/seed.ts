@@ -43,6 +43,8 @@ export type SeedOptions = {
   providers?: number[];
   /** Give every seeded person the test PIN (`pin` in the result). */
   pins?: boolean;
+  /** With `tonight`: everyone was at the night (G8), so everyone may rate it (issue #91). */
+  attended?: boolean;
 };
 
 const BACKEND = path.resolve(__dirname, "../../../backend");
@@ -57,6 +59,7 @@ export function seedNight(options: SeedOptions = {}): SeededNight {
   if (options.owned) args.push("--owned", String(options.owned));
   if (options.providers?.length) args.push("--providers", options.providers.join(","));
   if (options.pins) args.push("--pins");
+  if (options.attended) args.push("--attended");
   return runSeed(args) as SeededNight;
 }
 

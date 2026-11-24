@@ -36,6 +36,8 @@ class ProfileNightOut(BaseModel):
     picked_winner: bool
     rating: int | None
     photo_count: int
+    # Took part in the night (present or voted): only then may they rate it (issue #91).
+    attended: bool
 
 
 class ProfileAlbumOut(BaseModel):

@@ -4,11 +4,20 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.api.v1.photos import photo_storage
 from app.core.dependencies import AccountContext, AccountDb, CsrfProtected, require_permission
-from app.schemas.admin import JoinSlugOut, SettingsOut, SettingsUpdateIn
-from app.services import household_settings_service
+from app.integrations.storage import PhotoStorage
+from app.schemas.admin import (
+    JoinSlugOut,
+    SettingsOut,
+    SettingsUpdateIn,
+    StartFreshIn,
+    StartFreshOut,
+)
+from app.services import household_settings_service, removal_service
+from app.services.errors import Invalid, Unavailable
 
 router = APIRouter(tags=["admin"])
 
@@ -55,3 +64,32 @@ async def rotate_join_slug(account: CanManageSettings, db: AccountDb) -> JoinSlu
         db, account.household_id, account.account_id
     )
     return JoinSlugOut(join_slug=slug)
+
+
+@router.post(
+    "/start-fresh",
+    response_model=StartFreshOut,
+    dependencies=[CsrfProtected],
+    responses={
+        422: {"description": "The typed family name doesn't match"},
+        503: {"description": "Photos can't be deleted right now"},
+    },
+)
+async def start_fresh(
+    body: StartFreshIn,
+    account: CanManageSettings,
+    db: AccountDb,
+    storage: Annotated[PhotoStorage | None, Depends(photo_storage)],
+) -> StartFreshOut:
+    """Clear every person, phone/TV and night (with their votes, ratings, attendance and
+    photos). The household, accounts, settings and movie library stay. The admin types the
+    family name to confirm. Audited. Can't be undone (issue #94)."""
+    try:
+        c = await removal_service.start_fresh(
+            db, storage, account.household_id, account.account_id, body.confirm_name
+        )
+    except Invalid as err:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, err.reason) from None
+    except Unavailable as err:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, err.reason) from None
+    return StartFreshOut(people=c.people, phones=c.phones, nights=c.nights, photos=c.photos)

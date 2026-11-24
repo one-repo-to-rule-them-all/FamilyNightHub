@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hereCount, hereTonight, overflow, showHereStrip } from "./here-tonight";
+import { hereCount, hereTonight, showHereStrip } from "./here-tonight";
 
 const people = [
   { id: "g", name: "Tío", is_guest: true },
@@ -61,10 +61,5 @@ describe("strip", () => {
   it("counts here, and voted only while voting", () => {
     expect(hereCount(items, "voting")).toBe("2 here · 1 voted");
     expect(hereCount(items, "tonight")).toBe("2 here");
-  });
-
-  it("collapses the rest into +N", () => {
-    expect(overflow([1, 2, 3], 3)).toEqual({ shown: [1, 2, 3], more: 0 });
-    expect(overflow([1, 2, 3, 4, 5], 3)).toEqual({ shown: [1, 2], more: 3 });
   });
 });

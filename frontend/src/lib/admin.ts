@@ -36,8 +36,26 @@ export function colorChoices(current?: string | null): ColorChoice[] {
     : [...palette, { name: "Current colour", value }];
 }
 
-/** A few one-tap avatars; any emoji can be typed instead. */
-export const EMOJI_SUGGESTIONS = ["🦄", "🦖", "🐼", "🦊", "🐸", "🐙", "🦁", "🐧", "🌟", "🎸"];
+export type EmojiGroup = { name: string; emoji: readonly string[] };
+
+/**
+ * One-tap avatars by theme (issue #92), for Add person / Edit and the phone's change-picture
+ * sheet. Family-friendly, each a single emoji that renders without a variation selector; any
+ * other emoji can still be typed on the admin form.
+ */
+export const EMOJI_GROUPS: readonly EmojiGroup[] = [
+  {
+    name: "Animals",
+    emoji: ["🐶", "🐱", "🐰", "🦊", "🐼", "🐨", "🦁", "🐯", "🐸", "🐙", "🐧", "🦉"],
+  },
+  { name: "Faces", emoji: ["😀", "😎", "🤓", "🥳", "😇", "🤠", "🤩", "🤪"] },
+  { name: "Food", emoji: ["🍕", "🍩", "🍪", "🍓", "🍉", "🌮", "🧁", "🍿"] },
+  { name: "Sports", emoji: ["⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🛹", "🏆"] },
+  { name: "Fantasy", emoji: ["🦄", "🦖", "🐉", "🧙", "🧚", "🧜", "👻", "👽", "🤖", "🌟"] },
+];
+
+/** Every one-tap avatar, in group order. */
+export const EMOJI_SUGGESTIONS: readonly string[] = EMOJI_GROUPS.flatMap((group) => group.emoji);
 
 const MAX_NAME = 60;
 const MAX_EMOJI = 16;
@@ -149,6 +167,24 @@ export function personStatus(person: PersonStatusLike): PersonStatus {
   return person.has_pin ? "pin-set" : "no-pin";
 }
 
+/**
+ * How a People row offers **Reset PIN** (#88): up front when locked out, quietly when a PIN is
+ * set (a forgotten one), and not at all before anyone chose a PIN (nothing to reset).
+ */
+export function resetPinEmphasis(person: PersonStatusLike): "prominent" | "quiet" | null {
+  switch (personStatus(person)) {
+    case "locked":
+      return "prominent";
+    case "pin-set":
+      return "quiet";
+    default:
+      return null;
+  }
+}
+
+/** Under "Reset {name}'s PIN?" when an admin resets directly, on People and Home (#88). */
+export const RESET_PIN_NOTE = "They'll choose a new one on their phone.";
+
 /** Locked out, or nobody has chosen a PIN yet: the "Needs attention" filter. */
 export function needsAttention(person: PersonStatusLike): boolean {
   return personStatus(person) !== "pin-set";
@@ -200,8 +236,8 @@ export function attentionLine(people: (PersonStatusLike & { name: string })[]): 
   if (locked.length > 0) {
     const verb = locked.length === 1 ? "is" : "are";
     parts.push(
-      `${nameList(locked)} ${verb} locked after 5 wrong PINs. A Forgot PIN request from their ` +
-        "phone shows up under PIN requests.",
+      `${nameList(locked)} ${verb} locked after 5 wrong PINs. Tap Reset PIN on their row, and ` +
+        "they choose a new one on their phone.",
     );
   }
   return parts.length > 0 ? parts.join(" ") : null;
@@ -274,4 +310,53 @@ export function sameIds(a: readonly number[], b: readonly number[]): boolean {
   if (a.length !== b.length) return false;
   const set = new Set(a);
   return b.every((id) => set.has(id));
+}
+
+/** What removing a person deletes (#94), as the API previews it. */
+export type RemovalCountsLike = {
+  nights_voted: number;
+  ratings: number;
+  photos: number;
+  reactions: number;
+  phones: number;
+};
+
+/** The Remove dialog's sentence: "This deletes their votes on 2 nights, 1 rating and 3 photos."
+ *  A person with nothing yet gets a plainer line. */
+export function describeRemoval(name: string, c: RemovalCountsLike): string {
+  const parts = [
+    c.nights_voted > 0 ? `their votes on ${count(c.nights_voted, "night", "nights")}` : null,
+    c.ratings > 0 ? count(c.ratings, "rating", "ratings") : null,
+    c.photos > 0 ? count(c.photos, "photo they shared", "photos they shared") : null,
+    c.reactions > 0 ? count(c.reactions, "reaction", "reactions") : null,
+    c.phones > 0 ? `their link to ${count(c.phones, "phone", "phones")}` : null,
+  ].filter((p): p is string => p !== null);
+  const what = parts.length
+    ? `This also deletes ${joinAnd(parts)}.`
+    : `${name} hasn't voted, rated or shared anything yet.`;
+  return `${what} Past winners stay. This can't be undone.`;
+}
+
+/** Start fresh (#94) is armed only when the typed name matches the family's, ignoring case and
+ *  spaces at either end, the same way the API checks it. */
+export function startFreshArmed(typed: string, familyName: string): boolean {
+  return (
+    typed.trim().toLocaleLowerCase() === familyName.trim().toLocaleLowerCase() && !!typed.trim()
+  );
+}
+
+/** "Cleared 4 people, 6 phones and 5 nights." */
+export function describeStartFresh(c: {
+  people: number;
+  phones: number;
+  nights: number;
+  photos: number;
+}): string {
+  const parts = [
+    count(c.people, "person", "people"),
+    count(c.phones, "phone", "phones"),
+    count(c.nights, "night", "nights"),
+  ];
+  if (c.photos > 0) parts.push(count(c.photos, "photo", "photos"));
+  return `Cleared ${joinAnd(parts)}. Add people on People to start again.`;
 }

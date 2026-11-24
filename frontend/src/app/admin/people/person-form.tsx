@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  EMOJI_SUGGESTIONS,
+  EMOJI_GROUPS,
   PERSON_COLORS,
   type PersonDraft,
   type PersonErrors,
@@ -92,20 +92,29 @@ export function PersonForm({
             onChange={(event) => set({ avatarEmoji: event.target.value })}
             className="h-11 w-20 text-center text-2xl"
           />
-          <div role="group" aria-label="Suggested emoji" className="flex flex-wrap gap-1">
-            {EMOJI_SUGGESTIONS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                aria-label={`Use ${emoji}`}
-                aria-pressed={draft.avatarEmoji.trim() === emoji}
-                onClick={() => set({ avatarEmoji: emoji })}
-                className="flex size-11 items-center justify-center rounded-lg text-2xl outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 aria-pressed:bg-secondary aria-pressed:ring-1 aria-pressed:ring-foreground/40"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
+        </div>
+        <div role="group" aria-label="Suggested emoji" className="flex flex-col gap-2">
+          {EMOJI_GROUPS.map((group) => (
+            <div key={group.name} role="group" aria-label={group.name}>
+              <p aria-hidden className="text-xs font-medium text-muted-foreground">
+                {group.name}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {group.emoji.map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    aria-label={`Use ${emoji}`}
+                    aria-pressed={draft.avatarEmoji.trim() === emoji}
+                    onClick={() => set({ avatarEmoji: emoji })}
+                    className="flex size-11 items-center justify-center rounded-lg text-2xl outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 aria-pressed:bg-secondary aria-pressed:ring-1 aria-pressed:ring-foreground/40"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
         <FieldError id={`${id}-emoji-error`} message={errors.avatarEmoji} />
       </div>

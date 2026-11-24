@@ -5,7 +5,7 @@
  * (the tile with `current`, ADR-0014), and what is the household's live night. `resolve` is the
  * only place that decides where a phone goes, so a stale screen re-resolves instead of waiting.
  */
-import { EMOJI_SUGGESTIONS, PERSON_COLORS } from "@/lib/admin";
+import { PERSON_COLORS } from "@/lib/admin";
 import type { NightStatus, NightSummary, PersonTile } from "@/lib/api";
 import { POLL_MS } from "@/lib/live";
 
@@ -97,8 +97,11 @@ export function waitingPollInterval(people: readonly PersonTile[] | undefined): 
   return waiting ? POLL_MS : false;
 }
 
-/** Self-create's picture choices: the admin suggestions, 8 one-tap emoji (spec §5 S7). */
-export const GUEST_EMOJI = EMOJI_SUGGESTIONS.slice(0, 8);
+/**
+ * Self-create's picture choices: 8 one-tap emoji from the admin suggestions (spec §5 S7). A
+ * short pick keeps joining fast; the change-picture sheet on Me offers every group.
+ */
+export const GUEST_EMOJI: readonly string[] = ["🦄", "🦖", "🐼", "🦊", "🐸", "🐙", "🦁", "🐧"];
 
 /** A new guest's colour comes from the avatar palette by name, with no picker (spec §5 S7). */
 export function colorFor(name: string): string {

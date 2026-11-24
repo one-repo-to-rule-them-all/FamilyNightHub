@@ -1,4 +1,4 @@
-"""Add, edit, convert, merge and delete people (`admin:people`; hosts may add guests)."""
+"""Add, edit, convert and merge people (`admin:people`; hosts may add guests)."""
 
 from __future__ import annotations
 
@@ -22,10 +22,10 @@ from app.schemas.admin import (
     MergeIn,
     MergeOut,
     PersonCreateIn,
-    PersonDeletedOut,
     PersonUpdateIn,
+    RemovalOut,
 )
-from app.services import people_admin_service
+from app.services import people_admin_service, removal_service
 from app.services.errors import Conflict, NotFound, ServiceError, Unavailable
 
 router = APIRouter(prefix="/people", tags=["admin"])
@@ -180,32 +180,67 @@ async def convert_to_member(
     return _out(person)
 
 
+@router.post(
+    "/{person_id}/reset-pin",
+    response_model=AdminPersonOut,
+    dependencies=[CsrfProtected],
+    responses=NOT_FOUND,
+)
+async def reset_pin(
+    person_id: uuid.UUID, account: CanManagePeople, db: AccountDb
+) -> AdminPersonOut:
+    """Clear the person's PIN, failure count and lock, locked or not, and close any open
+    forgot-PIN request as approved. No PIN is set or revealed: the person chooses a new one
+    on their phone."""
+    try:
+        person = await people_admin_service.reset_pin(
+            db, account.household_id, account.account_id, person_id
+        )
+    except ServiceError as err:
+        _raise(err)
+    return _out(person)
+
+
+def _removal(c: removal_service.RemovalCounts) -> RemovalOut:
+    return RemovalOut(
+        nights_voted=c.nights_voted,
+        ratings=c.ratings,
+        photos=c.photos,
+        reactions=c.reactions,
+        phones=c.phones,
+    )
+
+
+@router.get("/{person_id}/removal", response_model=RemovalOut, responses=NOT_FOUND)
+async def removal_preview(
+    person_id: uuid.UUID, account: CanManagePeople, db: AccountDb
+) -> RemovalOut:
+    """What removing this person would delete, for the confirm dialog."""
+    try:
+        return _removal(await removal_service.removal_preview(db, person_id))
+    except ServiceError as err:
+        _raise(err)
+
+
 @router.delete(
     "/{person_id}",
-    response_model=PersonDeletedOut,
+    response_model=RemovalOut,
     dependencies=[CsrfProtected],
-    responses={
-        **NOT_FOUND,
-        503: {"description": "Photo storage is down; nothing was deleted, try again"},
-    },
+    responses={**NOT_FOUND, 503: {"description": "Their photos can't be deleted right now"}},
 )
-async def delete_person(
+async def remove_person(
     person_id: uuid.UUID,
     account: CanManagePeople,
     db: AccountDb,
     storage: Annotated[PhotoStorage | None, Depends(photo_storage)],
-) -> PersonDeletedOut:
-    """Erase a person and everything that names them, photos included (ADR-0017 §4). Not
-    undoable. People merged into them go too."""
+) -> RemovalOut:
+    """Delete a person and everything that is theirs: phone links, PIN requests, attendance,
+    votes, ratings, reactions and the photos they shared (issue #94). A night keeps its
+    winner. Audited. Can't be undone."""
     try:
-        deleted = await people_admin_service.delete(
+        counts = await removal_service.remove_person(
             db, storage, account.household_id, account.account_id, person_id
         )
     except ServiceError as err:
         _raise(err)
-    return PersonDeletedOut(
-        person_id=deleted.person_id,
-        photos=deleted.photos,
-        ballot_ranks=deleted.ballot_ranks,
-        ratings=deleted.ratings,
-    )
+    return _removal(counts)

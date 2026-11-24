@@ -87,6 +87,20 @@
   body {
     @apply bg-background text-foreground;
   }
+  /*
+   * Native <select> (issue #92): the closed controls are translucent (bg-input/30), and
+   * Chrome/Edge on Windows paint the open list from that colour over white, so the inherited
+   * white text vanished. The control states its scheme and every option gets solid popover
+   * tokens, which keeps the list readable in whatever scheme the tokens describe.
+   */
+  select {
+    color-scheme: dark;
+  }
+  select option,
+  select optgroup {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
   .tabular {
     font-variant-numeric: tabular-nums;
   }

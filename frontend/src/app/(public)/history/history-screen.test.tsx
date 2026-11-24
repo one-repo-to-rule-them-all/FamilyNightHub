@@ -21,6 +21,7 @@ const night = (id: string, extra: Partial<ProfileNight>): ProfileNight => ({
   picked_winner: false,
   rating: null,
   photo_count: 0,
+  attended: true,
   ...extra,
 });
 

@@ -476,13 +476,19 @@ The table (`ratings`, unique (session, person), `check(score between 1 and 5)`) 
   writes a `rating.proxy_rated` audit row whose `data` holds the person only, never the score.
   Both are an upsert (`ON CONFLICT (session_id, person_id) DO UPDATE`): rating again replaces the
   score, and repeating it changes nothing.
+- **Who.** Only someone who took part in the night may rate it, by phone or by proxy (issue #91):
+  *attended* means a `session_attendance` row (G8) or a ballot, defined once as
+  `attendance_service.attended_sql` / `attended`. Anyone else is 403 with code `not_attended`
+  ("You weren't at this one."). The same predicate drives `/present` and the profile's nights.
 - **When.** Ratings are accepted once the night's *effective* status is `tonight` or `closed`
   (`domain/session_state.check_can_rate`), so a reveal counts once it has settled (the lazy
   `revealed → tonight` rule). Earlier statuses are 409 "Ratings open once tonight's movie is picked".
   The session row is read `FOR SHARE`. The phone only *asks* after the movie (04-frontend.md), but
   the server doesn't refuse a rating given during it.
-- **Reads.** `GET …/ratings/mine` returns `{person_id, score|null}` for each person actively bound
-  to the calling phone. The snapshot and each history row carry `rating: {average, count}` (the
+- **Reads.** `GET …/ratings/mine` returns `{person_id, score|null, attended}` for each person
+  actively bound to the calling phone; the phone offers stars (and the rate prompt) only where
+  `attended` is true. A profile night carries `attended` too, and a profile lists every attended
+  night (plus any they rated or uploaded to). The snapshot and each history row carry `rating: {average, count}` (the
   family average, `average` null while `count` is 0), and only once the night is
   `tonight`/`closed` (`session_state.shows_rating`); before that `rating` is null. The only
   endpoint that returns another person's score is their profile (ADR-0014, family history).
@@ -549,9 +555,10 @@ consumed with `GETDEL`, so it opens exactly one stream.
 response starts; a missing, used, expired or other-night ticket is 401 (and is burned). The
 channel comes from the ticket's night only. The response is `text/event-stream` with
 `Cache-Control: no-cache, no-transform` (keeps the Next proxy from gzip-buffering it, see
-02-environments) and `X-Accel-Buffering: no`. It sends `: connected` right after
-subscribing, `: heartbeat` after 15s of quiet, and ends after 30 minutes so the client
-re-tickets. If Redis fails it sends a `degraded` frame and ends.
+02-environments) and `X-Accel-Buffering: no`. It sends `: connected` once Redis has
+confirmed the SUBSCRIBE (redis-py's `subscribe()` only sends it, and a hint published before
+the confirmation reaches nobody, #82), so the client's `ready` means no hint can be missed;
+then `: heartbeat` after 15s of quiet, and ends after 30 minutes so the client re-tickets. If Redis fails it sends a `degraded` frame and ends.
 
 **Events.** Unnamed `data:` frames, so `EventSource.onmessage` sees all of them:
 `{"type", "session_id", "version"}` and nothing else. The stream rebuilds each frame from

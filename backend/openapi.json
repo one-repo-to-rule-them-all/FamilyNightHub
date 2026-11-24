@@ -1906,6 +1906,10 @@
       },
       "OwnRatingOut": {
         "properties": {
+          "attended": {
+            "title": "Attended",
+            "type": "boolean"
+          },
           "person_id": {
             "format": "uuid",
             "title": "Person Id",
@@ -1925,7 +1929,8 @@
         },
         "required": [
           "person_id",
-          "score"
+          "score",
+          "attended"
         ],
         "title": "OwnRatingOut",
         "type": "object"
@@ -1983,36 +1988,6 @@
           "color"
         ],
         "title": "PersonCreateIn",
-        "type": "object"
-      },
-      "PersonDeletedOut": {
-        "description": "ADR-0017 \u00a74: what went with the person (anyone merged into them went too).",
-        "properties": {
-          "ballot_ranks": {
-            "title": "Ballot Ranks",
-            "type": "integer"
-          },
-          "person_id": {
-            "format": "uuid",
-            "title": "Person Id",
-            "type": "string"
-          },
-          "photos": {
-            "title": "Photos",
-            "type": "integer"
-          },
-          "ratings": {
-            "title": "Ratings",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "person_id",
-          "photos",
-          "ballot_ranks",
-          "ratings"
-        ],
-        "title": "PersonDeletedOut",
         "type": "object"
       },
       "PersonOut": {
@@ -2831,6 +2806,10 @@
       },
       "ProfileNightOut": {
         "properties": {
+          "attended": {
+            "title": "Attended",
+            "type": "boolean"
+          },
           "date": {
             "format": "date-time",
             "title": "Date",
@@ -2917,7 +2896,8 @@
           "picks",
           "picked_winner",
           "rating",
-          "photo_count"
+          "photo_count",
+          "attended"
         ],
         "title": "ProfileNightOut",
         "type": "object"
@@ -3205,6 +3185,40 @@
           "count"
         ],
         "title": "ReactionCountOut",
+        "type": "object"
+      },
+      "RemovalOut": {
+        "description": "What removing a person deletes (issue #94): shown in the confirm dialog, and returned\nby the delete.",
+        "properties": {
+          "nights_voted": {
+            "title": "Nights Voted",
+            "type": "integer"
+          },
+          "phones": {
+            "title": "Phones",
+            "type": "integer"
+          },
+          "photos": {
+            "title": "Photos",
+            "type": "integer"
+          },
+          "ratings": {
+            "title": "Ratings",
+            "type": "integer"
+          },
+          "reactions": {
+            "title": "Reactions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "nights_voted",
+          "ratings",
+          "photos",
+          "reactions",
+          "phones"
+        ],
+        "title": "RemovalOut",
         "type": "object"
       },
       "ReorderIn": {
@@ -3697,6 +3711,49 @@
           "expires_in"
         ],
         "title": "SseTicketOut",
+        "type": "object"
+      },
+      "StartFreshIn": {
+        "properties": {
+          "confirm_name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Confirm Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm_name"
+        ],
+        "title": "StartFreshIn",
+        "type": "object"
+      },
+      "StartFreshOut": {
+        "properties": {
+          "nights": {
+            "title": "Nights",
+            "type": "integer"
+          },
+          "people": {
+            "title": "People",
+            "type": "integer"
+          },
+          "phones": {
+            "title": "Phones",
+            "type": "integer"
+          },
+          "photos": {
+            "title": "Photos",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "people",
+          "phones",
+          "nights",
+          "photos"
+        ],
+        "title": "StartFreshOut",
         "type": "object"
       },
       "TmdbResultOut": {
@@ -5075,8 +5132,8 @@
     },
     "/api/v1/admin/people/{person_id}": {
       "delete": {
-        "description": "Erase a person and everything that names them, photos included (ADR-0017 \u00a74). Not\nundoable. People merged into them go too.",
-        "operationId": "delete_person_api_v1_admin_people__person_id__delete",
+        "description": "Delete a person and everything that is theirs: phone links, PIN requests, attendance,\nvotes, ratings, reactions and the photos they shared (issue #94). A night keeps its\nwinner. Audited. Can't be undone.",
+        "operationId": "remove_person_api_v1_admin_people__person_id__delete",
         "parameters": [
           {
             "in": "path",
@@ -5094,7 +5151,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PersonDeletedOut"
+                  "$ref": "#/components/schemas/RemovalOut"
                 }
               }
             },
@@ -5114,10 +5171,10 @@
             "description": "Validation Error"
           },
           "503": {
-            "description": "Photo storage is down; nothing was deleted, try again"
+            "description": "Their photos can't be deleted right now"
           }
         },
-        "summary": "Delete Person",
+        "summary": "Remove Person",
         "tags": [
           "admin"
         ]
@@ -5223,6 +5280,100 @@
           }
         },
         "summary": "Convert To Member",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/people/{person_id}/removal": {
+      "get": {
+        "description": "What removing this person would delete, for the confirm dialog.",
+        "operationId": "removal_preview_api_v1_admin_people__person_id__removal_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemovalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such (unmerged) person in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Removal Preview",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/people/{person_id}/reset-pin": {
+      "post": {
+        "description": "Clear the person's PIN, failure count and lock, locked or not, and close any open\nforgot-PIN request as approved. No PIN is set or revealed: the person chooses a new one\non their phone.",
+        "operationId": "reset_pin_api_v1_admin_people__person_id__reset_pin_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPersonOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such (unmerged) person in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Pin",
         "tags": [
           "admin"
         ]
@@ -5344,6 +5495,44 @@
           }
         },
         "summary": "Update Settings",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/start-fresh": {
+      "post": {
+        "description": "Clear every person, phone/TV and night (with their votes, ratings, attendance and\nphotos). The household, accounts, settings and movie library stay. The admin types the\nfamily name to confirm. Audited. Can't be undone (issue #94).",
+        "operationId": "start_fresh_api_v1_admin_start_fresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartFreshIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartFreshOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "The typed family name doesn't match"
+          },
+          "503": {
+            "description": "Photos can't be deleted right now"
+          }
+        },
+        "summary": "Start Fresh",
         "tags": [
           "admin"
         ]
@@ -8053,7 +8242,7 @@
             "description": "Successful Response"
           },
           "403": {
-            "description": "This phone isn't (actively) bound to that person"
+            "description": "This phone isn't (actively) bound to that person, or (code `not_attended`) that person didn't take part in the night"
           },
           "404": {
             "description": "No such night (or person) in this household"
@@ -8080,7 +8269,7 @@
     },
     "/api/v1/sessions/{session_id}/ratings/mine": {
       "get": {
-        "description": "Scores of the people actively bound to this phone (null until each has rated).",
+        "description": "Scores of the people actively bound to this phone (null until each has rated), and\nwhether each took part in the night (`attended`: only they may rate it).",
         "operationId": "my_ratings_api_v1_sessions__session_id__ratings_mine_get",
         "parameters": [
           {
@@ -8160,7 +8349,7 @@
             "description": "Successful Response"
           },
           "403": {
-            "description": "This phone isn't (actively) bound to that person"
+            "description": "This phone isn't (actively) bound to that person, or (code `not_attended`) that person didn't take part in the night"
           },
           "404": {
             "description": "No such night (or person) in this household"

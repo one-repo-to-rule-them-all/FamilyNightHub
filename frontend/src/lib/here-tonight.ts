@@ -50,9 +50,3 @@ export function hereCount(items: readonly HereItem[], status: NightStatus): stri
   const voted = items.filter((i) => i.voted).length;
   return `${items.length} here · ${voted} voted`;
 }
-
-/** Avatars that fit before the rest collapse into `+N`. */
-export function overflow<T>(items: readonly T[], max: number): { shown: T[]; more: number } {
-  if (items.length <= max) return { shown: [...items], more: 0 };
-  return { shown: items.slice(0, max - 1), more: items.length - (max - 1) };
-}

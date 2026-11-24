@@ -9,7 +9,7 @@ import { Avatar } from "@/components/night/avatar";
 import { buttonVariants } from "@/components/ui/button";
 import { nightKey } from "@/hooks/use-live-session";
 import { api, type ApiError, type Night, type OwnRating, type Person } from "@/lib/api";
-import { SCORES, describeAverage } from "@/lib/rating";
+import { NOT_ATTENDED, SCORES, describeAverage, mayRate } from "@/lib/rating";
 import { cn } from "@/lib/utils";
 import { actingPeople } from "@/lib/who";
 
@@ -23,7 +23,8 @@ type Rate = { personId: string; score: number };
  * "How was it?": five big stars for this phone's current person (04-frontend.md "Ratings";
  * ADR-0014: a phone rates only as its current person, so someone else on a shared phone switches
  * with the chip and their PIN first). Tapping a star saves that score at once; tapping another
- * replaces it. Below, the family average, never anyone else's own score.
+ * replaces it. Below, the family average, never anyone else's own score. Someone who wasn't part
+ * of the night (neither here nor voted, issue #91) gets `NOT_ATTENDED` instead of the stars.
  */
 export function RatingPanel({ night }: { night: Night }) {
   const queryClient = useQueryClient();
@@ -92,12 +93,25 @@ function RatingRows({
       {people.map((person) => {
         const shown =
           pending?.personId === person.id ? pending.score : (saved.get(person.id) ?? null);
+        const label = (
+          <span className="flex items-center gap-2 text-lg font-medium" id={`rate-${person.id}`}>
+            <Avatar emoji={person.avatar_emoji} color={person.color} className="size-9 text-xl" />
+            {person.name}
+          </span>
+        );
+        if (!mayRate(ratings, person.id)) {
+          return (
+            <li key={person.id} className="flex flex-col gap-2" data-testid="rating-row">
+              {label}
+              <p className="text-muted-foreground" data-testid="rating-not-attended">
+                {NOT_ATTENDED}
+              </p>
+            </li>
+          );
+        }
         return (
           <li key={person.id} className="flex flex-col gap-2" data-testid="rating-row">
-            <span className="flex items-center gap-2 text-lg font-medium" id={`rate-${person.id}`}>
-              <Avatar emoji={person.avatar_emoji} color={person.color} className="size-9 text-xl" />
-              {person.name}
-            </span>
+            {label}
             <div
               role="radiogroup"
               aria-labelledby={`rate-${person.id}`}

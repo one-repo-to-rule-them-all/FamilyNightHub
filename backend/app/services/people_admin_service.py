@@ -1,10 +1,9 @@
-"""Admin side of people (ADR-0002, 05-data.md "Conventions"): add, edit, guests, merge, delete.
+"""Admin side of people (ADR-0002, 05-data.md "Conventions"): add, edit, guests, merge.
 
 A merge repoints every row that names the source person to the target, in the request's one
 transaction, then sets `merged_into_id` on the source so it drops out of every list
-(`merged_into_id IS NULL` is the "live person" filter everywhere). A **delete** (ADR-0017 §4)
-is the other way out: it erases the person, everyone already merged into them, and every row
-that names them, photos included (objects deleted from the bucket in the same transaction).
+(`merged_into_id IS NULL` is the "live person" filter everywhere). The other way out is a
+**delete** (`removal_service`, ADR-0017 §4), which erases the person outright.
 
 Names are unique per household among live people, case-insensitively ("Sam" and "sam"
 are one avatar tile to a five-year-old). The check runs under a per-household advisory
@@ -22,9 +21,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.integrations.storage import PhotoStorage, StorageUnavailable
 from app.services import consent_service
-from app.services.errors import Conflict, NotFound, Unavailable
+from app.services.errors import Conflict, NotFound
 
 
 @dataclass(frozen=True)
@@ -382,104 +380,6 @@ async def merge(
     return result
 
 
-@dataclass(frozen=True)
-class DeletedPerson:
-    person_id: uuid.UUID
-    photos: int
-    ballot_ranks: int
-    ratings: int
-
-
-async def delete(
-    db: AsyncSession,
-    storage: PhotoStorage | None,
-    household_id: uuid.UUID,
-    account_id: uuid.UUID,
-    person_id: uuid.UUID,
-) -> DeletedPerson:
-    """Erase a person (ADR-0017 §4): their photos (tombstoned for the backup purge, objects
-    deleted last so a storage outage rolls everything back), reactions, ballots, ratings,
-    attendance, phone bindings and PIN resets; anyone merged into them; and the names in their
-    audit rows. The audit keeps that a person was deleted and the counts, never who.
-
-    Ballots go too, so a past night's tally can change; its recorded winner doesn't."""
-    await _get_live(db, person_id, lock=True)
-    ids = [
-        r.id
-        for r in await db.execute(
-            text("SELECT id FROM people WHERE id = :p OR merged_into_id = :p ORDER BY id"),
-            {"p": person_id},
-        )
-    ]
-    params: dict[str, Any] = {"ids": ids, "h": household_id}
-    photos = (
-        await db.execute(
-            text(
-                "SELECT id, object_key, thumb_key FROM photos WHERE person_id = ANY(:ids) "
-                "ORDER BY id FOR UPDATE"
-            ),
-            params,
-        )
-    ).all()
-    if photos and storage is None:
-        raise Unavailable("Photo storage is unavailable; try again shortly")
-    for photo in photos:
-        await db.execute(
-            text(
-                "INSERT INTO photo_deletions (household_id, photo_id, object_key, thumb_key) "
-                "VALUES (:h, :p, :k, :tk)"
-            ),
-            {"h": household_id, "p": photo.id, "k": photo.object_key, "tk": photo.thumb_key},
-        )
-
-    async def erase(table: str) -> int:
-        result = await db.execute(
-            text(f"DELETE FROM {table} WHERE person_id = ANY(:ids) RETURNING id"), params
-        )
-        return len(result.all())
-
-    # Photos first: their reactions (anyone's) cascade with them.
-    photo_count = await erase("photos")
-    await erase("photo_reactions")
-    ballot_ranks = await erase("ballot_ranks")
-    ratings = await erase("ratings")
-    await erase("session_attendance")
-    await erase("device_people")
-    await erase("pin_reset_requests")
-    await db.execute(text("DELETE FROM people WHERE merged_into_id = :p"), {"p": person_id})
-    await db.execute(text("DELETE FROM people WHERE id = :p"), {"p": person_id})
-    # Names and renames live in `data`; the rows themselves stay as a record of what happened.
-    await db.execute(
-        text(
-            "UPDATE audit_events SET data = '{\"redacted\": true}'::jsonb "
-            "WHERE target_id = ANY(:ids)"
-        ),
-        params,
-    )
-    await _audit(
-        db,
-        household_id,
-        account_id,
-        "person.deleted",
-        person_id,
-        {
-            "photos": photo_count,
-            "ballot_ranks": ballot_ranks,
-            "ratings": ratings,
-            "merged": len(ids) - 1,
-        },
-    )
-    if photos and storage is not None:
-        await db.flush()
-        try:
-            for photo in photos:
-                await storage.delete(photo.object_key)
-                await storage.delete(photo.thumb_key)
-        except StorageUnavailable:
-            raise Unavailable("Photo storage is unavailable; try again shortly") from None
-    return DeletedPerson(person_id, photo_count, ballot_ranks, ratings)
-
-
 # --- PIN resets (ADR-0014) ---------------------------------------------------------
 
 _RESET_SQL = """
@@ -576,6 +476,38 @@ async def approve_pin_reset(
         db, household_id, account_id, "person.pin_reset", person_id, {"request": str(request_id)}
     )
     return await _get_reset(db, request_id)
+
+
+async def reset_pin(
+    db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, person_id: uuid.UUID
+) -> Person:
+    """The admin resets a PIN without a request (ADR-0014 amendment): the same clear as
+    `approve_pin_reset`, locked or not. Any open request for them is closed as approved, so
+    the phone that asked may still set the new PIN."""
+    await _get_live(db, person_id, lock=True)
+    closed = (
+        await db.execute(
+            text(
+                "UPDATE pin_reset_requests SET status = 'approved', resolved_at = now(), "
+                "resolved_by_account_id = :a WHERE person_id = :p AND status = 'open' "
+                "RETURNING id"
+            ),
+            {"a": account_id, "p": person_id},
+        )
+    ).scalars()
+    requests = [str(r) for r in closed]
+    await db.execute(
+        text(
+            "UPDATE people SET pin_hash = NULL, pin_set_at = NULL, pin_failed_attempts = 0, "
+            "pin_locked_at = NULL WHERE id = :p"
+        ),
+        {"p": person_id},
+    )
+    data: dict[str, Any] = {"direct": True}
+    if requests:
+        data["requests"] = requests
+    await _audit(db, household_id, account_id, "person.pin_reset", person_id, data)
+    return await _get_live(db, person_id)
 
 
 async def dismiss_pin_reset(

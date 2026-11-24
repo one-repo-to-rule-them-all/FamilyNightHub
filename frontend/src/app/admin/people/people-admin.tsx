@@ -8,12 +8,13 @@ import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
 import { type Column, DataTable } from "@/components/ui/data-table";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import {
+  describeRemoval,
   PEOPLE_FILTERS,
   PERSON_STATUS_LABEL,
+  RESET_PIN_NOTE,
   type PeopleFilter,
   type PersonDraft,
   attentionLine,
@@ -24,13 +25,14 @@ import {
   personChanges,
   personIdFromHash,
   personStatus,
+  resetPinEmphasis,
 } from "@/lib/admin";
-import { type AdminPerson, type ApiError, type MergeResult, api } from "@/lib/api";
+import { type AdminPerson, type ApiError, type MergeResult, type Removal, api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 import { AdminQueryError } from "../admin-error";
 import { PersonForm } from "./person-form";
-import { PinRequests } from "./pin-requests";
+import { PIN_RESETS_KEY, PinRequests } from "./pin-requests";
 
 const PEOPLE_KEY = ["admin", "people"] as const;
 
@@ -103,6 +105,8 @@ export function PeopleAdmin() {
             people={people.data}
             onEdit={setEditing}
             onConverted={(p) => setNotice(`${p.name} is family now.`)}
+            onReset={(p) => setNotice(`Reset ${p.name}'s PIN. ${RESET_PIN_NOTE}`)}
+            onRemoved={(p) => setNotice(`Removed ${p.name}.`)}
           />
           {people.data.length > 1 ? (
             <MergePeople people={people.data} onMerged={setNotice} />
@@ -124,10 +128,6 @@ export function PeopleAdmin() {
           onDone={(saved) => {
             setEditing(null);
             if (saved) setNotice(`Saved ${saved.name}.`);
-          }}
-          onDeleted={(name) => {
-            setEditing(null);
-            setNotice(`Deleted ${name} and everything about them.`);
           }}
         />
       ) : null}
@@ -193,10 +193,14 @@ function PeopleTable({
   people,
   onEdit,
   onConverted,
+  onReset,
+  onRemoved,
 }: {
   people: AdminPerson[];
   onEdit: (person: AdminPerson) => void;
   onConverted: (person: AdminPerson) => void;
+  onReset: (person: AdminPerson) => void;
+  onRemoved: (person: AdminPerson) => void;
 }) {
   const queryClient = useQueryClient();
   const hash = useHash();
@@ -223,6 +227,21 @@ function PeopleTable({
       onConverted(person);
     },
   });
+
+  // #88: an admin resets a PIN directly, locked or not; the person picks a new one on their phone.
+  const [confirmReset, setConfirmReset] = useState<AdminPerson | null>(null);
+  const reset = useMutation<AdminPerson, ApiError, string>({
+    mutationFn: api.resetPin,
+    onSuccess: (person) => {
+      setConfirmReset(null);
+      void queryClient.invalidateQueries({ queryKey: PEOPLE_KEY });
+      void queryClient.invalidateQueries({ queryKey: PIN_RESETS_KEY });
+      onReset(person);
+    },
+  });
+
+  // #94: remove a person for good, after a preview of what goes with them.
+  const [removing, setRemoving] = useState<AdminPerson | null>(null);
 
   const columns: Column<AdminPerson>[] = [
     {
@@ -256,24 +275,56 @@ function PeopleTable({
       key: "actions",
       header: <span className="sr-only">Actions</span>,
       className: "text-right whitespace-nowrap",
-      cell: (p) => (
-        <span className="inline-flex gap-1">
-          <Button variant="ghost" size="sm" onClick={() => onEdit(p)} aria-label={`Edit ${p.name}`}>
-            Edit
-          </Button>
-          {p.is_guest ? (
+      cell: (p) => {
+        const emphasis = resetPinEmphasis(p);
+        return (
+          <span className="inline-flex gap-1">
+            {emphasis ? (
+              <Button
+                variant={emphasis === "prominent" ? "secondary" : "ghost"}
+                size="sm"
+                data-testid="reset-pin"
+                onClick={() => {
+                  reset.reset();
+                  setConfirmReset(p);
+                }}
+                aria-label={`Reset PIN for ${p.name}`}
+              >
+                Reset PIN
+              </Button>
+            ) : null}
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              disabled={convert.isPending}
-              onClick={() => convert.mutate(p.id)}
-              aria-label={`Make ${p.name} a family member`}
+              onClick={() => onEdit(p)}
+              aria-label={`Edit ${p.name}`}
             >
-              Make family member
+              Edit
             </Button>
-          ) : null}
-        </span>
-      ),
+            {p.is_guest ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={convert.isPending}
+                onClick={() => convert.mutate(p.id)}
+                aria-label={`Make ${p.name} a family member`}
+              >
+                Make family member
+              </Button>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              data-testid="remove-person"
+              onClick={() => setRemoving(p)}
+              aria-label={`Remove ${p.name}`}
+            >
+              Remove
+            </Button>
+          </span>
+        );
+      },
     },
   ];
 
@@ -335,6 +386,48 @@ function PeopleTable({
               : "Nobody here with this filter."
         }
       />
+      {removing ? (
+        <RemovePerson
+          person={removing}
+          onClose={() => setRemoving(null)}
+          onRemoved={(p) => {
+            setRemoving(null);
+            onRemoved(p);
+          }}
+        />
+      ) : null}
+      {confirmReset ? (
+        <ModalDialog
+          title={
+            <>
+              Reset <strong>{confirmReset.name}</strong>&apos;s PIN?
+            </>
+          }
+          onClose={() => setConfirmReset(null)}
+          testId="reset-pin-confirm"
+        >
+          <p className="text-sm">{RESET_PIN_NOTE}</p>
+          <ApiErrorNotice error={reset.error} />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="lg"
+              className="px-4"
+              disabled={reset.isPending}
+              onClick={() => reset.mutate(confirmReset.id)}
+            >
+              {reset.isPending ? "Resetting…" : "Reset PIN"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="px-4"
+              onClick={() => setConfirmReset(null)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </ModalDialog>
+      ) : null}
     </section>
   );
 }
@@ -342,14 +435,11 @@ function PeopleTable({
 function EditPerson({
   person,
   onDone,
-  onDeleted,
 }: {
   person: AdminPerson;
   onDone: (saved: AdminPerson | null) => void;
-  onDeleted: (name: string) => void;
 }) {
   const queryClient = useQueryClient();
-  const [deleting, setDeleting] = useState(false);
   const save = useMutation<AdminPerson | null, ApiError, PersonDraft>({
     mutationFn: async (draft) => {
       const changes = personChanges(person, draft);
@@ -374,87 +464,8 @@ function EditPerson({
           <Button type="button" variant="ghost" onClick={() => onDone(null)}>
             Cancel
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="text-destructive"
-            onClick={() => setDeleting(true)}
-            data-testid="delete-person"
-          >
-            Delete…
-          </Button>
         </div>
       </PersonForm>
-      {deleting ? (
-        <DeletePerson
-          person={person}
-          onCancel={() => setDeleting(false)}
-          onDeleted={() => onDeleted(person.name)}
-        />
-      ) : null}
-    </ModalDialog>
-  );
-}
-
-/**
- * ADR-0017 §4: erases the person and everything that names them (photos, votes, ratings, phone
- * bindings), plus anyone merged into them. Typing the name is the confirmation: there is no undo.
- */
-function DeletePerson({
-  person,
-  onCancel,
-  onDeleted,
-}: {
-  person: AdminPerson;
-  onCancel: () => void;
-  onDeleted: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const [typed, setTyped] = useState("");
-  const remove = useMutation<unknown, ApiError, void>({
-    mutationFn: () => api.deletePerson(person.id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: PEOPLE_KEY });
-      onDeleted();
-    },
-  });
-  const ready = typed.trim().toLowerCase() === person.name.toLowerCase();
-
-  return (
-    <ModalDialog title={`Delete ${person.name}?`} onClose={onCancel} testId="delete-person-confirm">
-      <div className="flex flex-col gap-2 text-sm">
-        <p>
-          This erases {person.name} for good: their photos, votes, ratings and phone bindings, and
-          anyone merged into them. Past winners stay as they were.
-        </p>
-        <p className="text-muted-foreground">
-          To keep their history under someone else instead, merge them.
-        </p>
-      </div>
-      <label className="flex flex-col gap-2 text-sm">
-        Type {person.name} to confirm
-        <Input
-          value={typed}
-          onChange={(event) => setTyped(event.target.value)}
-          autoComplete="off"
-          data-testid="delete-person-name"
-        />
-      </label>
-      <ApiErrorNotice error={remove.error} />
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="destructive"
-          size="lg"
-          className="px-4"
-          disabled={!ready || remove.isPending}
-          onClick={() => remove.mutate()}
-        >
-          {remove.isPending ? "Deleting…" : `Delete ${person.name}`}
-        </Button>
-        <Button variant="ghost" size="lg" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
     </ModalDialog>
   );
 }
@@ -582,5 +593,69 @@ function MergePeople({
         </ModalDialog>
       ) : null}
     </section>
+  );
+}
+
+/** #94: confirm a removal after showing what goes with the person. */
+function RemovePerson({
+  person,
+  onClose,
+  onRemoved,
+}: {
+  person: AdminPerson;
+  onClose: () => void;
+  onRemoved: (person: AdminPerson) => void;
+}) {
+  const queryClient = useQueryClient();
+  const preview = useQuery<Removal, ApiError>({
+    queryKey: ["admin", "people", person.id, "removal"],
+    queryFn: () => api.removalPreview(person.id),
+    gcTime: 0,
+  });
+  const remove = useMutation<Removal, ApiError>({
+    mutationFn: () => api.removePerson(person.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: PEOPLE_KEY });
+      void queryClient.invalidateQueries({ queryKey: PIN_RESETS_KEY });
+      onRemoved(person);
+    },
+  });
+  return (
+    <ModalDialog
+      title={
+        <>
+          Remove <strong>{person.name}</strong>?
+        </>
+      }
+      onClose={onClose}
+      testId="remove-person-confirm"
+    >
+      {preview.isPending ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Checking what goes with them…
+        </p>
+      ) : preview.isError ? (
+        <ApiErrorNotice error={preview.error} />
+      ) : (
+        <p className="text-sm" data-testid="removal-summary">
+          {describeRemoval(person.name, preview.data)}
+        </p>
+      )}
+      <ApiErrorNotice error={remove.error} />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="destructive"
+          size="lg"
+          className="px-4"
+          disabled={!preview.data || remove.isPending}
+          onClick={() => remove.mutate()}
+        >
+          {remove.isPending ? "Removing…" : `Remove ${person.name}`}
+        </Button>
+        <Button variant="ghost" size="lg" className="px-4" onClick={onClose}>
+          Cancel
+        </Button>
+      </div>
+    </ModalDialog>
   );
 }

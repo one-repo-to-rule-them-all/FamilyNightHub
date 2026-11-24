@@ -73,6 +73,7 @@ async def test_ballots_stay_hidden_until_the_reveal(two_households: Pair) -> Non
     ]
     assert night["picked_winner"] is True
     assert (night["rating"], night["photo_count"]) == (5, 1)
+    assert night["attended"] is True
     assert after["albums"] == [
         {
             "session_id": str(sid),
@@ -124,6 +125,43 @@ async def test_a_lost_pick_is_not_a_winner_and_approval_counts_any_approval(
     assert ranked["stats"]["winners_picked"] == 0
     assert approval["nights"][0]["picked_winner"] is True
     assert len(approval["nights"][0]["picks"]) == 2
+
+
+async def test_mine_lists_every_night_they_attended_and_says_which(two_households: Pair) -> None:
+    """Issue #91: "attended" (present or voted) is the rating rule, and Mine lists every such
+    night. A night they only rated (before the rule) is still listed, read-only."""
+    a, _ = two_households
+    kid, sid = a.ids["person"], a.ids["session"]
+    await open_night(a.household_id, sid, CODE, status="voting")
+    async with phone() as p:
+        assert (await p.join(a.slug, CODE)).status_code == 200
+        await _set(
+            a,
+            "UPDATE sessions SET status = 'closed', revealed_at = now() - interval '1 hour', "
+            "closed_at = now(), winner_option_id = :o WHERE id = :s",
+            o=a.ids["option"],
+            s=sid,
+        )
+        # Present only: no ballot, rating or photo.
+        await _set(a, "DELETE FROM ballot_ranks WHERE person_id = :p", p=kid)
+        await _set(a, "DELETE FROM ratings WHERE person_id = :p", p=kid)
+        await _set(a, "DELETE FROM photos WHERE person_id = :p", p=kid)
+        present_only = await _profile(p, kid)
+        # Rated only (a legacy row): listed, but not attended.
+        await _set(a, "DELETE FROM session_attendance WHERE person_id = :p", p=kid)
+        await _set(
+            a,
+            "INSERT INTO ratings (household_id, session_id, person_id, score) "
+            "VALUES (:h, :s, :p, 3)",
+            h=a.household_id,
+            s=sid,
+            p=kid,
+        )
+        rated_only = await _profile(p, kid)
+
+    assert [(n["session_id"], n["attended"]) for n in present_only["nights"]] == [(str(sid), True)]
+    assert present_only["stats"]["nights_joined"] == 1
+    assert [(n["attended"], n["rating"]) for n in rated_only["nights"]] == [(False, 3)]
 
 
 async def test_profile_is_household_scoped_and_hides_merged_people(two_households: Pair) -> None:

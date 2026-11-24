@@ -16,6 +16,13 @@ told that the operator can open its household before the operator can.
 The earlier draft of this ADR recommended option B (a content-blind operator). The owner chose A.
 Both options and the trade-off are kept below so the reasoning stays on record.
 
+**Second factor — reconciled 2026-11-24.** A separate revision of this ADR on `main` (2026-10-28,
+PR #87) had required a second factor (TOTP or a passkey) before entering a household, with entry
+refused without it. The owner reconfirmed on 2026-11-24 that it is **not** required: password
+re-entry plus the controls in Decision §2 (separate cookie, 4-hour absolute session, CLI-only
+grant, per-request re-check) and the family-visible audit (§6) are the controls. That requirement
+is withdrawn; this as-built ADR stands. Revisit if the platform ever has more than one operator.
+
 ## Context
 
 The owner wants `rbjengineeringservices.llc@gmail.com` to be the **platform owner** and to stay

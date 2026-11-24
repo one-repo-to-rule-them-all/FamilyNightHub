@@ -85,6 +85,28 @@ class AdminPersonOut(BaseModel):
     locked: bool
 
 
+class RemovalOut(BaseModel):
+    """What removing a person deletes (issue #94): shown in the confirm dialog, and returned
+    by the delete."""
+
+    nights_voted: int
+    ratings: int
+    photos: int
+    reactions: int
+    phones: int
+
+
+class StartFreshIn(BaseModel):
+    confirm_name: Annotated[str, Field(min_length=1, max_length=120)]
+
+
+class StartFreshOut(BaseModel):
+    people: int
+    phones: int
+    nights: int
+    photos: int
+
+
 class PinResetOut(BaseModel):
     """A "forgot PIN" request. Approving clears the PIN; no PIN is ever shown or chosen."""
 
@@ -98,15 +120,6 @@ class PinResetOut(BaseModel):
     status: Literal["open", "approved", "dismissed"]
     requested_at: datetime
     resolved_at: datetime | None
-
-
-class PersonDeletedOut(BaseModel):
-    """ADR-0017 §4: what went with the person (anyone merged into them went too)."""
-
-    person_id: uuid.UUID
-    photos: int
-    ballot_ranks: int
-    ratings: int
 
 
 class MergeOut(BaseModel):

@@ -1,11 +1,18 @@
 /*
  * The TV's own type scale (ADR-0008: "the TV uses its own type scale"). Everything on the TV is
  * sized in `em` off one root that follows the viewport, so a 1080p and a 4K TV read the same from
- * the sofa, and a laptop preview still fits.
+ * the sofa, and a laptop preview still fits. The root follows the shorter side, so every screen
+ * has at least ~69em × 39em to lay out in and never scrolls (issue #90): a laptop tab with its
+ * toolbar is shorter than 16:9.
  */
 .tv-screen {
-  font-size: clamp(14px, 1.45vw, 48px);
+  font-size: clamp(11px, min(1.45vw, 2.55dvh), 48px);
   line-height: 1.25;
+}
+
+/* Keep the header's right edge clear of the Full screen corner while it shows. */
+.tv-screen:has(.tv-corner) .tv-clear-corner {
+  margin-right: 14em;
 }
 
 .tv-display {
@@ -24,6 +31,22 @@
 
 .tv-body {
   font-size: 1.5em;
+}
+
+/*
+ * The lobby headline sits beside the QR, and the winner's title beside the poster: a step down
+ * so each stays on one or two lines and leaves the turnout grid (and the scores) their room.
+ */
+.tv-headline {
+  font-size: 3.2em;
+}
+
+.tv-winner-title {
+  font-size: 3.2em;
+}
+
+.tv-small {
+  font-size: 1.2em;
 }
 
 .tv-code {

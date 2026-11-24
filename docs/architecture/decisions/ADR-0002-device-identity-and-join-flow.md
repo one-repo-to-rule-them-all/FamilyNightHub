@@ -122,3 +122,22 @@ browser, Fire TV) without anyone signing in on it: the TV shows a short code, th
 in the portal, which mints a TV device for that screen. It needs a new pre-auth pairing table or
 Redis key with a TTL, a rate limit, a pairing poll on `/tv`, and a portal form. Filed as #61, its own
 issue, since it is more than half a day of work.
+
+## Amendment 2026-10-28: people can be removed, and a household can start fresh (#94)
+
+Until now people were never deleted, only merged away. The owner needed a real delete.
+
+- **Remove a person** (`DELETE /admin/people/{id}`, `admin:people`) deletes the person and
+  everything that is theirs: phone bindings, PIN requests, attendance, ballots, ratings,
+  reactions, and the photos they shared. Photos are tombstoned and their objects deleted, the same
+  way an admin photo delete works. A night keeps its stored winner, so past results don't
+  change their winner, but tallies and averages lose the removed person's votes and stars. Rows
+  earlier merged into the person go too, since a merge already moved their data. The portal
+  first shows what will go (`GET /admin/people/{id}/removal`).
+- **Start fresh** (`POST /admin/start-fresh`, `admin:settings`) clears every person, phone or TV
+  and night in the household. The household, its accounts, settings and the movie library stay.
+  The admin types the family name to confirm.
+- Both run in the request's one transaction under the household's RLS scope (no bypass), write
+  an audit event, and can't be undone. Merge is still the way to fold a duplicate in without
+  losing their history.
+

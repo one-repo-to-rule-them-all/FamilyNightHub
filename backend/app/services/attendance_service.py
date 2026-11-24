@@ -5,6 +5,11 @@ current binding to a person with a PIN) opens the night's live stream or casts a
 them, and anyone with a ballot (host proxy votes included) counts too. Rows live in
 `session_attendance`; a `presence` hint goes out after commit only when a row is new, so a
 phone re-ticketing every minute publishes nothing. Nothing here ever reads or returns ranks.
+
+*Attended* (issue #91) is the one definition of "took part in a night": an attendance row or a
+ballot. Ratings require it, the phone only offers to rate those nights, and a person's *Mine*
+history includes every one of them. `attended_sql` is that rule as a SQL predicate so every
+query spells it the same way.
 """
 
 from __future__ import annotations
@@ -19,6 +24,25 @@ from app.domain import night_code
 from app.realtime import events
 from app.realtime.publisher import publish_after_commit
 from app.services.errors import NotFound
+
+
+def attended_sql(session: str, person: str) -> str:
+    """`session` and `person` (SQL expressions) took part: present that night, or voted."""
+    return (
+        f"(EXISTS (SELECT 1 FROM session_attendance a "
+        f"WHERE a.session_id = {session} AND a.person_id = {person}) "
+        f"OR EXISTS (SELECT 1 FROM ballot_ranks br "
+        f"WHERE br.session_id = {session} AND br.person_id = {person}))"
+    )
+
+
+async def attended(db: AsyncSession, session_id: uuid.UUID, person_id: uuid.UUID) -> bool:
+    """Whether the person took part in the night (`attended_sql`)."""
+    return bool(
+        await db.scalar(
+            text(f"SELECT {attended_sql(':s', ':p')}"), {"s": session_id, "p": person_id}
+        )
+    )
 
 
 @dataclass(frozen=True)
@@ -87,17 +111,12 @@ async def present(
         raise NotFound("Night not found")
     rows = await db.execute(
         text(
-            """
+            f"""
             SELECT p.id, p.avatar_emoji, p.color,
                    EXISTS (SELECT 1 FROM ballot_ranks br
                            WHERE br.session_id = :s AND br.person_id = p.id) AS voted
             FROM people p
-            WHERE p.merged_into_id IS NULL AND (
-                EXISTS (SELECT 1 FROM session_attendance a
-                        WHERE a.session_id = :s AND a.person_id = p.id)
-                OR EXISTS (SELECT 1 FROM ballot_ranks br
-                           WHERE br.session_id = :s AND br.person_id = p.id)
-            )
+            WHERE p.merged_into_id IS NULL AND {attended_sql(":s", "p.id")}
             ORDER BY p.is_guest, lower(p.name)
             """
         ),

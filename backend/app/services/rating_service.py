@@ -4,8 +4,9 @@ One row per (session, person); rating again replaces the score. A phone rates as
 actively bound to it (`people_service.require_can_act_as`); a host with `ballots:proxy`
 rates for anyone (kids without phones), attributed by a `rating.proxy_rated` audit row.
 Ratings open once the night's *effective* status is `tonight` (a settled reveal counts) and
-stay open after `closed`. Readers only ever see their own people's scores and the family
-average; never another person's score.
+stay open after `closed`. Only someone who took part in the night may rate it
+(`attendance_service.attended`, issue #91), by phone or by proxy. Readers only ever see their
+own people's scores and the family average; never another person's score.
 
 `average_ratings` is the read the candidate generator uses (ADR-0007: a title watched in the
 last 12 months is skipped unless its average family rating is 4 or higher); `average_rating`
@@ -26,8 +27,8 @@ from app.domain import session_state
 from app.domain.session_state import SessionRuleError
 from app.realtime import events
 from app.realtime.publisher import publish_after_commit
-from app.services import people_service
-from app.services.errors import Conflict, NotFound
+from app.services import attendance_service, people_service
+from app.services.errors import Conflict, NotAttended, NotFound
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,8 @@ class OwnRating:
     person_id: uuid.UUID
     # None until this person has rated.
     score: int | None
+    # Took part in the night, so may rate it (attendance_service.attended).
+    attended: bool
 
 
 async def _check_open(db: AsyncSession, household_id: uuid.UUID, session_id: uuid.UUID) -> None:
@@ -92,6 +95,8 @@ async def rate(
         )
         if person is None:
             raise NotFound("Person not found")
+    if not await attendance_service.attended(db, session_id, person_id):
+        raise NotAttended
 
     await db.execute(
         text(
@@ -117,7 +122,8 @@ async def rate(
 async def own_ratings(
     db: AsyncSession, household_id: uuid.UUID, device_id: uuid.UUID, session_id: uuid.UUID
 ) -> list[OwnRating]:
-    """The scores of the people actively bound to this device (pending claims excluded)."""
+    """The scores of the people actively bound to this device (pending claims excluded),
+    and whether each took part in the night (only they may rate it)."""
     found = await db.scalar(
         text("SELECT 1 FROM sessions WHERE id = :s AND household_id = :h"),
         {"s": session_id, "h": household_id},
@@ -126,8 +132,9 @@ async def own_ratings(
         raise NotFound
     rows = await db.execute(
         text(
-            """
-            SELECT dp.person_id, r.score
+            f"""
+            SELECT dp.person_id, r.score,
+                   {attendance_service.attended_sql(":s", "dp.person_id")} AS attended
             FROM device_people dp
             JOIN people p ON p.id = dp.person_id
             LEFT JOIN ratings r ON r.person_id = dp.person_id AND r.session_id = :s
@@ -137,7 +144,7 @@ async def own_ratings(
         ),
         {"s": session_id, "d": device_id},
     )
-    return [OwnRating(r.person_id, r.score) for r in rows]
+    return [OwnRating(r.person_id, r.score, r.attended) for r in rows]
 
 
 async def session_average(db: AsyncSession, session_id: uuid.UUID) -> RatingAverage:

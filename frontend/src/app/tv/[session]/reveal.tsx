@@ -44,19 +44,23 @@ export function Reveal({ night, animate }: { night: Night; animate: boolean }) {
 
   if (!landed) {
     return (
-      <section aria-label="Revealing the winner" className="flex flex-1 flex-col gap-[1.5em]">
+      <section
+        aria-label="Revealing the winner"
+        className="flex min-h-0 flex-1 flex-col gap-[1.5em]"
+      >
         <p className="tv-display text-center" role="status">
           And tonight&apos;s movie is…
         </p>
         <ul
-          className="flex flex-1 items-center justify-center gap-[1.2em]"
+          className="flex min-h-0 flex-1 items-center justify-center gap-[1.2em]"
           data-testid="tv-spinner"
         >
           {night.options.map((option) => (
             <li
               key={option.id}
               className={cn(
-                "w-[9em] transition-transform duration-100",
+                // Up to 8 titles share the width: each shrinks rather than pushing past the edge.
+                "max-w-[9em] min-w-0 flex-1 transition-transform duration-100",
                 option.id === highlighted ? "scale-110 rounded-lg marquee-glow" : "opacity-40",
               )}
             >
@@ -71,24 +75,24 @@ export function Reveal({ night, animate }: { night: Night; animate: boolean }) {
   return (
     <section
       aria-labelledby="tv-winner-title"
-      className="flex flex-1 items-center justify-center gap-[3em]"
+      className="flex min-h-0 flex-1 items-center justify-center gap-[3em]"
       data-testid="tv-winner"
     >
       <Poster
         title={winner.title}
         posterPath={winner.poster_path}
         width="w500"
-        className="w-[16em] marquee-glow"
+        className="w-[15em] shrink-0 marquee-glow"
       />
-      <div className="flex max-w-[28em] flex-col gap-[0.6em]" role="status">
+      <div className="flex max-h-full max-w-[30em] min-w-0 flex-col gap-[0.5em]" role="status">
         <p className="tv-body flex items-center gap-[0.4em] text-cinema">
           <Trophy aria-hidden className="size-[1.2em]" /> Tonight&apos;s movie
         </p>
-        <h2 id="tv-winner-title" className="tv-display">
+        <h2 id="tv-winner-title" className="tv-display tv-winner-title line-clamp-2">
           {winner.title}
         </h2>
-        {winner.year ? <p className="tv-title text-muted-foreground">{winner.year}</p> : null}
         <p className="tv-body text-muted-foreground">
+          {winner.year ? `${winner.year} · ` : null}
           {night.result?.ballot_count ?? 0} {night.result?.ballot_count === 1 ? "vote" : "votes"}{" "}
           counted
         </p>
@@ -104,11 +108,11 @@ function Scores({ night, result }: { night: Night; result: NonNullable<Night["re
   return (
     <>
       {note ? (
-        <p className="tv-body text-muted-foreground" data-testid="tv-tiebreak">
+        <p className="tv-small text-muted-foreground" data-testid="tv-tiebreak">
           {note}
         </p>
       ) : null}
-      <ol className="tv-body flex flex-col gap-[0.2em]" data-testid="tv-scores">
+      <ol className="tv-small flex flex-col gap-[0.1em]" data-testid="tv-scores">
         {result.placements.map((p) => (
           <li key={p.option_id} className="flex justify-between gap-[1em]">
             <span className={cn(p.place !== 1 && "text-muted-foreground")}>

@@ -18,6 +18,8 @@ import {
   phoneTabs,
   type PastNightLike,
   ratingLine,
+  resetPlan,
+  type ResetRow,
   splitActive,
   stats,
   toggleHidden,
@@ -185,6 +187,28 @@ describe("inbox", () => {
     expect(isUnrated(past({ id: "a", closed_at: null }), NOW)).toBe(false);
     expect(isUnrated(past({ id: "a", turnout: 0 }), NOW)).toBe(false);
     expect(isUnrated(past({ id: "a", closed_at: hoursAgo(15 * 24) }), NOW)).toBe(false);
+  });
+
+  // #88: a locked row resets directly; a request row still approves the phone's request.
+  it("plans a Reset PIN for request rows and locked rows", () => {
+    const items = buildInbox({ ...sources, role: "admin" });
+    const rows = items.filter((i): i is ResetRow => i.kind === "pin-reset" || i.kind === "locked");
+    expect(rows.map(resetPlan)).toEqual([
+      {
+        rowId: "reset:r1",
+        name: "mateo",
+        note: "Their old PIN stops working. They'll choose a new one on the phone that asked.",
+        via: "request",
+        requestId: "r1",
+      },
+      {
+        rowId: "locked:abuela",
+        name: "abuela",
+        note: "Their old PIN stops working. They'll choose a new one on their phone.",
+        via: "direct",
+        personId: "abuela",
+      },
+    ]);
   });
 
   it("toggles and parses the hidden list", () => {

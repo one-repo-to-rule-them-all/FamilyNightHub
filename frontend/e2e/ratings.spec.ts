@@ -33,7 +33,8 @@ test.describe("ratings", () => {
     page,
     request,
   }) => {
-    const night = seedNight({ movies: 3, tonight: true });
+    // Both were at the night (issue #91: only they may rate it).
+    const night = seedNight({ movies: 3, tonight: true, attended: true });
     const [first, second] = night.people;
     await joinAs(page, night, [first, second]);
 
