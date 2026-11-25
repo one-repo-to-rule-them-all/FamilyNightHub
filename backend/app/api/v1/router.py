@@ -15,6 +15,7 @@ from app.api.v1 import (
     photos,
     platform,
     ratings,
+    reel,
     sessions,
     stream,
     tmdb,
@@ -33,6 +34,7 @@ api_router.include_router(people.router)
 api_router.include_router(photos.router)
 api_router.include_router(platform.router)
 api_router.include_router(ratings.router)
+api_router.include_router(reel.router)
 api_router.include_router(sessions.router)
 api_router.include_router(stream.router)
 api_router.include_router(tmdb.router)

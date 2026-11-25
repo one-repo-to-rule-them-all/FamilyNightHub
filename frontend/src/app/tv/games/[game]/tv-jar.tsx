@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo, useState } from "react";
+
 import { TvGameFrame } from "@/components/games/tv-game-frame";
 import { Avatar } from "@/components/night/avatar";
 import { useJarCycle } from "@/hooks/use-jar-cycle";
@@ -19,11 +21,29 @@ export function TvJar({ gameId }: { gameId: string }) {
   const game = useLiveGame(gameId);
   useWakeLock();
   const data = game.data;
-  const jar = data?.jar ?? null;
+  const ended = data?.status === "ended";
+  // An ended jar keeps showing its notes (night reel amendment): a manual jar has no cycle, so it
+  // gets a local one, and a paused or anchored cycle runs on once the game is over.
+  const [mountedAt] = useState(() => new Date().toISOString());
+  // Memoised: the cycle hook reads the clock offset each time its `cycle` object changes.
+  const snapshotJar = data?.jar ?? null;
+  const jar = useMemo(() => {
+    if (!snapshotJar || !ended || snapshotJar.revealed.length === 0) return snapshotJar;
+    return {
+      ...snapshotJar,
+      mode: "cycle" as const,
+      cycle: {
+        anchor_at: snapshotJar.cycle?.anchor_at ?? new Date(0).toISOString(),
+        server_now: snapshotJar.cycle?.server_now ?? mountedAt,
+        dwell_seconds: snapshotJar.cycle?.dwell_seconds ?? 12,
+        paused_index: null,
+      },
+    };
+  }, [snapshotJar, ended, mountedAt]);
   const cycling = jar?.mode === "cycle";
   const cycle = useJarCycle(jar);
   const note = cycling
-    ? data?.status === "live"
+    ? data?.status === "live" || ended
       ? (jar?.revealed[cycle.index] ?? null)
       : null
     : (jar?.current ?? null);
@@ -81,7 +101,7 @@ export function TvJar({ gameId }: { gameId: string }) {
           <p className="tv-body text-muted-foreground">Here comes the first note…</p>
         ) : null}
       </div>
-      {data?.status === "live" && jar && cycling ? (
+      {(data?.status === "live" || ended) && jar && cycling ? (
         <p
           className="tv-body flex items-center gap-[0.75em] text-muted-foreground"
           data-testid="tv-jar-progress"
@@ -101,8 +121,10 @@ export function TvJar({ gameId }: { gameId: string }) {
           {jarProgress(jar.note_count, jar.revealed_count)}
         </p>
       ) : null}
-      {data?.status === "ended" ? (
-        <p className="tv-body text-muted-foreground">That is every note. Thank you, everyone.</p>
+      {ended ? (
+        <p className="tv-body text-muted-foreground" data-testid="tv-jar-ended">
+          That is every note. Thank you, everyone.
+        </p>
       ) : null}
     </TvGameFrame>
   );

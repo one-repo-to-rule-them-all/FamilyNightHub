@@ -298,6 +298,10 @@ export const api = {
   sseTicket: (sessionId: string) =>
     request<Schemas["SseTicketOut"]>("POST", "/sse-tickets", { session_id: sessionId }),
 
+  /** The night reel (ADR-0018 amendment): recent quotes, winners and photos in show order. */
+  reel: (window: Schemas["ReelOut"]["window"]) =>
+    request<Schemas["ReelOut"]>("GET", `/reel?window=${window}`),
+
   // Games (ADR-0018). Reads work for any household viewer; hosting is `sessions:run`.
   games: () => request<GameSummary[]>("GET", "/games"),
   game: (gameId: string) => request<Game>("GET", `/games/${encodeURIComponent(gameId)}`),

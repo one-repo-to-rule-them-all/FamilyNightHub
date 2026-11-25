@@ -13,6 +13,8 @@ import { api, type ApiError, type Game, type GameSummary } from "@/lib/api";
 import { type BingoMode, MODE_COPY, WIN_MODE_COPY, type WinMode } from "@/lib/bingo";
 import { clampCycleSeconds, KIND_COPY, kindName, PLAYABLE, statusLabel } from "@/lib/games";
 
+import { NightReelCard } from "./night-reel-card";
+
 /** One named tab for a game's control page, so the Family Night hub tab stays where it is. */
 export const GAME_WINDOW_NAME = "fnh-game";
 
@@ -279,6 +281,8 @@ export function GamesAdmin() {
           <Plus aria-hidden /> Start scattergories
         </Button>
       </form>
+
+      <NightReelCard />
 
       <section className="flex flex-col gap-2" aria-label="Your games">
         <h2 className="text-lg font-medium">Your games</h2>

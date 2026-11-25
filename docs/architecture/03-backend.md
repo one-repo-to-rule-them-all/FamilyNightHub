@@ -845,6 +845,24 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   (any device or account) returns `{game_id}` and returns `null` once the game has ended. No
   event: the TV polls the snapshot. The row cascades with its game, so person removal and Start
   fresh need no code; it is in `NOT_EXPORTED`.
+- **Night reel** (ADR-0018 amendment 2026-11-26). `GET /reel?window=tonight|all` (any device or
+  account, `ViewerDb`; `app/api/v1/reel.py`, `app/services/reel_service.py`, pure rules in
+  `app/domain/reel.py`) is a read-only, no-migration snapshot of the household's recent slides:
+  `quote` (revealed, unhidden notes, ended jars included; an anonymous note's author columns are
+  `NULL` in the SQL, so the name never leaves the database), `winner` (bingo cards with `won_at`
+  with their finishing place; a scattergories round's top scorers via `scatter_service.state`),
+  `leaderboard` (scattergories standings, top 5, `final` once the game ended) and `photo`
+  (`status = 'ready'` only, one presigned GET per photo minted per request, 60 at most; no storage
+  configured means no photo slides, not an error). `tonight` is a rolling 12 hours, `all` has no
+  lower bound; a slide is filtered on when it happened (`revealed_at`, `won_at`, round
+  `revealed_at`, photo `created_at`). Game kinds register their slides in
+  `reel_service.GAME_PROVIDERS` (Lotería adds one function). The response carries `items` in show
+  order, `anchor` (start of the UTC day), `server_now` and `dwell_seconds` (12): the order is each
+  id's `sha256(seed:id)`, so a new slide lands anywhere without reordering the rest, and the seed is
+  per household and UTC day unless `X-FNH-Test-Seed` pins it (test only). No write, audit row or
+  event. Tests: `tests/integration/test_reel.py` (real Postgres: typed slides, no hidden or
+  anonymous leak, window, cross-household and 401, stable seeded order) and
+  `tests/unit/test_reel_domain.py`.
 
 ## Where business logic belongs
 
