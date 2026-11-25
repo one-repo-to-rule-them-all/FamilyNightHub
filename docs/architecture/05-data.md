@@ -31,6 +31,7 @@ PostgreSQL 16 on Fly, SQLAlchemy 2 async, Alembic. Object storage on Tigris (S3 
 | `bingo_cards` | yes | ADR-0018 slice B (migration `0010_bingo`): `game_id`, `person_id`, `squares text[25]` (snapshot of the pool at join), `marked_mask` (25-bit int, bit i = square i), `won_at`; unique per (game, person) |
 | `scatter_rounds` | yes | A scattergories round: `game_id`, `round_no` (unique per game), `letter`, `categories jsonb` (snapshotted at start), `duration_seconds`, `started_at`, `ends_at` (the server's clock), `revealed_at` (freezes answers). Migration `0011_scattergories` |
 | `scatter_answers` | yes | One answer: `round_id`, `person_id`, `category_index`, `text` (1-60), `host_verdict` (null/`accepted`/`rejected`); unique per (round, person, category). Scores are derived on read, never stored |
+| `household_tv_target` | yes | ADR-0018 amendment (migration `0012_tv_target`): the game a host sent to the paired TV. `household_id` is the primary key (one row), `game_id` (composite FK to `games`, cascade), `set_by_account_id`, `updated_at`. Not exported |
 | `audit_events` | yes | Who did what (session transitions, winner corrections, merges, revokes, deletes) |
 | `failed_jobs` | no (global) | ARQ dead letters: job name/id/try and a truncated error. Never job args |
 | `backup_runs` | no (global) | One row per backup run (`kind` photos/pg_dump, counts, errors) |

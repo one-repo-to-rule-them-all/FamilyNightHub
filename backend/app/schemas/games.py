@@ -230,3 +230,13 @@ class ScatterVerdictIn(BaseModel):
 
 
 GameOut.model_rebuild()
+
+
+class TvTargetOut(BaseModel):
+    """The game the host sent to the paired TV; null when none (or it ended)."""
+
+    game_id: uuid.UUID | None
+
+
+class TvTargetIn(BaseModel):
+    game_id: uuid.UUID | None = None

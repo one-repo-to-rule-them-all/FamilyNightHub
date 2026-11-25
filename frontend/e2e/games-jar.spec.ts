@@ -23,10 +23,15 @@ test.describe("gratitude jar", () => {
     // Host: start the jar.
     const hostContext = await browser.newContext({ baseURL: origin });
     await signInAsHost(hostContext, night, origin);
-    const host = await hostContext.newPage();
-    await host.goto("/host/games");
-    await host.getByTestId("game-title").fill("E2E jar");
-    await host.getByTestId("create-game").click();
+    const hub = await hostContext.newPage();
+    await hub.goto("/host/games");
+    await hub.getByTestId("game-title").fill("E2E jar");
+    // Creating a game opens its control page in a new tab; the hub tab stays put.
+    const [host] = await Promise.all([
+      hub.waitForEvent("popup"),
+      hub.getByTestId("create-game").click(),
+    ]);
+    await expect(hub).toHaveURL(/\/host\/games$/);
     await expect(host).toHaveURL(/\/host\/games\/[0-9a-f-]{36}$/);
     const gameId = host.url().split("/").pop()!;
     await expect(host.getByTestId("host-game")).toHaveAttribute("data-live", "ready", POLL);

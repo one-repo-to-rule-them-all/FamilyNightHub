@@ -301,6 +301,11 @@ export const api = {
   createGame: (
     body: Pick<Schemas["GameCreateIn"], "kind" | "title"> & Partial<Schemas["GameCreateIn"]>,
   ) => request<Game>("POST", "/games", body),
+  /** The game a host sent to the paired TV (null: none). Any device or account reads it. */
+  tvTarget: () => request<Schemas["TvTargetOut"]>("GET", "/games/tv-target"),
+  /** Hosts: show a game on the paired TV, or null to send it back to the QR home. */
+  setTvTarget: (gameId: string | null) =>
+    request<Schemas["TvTargetOut"]>("PUT", "/games/tv-target", { game_id: gameId }),
   endGame: (gameId: string) => request<Game>("POST", `/games/${encodeURIComponent(gameId)}/end`),
   sseGameTicket: (gameId: string) =>
     request<Schemas["SseTicketOut"]>("POST", "/sse-tickets", { game_id: gameId }),

@@ -44,6 +44,8 @@ from app.schemas.games import (
     ScatterRoundOut,
     ScatterScoreOut,
     ScatterStandingOut,
+    TvTargetIn,
+    TvTargetOut,
 )
 from app.services import games_service, scatter_service
 from app.services.errors import ServiceError
@@ -172,6 +174,30 @@ async def create_game(body: GameCreateIn, account: CanHost, db: AccountDb) -> Ga
     except ServiceError as err:
         raise_http(err)
     return await _snapshot(db, account.household_id, game.id)
+
+
+@router.get("/tv-target", response_model=TvTargetOut)
+async def get_tv_target(viewer: CurrentViewer, db: ViewerDb) -> TvTargetOut:
+    """The game a host sent to the paired TV, if any (any device or account). The TV polls
+    this snapshot and follows it; there is no event to miss."""
+    return TvTargetOut(game_id=await games_service.tv_target(db, viewer.household_id))
+
+
+@router.put(
+    "/tv-target",
+    response_model=TvTargetOut,
+    dependencies=[CsrfProtected],
+    responses=HOST,
+)
+async def put_tv_target(body: TvTargetIn, account: CanHost, db: AccountDb) -> TvTargetOut:
+    """Show a game on the paired TV, or (null) send the TV back to its QR home (hosts)."""
+    try:
+        target = await games_service.set_tv_target(
+            db, account.household_id, account.account_id, body.game_id
+        )
+    except ServiceError as err:
+        raise_http(err)
+    return TvTargetOut(game_id=target)
 
 
 @router.get("/{game_id}", response_model=GameOut, responses=NOT_FOUND)

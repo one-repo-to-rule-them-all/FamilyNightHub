@@ -989,6 +989,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/tv-target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tv Target
+         * @description The game a host sent to the paired TV, if any (any device or account). The TV polls
+         *     this snapshot and follows it; there is no event to miss.
+         */
+        get: operations["get_tv_target_api_v1_games_tv_target_get"];
+        /**
+         * Put Tv Target
+         * @description Show a game on the paired TV, or (null) send the TV back to its QR home (hosts).
+         */
+        put: operations["put_tv_target_api_v1_games_tv_target_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}": {
         parameters: {
             query?: never;
@@ -4179,6 +4204,19 @@ export interface components {
             /** Year */
             year: number | null;
         };
+        /** TvTargetIn */
+        TvTargetIn: {
+            /** Game Id */
+            game_id?: string | null;
+        };
+        /**
+         * TvTargetOut
+         * @description The game the host sent to the paired TV; null when none (or it ended).
+         */
+        TvTargetOut: {
+            /** Game Id */
+            game_id: string | null;
+        };
         /** TypedTitleIn */
         TypedTitleIn: {
             /** Title */
@@ -6310,6 +6348,73 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_tv_target_api_v1_games_tv_target_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvTargetOut"];
+                };
+            };
+        };
+    };
+    put_tv_target_api_v1_games_tv_target_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TvTargetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvTargetOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

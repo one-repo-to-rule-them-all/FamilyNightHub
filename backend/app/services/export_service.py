@@ -63,7 +63,7 @@ ORDER_BY = {
     "game_players": "joined_at, id",
     "scatter_rounds": "started_at, id",
 }
-NOT_EXPORTED = frozenset({"magic_links", "photo_deletions"})
+NOT_EXPORTED = frozenset({"magic_links", "photo_deletions", "household_tv_target"})
 SECRET_COLUMNS = frozenset({"token_hash", "password_hash", "pin_hash", "night_code_hash"})
 
 README = """Family Night export: {household}

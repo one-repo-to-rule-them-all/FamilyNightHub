@@ -174,6 +174,10 @@ async def seed_household(tag: str) -> SeededHousehold:
             person_id=ids["person"],
             body="Seed note",
         )
+        await s.execute(
+            text("INSERT INTO household_tv_target (household_id, game_id) VALUES (:h, :g)"),
+            {"h": hid, "g": ids["game"]},
+        )
         ids["bingo_card"] = await _insert(
             s,
             "bingo_cards",

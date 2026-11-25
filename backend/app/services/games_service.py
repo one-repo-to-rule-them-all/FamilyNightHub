@@ -506,6 +506,53 @@ async def end_game(
     publish_game_after_commit(db, game_id, events.GAME_CHANGED)
 
 
+# ---- The paired TV's target (ADR-0018 amendment) ----
+
+
+async def tv_target(db: AsyncSession, household_id: uuid.UUID) -> uuid.UUID | None:
+    """The game a host sent to the TV, or None. A game that has ended is no longer sent: the
+    TV falls back on its own, so there is nothing to clean up (events stay hints)."""
+    row = (
+        await db.execute(
+            text(
+                "SELECT t.game_id FROM household_tv_target t "
+                "JOIN games g ON g.id = t.game_id AND g.household_id = t.household_id "
+                "WHERE t.household_id = :h AND g.status <> 'ended'"
+            ),
+            {"h": household_id},
+        )
+    ).first()
+    return None if row is None else row.game_id
+
+
+async def set_tv_target(
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    account_id: uuid.UUID,
+    game_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    """Send a game to the TV, or (None) send the TV back to its home screen. Idempotent."""
+    if game_id is None:
+        await db.execute(
+            text("DELETE FROM household_tv_target WHERE household_id = :h"), {"h": household_id}
+        )
+        return None
+    game = await _load(db, household_id, game_id)
+    if game.status == "ended":
+        raise Conflict("That game has ended.")
+    await db.execute(
+        text(
+            "INSERT INTO household_tv_target (household_id, game_id, set_by_account_id) "
+            "VALUES (:h, :g, :a) ON CONFLICT (household_id) DO UPDATE "
+            "SET game_id = EXCLUDED.game_id, set_by_account_id = EXCLUDED.set_by_account_id, "
+            "updated_at = now()"
+        ),
+        {"h": household_id, "g": game_id, "a": account_id},
+    )
+    await _audit(db, household_id, account_id, "game.shown_on_tv", game_id)
+    return game_id
+
+
 # ---- Thanksgiving Bingo ----
 
 

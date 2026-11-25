@@ -217,3 +217,49 @@ per category, not a ranking of options.
 4. Scattergories uses a local countdown against the server's `ends_at`; no tick events.
 
 Games use the household's existing people, devices and accounts; no second roster or identity.
+
+---
+
+## Amendment 2026-11-25: the paired TV follows the host (`/tv`, "Show on TV")
+
+<!-- Appended section: written by the games-tv-unify session; the rest of this ADR is untouched. -->
+
+**Context.** Hand-testing on staging showed that the paired TV sat on `/tv` and never moved to a
+game, and that "Open on the TV" opened a *new* tab on `/tv/games/{id}` instead of using the TV the
+household had already paired. The TV is one screen the host drives; it should not need a second
+window per game.
+
+**Decision.**
+
+1. **A household "TV target".** One row at most per household in `household_tv_target`
+   (migration `0012_tv_target`: `household_id` primary key, `game_id` with a composite
+   `(game_id, household_id)` FK to `games` `ON DELETE CASCADE`, `set_by_account_id`, `updated_at`;
+   FORCE RLS + `household_isolation` in the same migration, ADR-0003). It points at the game a host
+   sent to the TV. No row means nothing was sent.
+2. **API.** `GET /games/tv-target` (any device or account) returns `{game_id}`;
+   `PUT /games/tv-target {game_id | null}` (`sessions:run`, CSRF) sets it, `null` clears it.
+   Another household's game is 404; an ended game is 409. Audit: `game.shown_on_tv`.
+   `GET` returns `null` once the sent game has `ended`, so the TV leaves on its own and there is
+   nothing to clean up.
+3. **Transport: polling the snapshot, no new event.** The TV already polls its night and games list
+   every few seconds (`POLL_MS`); it now polls `GET /games/tv-target` the same way. This is the
+   least invasive option: no new channel, no ticket for a TV that has no game id yet, and
+   no event to miss (events stay hints and the snapshot is the truth, ADR-0004). A push hint on a
+   household channel can be added later without changing the API.
+4. **What `/tv` follows, in order:** the game a host sent to the TV; else a live night
+   (`draft`/`voting`/`revealed`/`tonight`); else any `open` or `live` game; else the home screen.
+   Screens that are already open follow too: `/tv/games/{id}` leaves when the host sends another
+   game, presses **Back to QR**, or the game ends (only if the host had sent it: a game screen
+   opened by hand stays put); `/tv/{night}` moves to a game the host sends.
+5. **Host UI.** Each game's host screen has **Show on TV** / **Back to QR** (replacing the
+   "Open on the TV" link). It only writes the target; the TV is a different device.
+6. **Owner panel.** Creating a game opens its control page in a named new tab (`fnh-game`), opened
+   synchronously in the click so popup blockers allow it, with a plain link when blocked; the
+   hub tab stays on `/host/games`.
+
+**Consequences.** Review answer 3 ("a live night always wins `/tv`; otherwise a live game") now
+reads: *a game the host sent beats a night; then a night; then any open or live game*. **Back to
+QR** returns the TV to whatever it would show with nothing sent: with a night in progress that is
+the night's QR screen; with no night but an open or live game, the TV settles on that game again.
+The target is not exported (it is a transient screen pointer, not household content) and is
+removed with its game (cascade, so person delete and Start fresh need no extra code).

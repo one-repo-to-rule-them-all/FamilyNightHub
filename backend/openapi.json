@@ -4816,6 +4816,46 @@
         "title": "TmdbResultOut",
         "type": "object"
       },
+      "TvTargetIn": {
+        "properties": {
+          "game_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Id"
+          }
+        },
+        "title": "TvTargetIn",
+        "type": "object"
+      },
+      "TvTargetOut": {
+        "description": "The game the host sent to the paired TV; null when none (or it ended).",
+        "properties": {
+          "game_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Id"
+          }
+        },
+        "required": [
+          "game_id"
+        ],
+        "title": "TvTargetOut",
+        "type": "object"
+      },
       "TypedTitleIn": {
         "properties": {
           "title": {
@@ -7433,6 +7473,74 @@
           }
         },
         "summary": "Create Game",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/tv-target": {
+      "get": {
+        "description": "The game a host sent to the paired TV, if any (any device or account). The TV polls\nthis snapshot and follows it; there is no event to miss.",
+        "operationId": "get_tv_target_api_v1_games_tv_target_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TvTargetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Tv Target",
+        "tags": [
+          "games"
+        ]
+      },
+      "put": {
+        "description": "Show a game on the paired TV, or (null) send the TV back to its QR home (hosts).",
+        "operationId": "put_tv_target_api_v1_games_tv_target_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TvTargetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TvTargetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Tv Target",
         "tags": [
           "games"
         ]

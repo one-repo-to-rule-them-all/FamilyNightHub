@@ -3,8 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Button } from "@/components/ui/button";
@@ -14,10 +13,39 @@ import { api, type ApiError, type Game, type GameSummary } from "@/lib/api";
 import { WIN_MODE_COPY, type WinMode } from "@/lib/bingo";
 import { KIND_COPY, PLAYABLE, statusLabel } from "@/lib/games";
 
+/** One named tab for a game's control page, so the Family Night hub tab stays where it is. */
+export const GAME_WINDOW_NAME = "fnh-game";
+
+/** Where a game's control page lives. */
+const hostGameHref = (gameId: string) => `/host/games/${encodeURIComponent(gameId)}`;
+
 /** Start a Gratitude Jar, a bingo round or Scattergories and list the household's games. */
 export function GamesAdmin() {
-  const router = useRouter();
   const queryClient = useQueryClient();
+  // The control page opens in a new tab (like "Open TV window"): the tab is opened
+  // synchronously inside the click, since a popup blocker only allows that, then pointed at
+  // the game once it exists. If the blocker ate it, a plain link is offered instead.
+  const gameTab = useRef<Window | null>(null);
+  const [fallbackHref, setFallbackHref] = useState<string | null>(null);
+  const openGameTab = () => {
+    setFallbackHref(null);
+    gameTab.current = window.open("", GAME_WINDOW_NAME);
+  };
+  const sendGameTab = (game: Game) => {
+    void queryClient.invalidateQueries({ queryKey: ["games"] });
+    const win = gameTab.current;
+    gameTab.current = null;
+    if (!win || win.closed) {
+      setFallbackHref(hostGameHref(game.id));
+      return;
+    }
+    win.location.replace(hostGameHref(game.id));
+    win.focus();
+  };
+  const closeGameTab = () => {
+    gameTab.current?.close();
+    gameTab.current = null;
+  };
   const [title, setTitle] = useState("Thanksgiving gratitude jar");
   const [allowAnonymous, setAllowAnonymous] = useState(true);
   const [bingoTitle, setBingoTitle] = useState("Thanksgiving bingo");
@@ -38,10 +66,8 @@ export function GamesAdmin() {
           ? { kind, title, allow_anonymous: allowAnonymous }
           : { kind, title: scatterTitle, allow_anonymous: true },
       ),
-    onSuccess: (game) => {
-      void queryClient.invalidateQueries({ queryKey: ["games"] });
-      router.push(`/host/games/${game.id}`);
-    },
+    onSuccess: sendGameTab,
+    onError: closeGameTab,
   });
 
   const createBingo = useMutation<Game, ApiError>({
@@ -53,21 +79,33 @@ export function GamesAdmin() {
         free_center: freeCenter,
         end_on_first_win: endOnFirstWin,
       }),
-    onSuccess: (game) => {
-      void queryClient.invalidateQueries({ queryKey: ["games"] });
-      router.push(`/host/games/${game.id}`);
-    },
+    onSuccess: sendGameTab,
+    onError: closeGameTab,
   });
 
   return (
     <div className="flex flex-col gap-6" data-screen="portal-games">
       <h1 className="font-heading text-2xl font-semibold">Games</h1>
+      {fallbackHref ? (
+        <p
+          className="rounded-xl border border-foreground/10 bg-card p-3"
+          data-testid="game-tab-fallback"
+        >
+          Your browser blocked the new tab.{" "}
+          <a href={fallbackHref} target={GAME_WINDOW_NAME} className="font-medium underline">
+            Open the game
+          </a>
+        </p>
+      ) : null}
 
       <form
         className="flex flex-col gap-3 rounded-2xl border border-foreground/10 bg-card p-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (title.trim() && !create.isPending) create.mutate("gratitude_jar");
+          if (title.trim() && !create.isPending) {
+            openGameTab();
+            create.mutate("gratitude_jar");
+          }
         }}
       >
         <h2 className="text-lg font-medium">
@@ -105,7 +143,10 @@ export function GamesAdmin() {
         className="flex flex-col gap-3 rounded-2xl border border-foreground/10 bg-card p-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (bingoTitle.trim() && !createBingo.isPending) createBingo.mutate();
+          if (bingoTitle.trim() && !createBingo.isPending) {
+            openGameTab();
+            createBingo.mutate();
+          }
         }}
       >
         <h2 className="text-lg font-medium">Start a bingo round</h2>
@@ -171,7 +212,10 @@ export function GamesAdmin() {
         className="flex flex-col gap-3 rounded-2xl border border-foreground/10 bg-card p-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (scatterTitle.trim() && !create.isPending) create.mutate("scattergories");
+          if (scatterTitle.trim() && !create.isPending) {
+            openGameTab();
+            create.mutate("scattergories");
+          }
         }}
       >
         <h2 className="text-lg font-medium">Start {KIND_COPY.scattergories.name.toLowerCase()}</h2>
