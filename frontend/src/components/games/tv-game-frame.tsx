@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { FitBanner, FitStage } from "@/components/games/fit-stage";
 import { PlayerStrip } from "@/components/games/player-strip";
 import type { StripPlayer } from "@/lib/game-layout";
 
@@ -7,7 +8,7 @@ import type { StripPlayer } from "@/lib/game-layout";
  * The TV's game template (04-frontend.md, "Game layout template"): a header, a stage that takes
  * the height that is left, and the player strip pinned to the foot. It fills the `/tv` layout's one
  * viewport (`flex-1 min-h-0`), so the strip is always on screen, fullscreen or not. Type is in the
- * TV's `em` scale; the stage scrolls only if a very short window cannot fit it.
+ * TV's `em` scale; the stage shrinks to fit (FitStage) rather than scroll.
  *
  * `attrs` lands on the root (`data-testid`, `data-status`, `data-live`, ...), so a game keeps the
  * hooks its specs read.
@@ -46,12 +47,8 @@ export function TvGameFrame({
           <div className="tv-body mt-[0.3em] text-muted-foreground">{subtitle}</div>
         ) : null}
       </header>
-      {banner ? <div className="shrink-0">{banner}</div> : null}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto" data-testid="game-stage">
-        <div className="m-auto flex w-full flex-col items-center gap-[1.25em] py-[0.25em]">
-          {children}
-        </div>
-      </div>
+      {banner ? <FitBanner>{banner}</FitBanner> : null}
+      <FitStage>{children}</FitStage>
       <footer className="shrink-0 border-t border-foreground/10 pt-[0.8em] pb-[max(0.2em,env(safe-area-inset-bottom,0px))]">
         <PlayerStrip
           players={players}

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { stripSticky } from "@/lib/game-layout";
 import { PlayerStrip } from "@/components/games/player-strip";
 import type { StripPlayer } from "@/lib/game-layout";
 
@@ -48,7 +49,13 @@ export function HostGameFrame({
             {children}
           </div>
           {players ? (
-            <footer className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-10 -mx-4 border-t border-foreground/10 bg-background/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 md:bottom-0 md:mx-0 md:px-0">
+            <footer
+              className={
+                stripSticky(players.length)
+                  ? "sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-10 -mx-4 border-t border-foreground/10 bg-background/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 md:bottom-0 md:mx-0 md:px-0"
+                  : "border-t border-foreground/10 pt-2"
+              }
+            >
               <PlayerStrip
                 players={players}
                 variant="host"

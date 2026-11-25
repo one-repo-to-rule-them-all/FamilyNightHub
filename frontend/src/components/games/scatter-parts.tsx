@@ -1,8 +1,11 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { type ReactNode, useEffect, useState } from "react";
 
 import { Avatar } from "@/components/night/avatar";
 import type { ScatterAnswer, ScatterRevealed, ScatterState } from "@/lib/api";
 import { answerNote, byCategory, formatClock, pointsLabel, timeFraction } from "@/lib/scatter";
+import { LEADERBOARD_TV_MAX, needsResultsPaging, nextPage } from "@/lib/game-layout";
 import { cn } from "@/lib/utils";
 
 type Standing = ScatterState["leaderboard"][number];
@@ -53,7 +56,7 @@ export function LetterTile({ letter, tv }: { letter: string; tv?: boolean }) {
       aria-label={`The letter is ${letter}`}
       className={cn(
         "flex aspect-square items-center justify-center rounded-3xl border border-foreground/10 bg-card font-heading font-bold marquee-glow",
-        tv ? "w-[7em] text-[5em]" : "w-28 text-7xl",
+        tv ? "w-[1.4em] text-[5em]" : "w-28 text-7xl",
       )}
     >
       {letter}
@@ -63,11 +66,19 @@ export function LetterTile({ letter, tv }: { letter: string; tv?: boolean }) {
 
 export function Leaderboard({ standings, tv }: { standings: Standing[]; tv?: boolean }) {
   if (standings.length === 0) return null;
+  // A TV cannot scroll: a crowd's table shows its top places and says how many more there are.
+  const shown = tv ? standings.slice(0, LEADERBOARD_TV_MAX) : standings;
+  const more = standings.length - shown.length;
   return (
     <section className="flex w-full flex-col gap-2" aria-label="Leaderboard">
       <h2 className={cn("font-medium", tv ? "tv-body" : "text-lg")}>Leaderboard</h2>
-      <ol className="flex flex-col gap-2">
-        {standings.map((s, i) => (
+      <ol
+        className={cn(
+          "flex flex-col gap-2",
+          tv && standings.length > 6 && "grid grid-cols-2 gap-[0.5em]",
+        )}
+      >
+        {shown.map((s, i) => (
           <li
             key={s.person_id}
             data-testid="scatter-standing"
@@ -85,6 +96,11 @@ export function Leaderboard({ standings, tv }: { standings: Standing[]; tv?: boo
           </li>
         ))}
       </ol>
+      {more > 0 ? (
+        <p className="tv-small text-muted-foreground" data-testid="scatter-standing-more">
+          and {more} more
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -107,20 +123,39 @@ export function Results({
 }) {
   const people = new Map(standings.map((s) => [s.person_id, s]));
   const scores = new Map(round.scores.map((s) => [s.person_id, s.points]));
+  const groups = byCategory(round.categories, round.answers);
+  const paged = tv === true && needsResultsPaging(round.answers.length);
+  const [page, setPage] = useState(0);
+  useEffect(() => {
+    if (!paged) return;
+    const timer = setInterval(() => setPage((p) => nextPage(p, groups.length)), 9000);
+    return () => clearInterval(timer);
+  }, [paged, groups.length]);
+  const visible = paged ? [groups[page % groups.length]] : groups;
   return (
     <section
-      className="flex w-full flex-col gap-4"
+      className={cn("flex w-full flex-col gap-4", tv && "grid grid-cols-3 items-start gap-[0.8em]")}
       aria-label={`Round ${round.round_no} answers`}
       data-testid="scatter-results"
       data-round={round.round_no}
     >
-      {byCategory(round.categories, round.answers).map(({ category, answers }) => (
-        <div key={category} className="flex flex-col gap-2" data-testid="scatter-category">
-          <h3 className={cn("font-medium", tv ? "tv-body" : "text-base")}>{category}</h3>
+      {visible.map(({ category, answers }) => (
+        <div
+          key={category}
+          className={cn("flex flex-col gap-2", paged && "col-span-3")}
+          data-testid="scatter-category"
+        >
+          <h3 className={cn("font-medium", tv ? "tv-small" : "text-base")}>{category}</h3>
           {answers.length === 0 ? (
             <p className="text-sm text-muted-foreground">No answers.</p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul
+              className={cn(
+                "flex flex-col gap-2",
+                tv && "gap-[0.3em]",
+                paged && "grid grid-cols-3",
+              )}
+            >
               {answers.map((a) => {
                 const who = people.get(a.person_id);
                 const note = answerNote(a);
@@ -132,7 +167,7 @@ export function Results({
                     data-verdict={a.verdict ?? ""}
                     className={cn(
                       "flex items-center gap-3 rounded-xl border border-foreground/10 bg-card p-3",
-                      tv && "tv-body gap-[0.75em] p-[0.6em]",
+                      tv && "tv-small gap-[0.5em] p-[0.3em]",
                       a.point === 0 && "opacity-70",
                     )}
                   >
@@ -155,7 +190,18 @@ export function Results({
           )}
         </div>
       ))}
-      <p className="text-sm text-muted-foreground" data-testid="scatter-round-scores">
+      {paged ? (
+        <p
+          className="tv-small col-span-3 text-center text-muted-foreground"
+          data-testid="scatter-page"
+        >
+          Category {(page % groups.length) + 1} of {groups.length}
+        </p>
+      ) : null}
+      <p
+        className={cn("text-sm text-muted-foreground", tv && "col-span-3", paged && "sr-only")}
+        data-testid="scatter-round-scores"
+      >
         {[...scores.entries()]
           .map(([id, pts]) => `${people.get(id)?.name ?? "Someone"} ${pointsLabel(pts)}`)
           .join(" · ")}

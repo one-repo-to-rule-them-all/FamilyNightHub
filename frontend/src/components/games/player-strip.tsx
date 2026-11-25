@@ -5,6 +5,7 @@ import {
   playerCountLabel,
   stripDensity,
   stripMaxRows,
+  stripNameMaxEm,
   type StripPlayer,
   type StripVariant,
 } from "@/lib/game-layout";
@@ -12,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 /** Type scale per variant and density; the TV's is in `em` off the `.tv-screen` root. */
 const TEXT: Record<StripVariant, Record<"roomy" | "compact" | "dense", string>> = {
-  tv: { roomy: "text-[1.5em]", compact: "text-[1.2em]", dense: "text-[1em]" },
+  tv: { roomy: "text-[1.5em]", compact: "text-[1.05em]", dense: "text-[0.9em]" },
   phone: { roomy: "text-base", compact: "text-base", dense: "text-sm" },
   host: { roomy: "text-base", compact: "text-base", dense: "text-sm" },
 };
@@ -86,7 +87,10 @@ export function PlayerStrip({
                 color={p.color}
                 className="size-[2em] shrink-0 text-[1.1em]"
               />
-              <span className="min-w-0 leading-tight">
+              <span
+                className="min-w-0 leading-tight"
+                style={phone ? undefined : { maxWidth: `${stripNameMaxEm(density)}em` }}
+              >
                 <span className="block truncate font-medium">{p.name}</span>
                 {p.chip ? (
                   <span className="flex items-center gap-[0.3em] text-[0.85em] text-muted-foreground">
