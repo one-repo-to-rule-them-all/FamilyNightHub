@@ -831,7 +831,7 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   letter; the phone's hint is a convenience. Category fit is not judged. Ending the game does not
   reveal an unrevealed round.
 - **Lotería (amendment 2026-11-26, migration `0015_loteria`).** Kind `loteria`, config `pattern`
-  (`line` | `corners` | `center` | `full`, default line) and `end_on_first_win`. Pure
+  (`line` | `corners` | `center` | `full`, default full) and `end_on_first_win`. Pure
   `domain/games/loteria.py` (4 x 4 masks, seeded `call_order`, `pattern`/`missing`) and the 54-card
   data module `loteria_deck.py` (Spanish name, English gloss, emoji; mirrored in
   `frontend/src/lib/loteria-deck.ts` and pinned equal by a unit test). **No new tables**: a tabla is
