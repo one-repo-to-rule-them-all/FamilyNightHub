@@ -1419,6 +1419,21 @@
             "title": "Kind",
             "type": "string"
           },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "thanksgiving",
+                  "classic"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
           "scatter": {
             "anyOf": [
               {
@@ -1476,6 +1491,21 @@
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "thanksgiving",
+                  "classic"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
           },
           "status": {
             "enum": [

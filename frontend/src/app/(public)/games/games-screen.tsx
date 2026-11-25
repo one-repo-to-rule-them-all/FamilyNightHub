@@ -6,7 +6,7 @@ import Link from "next/link";
 
 import { GuestShell } from "@/components/home/guest-shell";
 import { api, type ApiError, type GameSummary } from "@/lib/api";
-import { KIND_COPY, PLAYABLE, statusLabel } from "@/lib/games";
+import { kindName, PLAYABLE, statusLabel } from "@/lib/games";
 
 const GAMES_POLL_MS = 10_000;
 
@@ -67,7 +67,7 @@ function GameList({ title, games }: { title: string; games: GameSummary[] }) {
               <span className="min-w-0 flex-1">
                 <span className="block text-lg font-medium">{game.title}</span>
                 <span className="block text-sm text-muted-foreground">
-                  {KIND_COPY[game.kind].name} · {statusLabel(game.kind, game.status)}
+                  {kindName(game.kind, game.mode)} · {statusLabel(game.kind, game.status)}
                 </span>
               </span>
               <ChevronRight aria-hidden className="size-5 text-muted-foreground" />

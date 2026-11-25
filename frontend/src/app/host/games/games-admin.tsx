@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, type ApiError, type Game, type GameSummary } from "@/lib/api";
 import { type BingoMode, MODE_COPY, WIN_MODE_COPY, type WinMode } from "@/lib/bingo";
-import { KIND_COPY, PLAYABLE, statusLabel } from "@/lib/games";
+import { KIND_COPY, kindName, PLAYABLE, statusLabel } from "@/lib/games";
 
 /** One named tab for a game's control page, so the Family Night hub tab stays where it is. */
 export const GAME_WINDOW_NAME = "fnh-game";
@@ -297,7 +297,7 @@ export function GamesAdmin() {
                   <span className="min-w-0 flex-1">
                     <span className="block font-medium">{game.title}</span>
                     <span className="block text-sm text-muted-foreground">
-                      {KIND_COPY[game.kind].name} · {statusLabel(game.kind, game.status)}
+                      {kindName(game.kind, game.mode)} · {statusLabel(game.kind, game.status)}
                     </span>
                   </span>
                   <ChevronRight aria-hidden className="size-5 text-muted-foreground" />

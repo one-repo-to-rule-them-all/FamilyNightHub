@@ -347,3 +347,16 @@ async def test_cross_household_is_404_and_the_export_lists_the_table(two_househo
         assert resp.status_code == 200
         archive = zipfile.ZipFile(io.BytesIO(resp.content))
         assert "tables/bingo_calls.json" in archive.namelist()
+
+
+async def test_the_games_list_says_which_kind_of_bingo(two_households: Pair) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        classic = await _classic(host)
+        old = (await host.post(GAMES, {"kind": "bingo", "title": "Old school"})).json()["id"]
+        jar = (await host.post(GAMES, {"kind": "gratitude_jar", "title": "Jar"})).json()["id"]
+        modes = {g["id"]: g["mode"] for g in (await host.client.get(GAMES)).json()}
+        assert modes[classic] == "classic"
+        assert modes[old] == "thanksgiving"
+        assert modes[jar] is None

@@ -4,6 +4,7 @@ import {
   authorLine,
   canSendNote,
   jarProgress,
+  kindName,
   jarStatusLine,
   KIND_COPY,
   NOTE_MAX,
@@ -53,5 +54,12 @@ describe("games", () => {
   it("only offers the jar so far", () => {
     expect(PLAYABLE).toEqual(["gratitude_jar", "bingo", "scattergories"]);
     expect(KIND_COPY.gratitude_jar.name).toBe("Gratitude jar");
+  });
+
+  it("names a bingo round by its kind", () => {
+    expect(kindName("bingo", "classic")).toBe("Classic bingo");
+    expect(kindName("bingo", "thanksgiving")).toBe("Thanksgiving bingo");
+    expect(kindName("bingo")).toBe("Thanksgiving bingo");
+    expect(kindName("gratitude_jar", null)).toBe("Gratitude jar");
   });
 });

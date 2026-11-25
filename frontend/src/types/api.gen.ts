@@ -3020,6 +3020,8 @@ export interface components {
              * @enum {string}
              */
             kind: "gratitude_jar" | "bingo" | "scattergories";
+            /** Mode */
+            mode?: ("thanksgiving" | "classic") | null;
             scatter?: components["schemas"]["ScatterOut"] | null;
             /**
              * Status
@@ -3046,6 +3048,8 @@ export interface components {
              * @enum {string}
              */
             kind: "gratitude_jar" | "bingo" | "scattergories";
+            /** Mode */
+            mode?: ("thanksgiving" | "classic") | null;
             /**
              * Status
              * @enum {string}

@@ -27,6 +27,12 @@ export const KIND_COPY: Record<GameKind, { name: string; blurb: string }> = {
 /** Every kind is playable. */
 export const PLAYABLE: readonly GameKind[] = ["gratitude_jar", "bingo", "scattergories"];
 
+/** The name to show for a game: bingo says which kind (classic or Thanksgiving). */
+export function kindName(kind: GameKind, mode?: "thanksgiving" | "classic" | null): string {
+  if (kind === "bingo" && mode === "classic") return "Classic bingo";
+  return KIND_COPY[kind].name;
+}
+
 export function statusLabel(kind: GameKind, status: GameStatus): string {
   if (kind === "gratitude_jar") {
     if (status === "open") return "Collecting notes";
