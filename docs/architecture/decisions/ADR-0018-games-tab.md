@@ -665,14 +665,15 @@ win patterns differ.
    emoji is decoration, the name carries the meaning, `aria-label` is the name, and a mark is a
    check glyph plus colour, never colour alone). The deck is the same for every client: the API
    sends card **ids** and the frontend maps id to name/emoji from a mirror table
-   (`frontend/src/lib/loteria-deck.ts`), pinned equal to the backend list by a vitest that reads the
-   Python file's names; the snapshot also carries `name_es`/`name_en`/`emoji` for the cards it
-   mentions, so a screen is never wrong even if the mirror drifts.
+   (`frontend/src/lib/loteria-deck.ts`), pinned equal to the backend list by a backend unit test that
+   reads the TypeScript file; the snapshot's calls also carry `name_es`/`name_en`/`emoji`, so the
+   current card is right even if the mirror drifted.
 3. **The tabla.** 16 distinct card ids drawn by `random.Random(seed ^ person.int)`, row-major 4 x 4,
    stored as decimal text. Mask bit `i` is square `i`; no free square. **Reroll** while the game is
    `open`: unlimited, replaces the squares, resets marks, refused 409 once `live` (same rule as the
-   bingo reroll on `claude/games-card-reroll`, implemented separately here; the pick uses a fresh
-   `secrets.randbits(64)` salt, or `seed ^ person ^ n` under the test header, so a reroll differs).
+   bingo reroll on `claude/games-card-reroll`, implemented separately here; a reroll takes
+   its own `tie_seed`: random in production, the test header under test; it never returns the same
+   tabla).
 4. **Storage: reuse, do not add tables.** Cards live in `bingo_cards` and calls in `bingo_calls`.
    `bingo_calls.value BETWEEN 1 AND 75` already admits 1-54 and its unique indexes give "no repeat,
    no shared slot" for free. `bingo_cards` carries a `cardinality(squares) = 25` CHECK; migration

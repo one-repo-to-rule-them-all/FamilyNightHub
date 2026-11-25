@@ -3,7 +3,7 @@
  * React-free so it is unit-tested.
  */
 
-export type GameKind = "gratitude_jar" | "bingo" | "scattergories";
+export type GameKind = "gratitude_jar" | "bingo" | "scattergories" | "loteria";
 export type GameStatus = "draft" | "open" | "live" | "ended";
 
 /** The server's note limit (domain/games/jar.py). */
@@ -22,10 +22,14 @@ export const KIND_COPY: Record<GameKind, { name: string; blurb: string }> = {
     name: "Scattergories",
     blurb: "One letter, a list of categories, beat the clock.",
   },
+  loteria: {
+    name: "Lotería",
+    blurb: "The host calls a picture, you mark it on your tabla. Shout ¡Lotería! to win.",
+  },
 };
 
 /** Every kind is playable. */
-export const PLAYABLE: readonly GameKind[] = ["gratitude_jar", "bingo", "scattergories"];
+export const PLAYABLE: readonly GameKind[] = ["gratitude_jar", "bingo", "scattergories", "loteria"];
 
 /** The name to show for a game: bingo says which kind (classic or Thanksgiving). */
 export function kindName(kind: GameKind, mode?: "thanksgiving" | "classic" | null): string {
@@ -42,6 +46,7 @@ export function statusLabel(kind: GameKind, status: GameStatus): string {
   if (status === "ended") return "Finished";
   if (status === "draft") return "Setting up";
   if (kind === "scattergories") return status === "live" ? "Playing" : "Waiting to start";
+  if (kind === "loteria") return status === "live" ? "Playing" : "Open";
   return status === "live" ? "Live" : "Open";
 }
 

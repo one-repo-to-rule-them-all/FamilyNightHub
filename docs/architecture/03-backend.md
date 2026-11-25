@@ -830,6 +830,21 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   publishes nothing, and "Accept the rest" is client-side. The server stays the authority on the
   letter; the phone's hint is a convenience. Category fit is not judged. Ending the game does not
   reveal an unrevealed round.
+- **Lotería (amendment 2026-11-26, migration `0015_loteria`).** Kind `loteria`, config `pattern`
+  (`line` | `corners` | `center` | `full`, default line) and `end_on_first_win`. Pure
+  `domain/games/loteria.py` (4 x 4 masks, seeded `call_order`, `pattern`/`missing`) and the 54-card
+  data module `loteria_deck.py` (Spanish name, English gloss, emoji; mirrored in
+  `frontend/src/lib/loteria-deck.ts` and pinned equal by a unit test). **No new tables**: a tabla is
+  a `bingo_cards` row with 16 squares (the CHECK became `cardinality(squares) IN (16, 25)`) and
+  calls are `bingo_calls` rows with `value` 1-54. Routes live in `api/v1/games_loteria.py` and
+  `services/loteria_service.py`: `POST /games/{id}/loteria/{open,start,join,reroll,draw,check}`,
+  `GET …/loteria/mine`, `PUT/DELETE …/loteria/mark/{index}?person_id=`. Open fixes `reveal_seed`;
+  the n-th draw is `call_order(seed)[n]` (stale `expected_seq` 409, 54 calls max). Mark only a
+  called card (409); marking never wins. **Reroll** replaces the tabla and clears marks, unlimited
+  while `open`, 409 once `live`. **Check** (host) reads the called set, never the marks: a false
+  claim changes nothing and publishes nothing; a true one records `won_at` and, with
+  `end_on_first_win`, ends the game in the same transaction. Audit `game.loteria_called`,
+  `game.loteria_checked`. Merge, delete, Start fresh and export need nothing new.
 - **Events.** `game_changed` (status, reveal, hide, roster, a win, a round start, a verdict) and
   `game_activity` (a note dropped or taken back, a square marked, an answer saved) go to
   `game:{id}` after commit. `POST /sse-tickets` takes exactly one of `session_id` or
