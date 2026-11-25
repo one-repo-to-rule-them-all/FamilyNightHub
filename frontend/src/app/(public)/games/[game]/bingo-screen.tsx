@@ -13,7 +13,9 @@ import { useLiveGame } from "@/hooks/use-live-game";
 import { usePhonePeople } from "@/hooks/use-phone";
 import { api, type ApiError, type BingoCard } from "@/lib/api";
 import {
+  BINGO_LETTERS,
   bingoStatusLine,
+  callParts,
   calledSet,
   canTapSquare,
   canMarkClassic,
@@ -156,12 +158,24 @@ export function BingoScreen({ gameId }: { gameId: string }) {
               >
                 {last ? spacedLabel(last) : "—"}
               </p>
-              <p className="text-sm text-muted-foreground" data-testid="bingo-recent-calls">
-                {recentCalls(calls).length > 0
-                  ? `Before: ${recentCalls(calls)
-                      .map((c) => c.label)
-                      .join(", ")}`
-                  : "Numbers show up here as the host calls them."}
+              <p className="text-base text-muted-foreground" data-testid="bingo-recent-calls">
+                {recentCalls(calls).length > 0 ? (
+                  <>
+                    Before:{" "}
+                    {recentCalls(calls).map((c, i) => {
+                      const { letter, number } = callParts(c);
+                      return (
+                        <span key={c.seq} className="whitespace-nowrap">
+                          {i > 0 ? ", " : ""}
+                          <strong className="font-bold text-foreground">{letter}</strong>
+                          <span className="text-foreground">{number}</span>
+                        </span>
+                      );
+                    })}
+                  </>
+                ) : (
+                  "Numbers show up here as the host calls them."
+                )}
               </p>
             </div>
           ) : null}
@@ -174,6 +188,17 @@ export function BingoScreen({ gameId }: { gameId: string }) {
                   won: card.won,
                 })}
               </p>
+              {classic ? (
+                <div
+                  aria-hidden
+                  data-testid="bingo-card-header"
+                  className="-mb-1 grid grid-cols-5 gap-1.5 text-center font-heading text-2xl font-bold"
+                >
+                  {BINGO_LETTERS.map((letter) => (
+                    <span key={letter}>{letter}</span>
+                  ))}
+                </div>
+              ) : null}
               <ul
                 className="grid grid-cols-5 gap-1.5"
                 aria-label="Your bingo card"

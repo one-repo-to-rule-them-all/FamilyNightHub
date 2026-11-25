@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   bingoStatusLine,
+  callParts,
   canTapSquare,
   markedSet,
   progressLabel,
@@ -152,5 +153,16 @@ describe("classic bingo", () => {
     expect(checkResultLine("Sam", { ...base, valid: true, pattern: [0, 1, 2, 3, 4] })).toBe(
       "Sam: valid, top row.",
     );
+  });
+});
+
+describe("callParts", () => {
+  it("splits a call into its letter and number", () => {
+    expect(callParts({ label: "N34" })).toEqual({ letter: "N", number: "34" });
+    expect(callParts({ label: "B7" })).toEqual({ letter: "B", number: "7" });
+  });
+
+  it("leaves anything else as the number", () => {
+    expect(callParts({ label: "FREE" })).toEqual({ letter: "", number: "FREE" });
   });
 });

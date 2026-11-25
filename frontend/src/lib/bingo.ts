@@ -108,6 +108,12 @@ export function spacedLabel(call: Pick<CallLike, "label">): string {
   return call.label.replace(/^([BINGO])/, "$1 ");
 }
 
+/** A call split for display: "N34" is the letter "N" and the number "34". */
+export function callParts(call: Pick<CallLike, "label">): { letter: string; number: string } {
+  const match = /^([BINGO])(\d+)$/.exec(call.label);
+  return match ? { letter: match[1], number: match[2] } : { letter: "", number: call.label };
+}
+
 /** The called numbers as a set for O(1) lookups. */
 export function calledSet(calls: readonly Pick<CallLike, "value">[]): ReadonlySet<number> {
   return new Set(calls.map((c) => c.value));
