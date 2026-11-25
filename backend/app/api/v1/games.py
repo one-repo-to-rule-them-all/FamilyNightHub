@@ -32,6 +32,7 @@ from app.schemas.games import (
     GameOut,
     GameSummaryOut,
     JarAuthorOut,
+    JarCycleOut,
     JarNoteOut,
     JarOut,
     ModerationNoteOut,
@@ -121,6 +122,8 @@ def _out(
         jar=None
         if jar_state is None
         else JarOut(
+            mode="cycle" if jar_state.mode == "cycle" else "manual",
+            cycle=None if jar_state.cycle is None else JarCycleOut(**jar_state.cycle.__dict__),
             note_count=jar_state.note_count,
             revealed_count=jar_state.revealed_count,
             remaining=jar_state.remaining,
@@ -170,6 +173,8 @@ async def create_game(body: GameCreateIn, account: CanHost, db: AccountDb) -> Ga
             win_mode=body.win_mode,
             free_center=body.free_center,
             end_on_first_win=body.end_on_first_win,
+            reveal_mode=body.reveal_mode,
+            cycle_seconds=body.cycle_seconds,
         )
     except ServiceError as err:
         raise_http(err)
@@ -350,9 +355,61 @@ async def start_reveal(
     responses=HOST,
 )
 async def reveal_next(game_id: uuid.UUID, account: CanHost, db: AccountDb) -> GameOut:
-    """Show the next note on the TV."""
+    """Show the next note on the TV (manual jars only; a cycling jar is 409)."""
     try:
         await games_service.reveal_next(db, account.household_id, account.account_id, game_id)
+    except ServiceError as err:
+        raise_http(err)
+    return await _snapshot(db, account.household_id, game_id)
+
+
+@router.post(
+    "/{game_id}/jar/pause",
+    response_model=GameOut,
+    dependencies=[CsrfProtected],
+    responses=HOST,
+)
+async def pause_jar(game_id: uuid.UUID, account: CanHost, db: AccountDb) -> GameOut:
+    """Hold the note on show (cycling jars; pausing a paused jar is a no-op)."""
+    try:
+        await games_service.pause_cycle(db, account.household_id, account.account_id, game_id)
+    except ServiceError as err:
+        raise_http(err)
+    return await _snapshot(db, account.household_id, game_id)
+
+
+@router.post(
+    "/{game_id}/jar/resume",
+    response_model=GameOut,
+    dependencies=[CsrfProtected],
+    responses=HOST,
+)
+async def resume_jar(game_id: uuid.UUID, account: CanHost, db: AccountDb) -> GameOut:
+    """Carry on cycling; the held note gets a full turn (resuming a running jar is a no-op)."""
+    try:
+        await games_service.resume_cycle(db, account.household_id, account.account_id, game_id)
+    except ServiceError as err:
+        raise_http(err)
+    return await _snapshot(db, account.household_id, game_id)
+
+
+@router.post(
+    "/{game_id}/jar/reshuffle",
+    response_model=GameOut,
+    dependencies=[CsrfProtected],
+    responses=HOST,
+)
+async def reshuffle_jar(
+    game_id: uuid.UUID,
+    account: CanHost,
+    db: AccountDb,
+    x_fnh_test_seed: Annotated[str | None, Header(include_in_schema=False)] = None,
+) -> GameOut:
+    """A new grouped order, starting again from its first note."""
+    try:
+        await games_service.reshuffle_cycle(
+            db, account.household_id, account.account_id, game_id, seed=tie_seed(x_fnh_test_seed)
+        )
     except ServiceError as err:
         raise_http(err)
     return await _snapshot(db, account.household_id, game_id)

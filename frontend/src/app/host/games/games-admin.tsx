@@ -48,6 +48,7 @@ export function GamesAdmin() {
   };
   const [title, setTitle] = useState("Thanksgiving gratitude jar");
   const [allowAnonymous, setAllowAnonymous] = useState(true);
+  const [cycleSeconds, setCycleSeconds] = useState(12);
   const [bingoTitle, setBingoTitle] = useState("Thanksgiving bingo");
   const [winMode, setWinMode] = useState<WinMode>("line");
   const [freeCenter, setFreeCenter] = useState(true);
@@ -63,7 +64,13 @@ export function GamesAdmin() {
     mutationFn: (kind) =>
       api.createGame(
         kind === "gratitude_jar"
-          ? { kind, title, allow_anonymous: allowAnonymous }
+          ? {
+              kind,
+              title,
+              allow_anonymous: allowAnonymous,
+              reveal_mode: "cycle",
+              cycle_seconds: cycleSeconds,
+            }
           : { kind, title: scatterTitle, allow_anonymous: true },
       ),
     onSuccess: sendGameTab,
@@ -119,6 +126,19 @@ export function GamesAdmin() {
           value={title}
           maxLength={80}
           onChange={(event) => setTitle(event.target.value)}
+        />
+        <Label htmlFor="jar-cycle-seconds">Seconds a note stays up (5 to 60)</Label>
+        <Input
+          id="jar-cycle-seconds"
+          data-testid="jar-cycle-seconds"
+          type="number"
+          inputMode="numeric"
+          min={5}
+          max={60}
+          value={cycleSeconds}
+          onChange={(event) =>
+            setCycleSeconds(Math.min(60, Math.max(5, Math.round(Number(event.target.value)) || 12)))
+          }
         />
         <label className="flex min-h-11 items-center gap-3">
           <input

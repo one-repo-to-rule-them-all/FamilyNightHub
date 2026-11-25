@@ -37,8 +37,8 @@ backend/app/
 | Sessions | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET/PATCH /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}`, `PUT /sessions/{id}/slideshow` | Host (`sessions:run`): create (code shown once; `voting_method` defaults to the household's), change the voting method while `draft`, rotate code, shortlist, open/close voting, close the night, start/stop the TV slideshow. Snapshot and history: any device or account of the household |
 | Ballots | `PUT /api/v1/sessions/{id}/ballots`, `PUT …/ballots/proxy`, `GET …/ballots/mine`, `GET …/voters` | Phone casts/replaces a bound person's ballot; host proxy ballot (`ballots:proxy`); a phone reads back its own people's ballots; who has voted (avatars only) |
 | Live | `/api/v1/sse-tickets {session_id | game_id}`, `/api/v1/sessions/{id}/stream`, `/api/v1/games/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md), [ADR-0018](decisions/ADR-0018-games-tab.md) |
-| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next}`, `POST /games/{id}/{open,start}`, `POST …/bingo/join`, `GET …/bingo/mine`, `PUT/DELETE …/bingo/mark/{index}?person_id=` | Gratitude Jar and Thanksgiving Bingo ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate, reveal and end; a phone drops a note as a bound person; any device or account reads the snapshot. See "Games" |
-| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next}`, `GET …/scatter/draw`, `POST …/scatter/rounds`, `POST …/scatter/reveal`, `PUT …/scatter/answers/{aid}/verdict`, `POST …/scatter/join`, `PUT …/scatter/answers`, `GET …/scatter/answers/mine`, `GET/PUT /games/tv-target` | Gratitude Jar and Scattergories ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate or run rounds, reveal and end; a phone drops a note or answers as a bound person; any device or account reads the snapshot. See "Games" |
+| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next,pause,resume,reshuffle}`, `POST /games/{id}/{open,start}`, `POST …/bingo/join`, `GET …/bingo/mine`, `PUT/DELETE …/bingo/mark/{index}?person_id=` | Gratitude Jar and Thanksgiving Bingo ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate, reveal and end; a phone drops a note as a bound person; any device or account reads the snapshot. See "Games" |
+| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next,pause,resume,reshuffle}`, `GET …/scatter/draw`, `POST …/scatter/rounds`, `POST …/scatter/reveal`, `PUT …/scatter/answers/{aid}/verdict`, `POST …/scatter/join`, `PUT …/scatter/answers`, `GET …/scatter/answers/mine`, `GET/PUT /games/tv-target` | Gratitude Jar and Scattergories ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate or run rounds, reveal and end; a phone drops a note or answers as a bound person; any device or account reads the snapshot. See "Games" |
 | Photos | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}` | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below |
 | Ratings | `PUT /api/v1/sessions/{id}/ratings`, `PUT …/ratings/proxy`, `GET …/ratings/mine` | 1–5 per person, once the night is `tonight`/`closed`: a phone rates as its bound people, a host proxy-rates (`ballots:proxy`), a phone reads back its own people's scores. See "Ratings" |
 | Movies | `GET /api/v1/tmdb/search?q=` | TMDB search proxy for hosts (503 when TMDB is off or down). The library itself is admin-only (next rows) |
@@ -744,10 +744,22 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
 - **Gratitude Jar.** Hosts create a jar (`open`). A phone drops a note as a person it is
   acting as (`require_can_act_as`, consent gate; 1-280 chars, whitespace collapsed; `anonymous`
   unless the jar's `allow_anonymous` is false). The author may delete their own note until it is
-  shown (anyone else's, or a shown one, is 404). **Start reveal** closes the jar, shuffles the
-  unhidden notes with `random.Random(seed)` over the sorted ids (`secrets.randbits(64)`; the
-  `X-FNH-Test-Seed` header pins it in `ENVIRONMENT=test`) and writes `reveal_position`;
-  **reveal next** sets `revealed_at` on the next one. The game row is read `FOR UPDATE` by hosts
+  shown (anyone else's, or a shown one, is 404). `config.reveal_mode` is `cycle` (the create
+  default) or `manual`; a config without the key is `manual`. **Start reveal** closes the jar and
+  orders the unhidden notes with a seed (`secrets.randbits(64)`; the `X-FNH-Test-Seed` header
+  pins it in `ENVIRONMENT=test`) into `reveal_position`. A **manual** jar shuffles them
+  (`jar.reveal_order`) and **reveal next** sets `revealed_at` on the next one. A **cycle** jar
+  (`config.cycle_seconds`, 5-60, default 12) orders them with `jar.group_order` (deterministic
+  keyword/word-overlap grouping, similar notes adjacent, no AI call), sets `revealed_at` on every
+  unhidden note at once and stores `games.cycle_anchor_at` (migration `0014_jar_cycle`, with
+  `cycle_paused_index`). **Pause** stores the index on show, **Resume** re-anchors so that note
+  gets a full dwell, **Reshuffle** regroups with a new seed and re-anchors; each is 409 on a
+  manual jar and `reveal-next` is 409 on a cycle jar. The snapshot's `jar.cycle` is
+  `{anchor_at, server_now, dwell_seconds, paused_index}` and `jar.revealed` is in cycle order, so
+  clients compute the index on show with `jar.cycle_index` (twin `lib/jar-cycle.ts`, shared
+  vectors `frontend/src/lib/jar-cycle.vectors.json`); there are no tick events. Start is the point
+  where text becomes visible to everyone; hiding afterwards drops a note from the next snapshot.
+  The game row is read `FOR UPDATE` by hosts
   and `FOR SHARE` by a dropped note, so they serialize. Hosts read every note's text in
   `/jar/moderation` and can hide one before it shows (idempotent); an anonymous note never
   carries its author, even there. The snapshot holds revealed, unhidden notes only, and counts.

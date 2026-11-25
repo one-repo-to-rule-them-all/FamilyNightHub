@@ -327,6 +327,12 @@ export const api = {
     ),
   startJarReveal: (gameId: string) =>
     request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/start-reveal`),
+  pauseJar: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/pause`),
+  resumeJar: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/resume`),
+  reshuffleJar: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/reshuffle`),
   jarRevealNext: (gameId: string) =>
     request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/reveal-next`),
   openGame: (gameId: string) => request<Game>("POST", `/games/${encodeURIComponent(gameId)}/open`),

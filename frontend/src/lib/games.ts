@@ -12,7 +12,7 @@ export const NOTE_MAX = 280;
 export const KIND_COPY: Record<GameKind, { name: string; blurb: string }> = {
   gratitude_jar: {
     name: "Gratitude jar",
-    blurb: "Drop in what you are thankful for. The host reveals the notes one by one.",
+    blurb: "Drop in what you are thankful for. Once the host starts it, the notes cycle on the TV.",
   },
   bingo: {
     name: "Thanksgiving bingo",
@@ -57,6 +57,17 @@ export function jarProgress(noteCount: number, revealedCount: number): string {
   if (noteCount === 0) return "No notes yet";
   if (revealedCount === 0) return `${noteCount} ${noteCount === 1 ? "note" : "notes"} in the jar`;
   return `${revealedCount} of ${noteCount} revealed`;
+}
+
+/** The jar's progress line. A cycling jar that has started has no "revealed" count to show. */
+export function jarStatusLine(
+  jar: { mode?: string; cycle?: unknown; note_count: number; revealed_count: number },
+  position: { index: number; count: number } | null,
+): string {
+  if (jar.mode === "cycle" && jar.cycle && position && position.count > 0) {
+    return `${position.count} ${position.count === 1 ? "note" : "notes"} cycling`;
+  }
+  return jarProgress(jar.note_count, jar.revealed_count);
 }
 
 /** Who wrote a revealed note, as a caption. An anonymous note has no author. */

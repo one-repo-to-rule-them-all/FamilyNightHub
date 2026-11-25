@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { EyeOff, Play, SkipForward, Square } from "lucide-react";
+import { EyeOff, Pause, Play, Shuffle, SkipForward, Square } from "lucide-react";
 
 import { ShowOnTvButton } from "@/components/games/show-on-tv-button";
 import { ApiErrorNotice } from "@/components/api-error-notice";
@@ -11,11 +11,14 @@ import { Button } from "@/components/ui/button";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { api, type ApiError, type Game, type ModerationNote } from "@/lib/api";
 import { jarStripPlayers } from "@/lib/game-layout";
-import { jarProgress, statusLabel } from "@/lib/games";
+import { useJarCycle } from "@/hooks/use-jar-cycle";
+import { jarStatusLine, statusLabel } from "@/lib/games";
+import { cycleCounter } from "@/lib/jar-cycle";
 
 /**
- * Run a Gratitude Jar (ADR-0018): read and hide notes before they show, start the reveal, show
- * the next note, end it. The moderation list carries note text for the host only, and never the
+ * Run a Gratitude Jar (ADR-0018): read and hide notes before they show, start the reveal, end it.
+ * A cycling jar (the default) then shows every unhidden note on its own, so the host can Pause,
+ * Resume, Reshuffle or Hide; a manual jar still has Next note. The moderation list carries note text for the host only, and never the
  * author of an anonymous note. Everything refetches on the game's live hints.
  */
 export function JarHost({ gameId }: { gameId: string }) {
@@ -27,13 +30,20 @@ export function JarHost({ gameId }: { gameId: string }) {
   });
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["game", gameId] });
 
-  const step = useMutation<Game, ApiError, "start" | "next" | "end">({
+  const step = useMutation<
+    Game,
+    ApiError,
+    "start" | "next" | "pause" | "resume" | "reshuffle" | "end"
+  >({
     mutationFn: (action) =>
-      action === "start"
-        ? api.startJarReveal(gameId)
-        : action === "next"
-          ? api.jarRevealNext(gameId)
-          : api.endGame(gameId),
+      ({
+        start: api.startJarReveal,
+        next: api.jarRevealNext,
+        pause: api.pauseJar,
+        resume: api.resumeJar,
+        reshuffle: api.reshuffleJar,
+        end: api.endGame,
+      })[action](gameId),
     onSuccess: refresh,
   });
   const hide = useMutation<void, ApiError, string>({
@@ -42,6 +52,8 @@ export function JarHost({ gameId }: { gameId: string }) {
   });
 
   const data = game.data;
+  const cycling = data?.jar?.mode === "cycle";
+  const cycle = useJarCycle(data?.jar);
   const notes = (moderation.data ?? []).filter((n) => !n.hidden_at);
 
   return (
@@ -50,7 +62,7 @@ export function JarHost({ gameId }: { gameId: string }) {
       status={
         data
           ? `${statusLabel(data.kind, data.status)}${
-              data.jar ? ` · ${jarProgress(data.jar.note_count, data.jar.revealed_count)}` : ""
+              data.jar ? ` · ${jarStatusLine(data.jar, cycle)}` : ""
             }`
           : undefined
       }
@@ -74,10 +86,39 @@ export function JarHost({ gameId }: { gameId: string }) {
                 disabled={!data.jar || data.jar.note_count === 0 || step.isPending}
                 onClick={() => step.mutate("start")}
               >
-                <Play aria-hidden /> Start the reveal
+                <Play aria-hidden /> {cycling ? "Start the jar" : "Start the reveal"}
               </Button>
             ) : null}
-            {data.status === "live" ? (
+            {data.status === "live" && cycling ? (
+              <>
+                {data.jar?.cycle?.paused_index != null ? (
+                  <Button
+                    data-testid="jar-resume"
+                    disabled={step.isPending}
+                    onClick={() => step.mutate("resume")}
+                  >
+                    <Play aria-hidden /> Resume
+                  </Button>
+                ) : (
+                  <Button
+                    data-testid="jar-pause"
+                    disabled={step.isPending}
+                    onClick={() => step.mutate("pause")}
+                  >
+                    <Pause aria-hidden /> Pause
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  data-testid="jar-reshuffle"
+                  disabled={step.isPending}
+                  onClick={() => step.mutate("reshuffle")}
+                >
+                  <Shuffle aria-hidden /> Reshuffle
+                </Button>
+              </>
+            ) : null}
+            {data.status === "live" && !cycling ? (
               <Button
                 data-testid="reveal-next"
                 disabled={!data.jar || data.jar.remaining === 0 || step.isPending}
@@ -99,12 +140,27 @@ export function JarHost({ gameId }: { gameId: string }) {
             ) : null}
             <ShowOnTvButton gameId={gameId} />
           </div>
+          {data.status === "open" && cycling ? (
+            <p className="text-sm text-muted-foreground" data-testid="jar-start-warning">
+              Starting puts every note you have not hidden on the TV and on every phone, one after
+              another. Read and hide first; once it starts, hiding takes a note off at once.
+            </p>
+          ) : null}
+          {data.status === "live" && cycling && data.jar ? (
+            <p className="text-sm text-muted-foreground" data-testid="host-jar-cycle">
+              {cycleCounter(cycle.index, cycle.count)}
+              {data.jar.cycle ? ` · ${data.jar.cycle.dwell_seconds} seconds a note` : ""}
+              {cycle.paused ? " · Paused" : ""}
+            </p>
+          ) : null}
           <ApiErrorNotice error={step.error ?? hide.error} />
 
           <section className="flex flex-col gap-2" aria-label="Notes in the jar">
             <h2 className="text-lg font-medium">Notes</h2>
             <p className="text-sm text-muted-foreground">
-              Only you can read these before they show. Hide one to keep it off the TV.
+              {cycling
+                ? "Only you can read these before you start. Hide one to keep it off every screen."
+                : "Only you can read these before they show. Hide one to keep it off the TV."}
             </p>
             {notes.length === 0 ? <p className="text-muted-foreground">No notes yet.</p> : null}
             <ul className="flex flex-col gap-2">

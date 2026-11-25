@@ -26,6 +26,9 @@ class GameCreateIn(BaseModel):
     win_mode: Literal["line", "blackout"] = "line"
     free_center: bool = True
     end_on_first_win: bool = True
+    # Gratitude Jar: cycle notes by themselves once started, or show them one by one.
+    reveal_mode: Literal["cycle", "manual"] = "cycle"
+    cycle_seconds: int = Field(default=12, ge=5, le=60)
 
 
 class JarAuthorOut(BaseModel):
@@ -43,12 +46,27 @@ class JarNoteOut(BaseModel):
     revealed_at: datetime
 
 
+class JarCycleOut(BaseModel):
+    """Everything a screen needs to find the note on show with no tick events: the index is
+    `floor((now + (server_now - Date.now()) - anchor_at) / dwell_seconds) mod count`, or
+    `paused_index` while paused."""
+
+    anchor_at: datetime
+    server_now: datetime
+    dwell_seconds: int
+    paused_index: int | None
+
+
 class JarOut(BaseModel):
+    mode: Literal["cycle", "manual"] = "manual"
+    # Null for a manual jar, or a cycle jar that has not started.
+    cycle: JarCycleOut | None = None
     note_count: int
     revealed_count: int
     remaining: int
-    # The note on screen now (the latest one revealed), if any.
+    # Manual: the note on screen now (the latest one revealed), if any. Null in cycle mode.
     current: JarNoteOut | None
+    # The notes on show, in `reveal_position` order (the cycle order in cycle mode).
     revealed: list[JarNoteOut]
 
 

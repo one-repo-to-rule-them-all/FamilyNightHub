@@ -4,6 +4,7 @@ import {
   authorLine,
   canSendNote,
   jarProgress,
+  jarStatusLine,
   KIND_COPY,
   NOTE_MAX,
   noteCounter,
@@ -37,6 +38,11 @@ describe("games", () => {
     expect(jarProgress(1, 0)).toBe("1 note in the jar");
     expect(jarProgress(3, 0)).toBe("3 notes in the jar");
     expect(jarProgress(3, 2)).toBe("2 of 3 revealed");
+    const jar = { mode: "cycle", cycle: {}, note_count: 3, revealed_count: 3 };
+    expect(jarStatusLine(jar, { index: 0, count: 3 })).toBe("3 notes cycling");
+    expect(jarStatusLine(jar, { index: 0, count: 1 })).toBe("1 note cycling");
+    expect(jarStatusLine({ ...jar, cycle: null }, { index: 0, count: 0 })).toBe("3 of 3 revealed");
+    expect(jarStatusLine({ note_count: 2, revealed_count: 1 }, null)).toBe("1 of 2 revealed");
   });
 
   it("names the author, or nobody for an anonymous note", () => {

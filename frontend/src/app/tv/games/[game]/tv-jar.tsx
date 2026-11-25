@@ -2,10 +2,12 @@
 
 import { TvGameFrame } from "@/components/games/tv-game-frame";
 import { Avatar } from "@/components/night/avatar";
+import { useJarCycle } from "@/hooks/use-jar-cycle";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { jarStripPlayers } from "@/lib/game-layout";
 import { authorLine, jarProgress } from "@/lib/games";
+import { cycleCounter } from "@/lib/jar-cycle";
 
 /**
  * /tv/games/[game] for the Gratitude Jar (ADR-0018): while notes are being collected the TV shows
@@ -18,7 +20,13 @@ export function TvJar({ gameId }: { gameId: string }) {
   useWakeLock();
   const data = game.data;
   const jar = data?.jar ?? null;
-  const note = jar?.current ?? null;
+  const cycling = jar?.mode === "cycle";
+  const cycle = useJarCycle(jar);
+  const note = cycling
+    ? data?.status === "live"
+      ? (jar?.revealed[cycle.index] ?? null)
+      : null
+    : (jar?.current ?? null);
 
   if (game.error) {
     return (
@@ -49,12 +57,13 @@ export function TvJar({ gameId }: { gameId: string }) {
           </span>
         </p>
       ) : null}
-      <div aria-live="polite" className="w-full">
+      {/* A manual reveal is announced; a cycling note every few seconds would be noise. */}
+      <div aria-live={cycling ? "off" : "polite"} className="w-full">
         {note ? (
           <figure
             key={note.id}
             data-testid="tv-note"
-            className="flex flex-col items-center gap-[0.75em] rounded-[1em] border border-foreground/10 bg-card p-[1.5em] marquee-glow"
+            className="flex flex-col items-center gap-[0.75em] rounded-[1em] border border-foreground/10 bg-card p-[1.5em] marquee-glow motion-safe:animate-in motion-safe:duration-700 motion-safe:fade-in"
           >
             <blockquote className="tv-display">{note.body}</blockquote>
             <figcaption className="tv-body flex items-center gap-[0.5em] text-muted-foreground">
@@ -68,11 +77,26 @@ export function TvJar({ gameId }: { gameId: string }) {
               {authorLine(note.author)}
             </figcaption>
           </figure>
-        ) : data?.status === "live" ? (
+        ) : data?.status === "live" && !cycling ? (
           <p className="tv-body text-muted-foreground">Here comes the first note…</p>
         ) : null}
       </div>
-      {data?.status === "live" && jar ? (
+      {data?.status === "live" && jar && cycling ? (
+        <p
+          className="tv-body flex items-center gap-[0.75em] text-muted-foreground"
+          data-testid="tv-jar-progress"
+        >
+          {cycleCounter(cycle.index, cycle.count)}
+          {cycle.paused ? (
+            <span
+              data-testid="tv-jar-paused"
+              className="rounded-full bg-muted px-[0.75em] py-[0.15em] text-foreground"
+            >
+              Paused
+            </span>
+          ) : null}
+        </p>
+      ) : data?.status === "live" && jar ? (
         <p className="tv-body text-muted-foreground" data-testid="tv-jar-progress">
           {jarProgress(jar.note_count, jar.revealed_count)}
         </p>
