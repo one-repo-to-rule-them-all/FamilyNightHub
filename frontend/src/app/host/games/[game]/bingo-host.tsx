@@ -5,11 +5,12 @@ import { DoorOpen, Monitor, Play, Square } from "lucide-react";
 import Link from "next/link";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
-import { Avatar } from "@/components/night/avatar";
+import { HostGameFrame } from "@/components/games/host-game-frame";
 import { Button } from "@/components/ui/button";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { api, type ApiError, type Game } from "@/lib/api";
-import { progressLabel, rankPlayers, WIN_MODE_COPY, winnerLine, winnerNames } from "@/lib/bingo";
+import { rankPlayers, WIN_MODE_COPY, winnerLine, winnerNames } from "@/lib/bingo";
+import { bingoStripPlayers, playerCountLabel } from "@/lib/game-layout";
 import { statusLabel } from "@/lib/games";
 
 /**
@@ -36,26 +37,30 @@ export function BingoHost({ gameId }: { gameId: string }) {
   const announcement = winnerLine(winnerNames(players));
 
   return (
-    <div
-      className="flex flex-col gap-5"
-      data-screen="portal-game"
-      data-testid="host-game"
-      data-kind="bingo"
-      data-status={data?.status}
-      data-live={game.live}
+    <HostGameFrame
+      title={data && bingo ? data.title : undefined}
+      status={
+        data && bingo
+          ? `${statusLabel(data.kind, data.status)} · ${WIN_MODE_COPY[bingo.win_mode].name}${
+              bingo.end_on_first_win ? ", first win ends it" : ", keeps going after a win"
+            } · ${playerCountLabel(players.length)}`
+          : undefined
+      }
+      statusTestId="host-bingo-status"
+      players={bingo ? bingoStripPlayers(players) : undefined}
+      playerTestId="host-bingo-player"
+      emptyPlayersText="Nobody has a card yet."
+      attrs={{
+        "data-screen": "portal-game",
+        "data-testid": "host-game",
+        "data-kind": "bingo",
+        "data-status": data?.status,
+        "data-live": game.live,
+      }}
+      notice={<ApiErrorNotice error={game.error} />}
     >
-      <ApiErrorNotice error={game.error} />
       {data && bingo ? (
         <>
-          <header className="flex flex-col gap-1">
-            <h1 className="font-heading text-2xl font-semibold">{data.title}</h1>
-            <p className="text-muted-foreground" data-testid="host-bingo-status">
-              {statusLabel(data.kind, data.status)} · {WIN_MODE_COPY[bingo.win_mode].name}
-              {bingo.end_on_first_win ? ", first win ends it" : ", keeps going after a win"} ·{" "}
-              {players.length} {players.length === 1 ? "player" : "players"}
-            </p>
-          </header>
-
           <div className="flex flex-wrap gap-3">
             {data.status === "draft" ? (
               <Button
@@ -105,29 +110,8 @@ export function BingoHost({ gameId }: { gameId: string }) {
               </p>
             ) : null}
           </div>
-
-          <section className="flex flex-col gap-2" aria-label="Players">
-            <h2 className="text-lg font-medium">Players</h2>
-            {players.length === 0 ? (
-              <p className="text-muted-foreground">Nobody has a card yet.</p>
-            ) : null}
-            <ul className="flex flex-col gap-2">
-              {players.map((p) => (
-                <li
-                  key={p.person_id}
-                  data-testid="host-bingo-player"
-                  data-won={p.won ? "true" : "false"}
-                  className="flex items-center gap-3 rounded-xl border border-foreground/10 bg-card p-3"
-                >
-                  <Avatar emoji={p.avatar_emoji} color={p.color} size="sm" />
-                  <span className="min-w-0 flex-1 font-medium">{p.name}</span>
-                  <span className="text-sm text-muted-foreground">{progressLabel(p)}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
         </>
       ) : null}
-    </div>
+    </HostGameFrame>
   );
 }

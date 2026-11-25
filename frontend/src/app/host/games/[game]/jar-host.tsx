@@ -5,10 +5,12 @@ import { EyeOff, Monitor, Play, SkipForward, Square } from "lucide-react";
 import Link from "next/link";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
+import { HostGameFrame } from "@/components/games/host-game-frame";
 import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { api, type ApiError, type Game, type ModerationNote } from "@/lib/api";
+import { jarStripPlayers } from "@/lib/game-layout";
 import { jarProgress, statusLabel } from "@/lib/games";
 
 /**
@@ -43,24 +45,28 @@ export function JarHost({ gameId }: { gameId: string }) {
   const notes = (moderation.data ?? []).filter((n) => !n.hidden_at);
 
   return (
-    <div
-      className="flex flex-col gap-5"
-      data-screen="portal-game"
-      data-testid="host-game"
-      data-status={data?.status}
-      data-live={game.live}
+    <HostGameFrame
+      title={data?.title}
+      status={
+        data
+          ? `${statusLabel(data.kind, data.status)}${
+              data.jar ? ` · ${jarProgress(data.jar.note_count, data.jar.revealed_count)}` : ""
+            }`
+          : undefined
+      }
+      statusTestId="host-jar-progress"
+      players={data ? jarStripPlayers(data.jar?.revealed ?? []) : undefined}
+      emptyPlayersText="Names appear here as notes are revealed"
+      attrs={{
+        "data-screen": "portal-game",
+        "data-testid": "host-game",
+        "data-status": data?.status,
+        "data-live": game.live,
+      }}
+      notice={<ApiErrorNotice error={game.error} />}
     >
-      <ApiErrorNotice error={game.error} />
       {data ? (
         <>
-          <header className="flex flex-col gap-1">
-            <h1 className="font-heading text-2xl font-semibold">{data.title}</h1>
-            <p className="text-muted-foreground" data-testid="host-jar-progress">
-              {statusLabel(data.kind, data.status)}
-              {data.jar ? ` · ${jarProgress(data.jar.note_count, data.jar.revealed_count)}` : ""}
-            </p>
-          </header>
-
           <div className="flex flex-wrap gap-3">
             {data.status === "open" ? (
               <Button
@@ -140,6 +146,6 @@ export function JarHost({ gameId }: { gameId: string }) {
           </section>
         </>
       ) : null}
-    </div>
+    </HostGameFrame>
   );
 }

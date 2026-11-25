@@ -7,18 +7,18 @@ import { useEffect, useRef, useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Countdown, Leaderboard, LetterTile, Results } from "@/components/games/scatter-parts";
-import { GuestShell } from "@/components/home/guest-shell";
+import { PhoneGameFrame } from "@/components/games/phone-game-frame";
 import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { usePhonePeople } from "@/hooks/use-phone";
 import { useScatterClock } from "@/hooks/use-scatter-clock";
 import { api, type ApiError, type OwnScatterAnswer } from "@/lib/api";
+import { scatterStripPlayers } from "@/lib/game-layout";
 import { statusLabel } from "@/lib/games";
 import {
   ANSWER_MAX,
   answerBody,
-  answeredLine,
   canAnswer,
   draftFrom,
   isDirty,
@@ -171,130 +171,130 @@ export function ScatterScreen({ gameId }: { gameId: string }) {
         : "";
 
   return (
-    <GuestShell screen="game" back={{ href: "/games", label: "Games" }}>
-      <div
-        className="flex flex-col gap-5"
-        data-testid="game-screen"
-        data-kind="scattergories"
-        data-status={data?.status}
-        data-round-state={state}
-        data-live={game.live}
-      >
-        {game.error ? <ApiErrorNotice error={game.error} /> : null}
-        <p role="status" aria-live="polite" className="sr-only" data-testid="scatter-announce">
-          {announcement}
-        </p>
-        {data && scatter ? (
-          <>
-            <header className="flex flex-col gap-1">
-              <h1 className="font-heading text-3xl font-semibold tracking-tight">{data.title}</h1>
-              <p className="text-muted-foreground" data-testid="scatter-status">
-                {statusLabel(data.kind, data.status)} · {stateLabel(state, seconds)}
-              </p>
-            </header>
+    <PhoneGameFrame
+      title={data && scatter ? data.title : undefined}
+      status={
+        data && scatter
+          ? `${statusLabel(data.kind, data.status)} · ${stateLabel(state, seconds)}`
+          : undefined
+      }
+      statusTestId="scatter-status"
+      players={
+        scatter
+          ? scatterStripPlayers(
+              scatter.players,
+              round && (state === "running" || state === "closed") ? round.categories.length : null,
+            )
+          : undefined
+      }
+      emptyPlayersText="Players show up here as they join"
+      attrs={{
+        "data-kind": "scattergories",
+        "data-status": data?.status,
+        "data-round-state": state,
+        "data-live": game.live,
+      }}
+      notice={
+        <>
+          {game.error ? <ApiErrorNotice error={game.error} /> : null}
+          <p role="status" aria-live="polite" className="sr-only" data-testid="scatter-announce">
+            {announcement}
+          </p>
+        </>
+      }
+    >
+      {data && scatter ? (
+        <>
+          {!me ? (
+            <p className="rounded-xl bg-muted p-4" data-testid="scatter-pick-person">
+              <Link href="/who" className="font-medium underline">
+                Pick who you are
+              </Link>{" "}
+              to play.
+            </p>
+          ) : (
+            <p className="flex items-center gap-2 text-muted-foreground">
+              <Avatar emoji={me.avatar_emoji} color={me.color} size="sm" />
+              Playing as {me.name}
+            </p>
+          )}
 
-            {!me ? (
-              <p className="rounded-xl bg-muted p-4" data-testid="scatter-pick-person">
-                <Link href="/who" className="font-medium underline">
-                  Pick who you are
-                </Link>{" "}
-                to play.
-              </p>
-            ) : (
-              <p className="flex items-center gap-2 text-muted-foreground">
-                <Avatar emoji={me.avatar_emoji} color={me.color} size="sm" />
-                Playing as {me.name}
-              </p>
-            )}
-
-            {me && !joined && data.status !== "ended" ? (
-              <>
-                <ApiErrorNotice error={join.error} />
-                <Button
-                  size="tap"
-                  data-testid="primary-action"
-                  disabled={join.isPending}
-                  onClick={() => join.mutate()}
-                >
-                  Join the game
-                </Button>
-              </>
-            ) : null}
-
-            {round && state !== "revealed" ? (
-              <section
-                className="flex flex-col gap-4"
-                aria-label={roundHeading(round.round_no, round.letter)}
+          {me && !joined && data.status !== "ended" ? (
+            <>
+              <ApiErrorNotice error={join.error} />
+              <Button
+                size="tap"
+                data-testid="primary-action"
+                disabled={join.isPending}
+                onClick={() => join.mutate()}
               >
-                <div className="flex items-center gap-4">
-                  <LetterTile letter={round.letter} />
-                  <div className="flex min-w-0 flex-1 flex-col gap-1">
-                    <h2 className="text-lg font-medium" data-testid="scatter-round-heading">
-                      {roundHeading(round.round_no, round.letter)}
-                    </h2>
-                    <Countdown seconds={seconds} duration={round.duration_seconds} />
-                  </div>
+                Join the game
+              </Button>
+            </>
+          ) : null}
+
+          {round && state !== "revealed" ? (
+            <section
+              className="flex flex-col gap-4"
+              aria-label={roundHeading(round.round_no, round.letter)}
+            >
+              <div className="flex items-center gap-4">
+                <LetterTile letter={round.letter} />
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <h2 className="text-lg font-medium" data-testid="scatter-round-heading">
+                    {roundHeading(round.round_no, round.letter)}
+                  </h2>
+                  <Countdown seconds={seconds} duration={round.duration_seconds} />
                 </div>
-                {state === "closed" ? (
-                  <p
-                    className="rounded-2xl bg-muted p-4 text-center text-lg"
-                    data-testid="scatter-time-up"
-                  >
-                    Time is up. Waiting for the host to reveal.
-                  </p>
-                ) : null}
-                {joined && me ? (
-                  <AnswerSheet
-                    key={`${round.round_no}-${me.id}`}
-                    gameId={gameId}
-                    personId={me.id}
-                    categories={round.categories}
-                    saved={saved}
-                    seconds={seconds}
-                    canType={canAnswer(state, seconds)}
-                  />
-                ) : (
-                  <ul className="flex flex-col gap-1 text-lg">
-                    {round.categories.map((c) => (
-                      <li key={c}>{c}</li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            ) : null}
+              </div>
+              {state === "closed" ? (
+                <p
+                  className="rounded-2xl bg-muted p-4 text-center text-lg"
+                  data-testid="scatter-time-up"
+                >
+                  Time is up. Waiting for the host to reveal.
+                </p>
+              ) : null}
+              {joined && me ? (
+                <AnswerSheet
+                  key={`${round.round_no}-${me.id}`}
+                  gameId={gameId}
+                  personId={me.id}
+                  categories={round.categories}
+                  saved={saved}
+                  seconds={seconds}
+                  canType={canAnswer(state, seconds)}
+                />
+              ) : (
+                <ul className="flex flex-col gap-1 text-lg">
+                  {round.categories.map((c) => (
+                    <li key={c}>{c}</li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
 
-            {state === "lobby" ? (
-              <p
-                className="rounded-2xl bg-muted p-6 text-center text-lg"
-                data-testid="scatter-lobby"
-              >
-                {data.status === "ended"
-                  ? "The game is over."
-                  : "The host will start the first round any moment."}
-              </p>
-            ) : null}
+          {state === "lobby" ? (
+            <p className="rounded-2xl bg-muted p-6 text-center text-lg" data-testid="scatter-lobby">
+              {data.status === "ended"
+                ? "The game is over."
+                : "The host will start the first round any moment."}
+            </p>
+          ) : null}
 
-            {scatter.players.length > 0 && round && state !== "revealed" ? (
-              <p className="text-sm text-muted-foreground" data-testid="scatter-answered">
-                {scatter.players
-                  .map((p) => `${p.name}: ${answeredLine(p.answered, round.categories.length)}`)
-                  .join(" · ")}
-              </p>
-            ) : null}
+          {state === "revealed" && lastRevealed ? (
+            <>
+              <h2 className="text-lg font-medium" data-testid="scatter-round-heading">
+                {roundHeading(lastRevealed.round_no, lastRevealed.letter)} results
+              </h2>
+              <Results round={lastRevealed} standings={scatter.leaderboard} />
+            </>
+          ) : null}
 
-            {state === "revealed" && lastRevealed ? (
-              <>
-                <h2 className="text-lg font-medium" data-testid="scatter-round-heading">
-                  {roundHeading(lastRevealed.round_no, lastRevealed.letter)} results
-                </h2>
-                <Results round={lastRevealed} standings={scatter.leaderboard} />
-              </>
-            ) : null}
-
-            {scatter.revealed.length > 0 ? <Leaderboard standings={scatter.leaderboard} /> : null}
-          </>
-        ) : null}
-      </div>
-    </GuestShell>
+          {scatter.revealed.length > 0 ? <Leaderboard standings={scatter.leaderboard} /> : null}
+        </>
+      ) : null}
+    </PhoneGameFrame>
   );
 }
