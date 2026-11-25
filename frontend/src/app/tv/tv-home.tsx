@@ -10,6 +10,7 @@ import { POLL_MS } from "@/hooks/use-live-session";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { api, type ApiError, type GameSummary, type NightSummary } from "@/lib/api";
 import { DEVICE_EXPIRED_COPY, isDeviceExpired } from "@/lib/device-idle";
+import { useTvTarget } from "@/lib/tv-target";
 
 /** Nights the TV should be showing, newest first. A closed night is history, not the TV's job. */
 const ON_SCREEN = ["draft", "voting", "revealed", "tonight"] as const;
@@ -23,30 +24,48 @@ export function useCurrentNight() {
   });
 }
 
-/** A game being played (a jar mid-reveal, ADR-0018): what /tv shows when there is no night. */
-function useLiveGame() {
+/** Open or live games, newest first: what /tv shows when nothing else is on (ADR-0018). */
+function useOpenGame() {
   return useQuery<GameSummary | null, ApiError>({
-    queryKey: ["games", "live"],
-    queryFn: async () => (await api.games()).find((g) => g.status === "live") ?? null,
+    queryKey: ["games", "on-tv"],
+    queryFn: async () =>
+      (await api.games()).find((g) => g.status === "open" || g.status === "live") ?? null,
     refetchInterval: POLL_MS,
     refetchIntervalInBackground: true,
   });
 }
 
-/** /tv: waits for tonight's night and jumps to it; explains pairing to an unpaired browser. */
+/** What the paired TV is following right now, for the copy on the home screen. */
+type Following = "sent-game" | "night" | "game" | "none";
+
+/**
+ * /tv follows, in order: a game the host sent to the TV, a live night, any open or live game,
+ * else this home screen (ADR-0018 amendment "The TV follows the host"). Polls only: every
+ * answer is a snapshot, so nothing depends on having seen an event.
+ */
 export function TvHome() {
   const router = useRouter();
   const current = useCurrentNight();
-  const liveGame = useLiveGame();
+  const sent = useTvTarget();
+  const openGame = useOpenGame();
   useWakeLock();
 
-  // A live night always wins; with none, a live game (ADR-0018).
-  const target = current.data?.id ?? null;
-  const gameTarget = !current.isPending && !target ? (liveGame.data?.id ?? null) : null;
+  const settled = !current.isPending && !sent.isPending;
+  let path: string | null = null;
+  let following: Following = "none";
+  if (sent.data) {
+    path = `/tv/games/${sent.data}`;
+    following = "sent-game";
+  } else if (current.data?.id) {
+    path = `/tv/${current.data.id}`;
+    following = "night";
+  } else if (settled && openGame.data) {
+    path = `/tv/games/${openGame.data.id}`;
+    following = "game";
+  }
   useEffect(() => {
-    if (target) router.replace(`/tv/${target}`);
-    else if (gameTarget) router.replace(`/tv/games/${gameTarget}`);
-  }, [target, gameTarget, router]);
+    if (path) router.replace(path);
+  }, [path, router]);
 
   if (current.error?.status === 401) {
     // Unused for 30 days (issue #56): the same pairing, said as "again".
@@ -83,9 +102,20 @@ export function TvHome() {
       <Clapperboard aria-hidden className="size-[5em] text-muted-foreground" />
       <h1 className="tv-title">Family Night</h1>
       <p className="tv-body text-muted-foreground" data-testid="tv-waiting">
-        {current.isPending || target || gameTarget
-          ? "Getting tonight ready…"
-          : "Waiting for the host to start a night."}
+        {!settled || path ? "Getting tonight ready…" : "Waiting for the host to start a night."}
+      </p>
+      <p
+        className="tv-body text-muted-foreground"
+        data-testid="tv-following"
+        data-following={following}
+      >
+        {following === "sent-game"
+          ? "Showing the game the host picked."
+          : following === "night"
+            ? "Following tonight's movie night."
+            : following === "game"
+              ? "Following the open game."
+              : "This screen follows the host: a game sent to the TV, tonight's movie night, or an open game."}
       </p>
     </div>
   );

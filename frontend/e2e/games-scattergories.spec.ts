@@ -21,9 +21,14 @@ test.describe("scattergories", () => {
     // Host: start the game.
     const hostContext = await browser.newContext({ baseURL: origin });
     await signInAsHost(hostContext, night, origin);
-    const host = await hostContext.newPage();
-    await host.goto("/host/games");
-    await host.getByTestId("create-scatter").click();
+    const hub = await hostContext.newPage();
+    await hub.goto("/host/games");
+    // Creating a game opens its control page in a new tab; the hub tab stays put.
+    const [host] = await Promise.all([
+      hub.waitForEvent("popup"),
+      hub.getByTestId("create-scatter").click(),
+    ]);
+    await expect(hub).toHaveURL(/\/host\/games$/);
     await expect(host).toHaveURL(/\/host\/games\/[0-9a-f-]{36}$/);
     const gameId = host.url().split("/").pop()!;
     const hostScreen = host.getByTestId("host-game");

@@ -12,6 +12,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    ForeignKey,
     Integer,
     Numeric,
     String,
@@ -158,6 +159,22 @@ class ScatterAnswer(Base):
     text: Mapped[str] = mapped_column(String(60))
     host_verdict: Mapped[str | None] = mapped_column(String(10))
     created_at: Mapped[datetime] = created_at()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=sql_text("now()")
+    )
+
+
+class HouseholdTvTarget(Base):
+    """The game a host sent to the household's paired TV (ADR-0018 amendment). At most one row."""
+
+    __tablename__ = "household_tv_target"
+    __table_args__ = (scoped_fk("game_id", "games", ondelete="CASCADE"),)
+
+    household_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("households.id", ondelete="CASCADE"), primary_key=True
+    )
+    game_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    set_by_account_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=sql_text("now()")
     )

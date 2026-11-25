@@ -1,10 +1,10 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Ban, Check, Dices, Eye, Monitor, Play, Square } from "lucide-react";
-import Link from "next/link";
+import { Ban, Check, Dices, Eye, Play, Square } from "lucide-react";
 import { useState } from "react";
 
+import { ShowOnTvButton } from "@/components/games/show-on-tv-button";
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Countdown, Leaderboard, LetterTile, Results } from "@/components/games/scatter-parts";
 import { HostGameFrame } from "@/components/games/host-game-frame";
@@ -189,13 +189,7 @@ export function ScatterHost({ gameId }: { gameId: string }) {
                 <Square aria-hidden /> End game
               </Button>
             ) : null}
-            <Link
-              href={`/tv/games/${gameId}`}
-              target="fnh-tv"
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/15 px-3 text-sm font-medium"
-            >
-              <Monitor aria-hidden className="size-4" /> Open on the TV
-            </Link>
+            <ShowOnTvButton gameId={gameId} />
           </div>
           <ApiErrorNotice error={step.error ?? judge.error} />
 

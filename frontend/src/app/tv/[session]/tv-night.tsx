@@ -27,6 +27,8 @@ import { runKey, tvPlays } from "@/lib/slideshow-control";
 import { TV_HELP_POLL_MS, tvHelpName } from "@/lib/tv-help";
 import { cn } from "@/lib/utils";
 
+import { useTvTarget } from "@/lib/tv-target";
+
 import { useCurrentNight } from "../tv-home";
 import { Reveal } from "./reveal";
 import { DropPrompt, TvSlideshow } from "./slideshow";
@@ -38,6 +40,11 @@ const JOIN_LINK_REFRESH_MS = 10_000;
 export function TvNight({ sessionId }: { sessionId: string }) {
   const router = useRouter();
   const night = useLiveSession(sessionId);
+  // A game the host sent to the TV outranks the night (ADR-0018 amendment).
+  const sentGame = useTvTarget().data;
+  useEffect(() => {
+    if (sentGame) router.replace(`/tv/games/${sentGame}`);
+  }, [sentGame, router]);
   const { live } = night;
   const status = night.data?.status;
   const people = useQuery<Person[], ApiError>({

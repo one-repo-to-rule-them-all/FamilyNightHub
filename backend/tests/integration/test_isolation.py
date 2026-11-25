@@ -41,6 +41,7 @@ SCOPED_TABLES = (
     "bingo_cards",
     "scatter_rounds",
     "scatter_answers",
+    "household_tv_target",
 )
 Pair = tuple[SeededHousehold, SeededHousehold]
 

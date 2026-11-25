@@ -1,9 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { EyeOff, Monitor, Play, SkipForward, Square } from "lucide-react";
-import Link from "next/link";
+import { EyeOff, Play, SkipForward, Square } from "lucide-react";
 
+import { ShowOnTvButton } from "@/components/games/show-on-tv-button";
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { HostGameFrame } from "@/components/games/host-game-frame";
 import { Avatar } from "@/components/night/avatar";
@@ -97,13 +97,7 @@ export function JarHost({ gameId }: { gameId: string }) {
                 <Square aria-hidden /> End
               </Button>
             ) : null}
-            <Link
-              href={`/tv/games/${gameId}`}
-              target="fnh-tv"
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-foreground/15 px-3 text-sm font-medium"
-            >
-              <Monitor aria-hidden className="size-4" /> Open on the TV
-            </Link>
+            <ShowOnTvButton gameId={gameId} />
           </div>
           <ApiErrorNotice error={step.error ?? hide.error} />
 
