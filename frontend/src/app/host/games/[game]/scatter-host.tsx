@@ -7,13 +7,14 @@ import { useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Countdown, Leaderboard, LetterTile, Results } from "@/components/games/scatter-parts";
+import { HostGameFrame } from "@/components/games/host-game-frame";
 import { Button } from "@/components/ui/button";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { useScatterClock } from "@/hooks/use-scatter-clock";
 import { api, type ApiError, type Game, type ScatterAnswer } from "@/lib/api";
+import { playerCountLabel, scatterStripPlayers } from "@/lib/game-layout";
 import { statusLabel } from "@/lib/games";
 import {
-  answeredLine,
   canStartRound,
   categoriesToText,
   DEFAULT_DURATION,
@@ -138,26 +139,36 @@ export function ScatterHost({ gameId }: { gameId: string }) {
   const between = !ended && (state === "lobby" || state === "revealed");
 
   return (
-    <div
-      className="flex flex-col gap-5"
-      data-screen="portal-game"
-      data-testid="host-game"
-      data-kind="scattergories"
-      data-status={data?.status}
-      data-round-state={state}
-      data-live={game.live}
+    <HostGameFrame
+      title={data && scatter ? data.title : undefined}
+      status={
+        data && scatter
+          ? `${statusLabel(data.kind, data.status)} · ${stateLabel(state, seconds)} · ${playerCountLabel(scatter.players.length)}`
+          : undefined
+      }
+      statusTestId="host-scatter-status"
+      players={
+        scatter
+          ? scatterStripPlayers(
+              scatter.players,
+              round && (state === "running" || state === "closed") ? round.categories.length : null,
+            )
+          : undefined
+      }
+      playerTestId="scatter-player"
+      emptyPlayersText="Nobody has joined yet."
+      attrs={{
+        "data-screen": "portal-game",
+        "data-testid": "host-game",
+        "data-kind": "scattergories",
+        "data-status": data?.status,
+        "data-round-state": state,
+        "data-live": game.live,
+      }}
+      notice={<ApiErrorNotice error={game.error} />}
     >
-      <ApiErrorNotice error={game.error} />
       {data && scatter ? (
         <>
-          <header className="flex flex-col gap-1">
-            <h1 className="font-heading text-2xl font-semibold">{data.title}</h1>
-            <p className="text-muted-foreground" data-testid="host-scatter-status">
-              {statusLabel(data.kind, data.status)} · {stateLabel(state, seconds)} ·{" "}
-              {scatter.players.length} {scatter.players.length === 1 ? "player" : "players"}
-            </p>
-          </header>
-
           <div className="flex flex-wrap gap-3">
             {(state === "running" || state === "closed") && !ended ? (
               <Button
@@ -202,13 +213,6 @@ export function ScatterHost({ gameId }: { gameId: string }) {
               <p className="text-sm text-muted-foreground">
                 Answers stay hidden from everyone, you included, until you reveal.
               </p>
-              <ul className="flex flex-col gap-1" data-testid="scatter-progress">
-                {scatter.players.map((p) => (
-                  <li key={p.person_id} data-testid="scatter-player">
-                    {p.name}: {answeredLine(p.answered, round.categories.length)}
-                  </li>
-                ))}
-              </ul>
             </section>
           ) : null}
 
@@ -250,6 +254,6 @@ export function ScatterHost({ gameId }: { gameId: string }) {
           {scatter.revealed.length > 0 ? <Leaderboard standings={scatter.leaderboard} /> : null}
         </>
       ) : null}
-    </div>
+    </HostGameFrame>
   );
 }

@@ -1,17 +1,19 @@
 "use client";
 
 import { Countdown, Leaderboard, LetterTile, Results } from "@/components/games/scatter-parts";
-import { Avatar } from "@/components/night/avatar";
+import { TvGameFrame } from "@/components/games/tv-game-frame";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { useScatterClock } from "@/hooks/use-scatter-clock";
 import { useWakeLock } from "@/hooks/use-wake-lock";
-import { answeredLine, roundHeading } from "@/lib/scatter";
+import { scatterStripPlayers } from "@/lib/game-layout";
+import { roundHeading } from "@/lib/scatter";
 
 /**
  * /tv/games/[game] for Scattergories (ADR-0018 slice C): the lobby, then the letter, the
  * categories and a big countdown, then "time's up", then every answer with its score and the
  * leaderboard once the host reveals. The snapshot never holds an answer before reveal, so
- * nothing here can leak one. The TV's clock follows the server's `ends_at`.
+ * nothing here can leak one. The TV's clock follows the server's `ends_at`. Laid out on the TV game
+ * template: the players (with how many answers each has in) are the footer strip.
  */
 export function TvScatter({ gameId }: { gameId: string }) {
   const game = useLiveGame(gameId);
@@ -34,33 +36,31 @@ export function TvScatter({ gameId }: { gameId: string }) {
     state === "closed" ? "Time is up." : state === "revealed" ? "Answers revealed." : "";
 
   return (
-    <div
-      className="m-auto flex w-full max-w-[64em] flex-col items-center gap-[1.25em] px-[1em] text-center"
-      data-testid="tv-scatter"
-      data-status={data?.status}
-      data-round-state={state}
-      data-live={game.live}
+    <TvGameFrame
+      title={data?.title ?? "Scattergories"}
+      players={scatterStripPlayers(
+        scatter?.players ?? [],
+        round && (state === "running" || state === "closed") ? round.categories.length : null,
+      )}
+      playerTestId="tv-player"
+      emptyPlayersText="Players show up here as they join from their phones"
+      attrs={{
+        "data-testid": "tv-scatter",
+        "data-status": data?.status,
+        "data-round-state": state,
+        "data-live": game.live,
+      }}
     >
-      <h1 className="tv-title">{data?.title ?? "Scattergories"}</h1>
       <p role="status" aria-live="polite" className="sr-only" data-testid="tv-announce">
         {announcement}
       </p>
 
       {scatter && state === "lobby" ? (
-        <div className="flex flex-col items-center gap-[1em]" data-testid="tv-scatter-lobby">
-          <p className="tv-body text-muted-foreground">
-            {data?.status === "ended"
-              ? "That is the game. Thank you, everyone."
-              : "Join from your phone: Games, then " + (data?.title ?? "this game") + "."}
-          </p>
-          <ul className="flex flex-wrap justify-center gap-[0.75em]">
-            {scatter.players.map((p) => (
-              <li key={p.person_id} className="tv-body flex items-center gap-[0.4em]">
-                <Avatar emoji={p.avatar_emoji} color={p.color} size="sm" /> {p.name}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <p className="tv-body text-muted-foreground" data-testid="tv-scatter-lobby">
+          {data?.status === "ended"
+            ? "That is the game. Thank you, everyone."
+            : "Join from your phone: Games, then " + (data?.title ?? "this game") + "."}
+        </p>
       ) : null}
 
       {scatter && round && (state === "running" || state === "closed") ? (
@@ -89,18 +89,6 @@ export function TvScatter({ gameId }: { gameId: string }) {
               </li>
             ))}
           </ol>
-          <ul className="tv-body flex flex-wrap justify-center gap-[1em] text-muted-foreground">
-            {scatter.players.map((p) => (
-              <li
-                key={p.person_id}
-                data-testid="tv-player"
-                className="flex items-center gap-[0.4em]"
-              >
-                <Avatar emoji={p.avatar_emoji} color={p.color} size="sm" />
-                {p.name} · {answeredLine(p.answered, round.categories.length)}
-              </li>
-            ))}
-          </ul>
         </>
       ) : null}
 
@@ -116,6 +104,6 @@ export function TvScatter({ gameId }: { gameId: string }) {
       {scatter && scatter.revealed.length > 0 ? (
         <Leaderboard standings={scatter.leaderboard} tv />
       ) : null}
-    </div>
+    </TvGameFrame>
   );
 }

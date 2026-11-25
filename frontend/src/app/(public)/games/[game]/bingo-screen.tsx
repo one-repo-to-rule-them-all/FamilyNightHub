@@ -5,7 +5,7 @@ import { Check } from "lucide-react";
 import Link from "next/link";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
-import { GuestShell } from "@/components/home/guest-shell";
+import { PhoneGameFrame } from "@/components/games/phone-game-frame";
 import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
 import { useLiveGame } from "@/hooks/use-live-game";
@@ -17,10 +17,12 @@ import {
   FREE_LABEL,
   markedSet,
   progressLabel,
+  rankPlayers,
   squareLabel,
   winnerLine,
   winnerNames,
 } from "@/lib/bingo";
+import { bingoStripPlayers } from "@/lib/game-layout";
 import { statusLabel } from "@/lib/games";
 import { cn } from "@/lib/utils";
 
@@ -69,113 +71,109 @@ export function BingoScreen({ gameId }: { gameId: string }) {
   const marked = markedSet(card?.marked ?? []);
 
   return (
-    <GuestShell screen="game" back={{ href: "/games", label: "Games" }}>
-      <div
-        className="flex flex-col gap-5"
-        data-testid="game-screen"
-        data-kind="bingo"
-        data-status={data?.status}
-        data-live={game.live}
-      >
-        {game.error ? <ApiErrorNotice error={game.error} /> : null}
-        {data ? (
-          <>
-            <header className="flex flex-col gap-1">
-              <h1 className="font-heading text-3xl font-semibold tracking-tight">{data.title}</h1>
-              <p className="text-muted-foreground" data-testid="bingo-status">
-                {statusLabel(data.kind, data.status)} · {bingoStatusLine(data.status, !!card)}
+    <PhoneGameFrame
+      title={data?.title}
+      status={
+        data
+          ? `${statusLabel(data.kind, data.status)} · ${bingoStatusLine(data.status, !!card)}`
+          : undefined
+      }
+      statusTestId="bingo-status"
+      players={data ? bingoStripPlayers(rankPlayers(players)) : undefined}
+      emptyPlayersText="Players show up here as they get their cards"
+      attrs={{ "data-kind": "bingo", "data-status": data?.status, "data-live": game.live }}
+      notice={game.error ? <ApiErrorNotice error={game.error} /> : null}
+    >
+      {data ? (
+        <>
+          <div aria-live="polite" data-testid="bingo-announcement">
+            {announcement ? (
+              <p className="rounded-2xl bg-card p-4 text-xl font-semibold marquee-glow">
+                {announcement}
               </p>
-            </header>
-
-            <div aria-live="polite" data-testid="bingo-announcement">
-              {announcement ? (
-                <p className="rounded-2xl bg-card p-4 text-xl font-semibold marquee-glow">
-                  {announcement}
-                </p>
-              ) : null}
-            </div>
-
-            {!current ? (
-              <p className="rounded-xl bg-muted p-4" data-testid="bingo-pick-person">
-                <Link href="/who" className="font-medium underline">
-                  Pick who you are
-                </Link>{" "}
-                to play.
-              </p>
-            ) : (
-              <p className="flex items-center gap-2 text-muted-foreground">
-                <Avatar emoji={current.avatar_emoji} color={current.color} size="sm" />
-                Playing as {current.name}
-              </p>
-            )}
-
-            {current && !card && (data.status === "open" || data.status === "live") ? (
-              <>
-                <ApiErrorNotice error={join.error} />
-                <Button
-                  size="lg"
-                  data-testid="primary-action"
-                  className="min-h-14 w-full text-lg"
-                  disabled={join.isPending}
-                  onClick={() => join.mutate()}
-                >
-                  Get my card
-                </Button>
-              </>
             ) : null}
+          </div>
 
-            {card ? (
-              <>
-                <p className="text-sm text-muted-foreground" data-testid="bingo-progress">
-                  {progressLabel({
-                    squares_from_bingo: card.squares_from_bingo,
-                    won: card.won,
-                  })}
-                </p>
-                <ul
-                  className="grid grid-cols-5 gap-1.5"
-                  aria-label="Your bingo card"
-                  data-testid="bingo-card"
-                >
-                  {card.squares.map((square, index) => {
-                    const isMarked = marked.has(index);
-                    const free = square === FREE_LABEL;
-                    return (
-                      <li key={`${index}-${square}`} className="contents">
-                        <button
-                          type="button"
-                          data-testid="bingo-square"
-                          data-index={index}
-                          aria-pressed={isMarked}
-                          aria-label={squareLabel(square, index, isMarked)}
-                          disabled={!canTapSquare(data.status, square) || mark.isPending}
-                          onClick={() => mark.mutate({ index, marked: !isMarked })}
-                          className={cn(
-                            "relative flex aspect-square min-h-14 items-center justify-center rounded-lg border p-0.5 text-center text-[0.68rem] leading-tight font-medium break-words outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:text-sm",
-                            isMarked
-                              ? "border-[var(--accent-cinema)] bg-[var(--accent-cinema)]/20 text-foreground"
-                              : "border-foreground/15 bg-card text-foreground",
-                            free && "font-semibold",
-                          )}
-                        >
-                          {isMarked ? (
-                            <Check
-                              aria-hidden
-                              className="absolute top-0.5 right-0.5 size-3.5 text-[var(--accent-cinema)]"
-                            />
-                          ) : null}
-                          <span>{square}</span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <ApiErrorNotice error={mark.error} />
-              </>
-            ) : null}
-          </>
-        ) : null}
-      </div>
-    </GuestShell>
+          {!current ? (
+            <p className="rounded-xl bg-muted p-4" data-testid="bingo-pick-person">
+              <Link href="/who" className="font-medium underline">
+                Pick who you are
+              </Link>{" "}
+              to play.
+            </p>
+          ) : (
+            <p className="flex items-center gap-2 text-muted-foreground">
+              <Avatar emoji={current.avatar_emoji} color={current.color} size="sm" />
+              Playing as {current.name}
+            </p>
+          )}
+
+          {current && !card && (data.status === "open" || data.status === "live") ? (
+            <>
+              <ApiErrorNotice error={join.error} />
+              <Button
+                size="lg"
+                data-testid="primary-action"
+                className="min-h-14 w-full text-lg"
+                disabled={join.isPending}
+                onClick={() => join.mutate()}
+              >
+                Get my card
+              </Button>
+            </>
+          ) : null}
+
+          {card ? (
+            <>
+              <p className="text-sm text-muted-foreground" data-testid="bingo-progress">
+                {progressLabel({
+                  squares_from_bingo: card.squares_from_bingo,
+                  won: card.won,
+                })}
+              </p>
+              <ul
+                className="grid grid-cols-5 gap-1.5"
+                aria-label="Your bingo card"
+                data-testid="bingo-card"
+              >
+                {card.squares.map((square, index) => {
+                  const isMarked = marked.has(index);
+                  const free = square === FREE_LABEL;
+                  return (
+                    <li key={`${index}-${square}`} className="contents">
+                      <button
+                        type="button"
+                        data-testid="bingo-square"
+                        data-index={index}
+                        aria-pressed={isMarked}
+                        aria-label={squareLabel(square, index, isMarked)}
+                        disabled={!canTapSquare(data.status, square) || mark.isPending}
+                        onClick={() => mark.mutate({ index, marked: !isMarked })}
+                        className={cn(
+                          "relative flex aspect-square min-h-14 items-center justify-center rounded-lg border p-0.5 text-center text-[0.68rem] leading-tight font-medium break-words outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:text-sm",
+                          isMarked
+                            ? "border-[var(--accent-cinema)] bg-[var(--accent-cinema)]/20 text-foreground"
+                            : "border-foreground/15 bg-card text-foreground",
+                          free && "font-semibold",
+                        )}
+                      >
+                        {isMarked ? (
+                          <Check
+                            aria-hidden
+                            className="absolute top-0.5 right-0.5 size-3.5 text-[var(--accent-cinema)]"
+                          />
+                        ) : null}
+                        <span>{square}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <ApiErrorNotice error={mark.error} />
+            </>
+          ) : null}
+        </>
+      ) : null}
+    </PhoneGameFrame>
   );
 }
