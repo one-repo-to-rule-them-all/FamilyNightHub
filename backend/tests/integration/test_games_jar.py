@@ -79,7 +79,7 @@ async def test_only_hosts_run_a_jar_and_only_the_jar_exists_so_far(two_household
     a, _ = two_households
     async with phone() as host, phone() as nobody:
         await _host(host, a)
-        assert (await host.post(GAMES, {"kind": "bingo", "title": "B"})).status_code == 422
+        assert (await host.post(GAMES, {"kind": "scattergories", "title": "B"})).status_code == 422
         gid = await _jar(host)
         assert (
             await nobody.post(GAMES, {"kind": "gratitude_jar", "title": "x"})

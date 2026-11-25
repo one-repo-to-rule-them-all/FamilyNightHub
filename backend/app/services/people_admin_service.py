@@ -324,6 +324,19 @@ async def merge(
     await db.execute(
         text("UPDATE game_players SET person_id = :dst WHERE person_id = :src"), params
     )
+    # A bingo card is one per (game, person): the target's card wins, the source's is dropped.
+    await db.execute(
+        text(
+            """
+            DELETE FROM bingo_cards s WHERE s.person_id = :src AND EXISTS (
+                SELECT 1 FROM bingo_cards t
+                WHERE t.person_id = :dst AND t.game_id = s.game_id
+            )
+            """
+        ),
+        params,
+    )
+    await db.execute(text("UPDATE bingo_cards SET person_id = :dst WHERE person_id = :src"), params)
     await db.execute(
         text("UPDATE gratitude_notes SET person_id = :dst WHERE person_id = :src"), params
     )

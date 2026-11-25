@@ -18,7 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, created_at, household_fk, scoped_fk, uuid_pk
@@ -86,4 +86,24 @@ class GratitudeNote(Base):
     reveal_position: Mapped[int | None] = mapped_column(Integer)
     revealed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = created_at()
+
+
+class BingoCard(Base):
+    __tablename__ = "bingo_cards"
+    __table_args__ = (
+        UniqueConstraint("game_id", "person_id"),
+        CheckConstraint("cardinality(squares) = 25", name="squares_25"),
+        CheckConstraint("marked_mask BETWEEN 0 AND 33554431", name="marked_mask_range"),
+        scoped_fk("game_id", "games", ondelete="CASCADE"),
+        scoped_fk("person_id", "people"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    household_id: Mapped[uuid.UUID] = household_fk()
+    game_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    person_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    squares: Mapped[list[str]] = mapped_column(ARRAY(String(80)))
+    marked_mask: Mapped[int] = mapped_column(Integer, server_default=text("0"), default=0)
+    won_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = created_at()

@@ -21,7 +21,9 @@ export function GamesScreen() {
     refetchInterval: GAMES_POLL_MS,
     refetchOnWindowFocus: true,
   });
-  const playable = (games.data ?? []).filter((g) => PLAYABLE.includes(g.kind));
+  const playable = (games.data ?? []).filter(
+    (g) => PLAYABLE.includes(g.kind) && g.status !== "draft",
+  );
   const live = playable.filter((g) => g.status !== "ended");
   const done = playable.filter((g) => g.status === "ended");
 

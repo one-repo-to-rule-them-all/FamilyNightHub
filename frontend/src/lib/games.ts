@@ -14,15 +14,18 @@ export const KIND_COPY: Record<GameKind, { name: string; blurb: string }> = {
     name: "Gratitude jar",
     blurb: "Drop in what you are thankful for. The host reveals the notes one by one.",
   },
-  bingo: { name: "Thanksgiving bingo", blurb: "Tap squares as things happen." },
+  bingo: {
+    name: "Thanksgiving bingo",
+    blurb: "Tap squares as things happen at the table. First line wins.",
+  },
   scattergories: {
     name: "Scattergories",
     blurb: "One letter, a list of categories, beat the clock.",
   },
 };
 
-/** Only the jar is playable so far; the other kinds ship with their slices. */
-export const PLAYABLE: readonly GameKind[] = ["gratitude_jar"];
+/** The jar and bingo are playable; scattergories ships with its slice. */
+export const PLAYABLE: readonly GameKind[] = ["gratitude_jar", "bingo"];
 
 export function statusLabel(kind: GameKind, status: GameStatus): string {
   if (kind === "gratitude_jar") {
@@ -31,6 +34,7 @@ export function statusLabel(kind: GameKind, status: GameStatus): string {
     return "Finished";
   }
   if (status === "ended") return "Finished";
+  if (status === "draft") return "Setting up";
   return status === "live" ? "Live" : "Open";
 }
 

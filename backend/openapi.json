@@ -483,6 +483,158 @@
         "title": "BindingOut",
         "type": "object"
       },
+      "BingoCardOut": {
+        "properties": {
+          "finish_place": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Place"
+          },
+          "marked": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Marked",
+            "type": "array"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "squares": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Squares",
+            "type": "array"
+          },
+          "squares_from_bingo": {
+            "title": "Squares From Bingo",
+            "type": "integer"
+          },
+          "won": {
+            "title": "Won",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "person_id",
+          "squares",
+          "marked",
+          "squares_from_bingo",
+          "won",
+          "finish_place"
+        ],
+        "title": "BingoCardOut",
+        "type": "object"
+      },
+      "BingoJoinIn": {
+        "properties": {
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id"
+        ],
+        "title": "BingoJoinIn",
+        "type": "object"
+      },
+      "BingoOut": {
+        "properties": {
+          "end_on_first_win": {
+            "title": "End On First Win",
+            "type": "boolean"
+          },
+          "free_center": {
+            "title": "Free Center",
+            "type": "boolean"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/BingoPlayerOut"
+            },
+            "title": "Players",
+            "type": "array"
+          },
+          "win_mode": {
+            "enum": [
+              "line",
+              "blackout"
+            ],
+            "title": "Win Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "win_mode",
+          "free_center",
+          "end_on_first_win",
+          "players"
+        ],
+        "title": "BingoOut",
+        "type": "object"
+      },
+      "BingoPlayerOut": {
+        "properties": {
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "finish_place": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Place"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "squares_from_bingo": {
+            "title": "Squares From Bingo",
+            "type": "integer"
+          },
+          "won": {
+            "title": "Won",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "person_id",
+          "name",
+          "avatar_emoji",
+          "color",
+          "squares_from_bingo",
+          "won",
+          "finish_place"
+        ],
+        "title": "BingoPlayerOut",
+        "type": "object"
+      },
       "BulkAddIn": {
         "description": "Typed titles, one per line in the UI (\"Title (year)\" parsed client-side).",
         "properties": {
@@ -1034,6 +1186,16 @@
             "title": "Allow Anonymous",
             "type": "boolean"
           },
+          "end_on_first_win": {
+            "default": true,
+            "title": "End On First Win",
+            "type": "boolean"
+          },
+          "free_center": {
+            "default": true,
+            "title": "Free Center",
+            "type": "boolean"
+          },
           "kind": {
             "enum": [
               "gratitude_jar",
@@ -1047,6 +1209,15 @@
             "maxLength": 80,
             "minLength": 1,
             "title": "Title",
+            "type": "string"
+          },
+          "win_mode": {
+            "default": "line",
+            "enum": [
+              "line",
+              "blackout"
+            ],
+            "title": "Win Mode",
             "type": "string"
           }
         },
@@ -1062,6 +1233,16 @@
           "allow_anonymous": {
             "title": "Allow Anonymous",
             "type": "boolean"
+          },
+          "bingo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BingoOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "created_at": {
             "format": "date-time",
@@ -6770,7 +6951,7 @@
         ]
       },
       "post": {
-        "description": "Start a game (hosts). Only the Gratitude Jar exists so far.",
+        "description": "Create a game (hosts): a jar opens at once, a bingo round starts as a draft.",
         "operationId": "create_game_api_v1_games_post",
         "requestBody": {
           "content": {
@@ -6845,6 +7026,266 @@
           }
         },
         "summary": "Get Game",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/bingo/join": {
+      "post": {
+        "description": "Take a seat as a person bound to this phone and get a card (idempotent).",
+        "operationId": "join_bingo_api_v1_games__game_id__bingo_join_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BingoJoinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BingoCardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't acting as that person, or consent is needed"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Join Bingo",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/bingo/mark/{index}": {
+      "delete": {
+        "description": "Take a mark back. A win already recorded stays.",
+        "operationId": "unmark_square_api_v1_games__game_id__bingo_mark__index__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "index",
+            "required": true,
+            "schema": {
+              "maximum": 24,
+              "minimum": 0,
+              "title": "Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BingoCardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't acting as that person, or consent is needed"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unmark Square",
+        "tags": [
+          "games"
+        ]
+      },
+      "put": {
+        "description": "Mark a square on your own card. The mark that completes the pattern is the win.",
+        "operationId": "mark_square_api_v1_games__game_id__bingo_mark__index__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "index",
+            "required": true,
+            "schema": {
+              "maximum": 24,
+              "minimum": 0,
+              "title": "Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BingoCardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't acting as that person, or consent is needed"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Square",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/bingo/mine": {
+      "get": {
+        "description": "The cards of the people this phone is acting as. Nobody else's card is readable.",
+        "operationId": "my_cards_api_v1_games__game_id__bingo_mine_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BingoCardOut"
+                  },
+                  "title": "Response My Cards Api V1 Games  Game Id  Bingo Mine Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Cards",
         "tags": [
           "games"
         ]
@@ -7257,6 +7698,106 @@
           }
         },
         "summary": "Start Reveal",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/open": {
+      "post": {
+        "description": "Let the family join (draft to open).",
+        "operationId": "open_game_api_v1_games__game_id__open_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Game",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/start": {
+      "post": {
+        "description": "Start the round: squares can be marked (open to live).",
+        "operationId": "start_round_api_v1_games__game_id__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Round",
         "tags": [
           "games"
         ]

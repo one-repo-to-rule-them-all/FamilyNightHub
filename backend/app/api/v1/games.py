@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, Header, Path, Query, status
 
 from app.api.v1.sessions import NOT_FOUND, raise_http, tie_seed
 from app.core.dependencies import (
@@ -24,6 +24,10 @@ from app.core.dependencies import (
     require_permission,
 )
 from app.schemas.games import (
+    BingoCardOut,
+    BingoJoinIn,
+    BingoOut,
+    BingoPlayerOut,
     GameCreateIn,
     GameOut,
     GameSummaryOut,
@@ -69,10 +73,22 @@ def _summary(g: games_service.GameRow) -> GameSummaryOut:
     )
 
 
-def _out(game: games_service.GameRow, jar_state: games_service.JarState | None) -> GameOut:
+def _out(
+    game: games_service.GameRow,
+    jar_state: games_service.JarState | None,
+    bingo_state: games_service.BingoState | None = None,
+) -> GameOut:
     return GameOut(
         **_summary(game).model_dump(),
         allow_anonymous=bool(game.config.get("allow_anonymous", True)),
+        bingo=None
+        if bingo_state is None
+        else BingoOut(
+            win_mode="blackout" if bingo_state.win_mode == "blackout" else "line",
+            free_center=bingo_state.free_center,
+            end_on_first_win=bingo_state.end_on_first_win,
+            players=[BingoPlayerOut(**p.__dict__) for p in bingo_state.players],
+        ),
         jar=None
         if jar_state is None
         else JarOut(
@@ -87,10 +103,10 @@ def _out(game: games_service.GameRow, jar_state: games_service.JarState | None) 
 
 async def _snapshot(db: Any, household_id: uuid.UUID, game_id: uuid.UUID) -> GameOut:
     try:
-        game, jar_state = await games_service.snapshot(db, household_id, game_id)
+        game, jar_state, bingo_state = await games_service.snapshot(db, household_id, game_id)
     except ServiceError as err:
         raise_http(err)
-    return _out(game, jar_state)
+    return _out(game, jar_state, bingo_state)
 
 
 @router.get("", response_model=list[GameSummaryOut])
@@ -107,7 +123,7 @@ async def list_games(viewer: CurrentViewer, db: ViewerDb) -> list[GameSummaryOut
     responses={422: {"description": "That game isn't available yet"}},
 )
 async def create_game(body: GameCreateIn, account: CanHost, db: AccountDb) -> GameOut:
-    """Start a game (hosts). Only the Gratitude Jar exists so far."""
+    """Create a game (hosts): a jar opens at once, a bingo round starts as a draft."""
     try:
         game = await games_service.create_game(
             db,
@@ -116,10 +132,13 @@ async def create_game(body: GameCreateIn, account: CanHost, db: AccountDb) -> Ga
             kind=body.kind,
             title=body.title,
             allow_anonymous=body.allow_anonymous,
+            win_mode=body.win_mode,
+            free_center=body.free_center,
+            end_on_first_win=body.end_on_first_win,
         )
     except ServiceError as err:
         raise_http(err)
-    return _out(game, await games_service.jar_state(db, game.id))
+    return await _snapshot(db, account.household_id, game.id)
 
 
 @router.get("/{game_id}", response_model=GameOut, responses=NOT_FOUND)
@@ -278,3 +297,123 @@ async def reveal_next(game_id: uuid.UUID, account: CanHost, db: AccountDb) -> Ga
     except ServiceError as err:
         raise_http(err)
     return await _snapshot(db, account.household_id, game_id)
+
+
+# ---- Thanksgiving Bingo ----
+
+
+@router.post(
+    "/{game_id}/open", response_model=GameOut, dependencies=[CsrfProtected], responses=HOST
+)
+async def open_game(game_id: uuid.UUID, account: CanHost, db: AccountDb) -> GameOut:
+    """Let the family join (draft to open)."""
+    try:
+        await games_service.open_game(db, account.household_id, account.account_id, game_id)
+    except ServiceError as err:
+        raise_http(err)
+    return await _snapshot(db, account.household_id, game_id)
+
+
+@router.post(
+    "/{game_id}/start", response_model=GameOut, dependencies=[CsrfProtected], responses=HOST
+)
+async def start_round(game_id: uuid.UUID, account: CanHost, db: AccountDb) -> GameOut:
+    """Start the round: squares can be marked (open to live)."""
+    try:
+        await games_service.start_round(db, account.household_id, account.account_id, game_id)
+    except ServiceError as err:
+        raise_http(err)
+    return await _snapshot(db, account.household_id, game_id)
+
+
+@router.post(
+    "/{game_id}/bingo/join",
+    response_model=BingoCardOut,
+    dependencies=[CsrfProtected],
+    responses=PLAYER,
+)
+async def join_bingo(
+    game_id: uuid.UUID,
+    body: BingoJoinIn,
+    device: CurrentDevice,
+    db: DeviceDb,
+    x_fnh_test_seed: Annotated[str | None, Header(include_in_schema=False)] = None,
+) -> BingoCardOut:
+    """Take a seat as a person bound to this phone and get a card (idempotent)."""
+    try:
+        card = await games_service.join(
+            db,
+            device.household_id,
+            game_id,
+            device_id=device.device_id,
+            person_id=body.person_id,
+            seed=tie_seed(x_fnh_test_seed),
+        )
+    except ServiceError as err:
+        raise_http(err)
+    return BingoCardOut(**card.__dict__)
+
+
+@router.get("/{game_id}/bingo/mine", response_model=list[BingoCardOut], responses=NOT_FOUND)
+async def my_cards(game_id: uuid.UUID, device: CurrentDevice, db: DeviceDb) -> list[BingoCardOut]:
+    """The cards of the people this phone is acting as. Nobody else's card is readable."""
+    try:
+        cards = await games_service.my_cards(db, device.household_id, game_id, device.device_id)
+    except ServiceError as err:
+        raise_http(err)
+    return [BingoCardOut(**c.__dict__) for c in cards]
+
+
+async def _mark(
+    game_id: uuid.UUID, index: int, person_id: uuid.UUID, device: Any, db: Any, marked: bool
+) -> BingoCardOut:
+    try:
+        card = await games_service.set_mark(
+            db,
+            device.household_id,
+            game_id,
+            index,
+            device_id=device.device_id,
+            person_id=person_id,
+            marked=marked,
+        )
+    except ServiceError as err:
+        raise_http(err)
+    return BingoCardOut(**card.__dict__)
+
+
+Square = Annotated[int, Path(ge=0, le=24)]
+
+
+@router.put(
+    "/{game_id}/bingo/mark/{index}",
+    response_model=BingoCardOut,
+    dependencies=[CsrfProtected],
+    responses=PLAYER,
+)
+async def mark_square(
+    game_id: uuid.UUID,
+    index: Square,
+    person_id: Annotated[uuid.UUID, Query()],
+    device: CurrentDevice,
+    db: DeviceDb,
+) -> BingoCardOut:
+    """Mark a square on your own card. The mark that completes the pattern is the win."""
+    return await _mark(game_id, index, person_id, device, db, True)
+
+
+@router.delete(
+    "/{game_id}/bingo/mark/{index}",
+    response_model=BingoCardOut,
+    dependencies=[CsrfProtected],
+    responses=PLAYER,
+)
+async def unmark_square(
+    game_id: uuid.UUID,
+    index: Square,
+    person_id: Annotated[uuid.UUID, Query()],
+    device: CurrentDevice,
+    db: DeviceDb,
+) -> BingoCardOut:
+    """Take a mark back. A win already recorded stays."""
+    return await _mark(game_id, index, person_id, device, db, False)

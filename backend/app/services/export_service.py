@@ -50,6 +50,7 @@ TABLES = (
     "games",
     "game_players",
     "gratitude_notes",
+    "bingo_cards",
     "audit_events",
 )
 # Tables without `created_at` sort by their own time column.

@@ -178,6 +178,7 @@ async def remove_person(
         "session_attendance",
         "pin_reset_requests",
         "gratitude_notes",
+        "bingo_cards",
         "game_players",
     ):
         await run(f"DELETE FROM {table} WHERE person_id IN :ids")
@@ -246,6 +247,7 @@ async def start_fresh(
         "session_attendance",
         "pin_reset_requests",
         "gratitude_notes",
+        "bingo_cards",
         "game_players",
         "games",
         "options",

@@ -11,14 +11,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, type ApiError, type Game, type GameSummary } from "@/lib/api";
+import { WIN_MODE_COPY, type WinMode } from "@/lib/bingo";
 import { KIND_COPY, PLAYABLE, statusLabel } from "@/lib/games";
 
-/** Start a Gratitude Jar and list the household's games. Bingo and Scattergories join later. */
+/** Start a Gratitude Jar or a bingo round and list the household's games. */
 export function GamesAdmin() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("Thanksgiving gratitude jar");
   const [allowAnonymous, setAllowAnonymous] = useState(true);
+  const [bingoTitle, setBingoTitle] = useState("Thanksgiving bingo");
+  const [winMode, setWinMode] = useState<WinMode>("line");
+  const [freeCenter, setFreeCenter] = useState(true);
+  const [endOnFirstWin, setEndOnFirstWin] = useState(true);
 
   const games = useQuery<GameSummary[], ApiError>({
     queryKey: ["games"],
@@ -28,6 +33,21 @@ export function GamesAdmin() {
   const create = useMutation<Game, ApiError>({
     mutationFn: () =>
       api.createGame({ kind: "gratitude_jar", title, allow_anonymous: allowAnonymous }),
+    onSuccess: (game) => {
+      void queryClient.invalidateQueries({ queryKey: ["games"] });
+      router.push(`/host/games/${game.id}`);
+    },
+  });
+
+  const createBingo = useMutation<Game, ApiError>({
+    mutationFn: () =>
+      api.createGame({
+        kind: "bingo",
+        title: bingoTitle,
+        win_mode: winMode,
+        free_center: freeCenter,
+        end_on_first_win: endOnFirstWin,
+      }),
     onSuccess: (game) => {
       void queryClient.invalidateQueries({ queryKey: ["games"] });
       router.push(`/host/games/${game.id}`);
@@ -73,6 +93,72 @@ export function GamesAdmin() {
           disabled={!title.trim() || create.isPending}
         >
           <Plus aria-hidden /> Start jar
+        </Button>
+      </form>
+
+      <form
+        className="flex flex-col gap-3 rounded-2xl border border-foreground/10 bg-card p-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (bingoTitle.trim() && !createBingo.isPending) createBingo.mutate();
+        }}
+      >
+        <h2 className="text-lg font-medium">Start a bingo round</h2>
+        <p className="text-sm text-muted-foreground">{KIND_COPY.bingo.blurb}</p>
+        <Label htmlFor="bingo-title">Name</Label>
+        <Input
+          id="bingo-title"
+          data-testid="bingo-title"
+          value={bingoTitle}
+          maxLength={80}
+          onChange={(event) => setBingoTitle(event.target.value)}
+        />
+        <fieldset className="flex flex-col gap-1">
+          <legend className="text-sm font-medium">What wins</legend>
+          {(Object.keys(WIN_MODE_COPY) as WinMode[]).map((mode) => (
+            <label key={mode} className="flex min-h-11 items-center gap-3">
+              <input
+                type="radio"
+                name="win-mode"
+                data-testid={`win-mode-${mode}`}
+                checked={winMode === mode}
+                onChange={() => setWinMode(mode)}
+                className="size-5 accent-[var(--accent-cinema)]"
+              />
+              <span>
+                {WIN_MODE_COPY[mode].name}
+                <span className="block text-sm text-muted-foreground">
+                  {WIN_MODE_COPY[mode].blurb}
+                </span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <label className="flex min-h-11 items-center gap-3">
+          <input
+            type="checkbox"
+            checked={freeCenter}
+            onChange={(event) => setFreeCenter(event.target.checked)}
+            className="size-5 accent-[var(--accent-cinema)]"
+          />
+          Free space in the middle
+        </label>
+        <label className="flex min-h-11 items-center gap-3">
+          <input
+            type="checkbox"
+            checked={endOnFirstWin}
+            onChange={(event) => setEndOnFirstWin(event.target.checked)}
+            className="size-5 accent-[var(--accent-cinema)]"
+          />
+          The first win ends the round
+        </label>
+        <ApiErrorNotice error={createBingo.error} />
+        <Button
+          type="submit"
+          data-testid="create-bingo"
+          disabled={!bingoTitle.trim() || createBingo.isPending}
+        >
+          <Plus aria-hidden /> Start bingo
         </Button>
       </form>
 

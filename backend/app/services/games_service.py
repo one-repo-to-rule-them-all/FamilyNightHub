@@ -12,6 +12,7 @@ row and queues a hint on `game:{id}` for after the commit (events are hints, ADR
 
 from __future__ import annotations
 
+import random
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,7 +22,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.games import jar
+from app.domain.games import bingo, bingo_pool, jar
 from app.realtime import events
 from app.realtime.publisher import publish_game_after_commit
 from app.services import consent_service, people_service
@@ -32,8 +33,9 @@ _AUDIT = text(
     "target_id, data) VALUES (:h, :a, :action, 'game', :t, :data)"
 ).bindparams(bindparam("data", type_=JSONB))
 
-# Only the jar exists so far (slice A); the other kinds arrive with their slices.
-AVAILABLE_KINDS = frozenset({"gratitude_jar"})
+# The jar (slice A) and bingo (slice B); scattergories arrives with slice C.
+AVAILABLE_KINDS = frozenset({"gratitude_jar", "bingo"})
+WIN_MODES = frozenset({"line", "blackout"})
 
 
 @dataclass(frozen=True)
@@ -69,6 +71,36 @@ class JarState:
     remaining: int
     current: ShownNote | None
     revealed: list[ShownNote]
+
+
+@dataclass(frozen=True)
+class BingoPlayer:
+    person_id: uuid.UUID
+    name: str
+    avatar_emoji: str
+    color: str
+    squares_from_bingo: int
+    won: bool
+    # 1 for the first card to finish, 2 for the next; None until the card wins.
+    finish_place: int | None
+
+
+@dataclass(frozen=True)
+class BingoState:
+    win_mode: str
+    free_center: bool
+    end_on_first_win: bool
+    players: list[BingoPlayer]
+
+
+@dataclass(frozen=True)
+class OwnCard:
+    person_id: uuid.UUID
+    squares: list[str]
+    marked: list[int]
+    squares_from_bingo: int
+    won: bool
+    finish_place: int | None
 
 
 @dataclass(frozen=True)
@@ -147,9 +179,24 @@ async def create_game(
     kind: str,
     title: str,
     allow_anonymous: bool,
+    win_mode: str = "line",
+    free_center: bool = True,
+    end_on_first_win: bool = True,
 ) -> GameRow:
     if kind not in AVAILABLE_KINDS:
         raise Invalid("That game isn't available yet.")
+    if kind == "bingo":
+        if win_mode not in WIN_MODES:
+            raise Invalid("Pick line or blackout.")
+        config: dict[str, Any] = {
+            "win_mode": win_mode,
+            "free_center": free_center,
+            "end_on_first_win": end_on_first_win,
+        }
+        status = "draft"  # the host opens it when the family is ready to join
+    else:
+        config = {"allow_anonymous": allow_anonymous}
+        status = "open"
     clean = " ".join(title.split())
     if not clean:
         raise Invalid("Give the game a name.")
@@ -158,14 +205,17 @@ async def create_game(
             text(
                 "INSERT INTO games (household_id, kind, title, status, config, "
                 "created_by_account_id, started_at) "
-                "VALUES (:h, :kind, :title, 'open', :config, :a, now()) "
+                "VALUES (:h, :kind, :title, :status, :config, :a, "
+                "CASE WHEN :is_open THEN now() END) "
                 "RETURNING id, kind, title, status, created_at, config"
             ).bindparams(bindparam("config", type_=JSONB)),
             {
                 "h": household_id,
                 "kind": kind,
                 "title": clean,
-                "config": {"allow_anonymous": allow_anonymous},
+                "config": config,
+                "status": status,
+                "is_open": status == "open",
                 "a": account_id,
             },
         )
@@ -223,9 +273,13 @@ async def jar_state(db: AsyncSession, game_id: uuid.UUID) -> JarState:
 
 async def snapshot(
     db: AsyncSession, household_id: uuid.UUID, game_id: uuid.UUID
-) -> tuple[GameRow, JarState | None]:
+) -> tuple[GameRow, JarState | None, BingoState | None]:
     game = await _load(db, household_id, game_id)
-    return game, (await jar_state(db, game_id) if game.kind == "gratitude_jar" else None)
+    return (
+        game,
+        await jar_state(db, game_id) if game.kind == "gratitude_jar" else None,
+        await bingo_state(db, game) if game.kind == "bingo" else None,
+    )
 
 
 def _require_jar(game: GameRow) -> None:
@@ -450,3 +504,244 @@ async def end_game(
     )
     await _audit(db, household_id, account_id, "game.ended", game_id)
     publish_game_after_commit(db, game_id, events.GAME_CHANGED)
+
+
+# ---- Thanksgiving Bingo ----
+
+
+def _require_bingo(game: GameRow) -> None:
+    if game.kind != "bingo":
+        raise NotFound("Game not found")
+
+
+def _win_mode(game: GameRow) -> bingo.WinMode:
+    return "blackout" if game.config.get("win_mode") == "blackout" else "line"
+
+
+def _marked(mask: int) -> list[int]:
+    return [i for i in range(bingo.CELLS) if mask >> i & 1]
+
+
+async def _finish_places(db: AsyncSession, game_id: uuid.UUID) -> dict[uuid.UUID, int]:
+    """1-based finishing order by `won_at` (ties, which the game lock prevents, by id)."""
+    rows = await db.execute(
+        text(
+            "SELECT person_id FROM bingo_cards WHERE game_id = :g AND won_at IS NOT NULL "
+            "ORDER BY won_at, id"
+        ),
+        {"g": game_id},
+    )
+    return {r.person_id: i for i, r in enumerate(rows, start=1)}
+
+
+async def bingo_state(db: AsyncSession, game: GameRow) -> BingoState:
+    """Who is playing and how close each card is. Never which squares, never a card."""
+    mode = _win_mode(game)
+    places = await _finish_places(db, game.id)
+    rows = await db.execute(
+        text(
+            """
+            SELECT p.id, p.name, p.avatar_emoji, p.color, c.marked_mask, c.won_at
+            FROM bingo_cards c
+            JOIN people p ON p.id = c.person_id AND p.household_id = c.household_id
+            WHERE c.game_id = :g
+            ORDER BY c.created_at, c.id
+            """
+        ),
+        {"g": game.id},
+    )
+    return BingoState(
+        win_mode=mode,
+        free_center=bool(game.config.get("free_center", True)),
+        end_on_first_win=bool(game.config.get("end_on_first_win", True)),
+        players=[
+            BingoPlayer(
+                r.id,
+                r.name,
+                r.avatar_emoji,
+                r.color,
+                bingo.squares_from_bingo(r.marked_mask, mode),
+                r.won_at is not None,
+                places.get(r.id),
+            )
+            for r in rows
+        ],
+    )
+
+
+async def open_game(
+    db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, game_id: uuid.UUID
+) -> None:
+    """draft -> open: the family can join. Idempotent once open."""
+    game = await _load(db, household_id, game_id, lock="UPDATE")
+    _require_bingo(game)
+    if game.status == "open":
+        return
+    if game.status != "draft":
+        raise Conflict("That round has already started.")
+    await db.execute(
+        text("UPDATE games SET status = 'open', started_at = now() WHERE id = :g"), {"g": game_id}
+    )
+    await _audit(db, household_id, account_id, "game.opened", game_id)
+    publish_game_after_commit(db, game_id, events.GAME_CHANGED)
+
+
+async def start_round(
+    db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, game_id: uuid.UUID
+) -> None:
+    """open -> live: marking starts."""
+    game = await _load(db, household_id, game_id, lock="UPDATE")
+    _require_bingo(game)
+    if game.status == "live":
+        raise Conflict("The round has already started.")
+    if game.status != "open":
+        raise Conflict("Open the game for players first." if game.status == "draft" else "Over.")
+    await db.execute(text("UPDATE games SET status = 'live' WHERE id = :g"), {"g": game_id})
+    await _audit(db, household_id, account_id, "game.started", game_id)
+    publish_game_after_commit(db, game_id, events.GAME_CHANGED)
+
+
+def _card(row: Any, game: GameRow, places: dict[uuid.UUID, int]) -> OwnCard:
+    return OwnCard(
+        person_id=row.person_id,
+        squares=list(row.squares),
+        marked=_marked(row.marked_mask),
+        squares_from_bingo=bingo.squares_from_bingo(row.marked_mask, _win_mode(game)),
+        won=row.won_at is not None,
+        finish_place=places.get(row.person_id),
+    )
+
+
+_CARD = text(
+    "SELECT person_id, squares, marked_mask, won_at FROM bingo_cards "
+    "WHERE game_id = :g AND person_id = :p"
+)
+
+
+async def join(
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    game_id: uuid.UUID,
+    *,
+    device_id: uuid.UUID,
+    person_id: uuid.UUID,
+    seed: int,
+) -> OwnCard:
+    """Take a seat and get a card. Idempotent: joining again returns the same card."""
+    game = await _load(db, household_id, game_id, lock="SHARE")
+    _require_bingo(game)
+    await consent_service.require_household_consent(db)
+    await people_service.require_can_act_as(db, device_id, person_id)
+    if game.status == "draft":
+        raise Conflict("The game isn't open for players yet.")
+    if game.status == "ended":
+        raise Conflict("The round is over.")
+    free = bool(game.config.get("free_center", True))
+    squares = bingo.generate_card(
+        bingo_pool.THANKSGIVING_POOL, random.Random(seed ^ person_id.int), free
+    )
+    created = await db.scalar(
+        text(
+            "INSERT INTO bingo_cards (household_id, game_id, person_id, squares, marked_mask) "
+            "VALUES (:h, :g, :p, :squares, :mask) "
+            "ON CONFLICT (game_id, person_id) DO NOTHING RETURNING id"
+        ),
+        {
+            "h": household_id,
+            "g": game_id,
+            "p": person_id,
+            "squares": squares,
+            "mask": bingo.initial_mask(free),
+        },
+    )
+    await db.execute(
+        text(
+            "INSERT INTO game_players (household_id, game_id, person_id) VALUES (:h, :g, :p) "
+            "ON CONFLICT (game_id, person_id) DO NOTHING"
+        ),
+        {"h": household_id, "g": game_id, "p": person_id},
+    )
+    if created is not None:
+        publish_game_after_commit(db, game_id, events.GAME_CHANGED)
+    row = (await db.execute(_CARD, {"g": game_id, "p": person_id})).one()
+    return _card(row, game, await _finish_places(db, game_id))
+
+
+async def my_cards(
+    db: AsyncSession, household_id: uuid.UUID, game_id: uuid.UUID, device_id: uuid.UUID
+) -> list[OwnCard]:
+    """Cards of the people actively bound to this phone, and nobody else's."""
+    game = await _load(db, household_id, game_id)
+    _require_bingo(game)
+    rows = await db.execute(
+        text(
+            """
+            SELECT c.person_id, c.squares, c.marked_mask, c.won_at
+            FROM bingo_cards c
+            JOIN device_people dp ON dp.person_id = c.person_id AND dp.device_id = :d
+                                  AND dp.status = 'active'
+            WHERE c.game_id = :g
+            ORDER BY c.created_at, c.id
+            """
+        ),
+        {"d": device_id, "g": game_id},
+    )
+    places = await _finish_places(db, game_id)
+    return [_card(r, game, places) for r in rows]
+
+
+async def set_mark(
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    game_id: uuid.UUID,
+    index: int,
+    *,
+    device_id: uuid.UUID,
+    person_id: uuid.UUID,
+    marked: bool,
+) -> OwnCard:
+    """Mark or unmark one square on your own card. Idempotent. The game row's lock makes the
+    completing mark the single decision point: whoever takes the lock first and finishes a
+    pattern is the first winner, and `end_on_first_win` closes the round in that same
+    transaction, so a second phone completing at the same instant gets 409."""
+    if not 0 <= index < bingo.CELLS:
+        raise Invalid("No such square.")
+    game = await _load(db, household_id, game_id, lock="UPDATE")
+    _require_bingo(game)
+    await people_service.require_can_act_as(db, device_id, person_id)
+    if game.status == "ended":
+        raise Conflict("The round is over.")
+    if game.status != "live":
+        raise Conflict("The round hasn't started.")
+    row = (
+        await db.execute(text(str(_CARD) + " FOR UPDATE"), {"g": game_id, "p": person_id})
+    ).first()
+    if row is None:
+        raise NotFound("You haven't joined this game.")
+    free = bool(game.config.get("free_center", True))
+    mask = row.marked_mask
+    if bool(mask >> index & 1) != marked:
+        mask = bingo.toggle_mark(mask, index, free)
+    if mask == row.marked_mask:
+        return _card(row, game, await _finish_places(db, game_id))
+    just_won = row.won_at is None and bingo.has_win(mask, _win_mode(game))
+    # clock_timestamp(), not now(): now() is the transaction's start, which would let the
+    # second lock holder look earlier than the first.
+    await db.execute(
+        text(
+            "UPDATE bingo_cards SET marked_mask = :m"
+            + (", won_at = clock_timestamp()" if just_won else "")
+            + " WHERE game_id = :g AND person_id = :p"
+        ),
+        {"m": mask, "g": game_id, "p": person_id},
+    )
+    if just_won and game.config.get("end_on_first_win", True):
+        await db.execute(
+            text("UPDATE games SET status = 'ended', ended_at = now() WHERE id = :g"),
+            {"g": game_id},
+        )
+    publish_game_after_commit(
+        db, game_id, events.GAME_CHANGED if just_won else events.GAME_ACTIVITY
+    )
+    fresh = (await db.execute(_CARD, {"g": game_id, "p": person_id})).one()
+    return _card(fresh, game, await _finish_places(db, game_id))
