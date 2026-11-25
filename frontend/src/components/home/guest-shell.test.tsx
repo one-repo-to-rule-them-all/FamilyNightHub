@@ -79,7 +79,7 @@ afterEach(() => {
 });
 
 describe("GuestShell (§5 H0)", () => {
-  it("frames the page: app bar, data-screen, a three-tab nav with the active tab (AC-H0.1)", () => {
+  it("frames the page: app bar, data-screen, a four-tab nav with the active tab (AC-H0.1)", () => {
     render(
       <GuestShell screen="history">
         <p>content</p>
@@ -88,8 +88,8 @@ describe("GuestShell (§5 H0)", () => {
     expect(host.querySelector('main[data-screen="history"]')?.textContent).toContain("content");
     expect(q("household-name")?.textContent).toBe("Family Night");
     const links = [...host.querySelectorAll('[data-testid="bottom-nav"] a')];
-    expect(links.map((a) => a.textContent)).toEqual(["Home", "History", "Me"]);
-    expect(links.map((a) => a.getAttribute("aria-current"))).toEqual([null, "page", null]);
+    expect(links.map((a) => a.textContent)).toEqual(["Home", "Games", "History", "Me"]);
+    expect(links.map((a) => a.getAttribute("aria-current"))).toEqual([null, null, "page", null]);
     expect(q("live-dot")).toBeNull();
     expect(q("night-toast")).toBeNull();
   });

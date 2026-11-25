@@ -36,7 +36,8 @@ backend/app/
 | Host devices | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}` | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it, unless `keep_session`: the host's laptop opening a TV window); review pending person claims (`devices:enroll` / `devices:approve`) |
 | Sessions | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET/PATCH /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}`, `PUT /sessions/{id}/slideshow` | Host (`sessions:run`): create (code shown once; `voting_method` defaults to the household's), change the voting method while `draft`, rotate code, shortlist, open/close voting, close the night, start/stop the TV slideshow. Snapshot and history: any device or account of the household |
 | Ballots | `PUT /api/v1/sessions/{id}/ballots`, `PUT …/ballots/proxy`, `GET …/ballots/mine`, `GET …/voters` | Phone casts/replaces a bound person's ballot; host proxy ballot (`ballots:proxy`); a phone reads back its own people's ballots; who has voted (avatars only) |
-| Live | `/api/v1/sse-tickets`, `/api/v1/sessions/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md) |
+| Live | `/api/v1/sse-tickets {session_id | game_id}`, `/api/v1/sessions/{id}/stream`, `/api/v1/games/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md), [ADR-0018](decisions/ADR-0018-games-tab.md) |
+| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next}` | Gratitude Jar ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate, reveal and end; a phone drops a note as a bound person; any device or account reads the snapshot. See "Games" |
 | Photos | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}` | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below |
 | Ratings | `PUT /api/v1/sessions/{id}/ratings`, `PUT …/ratings/proxy`, `GET …/ratings/mine` | 1–5 per person, once the night is `tonight`/`closed`: a phone rates as its bound people, a host proxy-rates (`ballots:proxy`), a phone reads back its own people's scores. See "Ratings" |
 | Movies | `GET /api/v1/tmdb/search?q=` | TMDB search proxy for hosts (503 when TMDB is off or down). The library itself is admin-only (next rows) |
@@ -728,6 +729,32 @@ deletes the bucket objects, then the household row, whose cascade empties every 
   sign-ins, magic-link verifies and joins are 403 `household_disabled` after the credential
   checks out, and its accounts' sessions stop on their next request), rotate the join slug.
   Every action writes a global `platform_audit_events` row.
+
+## Games
+
+[ADR-0018](decisions/ADR-0018-games-tab.md); `services/games_service.py`, `api/v1/games.py`,
+`domain/games/jar.py`. Games are household-scoped and **not tied to a night**: `games`
+(`kind`, `status` `draft/open/live/ended`, `config`, `created_by_account_id`, `reveal_seed`),
+`game_players` (roster, used from the bingo slice) and `gratitude_notes`.
+
+- **Gratitude Jar.** Hosts create a jar (`open`). A phone drops a note as a person it is
+  acting as (`require_can_act_as`, consent gate; 1-280 chars, whitespace collapsed; `anonymous`
+  unless the jar's `allow_anonymous` is false). The author may delete their own note until it is
+  shown (anyone else's, or a shown one, is 404). **Start reveal** closes the jar, shuffles the
+  unhidden notes with `random.Random(seed)` over the sorted ids (`secrets.randbits(64)`; the
+  `X-FNH-Test-Seed` header pins it in `ENVIRONMENT=test`) and writes `reveal_position`;
+  **reveal next** sets `revealed_at` on the next one. The game row is read `FOR UPDATE` by hosts
+  and `FOR SHARE` by a dropped note, so they serialize. Hosts read every note's text in
+  `/jar/moderation` and can hide one before it shows (idempotent); an anonymous note never
+  carries its author, even there. The snapshot holds revealed, unhidden notes only, and counts.
+- **Events.** `game_changed` (status, reveal, hide) and `game_activity` (a note dropped or
+  taken back) go to `game:{id}` after commit. `POST /sse-tickets` takes exactly one of
+  `session_id` or `game_id`; tickets carry a `scope`, and a night's stream refuses a game's
+  ticket and the reverse.
+- **Lifecycle.** Merging people moves their notes and keeps the target's roster row; removing a
+  person (and Start fresh) deletes notes, roster rows and games; the export gains the three
+  tables. Audit: `game.created`, `game.reveal_started`, `game.note_revealed`,
+  `game.note_hidden`, `game.ended`.
 
 ## Where business logic belongs
 

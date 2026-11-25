@@ -2,6 +2,7 @@
 
 import {
   Clapperboard,
+  Gamepad2,
   History,
   House,
   type LucideIcon,
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 
 const ICONS: Record<NavKey, LucideIcon> = {
   home: House,
+  games: Gamepad2,
   people: Users,
   phones: Smartphone,
   library: Clapperboard,

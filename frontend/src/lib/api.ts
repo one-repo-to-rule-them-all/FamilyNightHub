@@ -56,6 +56,11 @@ export type TypedTitle = Schemas["TypedTitleIn"];
 export type PhotoCreated = Schemas["PhotoCreatedOut"];
 export type PinReset = Schemas["PinResetOut"];
 export type AdminAccount = Schemas["AdminAccountOut"];
+export type Game = Schemas["GameOut"];
+export type GameSummary = Schemas["GameSummaryOut"];
+export type JarNote = Schemas["JarNoteOut"];
+export type OwnJarNote = Schemas["OwnNoteOut"];
+export type ModerationNote = Schemas["ModerationNoteOut"];
 export type AccountRole = AdminAccount["role"];
 export type Profile = Schemas["ProfileOut"];
 export type ProfileNight = Schemas["ProfileNightOut"];
@@ -284,6 +289,34 @@ export const api = {
   sseTicket: (sessionId: string) =>
     request<Schemas["SseTicketOut"]>("POST", "/sse-tickets", { session_id: sessionId }),
 
+  // Games (ADR-0018). Reads work for any household viewer; hosting is `sessions:run`.
+  games: () => request<GameSummary[]>("GET", "/games"),
+  game: (gameId: string) => request<Game>("GET", `/games/${encodeURIComponent(gameId)}`),
+  createGame: (body: Schemas["GameCreateIn"]) => request<Game>("POST", "/games", body),
+  endGame: (gameId: string) => request<Game>("POST", `/games/${encodeURIComponent(gameId)}/end`),
+  sseGameTicket: (gameId: string) =>
+    request<Schemas["SseTicketOut"]>("POST", "/sse-tickets", { game_id: gameId }),
+  addJarNote: (gameId: string, body: Schemas["NoteIn"]) =>
+    request<OwnJarNote>("POST", `/games/${encodeURIComponent(gameId)}/jar/notes`, body),
+  myJarNotes: (gameId: string) =>
+    request<OwnJarNote[]>("GET", `/games/${encodeURIComponent(gameId)}/jar/notes/mine`),
+  deleteJarNote: (gameId: string, noteId: string) =>
+    request<void>(
+      "DELETE",
+      `/games/${encodeURIComponent(gameId)}/jar/notes/${encodeURIComponent(noteId)}`,
+    ),
+  jarModeration: (gameId: string) =>
+    request<ModerationNote[]>("GET", `/games/${encodeURIComponent(gameId)}/jar/moderation`),
+  hideJarNote: (gameId: string, noteId: string) =>
+    request<void>(
+      "POST",
+      `/games/${encodeURIComponent(gameId)}/jar/notes/${encodeURIComponent(noteId)}/hide`,
+    ),
+  startJarReveal: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/start-reveal`),
+  jarRevealNext: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/reveal-next`),
+
   // Nights (host + TV screens). Mutations are host-only; reads work for any household viewer.
   createNight: (body: Schemas["SessionCreateIn"]) =>
     request<Schemas["SessionCreatedOut"]>("POST", "/sessions", body),
@@ -482,6 +515,12 @@ export const api = {
   correctWinner: (sessionId: string, body: Schemas["CorrectWinnerIn"]) =>
     request<Night>("POST", `/admin/sessions/${encodeURIComponent(sessionId)}/correct-winner`, body),
 };
+
+/** A game's live stream URL (ADR-0018): the same ticket contract as a night's. */
+export function gameStreamUrl(gameId: string, ticket: string): string {
+  const query = new URLSearchParams({ ticket }).toString();
+  return `${BASE}/games/${encodeURIComponent(gameId)}/stream?${query}`;
+}
 
 /** The live stream URL for `EventSource`: the ticket is the credential (no cookie, no CSRF). */
 export function liveStreamUrl(sessionId: string, ticket: string): string {

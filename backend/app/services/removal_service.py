@@ -172,7 +172,14 @@ async def remove_person(
 
     await run("DELETE FROM photo_reactions WHERE person_id IN :ids")
     keys = await _delete_photos(db, storage, household_id, "person_id = ANY(:ids)", p)
-    for table in ("ratings", "ballot_ranks", "session_attendance", "pin_reset_requests"):
+    for table in (
+        "ratings",
+        "ballot_ranks",
+        "session_attendance",
+        "pin_reset_requests",
+        "gratitude_notes",
+        "game_players",
+    ):
         await run(f"DELETE FROM {table} WHERE person_id IN :ids")
     await run("DELETE FROM device_people WHERE person_id IN :ids")
     await run("UPDATE people SET merged_into_id = NULL WHERE id IN :ids")
@@ -238,6 +245,9 @@ async def start_fresh(
         "ballot_ranks",
         "session_attendance",
         "pin_reset_requests",
+        "gratitude_notes",
+        "game_players",
+        "games",
         "options",
         "sessions",
         "device_people",

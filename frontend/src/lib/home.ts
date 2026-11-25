@@ -18,7 +18,7 @@ export const HOME_COPY = {
     fallback: "Family Night",
     switch: (name: string) => `Switch person, now ${name}`,
   },
-  nav: { home: "Home", history: "History", me: "Me", live: "Movie night is on" },
+  nav: { home: "Home", games: "Games", history: "History", me: "Me", live: "Movie night is on" },
   home: { hi: "Hi," },
   new: "Just started",
   newAnnounce: "A new movie night just started.",
@@ -268,10 +268,11 @@ export function writeStayNight(id: string): void {
 // ---------------------------------------------------------------------------------------------
 // The shell (§5 H0)
 
-export type GuestTab = "home" | "history" | "me";
+export type GuestTab = "home" | "games" | "history" | "me";
 
 export const GUEST_TABS: readonly { key: GuestTab; href: string; label: string }[] = [
   { key: "home", href: "/", label: HOME_COPY.nav.home },
+  { key: "games", href: "/games", label: HOME_COPY.nav.games },
   { key: "history", href: "/history", label: HOME_COPY.nav.history },
   { key: "me", href: "/me", label: HOME_COPY.nav.me },
 ];
@@ -284,6 +285,7 @@ export function activeTab(pathname: string): GuestTab | null {
   if (pathname === "/" || pathname.startsWith("/s/") || pathname.startsWith("/albums/")) {
     return "home";
   }
+  if (pathname === "/games" || pathname.startsWith("/games/")) return "games";
   if (pathname === "/history" || pathname.startsWith("/history/")) return "history";
   if (pathname.startsWith("/people/")) return "history";
   if (pathname === "/me" || pathname.startsWith("/me/")) return "me";

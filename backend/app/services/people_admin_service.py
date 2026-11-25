@@ -308,6 +308,25 @@ async def merge(
     await db.execute(
         text("UPDATE session_attendance SET person_id = :dst WHERE person_id = :src"), params
     )
+    # Games (ADR-0018): notes always move; a roster row is one per (game, person), the
+    # target's wins.
+    await db.execute(
+        text(
+            """
+            DELETE FROM game_players s WHERE s.person_id = :src AND EXISTS (
+                SELECT 1 FROM game_players t
+                WHERE t.person_id = :dst AND t.game_id = s.game_id
+            )
+            """
+        ),
+        params,
+    )
+    await db.execute(
+        text("UPDATE game_players SET person_id = :dst WHERE person_id = :src"), params
+    )
+    await db.execute(
+        text("UPDATE gratitude_notes SET person_id = :dst WHERE person_id = :src"), params
+    )
     photos_moved = await count(
         "UPDATE photos SET person_id = :dst WHERE person_id = :src RETURNING id"
     )

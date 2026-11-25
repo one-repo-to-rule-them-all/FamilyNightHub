@@ -8,7 +8,7 @@ import { useEffect } from "react";
 
 import { POLL_MS } from "@/hooks/use-live-session";
 import { useWakeLock } from "@/hooks/use-wake-lock";
-import { api, type ApiError, type NightSummary } from "@/lib/api";
+import { api, type ApiError, type GameSummary, type NightSummary } from "@/lib/api";
 import { DEVICE_EXPIRED_COPY, isDeviceExpired } from "@/lib/device-idle";
 
 /** Nights the TV should be showing, newest first. A closed night is history, not the TV's job. */
@@ -23,16 +23,30 @@ export function useCurrentNight() {
   });
 }
 
+/** A game being played (a jar mid-reveal, ADR-0018): what /tv shows when there is no night. */
+function useLiveGame() {
+  return useQuery<GameSummary | null, ApiError>({
+    queryKey: ["games", "live"],
+    queryFn: async () => (await api.games()).find((g) => g.status === "live") ?? null,
+    refetchInterval: POLL_MS,
+    refetchIntervalInBackground: true,
+  });
+}
+
 /** /tv: waits for tonight's night and jumps to it; explains pairing to an unpaired browser. */
 export function TvHome() {
   const router = useRouter();
   const current = useCurrentNight();
+  const liveGame = useLiveGame();
   useWakeLock();
 
+  // A live night always wins; with none, a live game (ADR-0018).
   const target = current.data?.id ?? null;
+  const gameTarget = !current.isPending && !target ? (liveGame.data?.id ?? null) : null;
   useEffect(() => {
     if (target) router.replace(`/tv/${target}`);
-  }, [target, router]);
+    else if (gameTarget) router.replace(`/tv/games/${gameTarget}`);
+  }, [target, gameTarget, router]);
 
   if (current.error?.status === 401) {
     // Unused for 30 days (issue #56): the same pairing, said as "again".
@@ -69,7 +83,7 @@ export function TvHome() {
       <Clapperboard aria-hidden className="size-[5em] text-muted-foreground" />
       <h1 className="tv-title">Family Night</h1>
       <p className="tv-body text-muted-foreground" data-testid="tv-waiting">
-        {current.isPending || target
+        {current.isPending || target || gameTarget
           ? "Getting tonight ready…"
           : "Waiting for the host to start a night."}
       </p>

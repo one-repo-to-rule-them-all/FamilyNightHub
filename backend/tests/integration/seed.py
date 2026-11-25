@@ -154,6 +154,26 @@ async def seed_household(tag: str) -> SeededHousehold:
             session_id=ids["session"],
             person_id=ids["person"],
         )
+        ids["game"] = await _insert(
+            s,
+            "games",
+            household_id=hid,
+            kind="gratitude_jar",
+            title="Seed jar",
+            status="open",
+            created_by_account_id=ids["account"],
+        )
+        ids["game_player"] = await _insert(
+            s, "game_players", household_id=hid, game_id=ids["game"], person_id=ids["person"]
+        )
+        ids["gratitude_note"] = await _insert(
+            s,
+            "gratitude_notes",
+            household_id=hid,
+            game_id=ids["game"],
+            person_id=ids["person"],
+            body="Seed note",
+        )
         # ADR-0017: an admin's guardian acceptance of the current versions opens the gate.
         ids["household_consent"] = await _insert(
             s,

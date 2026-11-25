@@ -965,6 +965,231 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Games
+         * @description The household's games, newest first (any device or account).
+         */
+        get: operations["list_games_api_v1_games_get"];
+        put?: never;
+        /**
+         * Create Game
+         * @description Start a game (hosts). Only the Gratitude Jar exists so far.
+         */
+        post: operations["create_game_api_v1_games_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Game
+         * @description The snapshot: revealed notes only, never an anonymous note's author.
+         */
+        get: operations["get_game_api_v1_games__game_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End Game
+         * @description End the game (idempotent).
+         */
+        post: operations["end_game_api_v1_games__game_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/jar/moderation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Moderation
+         * @description Every note with its text, for the host to hide before it shows. No author for an
+         *     anonymous note.
+         */
+        get: operations["moderation_api_v1_games__game_id__jar_moderation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/jar/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Note
+         * @description Drop a note as a person bound to this phone.
+         */
+        post: operations["add_note_api_v1_games__game_id__jar_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/jar/notes/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Notes
+         * @description Notes written by the people this phone is acting as.
+         */
+        get: operations["my_notes_api_v1_games__game_id__jar_notes_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/jar/notes/{note_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Note
+         * @description Take your own note back until it has been shown.
+         */
+        delete: operations["delete_note_api_v1_games__game_id__jar_notes__note_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/jar/notes/{note_id}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hide Note
+         * @description Hide a note from every screen (idempotent).
+         */
+        post: operations["hide_note_api_v1_games__game_id__jar_notes__note_id__hide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/jar/reveal-next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reveal Next
+         * @description Show the next note on the TV.
+         */
+        post: operations["reveal_next_api_v1_games__game_id__jar_reveal_next_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/jar/start-reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Reveal
+         * @description Stop taking notes and fix a shuffled order for the reveal.
+         */
+        post: operations["start_reveal_api_v1_games__game_id__jar_start_reveal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Game
+         * @description The game twin of the night stream (ADR-0018): the same hints-only contract on `game:{id}`.
+         */
+        get: operations["stream_game_api_v1_games__game_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/join": {
         parameters: {
             query?: never;
@@ -1756,8 +1981,8 @@ export interface paths {
         put?: never;
         /**
          * Create Sse Ticket
-         * @description A 60s single-use ticket for this night's live stream. Another household's night
-         *     (or an unknown one) is 404.
+         * @description A 60s single-use ticket for this night's (or, with `game_id`, this game's) live stream.
+         *     Another household's night or game (or an unknown one) is 404.
          */
         post: operations["create_sse_ticket_api_v1_sse_tickets_post"];
         delete?: never;
@@ -2225,6 +2450,74 @@ export interface components {
             /** Is Tv */
             is_tv: boolean;
         };
+        /** GameCreateIn */
+        GameCreateIn: {
+            /**
+             * Allow Anonymous
+             * @default true
+             */
+            allow_anonymous: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "gratitude_jar" | "bingo" | "scattergories";
+            /** Title */
+            title: string;
+        };
+        /** GameOut */
+        GameOut: {
+            /** Allow Anonymous */
+            allow_anonymous: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            jar: components["schemas"]["JarOut"] | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "gratitude_jar" | "bingo" | "scattergories";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "open" | "live" | "ended";
+            /** Title */
+            title: string;
+        };
+        /** GameSummaryOut */
+        GameSummaryOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "gratitude_jar" | "bingo" | "scattergories";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "open" | "live" | "ended";
+            /** Title */
+            title: string;
+        };
         /**
          * GenerateIn
          * @description Roll candidates without adding them. Omit `age_cap` to use the night's cap (else the
@@ -2311,6 +2604,48 @@ export interface components {
             requested_at: string | null;
             /** Requested By */
             requested_by: string | null;
+        };
+        /** JarAuthorOut */
+        JarAuthorOut: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** JarNoteOut */
+        JarNoteOut: {
+            author: components["schemas"]["JarAuthorOut"] | null;
+            /** Body */
+            body: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Revealed At
+             * Format: date-time
+             */
+            revealed_at: string;
+        };
+        /** JarOut */
+        JarOut: {
+            current: components["schemas"]["JarNoteOut"] | null;
+            /** Note Count */
+            note_count: number;
+            /** Remaining */
+            remaining: number;
+            /** Revealed */
+            revealed: components["schemas"]["JarNoteOut"][];
+            /** Revealed Count */
+            revealed_count: number;
         };
         /** JoinIn */
         JoinIn: {
@@ -2420,6 +2755,23 @@ export interface components {
             /** Reactions Moved */
             reactions_moved: number;
         };
+        /** ModerationNoteOut */
+        ModerationNoteOut: {
+            /** Anonymous */
+            anonymous: boolean;
+            author: components["schemas"]["JarAuthorOut"] | null;
+            /** Body */
+            body: string;
+            /** Hidden At */
+            hidden_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Revealed At */
+            revealed_at: string | null;
+        };
         /**
          * MovieFlagsIn
          * @description Only the flags sent are changed.
@@ -2486,6 +2838,21 @@ export interface components {
             turnout: number;
             winner: components["schemas"]["WinnerOut"] | null;
         };
+        /** NoteIn */
+        NoteIn: {
+            /**
+             * Anonymous
+             * @default false
+             */
+            anonymous: boolean;
+            /** Body */
+            body: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
         /**
          * OptionIn
          * @description Exactly one of: a movie already in the library, a TMDB id (upserts the library row),
@@ -2538,6 +2905,25 @@ export interface components {
             person_id: string;
             /** Ranks */
             ranks: components["schemas"]["RankOut"][];
+        };
+        /** OwnNoteOut */
+        OwnNoteOut: {
+            /** Anonymous */
+            anonymous: boolean;
+            /** Body */
+            body: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Revealed */
+            revealed: boolean;
         };
         /** OwnRatingOut */
         OwnRatingOut: {
@@ -3254,11 +3640,10 @@ export interface components {
         };
         /** SseTicketIn */
         SseTicketIn: {
-            /**
-             * Session Id
-             * Format: uuid
-             */
-            session_id: string;
+            /** Game Id */
+            game_id?: string | null;
+            /** Session Id */
+            session_id?: string | null;
         };
         /** SseTicketOut */
         SseTicketOut: {
@@ -5361,6 +5746,469 @@ export interface operations {
             };
             /** @description No pending claim */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_games_api_v1_games_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameSummaryOut"][];
+                };
+            };
+        };
+    };
+    create_game_api_v1_games_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GameCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description That game isn't available yet */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_game_api_v1_games__game_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    end_game_api_v1_games__game_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    moderation_api_v1_games__game_id__jar_moderation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModerationNoteOut"][];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_note_api_v1_games__game_id__jar_notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnNoteOut"];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_notes_api_v1_games__game_id__jar_notes_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnNoteOut"][];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_note_api_v1_games__game_id__jar_notes__note_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hide_note_api_v1_games__game_id__jar_notes__note_id__hide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+                note_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reveal_next_api_v1_games__game_id__jar_reveal_next_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_reveal_api_v1_games__game_id__jar_start_reveal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_game_api_v1_games__game_id__stream_get: {
+        parameters: {
+            query: {
+                ticket: string;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Live hints for the game */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
+                };
+            };
+            /** @description Ticket invalid, expired, already used or for another game */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

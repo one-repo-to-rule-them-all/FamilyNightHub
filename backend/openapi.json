@@ -1027,6 +1027,144 @@
         "title": "EnrollOut",
         "type": "object"
       },
+      "GameCreateIn": {
+        "properties": {
+          "allow_anonymous": {
+            "default": true,
+            "title": "Allow Anonymous",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "gratitude_jar",
+              "bingo",
+              "scattergories"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title"
+        ],
+        "title": "GameCreateIn",
+        "type": "object"
+      },
+      "GameOut": {
+        "properties": {
+          "allow_anonymous": {
+            "title": "Allow Anonymous",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "jar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JarOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "enum": [
+              "gratitude_jar",
+              "bingo",
+              "scattergories"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "open",
+              "live",
+              "ended"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "status",
+          "created_at",
+          "allow_anonymous",
+          "jar"
+        ],
+        "title": "GameOut",
+        "type": "object"
+      },
+      "GameSummaryOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "gratitude_jar",
+              "bingo",
+              "scattergories"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "open",
+              "live",
+              "ended"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "status",
+          "created_at"
+        ],
+        "title": "GameSummaryOut",
+        "type": "object"
+      },
       "GenerateIn": {
         "description": "Roll candidates without adding them. Omit `age_cap` to use the night's cap (else the\nhousehold default); send `age_cap: null` for no cap tonight.",
         "properties": {
@@ -1302,6 +1440,113 @@
         "title": "HouseholdDeletionOut",
         "type": "object"
       },
+      "JarAuthorOut": {
+        "properties": {
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "name",
+          "avatar_emoji",
+          "color"
+        ],
+        "title": "JarAuthorOut",
+        "type": "object"
+      },
+      "JarNoteOut": {
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JarAuthorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "revealed_at": {
+            "format": "date-time",
+            "title": "Revealed At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "body",
+          "author",
+          "revealed_at"
+        ],
+        "title": "JarNoteOut",
+        "type": "object"
+      },
+      "JarOut": {
+        "properties": {
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JarNoteOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note_count": {
+            "title": "Note Count",
+            "type": "integer"
+          },
+          "remaining": {
+            "title": "Remaining",
+            "type": "integer"
+          },
+          "revealed": {
+            "items": {
+              "$ref": "#/components/schemas/JarNoteOut"
+            },
+            "title": "Revealed",
+            "type": "array"
+          },
+          "revealed_count": {
+            "title": "Revealed Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "note_count",
+          "revealed_count",
+          "remaining",
+          "current",
+          "revealed"
+        ],
+        "title": "JarOut",
+        "type": "object"
+      },
       "JoinIn": {
         "properties": {
           "device_label": {
@@ -1545,6 +1790,67 @@
         "title": "MergeOut",
         "type": "object"
       },
+      "ModerationNoteOut": {
+        "properties": {
+          "anonymous": {
+            "title": "Anonymous",
+            "type": "boolean"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JarAuthorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "hidden_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hidden At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "revealed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revealed At"
+          }
+        },
+        "required": [
+          "id",
+          "body",
+          "anonymous",
+          "author",
+          "revealed_at",
+          "hidden_at"
+        ],
+        "title": "ModerationNoteOut",
+        "type": "object"
+      },
       "MovieFlagsIn": {
         "description": "Only the flags sent are changed.",
         "properties": {
@@ -1745,6 +2051,32 @@
         "title": "NightSummaryOut",
         "type": "object"
       },
+      "NoteIn": {
+        "properties": {
+          "anonymous": {
+            "default": false,
+            "title": "Anonymous",
+            "type": "boolean"
+          },
+          "body": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "body"
+        ],
+        "title": "NoteIn",
+        "type": "object"
+      },
       "OptionIn": {
         "description": "Exactly one of: a movie already in the library, a TMDB id (upserts the library row),\nor a typed title (for when TMDB is off or doesn't have it).",
         "properties": {
@@ -1902,6 +2234,41 @@
           "ranks"
         ],
         "title": "OwnBallotOut",
+        "type": "object"
+      },
+      "OwnNoteOut": {
+        "properties": {
+          "anonymous": {
+            "title": "Anonymous",
+            "type": "boolean"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "revealed": {
+            "title": "Revealed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "person_id",
+          "body",
+          "anonymous",
+          "revealed"
+        ],
+        "title": "OwnNoteOut",
         "type": "object"
       },
       "OwnRatingOut": {
@@ -3683,15 +4050,31 @@
       },
       "SseTicketIn": {
         "properties": {
+          "game_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Id"
+          },
           "session_id": {
-            "format": "uuid",
-            "title": "Session Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
           }
         },
-        "required": [
-          "session_id"
-        ],
         "title": "SseTicketIn",
         "type": "object"
       },
@@ -6361,6 +6744,577 @@
         ]
       }
     },
+    "/api/v1/games": {
+      "get": {
+        "description": "The household's games, newest first (any device or account).",
+        "operationId": "list_games_api_v1_games_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GameSummaryOut"
+                  },
+                  "title": "Response List Games Api V1 Games Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Games",
+        "tags": [
+          "games"
+        ]
+      },
+      "post": {
+        "description": "Start a game (hosts). Only the Gratitude Jar exists so far.",
+        "operationId": "create_game_api_v1_games_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "That game isn't available yet"
+          }
+        },
+        "summary": "Create Game",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}": {
+      "get": {
+        "description": "The snapshot: revealed notes only, never an anonymous note's author.",
+        "operationId": "get_game_api_v1_games__game_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Game",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/end": {
+      "post": {
+        "description": "End the game (idempotent).",
+        "operationId": "end_game_api_v1_games__game_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End Game",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/jar/moderation": {
+      "get": {
+        "description": "Every note with its text, for the host to hide before it shows. No author for an\nanonymous note.",
+        "operationId": "moderation_api_v1_games__game_id__jar_moderation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ModerationNoteOut"
+                  },
+                  "title": "Response Moderation Api V1 Games  Game Id  Jar Moderation Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Moderation",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/jar/notes": {
+      "post": {
+        "description": "Drop a note as a person bound to this phone.",
+        "operationId": "add_note_api_v1_games__game_id__jar_notes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnNoteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't acting as that person, or consent is needed"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Note",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/jar/notes/mine": {
+      "get": {
+        "description": "Notes written by the people this phone is acting as.",
+        "operationId": "my_notes_api_v1_games__game_id__jar_notes_mine_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OwnNoteOut"
+                  },
+                  "title": "Response My Notes Api V1 Games  Game Id  Jar Notes Mine Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Notes",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/jar/notes/{note_id}": {
+      "delete": {
+        "description": "Take your own note back until it has been shown.",
+        "operationId": "delete_note_api_v1_games__game_id__jar_notes__note_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Note Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Note",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/jar/notes/{note_id}/hide": {
+      "post": {
+        "description": "Hide a note from every screen (idempotent).",
+        "operationId": "hide_note_api_v1_games__game_id__jar_notes__note_id__hide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "note_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Note Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hide Note",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/jar/reveal-next": {
+      "post": {
+        "description": "Show the next note on the TV.",
+        "operationId": "reveal_next_api_v1_games__game_id__jar_reveal_next_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reveal Next",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/jar/start-reveal": {
+      "post": {
+        "description": "Stop taking notes and fix a shuffled order for the reveal.",
+        "operationId": "start_reveal_api_v1_games__game_id__jar_start_reveal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Reveal",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/stream": {
+      "get": {
+        "description": "The game twin of the night stream (ADR-0018): the same hints-only contract on `game:{id}`.",
+        "operationId": "stream_game_api_v1_games__game_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "title": "Ticket",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Live hints for the game"
+          },
+          "401": {
+            "description": "Ticket invalid, expired, already used or for another game"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Game",
+        "tags": [
+          "live"
+        ]
+      }
+    },
     "/api/v1/join": {
       "post": {
         "operationId": "join_api_v1_join_post",
@@ -8535,7 +9489,7 @@
     },
     "/api/v1/sse-tickets": {
       "post": {
-        "description": "A 60s single-use ticket for this night's live stream. Another household's night\n(or an unknown one) is 404.",
+        "description": "A 60s single-use ticket for this night's (or, with `game_id`, this game's) live stream.\nAnother household's night or game (or an unknown one) is 404.",
         "operationId": "create_sse_ticket_api_v1_sse_tickets_post",
         "requestBody": {
           "content": {

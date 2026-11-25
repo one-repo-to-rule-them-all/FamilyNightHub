@@ -1,10 +1,15 @@
-import { History, House, type LucideIcon, Smile } from "lucide-react";
+import { Gamepad2, History, House, type LucideIcon, Smile } from "lucide-react";
 import Link from "next/link";
 
 import { GUEST_TABS, type GuestTab, HOME_COPY } from "@/lib/home";
 import { cn } from "@/lib/utils";
 
-const ICONS: Record<GuestTab, LucideIcon> = { home: House, history: History, me: Smile };
+const ICONS: Record<GuestTab, LucideIcon> = {
+  home: House,
+  games: Gamepad2,
+  history: History,
+  me: Smile,
+};
 
 /**
  * The guest bottom nav (guest-home §4 rule 2, §5 H0): Home, History, Me as links styled as nav,
