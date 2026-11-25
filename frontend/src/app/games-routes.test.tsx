@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({ resolveGame: (kind: string): void => void kind
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   api: {
+    tvTarget: vi.fn(async () => ({ game_id: null })),
     game: vi.fn(
       () =>
         new Promise<{ kind: string }>((resolve) => {
@@ -20,6 +21,8 @@ vi.mock("@/lib/api", async (importOriginal) => ({
     ),
   },
 }));
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 
 function marker(name: string) {
   function Marker() {

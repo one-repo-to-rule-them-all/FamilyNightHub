@@ -1,0 +1,19 @@
+{
+  "note": "Shared by backend/tests/unit/test_games_jar.py and frontend/src/lib/jar-cycle.test.ts. Times are seconds.",
+  "cases": [
+    { "now": 100, "anchor": 100, "dwell": 12, "count": 5, "paused": null, "expected": 0 },
+    { "now": 111.9, "anchor": 100, "dwell": 12, "count": 5, "paused": null, "expected": 0 },
+    { "now": 112, "anchor": 100, "dwell": 12, "count": 5, "paused": null, "expected": 1 },
+    { "now": 159.9, "anchor": 100, "dwell": 12, "count": 5, "paused": null, "expected": 4 },
+    { "now": 160, "anchor": 100, "dwell": 12, "count": 5, "paused": null, "expected": 0 },
+    { "now": 172, "anchor": 100, "dwell": 12, "count": 5, "paused": null, "expected": 1 },
+    { "now": 90, "anchor": 100, "dwell": 12, "count": 5, "paused": null, "expected": 0 },
+    { "now": 10000, "anchor": 100, "dwell": 5, "count": 1, "paused": null, "expected": 0 },
+    { "now": 1000, "anchor": 100, "dwell": 60, "count": 3, "paused": null, "expected": 0 },
+    { "now": 1000, "anchor": 100, "dwell": 5, "count": 7, "paused": null, "expected": 5 },
+    { "now": 1000, "anchor": 100, "dwell": 12, "count": 5, "paused": 3, "expected": 3 },
+    { "now": 1000, "anchor": 100, "dwell": 12, "count": 5, "paused": 0, "expected": 0 },
+    { "now": 1000, "anchor": 100, "dwell": 12, "count": 5, "paused": 9, "expected": 4 },
+    { "now": 1000, "anchor": 100, "dwell": 12, "count": 0, "paused": null, "expected": 0 }
+  ]
+}

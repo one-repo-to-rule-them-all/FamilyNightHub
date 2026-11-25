@@ -26,6 +26,12 @@ class GameCreateIn(BaseModel):
     win_mode: Literal["line", "blackout"] = "line"
     free_center: bool = True
     end_on_first_win: bool = True
+    # Bingo mode: Thanksgiving (honour-system marks, the API default) or classic (host-called
+    # numbers). Fixed at creation.
+    mode: Literal["thanksgiving", "classic"] = "thanksgiving"
+    # Gratitude Jar: cycle notes by themselves once started, or show them one by one.
+    reveal_mode: Literal["cycle", "manual"] = "cycle"
+    cycle_seconds: int = Field(default=12, ge=5, le=60)
 
 
 class JarAuthorOut(BaseModel):
@@ -43,12 +49,27 @@ class JarNoteOut(BaseModel):
     revealed_at: datetime
 
 
+class JarCycleOut(BaseModel):
+    """Everything a screen needs to find the note on show with no tick events: the index is
+    `floor((now + (server_now - Date.now()) - anchor_at) / dwell_seconds) mod count`, or
+    `paused_index` while paused."""
+
+    anchor_at: datetime
+    server_now: datetime
+    dwell_seconds: int
+    paused_index: int | None
+
+
 class JarOut(BaseModel):
+    mode: Literal["cycle", "manual"] = "manual"
+    # Null for a manual jar, or a cycle jar that has not started.
+    cycle: JarCycleOut | None = None
     note_count: int
     revealed_count: int
     remaining: int
-    # The note on screen now (the latest one revealed), if any.
+    # Manual: the note on screen now (the latest one revealed), if any. Null in cycle mode.
     current: JarNoteOut | None
+    # The notes on show, in `reveal_position` order (the cycle order in cycle mode).
     revealed: list[JarNoteOut]
 
 
@@ -72,7 +93,18 @@ class BingoPlayerOut(BaseModel):
     finish_place: int | None
 
 
+class BingoCallOut(BaseModel):
+    seq: int
+    value: int
+    # "B7", "G52".
+    label: str
+
+
 class BingoOut(BaseModel):
+    mode: Literal["thanksgiving", "classic"] = "thanksgiving"
+    # Classic only: the numbers called so far, in call order. Never a future call.
+    calls: list[BingoCallOut] = []
+    last_call: BingoCallOut | None = None
     win_mode: Literal["line", "blackout"]
     free_center: bool
     end_on_first_win: bool
@@ -88,6 +120,24 @@ class GameOut(GameSummaryOut):
 
 class BingoJoinIn(BaseModel):
     person_id: uuid.UUID
+
+
+class BingoDrawIn(BaseModel):
+    # How many calls the host's screen showed; a different server count is 409.
+    expected_seq: int = Field(ge=0, le=75)
+
+
+class BingoCheckIn(BaseModel):
+    person_id: uuid.UUID
+
+
+class BingoCheckOut(BaseModel):
+    valid: bool
+    win_mode: Literal["line", "blackout"]
+    # Indices of the first complete line (or all 25) when valid, else null.
+    pattern: list[int] | None
+    # Squares still to be called in the closest pattern (0 when valid).
+    missing: int
 
 
 class BingoCardOut(BaseModel):
@@ -229,4 +279,50 @@ class ScatterVerdictIn(BaseModel):
     verdict: Verdict | None
 
 
+ScatterReviewKind = Literal[
+    "near_duplicate", "short", "duplicate", "auto_rejected_letter", "host_rejected"
+]
+
+
+class ScatterReviewAnswerOut(BaseModel):
+    answer_id: uuid.UUID
+    person_id: uuid.UUID
+    name: str
+    text: str
+    verdict: Verdict | None
+    points: int
+
+
+class ScatterReviewItemOut(BaseModel):
+    kind: ScatterReviewKind
+    category_index: int
+    category: str
+    # True when the plural rule merged these answers (both 0 until the host counts them
+    # separately); false for a typo match, which scores as written.
+    merged: bool
+    answers: list[ScatterReviewAnswerOut]
+
+
+class ScatterReviewOut(BaseModel):
+    """What a revealed round needs from the host (ADR-0018 amendment, part C). Computed from
+    the same rows as scoring and never stored."""
+
+    round_no: int
+    letter: str
+    needs_decision: list[ScatterReviewItemOut]
+    informational: list[ScatterReviewItemOut]
+    auto_accepted_count: int
+    total: int
+
+
 GameOut.model_rebuild()
+
+
+class TvTargetOut(BaseModel):
+    """The game the host sent to the paired TV; null when none (or it ended)."""
+
+    game_id: uuid.UUID | None
+
+
+class TvTargetIn(BaseModel):
+    game_id: uuid.UUID | None = None

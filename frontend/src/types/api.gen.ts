@@ -989,6 +989,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/tv-target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tv Target
+         * @description The game a host sent to the paired TV, if any (any device or account). The TV polls
+         *     this snapshot and follows it; there is no event to miss.
+         */
+        get: operations["get_tv_target_api_v1_games_tv_target_get"];
+        /**
+         * Put Tv Target
+         * @description Show a game on the paired TV, or (null) send the TV back to its QR home (hosts).
+         */
+        put: operations["put_tv_target_api_v1_games_tv_target_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}": {
         parameters: {
             query?: never;
@@ -1003,6 +1028,48 @@ export interface paths {
         get: operations["get_game_api_v1_games__game_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/bingo/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Bingo
+         * @description Verify a player's spoken "bingo" against the called numbers (hosts). A false claim
+         *     changes nothing; a true one records the win and, by config, ends the game.
+         */
+        post: operations["check_bingo_api_v1_games__game_id__bingo_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/bingo/draw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Draw Number
+         * @description Call the next number (hosts). `expected_seq` is the count the host's screen showed; a
+         *     different count is 409 so a double tap or a second window cannot draw twice.
+         */
+        post: operations["draw_number_api_v1_games__game_id__bingo_draw_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1039,7 +1106,8 @@ export interface paths {
         get?: never;
         /**
          * Mark Square
-         * @description Mark a square on your own card. The mark that completes the pattern is the win.
+         * @description Mark a square on your own card. Thanksgiving: the mark that completes the pattern is the
+         *     win. Classic: only a called number can be marked (409), and only a host check wins.
          */
         put: operations["mark_square_api_v1_games__game_id__bingo_mark__index__put"];
         post?: never;
@@ -1194,6 +1262,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/jar/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause Jar
+         * @description Hold the note on show (cycling jars; pausing a paused jar is a no-op).
+         */
+        post: operations["pause_jar_api_v1_games__game_id__jar_pause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/jar/reshuffle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reshuffle Jar
+         * @description A new grouped order, starting again from its first note.
+         */
+        post: operations["reshuffle_jar_api_v1_games__game_id__jar_reshuffle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/jar/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Jar
+         * @description Carry on cycling; the held note gets a full turn (resuming a running jar is a no-op).
+         */
+        post: operations["resume_jar_api_v1_games__game_id__jar_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}/jar/reveal-next": {
         parameters: {
             query?: never;
@@ -1205,7 +1333,7 @@ export interface paths {
         put?: never;
         /**
          * Reveal Next
-         * @description Show the next note on the TV.
+         * @description Show the next note on the TV (manual jars only; a cycling jar is 409).
          */
         post: operations["reveal_next_api_v1_games__game_id__jar_reveal_next_post"];
         delete?: never;
@@ -1245,7 +1373,7 @@ export interface paths {
         put?: never;
         /**
          * Open Game
-         * @description Let the family join (draft to open).
+         * @description Let the family join (draft to open). A classic game fixes its draw seed here.
          */
         post: operations["open_game_api_v1_games__game_id__open_post"];
         delete?: never;
@@ -1388,6 +1516,27 @@ export interface paths {
          * @description Start the next round: a random letter, the given (or drawn) categories, a duration.
          */
         post: operations["start_round_api_v1_games__game_id__scatter_rounds_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/scatter/rounds/{round_no}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Review
+         * @description Only the answers that need a decision: near-duplicates and very short answers, with
+         *     wrong letters and exact duplicates as information. Everything else counts automatically.
+         */
+        get: operations["review_api_v1_games__game_id__scatter_rounds__round_no__review_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2482,6 +2631,15 @@ export interface components {
              */
             status: "active" | "pending";
         };
+        /** BingoCallOut */
+        BingoCallOut: {
+            /** Label */
+            label: string;
+            /** Seq */
+            seq: number;
+            /** Value */
+            value: number;
+        };
         /** BingoCardOut */
         BingoCardOut: {
             /** Finish Place */
@@ -2500,6 +2658,33 @@ export interface components {
             /** Won */
             won: boolean;
         };
+        /** BingoCheckIn */
+        BingoCheckIn: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** BingoCheckOut */
+        BingoCheckOut: {
+            /** Missing */
+            missing: number;
+            /** Pattern */
+            pattern: number[] | null;
+            /** Valid */
+            valid: boolean;
+            /**
+             * Win Mode
+             * @enum {string}
+             */
+            win_mode: "line" | "blackout";
+        };
+        /** BingoDrawIn */
+        BingoDrawIn: {
+            /** Expected Seq */
+            expected_seq: number;
+        };
         /** BingoJoinIn */
         BingoJoinIn: {
             /**
@@ -2510,10 +2695,22 @@ export interface components {
         };
         /** BingoOut */
         BingoOut: {
+            /**
+             * Calls
+             * @default []
+             */
+            calls: components["schemas"]["BingoCallOut"][];
             /** End On First Win */
             end_on_first_win: boolean;
             /** Free Center */
             free_center: boolean;
+            last_call?: components["schemas"]["BingoCallOut"] | null;
+            /**
+             * Mode
+             * @default thanksgiving
+             * @enum {string}
+             */
+            mode: "thanksgiving" | "classic";
             /** Players */
             players: components["schemas"]["BingoPlayerOut"][];
             /**
@@ -2762,6 +2959,11 @@ export interface components {
              */
             allow_anonymous: boolean;
             /**
+             * Cycle Seconds
+             * @default 12
+             */
+            cycle_seconds: number;
+            /**
              * End On First Win
              * @default true
              */
@@ -2776,6 +2978,18 @@ export interface components {
              * @enum {string}
              */
             kind: "gratitude_jar" | "bingo" | "scattergories";
+            /**
+             * Mode
+             * @default thanksgiving
+             * @enum {string}
+             */
+            mode: "thanksgiving" | "classic";
+            /**
+             * Reveal Mode
+             * @default cycle
+             * @enum {string}
+             */
+            reveal_mode: "cycle" | "manual";
             /** Title */
             title: string;
             /**
@@ -2941,6 +3155,28 @@ export interface components {
              */
             person_id: string;
         };
+        /**
+         * JarCycleOut
+         * @description Everything a screen needs to find the note on show with no tick events: the index is
+         *     `floor((now + (server_now - Date.now()) - anchor_at) / dwell_seconds) mod count`, or
+         *     `paused_index` while paused.
+         */
+        JarCycleOut: {
+            /**
+             * Anchor At
+             * Format: date-time
+             */
+            anchor_at: string;
+            /** Dwell Seconds */
+            dwell_seconds: number;
+            /** Paused Index */
+            paused_index: number | null;
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
+        };
         /** JarNoteOut */
         JarNoteOut: {
             author: components["schemas"]["JarAuthorOut"] | null;
@@ -2960,6 +3196,13 @@ export interface components {
         /** JarOut */
         JarOut: {
             current: components["schemas"]["JarNoteOut"] | null;
+            cycle?: components["schemas"]["JarCycleOut"] | null;
+            /**
+             * Mode
+             * @default manual
+             * @enum {string}
+             */
+            mode: "cycle" | "manual";
             /** Note Count */
             note_count: number;
             /** Remaining */
@@ -3921,6 +4164,62 @@ export interface components {
             /** Scores */
             scores: components["schemas"]["ScatterScoreOut"][];
         };
+        /** ScatterReviewAnswerOut */
+        ScatterReviewAnswerOut: {
+            /**
+             * Answer Id
+             * Format: uuid
+             */
+            answer_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Points */
+            points: number;
+            /** Text */
+            text: string;
+            /** Verdict */
+            verdict: ("accepted" | "rejected") | null;
+        };
+        /** ScatterReviewItemOut */
+        ScatterReviewItemOut: {
+            /** Answers */
+            answers: components["schemas"]["ScatterReviewAnswerOut"][];
+            /** Category */
+            category: string;
+            /** Category Index */
+            category_index: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "near_duplicate" | "short" | "duplicate" | "auto_rejected_letter" | "host_rejected";
+            /** Merged */
+            merged: boolean;
+        };
+        /**
+         * ScatterReviewOut
+         * @description What a revealed round needs from the host (ADR-0018 amendment, part C). Computed from
+         *     the same rows as scoring and never stored.
+         */
+        ScatterReviewOut: {
+            /** Auto Accepted Count */
+            auto_accepted_count: number;
+            /** Informational */
+            informational: components["schemas"]["ScatterReviewItemOut"][];
+            /** Letter */
+            letter: string;
+            /** Needs Decision */
+            needs_decision: components["schemas"]["ScatterReviewItemOut"][];
+            /** Round No */
+            round_no: number;
+            /** Total */
+            total: number;
+        };
         /** ScatterRoundIn */
         ScatterRoundIn: {
             /** Categories */
@@ -4178,6 +4477,19 @@ export interface components {
             tmdb_id: number;
             /** Year */
             year: number | null;
+        };
+        /** TvTargetIn */
+        TvTargetIn: {
+            /** Game Id */
+            game_id?: string | null;
+        };
+        /**
+         * TvTargetOut
+         * @description The game the host sent to the paired TV; null when none (or it ended).
+         */
+        TvTargetOut: {
+            /** Game Id */
+            game_id: string | null;
         };
         /** TypedTitleIn */
         TypedTitleIn: {
@@ -6313,6 +6625,73 @@ export interface operations {
             };
         };
     };
+    get_tv_target_api_v1_games_tv_target_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvTargetOut"];
+                };
+            };
+        };
+    };
+    put_tv_target_api_v1_games_tv_target_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TvTargetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TvTargetOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_game_api_v1_games__game_id__get: {
         parameters: {
             query?: never;
@@ -6335,6 +6714,104 @@ export interface operations {
             };
             /** @description No such night (or option/movie) in this household */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_bingo_api_v1_games__game_id__bingo_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BingoCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BingoCheckOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draw_number_api_v1_games__game_id__bingo_draw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BingoDrawIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6783,6 +7260,141 @@ export interface operations {
             };
             /** @description No such night (or option/movie) in this household */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_jar_api_v1_games__game_id__jar_pause_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reshuffle_jar_api_v1_games__game_id__jar_reshuffle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_jar_api_v1_games__game_id__jar_resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7259,6 +7871,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    review_api_v1_games__game_id__scatter_rounds__round_no__review_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+                round_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScatterReviewOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The round is not revealed yet */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

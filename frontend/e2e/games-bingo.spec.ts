@@ -24,10 +24,17 @@ test.describe("thanksgiving bingo", () => {
     // Host: create the round (a draft) and open it for players.
     const hostContext = await browser.newContext({ baseURL: origin });
     await signInAsHost(hostContext, night, origin);
-    const host = await hostContext.newPage();
-    await host.goto("/host/games");
-    await host.getByTestId("bingo-title").fill("E2E bingo");
-    await host.getByTestId("create-bingo").click();
+    const hub = await hostContext.newPage();
+    await hub.goto("/host/games");
+    await hub.getByTestId("bingo-title").fill("E2E bingo");
+    // The form preselects classic this year; this spec plays the Thanksgiving mode.
+    await hub.getByTestId("bingo-mode-thanksgiving").check();
+    // Creating a game opens its control page in a new tab; the hub tab stays put.
+    const [host] = await Promise.all([
+      hub.waitForEvent("popup"),
+      hub.getByTestId("create-bingo").click(),
+    ]);
+    await expect(hub).toHaveURL(/\/host\/games$/);
     await expect(host).toHaveURL(/\/host\/games\/[0-9a-f-]{36}$/);
     const gameId = host.url().split("/").pop()!;
     const hostGame = host.getByTestId("host-game");

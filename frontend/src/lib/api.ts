@@ -63,10 +63,13 @@ export type OwnJarNote = Schemas["OwnNoteOut"];
 export type ModerationNote = Schemas["ModerationNoteOut"];
 export type BingoCard = Schemas["BingoCardOut"];
 export type BingoPlayer = Schemas["BingoPlayerOut"];
+export type BingoCheckResult = Schemas["BingoCheckOut"];
 export type ScatterState = Schemas["ScatterOut"];
 export type ScatterRevealed = Schemas["ScatterRevealedOut"];
 export type ScatterAnswer = Schemas["ScatterAnswerOut"];
 export type OwnScatterAnswer = Schemas["ScatterOwnAnswerOut"];
+export type ScatterReview = Schemas["ScatterReviewOut"];
+export type ScatterReviewItem = Schemas["ScatterReviewItemOut"];
 export type AccountRole = AdminAccount["role"];
 export type Profile = Schemas["ProfileOut"];
 export type ProfileNight = Schemas["ProfileNightOut"];
@@ -301,6 +304,11 @@ export const api = {
   createGame: (
     body: Pick<Schemas["GameCreateIn"], "kind" | "title"> & Partial<Schemas["GameCreateIn"]>,
   ) => request<Game>("POST", "/games", body),
+  /** The game a host sent to the paired TV (null: none). Any device or account reads it. */
+  tvTarget: () => request<Schemas["TvTargetOut"]>("GET", "/games/tv-target"),
+  /** Hosts: show a game on the paired TV, or null to send it back to the QR home. */
+  setTvTarget: (gameId: string | null) =>
+    request<Schemas["TvTargetOut"]>("PUT", "/games/tv-target", { game_id: gameId }),
   endGame: (gameId: string) => request<Game>("POST", `/games/${encodeURIComponent(gameId)}/end`),
   sseGameTicket: (gameId: string) =>
     request<Schemas["SseTicketOut"]>("POST", "/sse-tickets", { game_id: gameId }),
@@ -322,6 +330,12 @@ export const api = {
     ),
   startJarReveal: (gameId: string) =>
     request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/start-reveal`),
+  pauseJar: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/pause`),
+  resumeJar: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/resume`),
+  reshuffleJar: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/reshuffle`),
   jarRevealNext: (gameId: string) =>
     request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/reveal-next`),
   openGame: (gameId: string) => request<Game>("POST", `/games/${encodeURIComponent(gameId)}/open`),
@@ -339,6 +353,17 @@ export const api = {
       `/games/${encodeURIComponent(gameId)}/bingo/mark/${index}?person_id=${encodeURIComponent(personId)}`,
     ),
 
+  // Classic bingo (hosts): call the next number (`expectedSeq` is the count the screen showed)
+  // and check a spoken "bingo" against the called numbers.
+  drawBingo: (gameId: string, expectedSeq: number) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/bingo/draw`, {
+      expected_seq: expectedSeq,
+    }),
+  checkBingo: (gameId: string, personId: string) =>
+    request<BingoCheckResult>("POST", `/games/${encodeURIComponent(gameId)}/bingo/check`, {
+      person_id: personId,
+    }),
+
   // Scattergories (ADR-0018 slice C). The timer is `ends_at` + `server_now` on the snapshot.
   scatterDraw: (gameId: string, count: number) =>
     request<Schemas["ScatterDrawOut"]>(
@@ -349,6 +374,11 @@ export const api = {
     request<Game>("POST", `/games/${encodeURIComponent(gameId)}/scatter/rounds`, body),
   revealScatter: (gameId: string) =>
     request<Game>("POST", `/games/${encodeURIComponent(gameId)}/scatter/reveal`),
+  scatterReview: (gameId: string, roundNo: number) =>
+    request<ScatterReview>(
+      "GET",
+      `/games/${encodeURIComponent(gameId)}/scatter/rounds/${roundNo}/review`,
+    ),
   setScatterVerdict: (gameId: string, answerId: string, verdict: "accepted" | "rejected" | null) =>
     request<Game>(
       "PUT",

@@ -483,6 +483,29 @@
         "title": "BindingOut",
         "type": "object"
       },
+      "BingoCallOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "value": {
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq",
+          "value",
+          "label"
+        ],
+        "title": "BingoCallOut",
+        "type": "object"
+      },
       "BingoCardOut": {
         "properties": {
           "finish_place": {
@@ -535,6 +558,77 @@
         "title": "BingoCardOut",
         "type": "object"
       },
+      "BingoCheckIn": {
+        "properties": {
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id"
+        ],
+        "title": "BingoCheckIn",
+        "type": "object"
+      },
+      "BingoCheckOut": {
+        "properties": {
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "pattern": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pattern"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          },
+          "win_mode": {
+            "enum": [
+              "line",
+              "blackout"
+            ],
+            "title": "Win Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "valid",
+          "win_mode",
+          "pattern",
+          "missing"
+        ],
+        "title": "BingoCheckOut",
+        "type": "object"
+      },
+      "BingoDrawIn": {
+        "properties": {
+          "expected_seq": {
+            "maximum": 75.0,
+            "minimum": 0.0,
+            "title": "Expected Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_seq"
+        ],
+        "title": "BingoDrawIn",
+        "type": "object"
+      },
       "BingoJoinIn": {
         "properties": {
           "person_id": {
@@ -551,6 +645,14 @@
       },
       "BingoOut": {
         "properties": {
+          "calls": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/BingoCallOut"
+            },
+            "title": "Calls",
+            "type": "array"
+          },
           "end_on_first_win": {
             "title": "End On First Win",
             "type": "boolean"
@@ -558,6 +660,25 @@
           "free_center": {
             "title": "Free Center",
             "type": "boolean"
+          },
+          "last_call": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BingoCallOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode": {
+            "default": "thanksgiving",
+            "enum": [
+              "thanksgiving",
+              "classic"
+            ],
+            "title": "Mode",
+            "type": "string"
           },
           "players": {
             "items": {
@@ -1186,6 +1307,13 @@
             "title": "Allow Anonymous",
             "type": "boolean"
           },
+          "cycle_seconds": {
+            "default": 12,
+            "maximum": 60.0,
+            "minimum": 5.0,
+            "title": "Cycle Seconds",
+            "type": "integer"
+          },
           "end_on_first_win": {
             "default": true,
             "title": "End On First Win",
@@ -1203,6 +1331,24 @@
               "scattergories"
             ],
             "title": "Kind",
+            "type": "string"
+          },
+          "mode": {
+            "default": "thanksgiving",
+            "enum": [
+              "thanksgiving",
+              "classic"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "reveal_mode": {
+            "default": "cycle",
+            "enum": [
+              "cycle",
+              "manual"
+            ],
+            "title": "Reveal Mode",
             "type": "string"
           },
           "title": {
@@ -1660,6 +1806,44 @@
         "title": "JarAuthorOut",
         "type": "object"
       },
+      "JarCycleOut": {
+        "description": "Everything a screen needs to find the note on show with no tick events: the index is\n`floor((now + (server_now - Date.now()) - anchor_at) / dwell_seconds) mod count`, or\n`paused_index` while paused.",
+        "properties": {
+          "anchor_at": {
+            "format": "date-time",
+            "title": "Anchor At",
+            "type": "string"
+          },
+          "dwell_seconds": {
+            "title": "Dwell Seconds",
+            "type": "integer"
+          },
+          "paused_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Index"
+          },
+          "server_now": {
+            "format": "date-time",
+            "title": "Server Now",
+            "type": "string"
+          }
+        },
+        "required": [
+          "anchor_at",
+          "server_now",
+          "dwell_seconds",
+          "paused_index"
+        ],
+        "title": "JarCycleOut",
+        "type": "object"
+      },
       "JarNoteOut": {
         "properties": {
           "author": {
@@ -1707,6 +1891,25 @@
                 "type": "null"
               }
             ]
+          },
+          "cycle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JarCycleOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode": {
+            "default": "manual",
+            "enum": [
+              "cycle",
+              "manual"
+            ],
+            "title": "Mode",
+            "type": "string"
           },
           "note_count": {
             "title": "Note Count",
@@ -4058,6 +4261,145 @@
         "title": "ScatterRevealedOut",
         "type": "object"
       },
+      "ScatterReviewAnswerOut": {
+        "properties": {
+          "answer_id": {
+            "format": "uuid",
+            "title": "Answer Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "enum": [
+                  "accepted",
+                  "rejected"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict"
+          }
+        },
+        "required": [
+          "answer_id",
+          "person_id",
+          "name",
+          "text",
+          "verdict",
+          "points"
+        ],
+        "title": "ScatterReviewAnswerOut",
+        "type": "object"
+      },
+      "ScatterReviewItemOut": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/ScatterReviewAnswerOut"
+            },
+            "title": "Answers",
+            "type": "array"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "category_index": {
+            "title": "Category Index",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "near_duplicate",
+              "short",
+              "duplicate",
+              "auto_rejected_letter",
+              "host_rejected"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "merged": {
+            "title": "Merged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "category_index",
+          "category",
+          "merged",
+          "answers"
+        ],
+        "title": "ScatterReviewItemOut",
+        "type": "object"
+      },
+      "ScatterReviewOut": {
+        "description": "What a revealed round needs from the host (ADR-0018 amendment, part C). Computed from\nthe same rows as scoring and never stored.",
+        "properties": {
+          "auto_accepted_count": {
+            "title": "Auto Accepted Count",
+            "type": "integer"
+          },
+          "informational": {
+            "items": {
+              "$ref": "#/components/schemas/ScatterReviewItemOut"
+            },
+            "title": "Informational",
+            "type": "array"
+          },
+          "letter": {
+            "title": "Letter",
+            "type": "string"
+          },
+          "needs_decision": {
+            "items": {
+              "$ref": "#/components/schemas/ScatterReviewItemOut"
+            },
+            "title": "Needs Decision",
+            "type": "array"
+          },
+          "round_no": {
+            "title": "Round No",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "round_no",
+          "letter",
+          "needs_decision",
+          "informational",
+          "auto_accepted_count",
+          "total"
+        ],
+        "title": "ScatterReviewOut",
+        "type": "object"
+      },
       "ScatterRoundIn": {
         "properties": {
           "categories": {
@@ -4814,6 +5156,46 @@
           "poster_path"
         ],
         "title": "TmdbResultOut",
+        "type": "object"
+      },
+      "TvTargetIn": {
+        "properties": {
+          "game_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Id"
+          }
+        },
+        "title": "TvTargetIn",
+        "type": "object"
+      },
+      "TvTargetOut": {
+        "description": "The game the host sent to the paired TV; null when none (or it ended).",
+        "properties": {
+          "game_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Id"
+          }
+        },
+        "required": [
+          "game_id"
+        ],
+        "title": "TvTargetOut",
         "type": "object"
       },
       "TypedTitleIn": {
@@ -7438,6 +7820,74 @@
         ]
       }
     },
+    "/api/v1/games/tv-target": {
+      "get": {
+        "description": "The game a host sent to the paired TV, if any (any device or account). The TV polls\nthis snapshot and follows it; there is no event to miss.",
+        "operationId": "get_tv_target_api_v1_games_tv_target_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TvTargetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Tv Target",
+        "tags": [
+          "games"
+        ]
+      },
+      "put": {
+        "description": "Show a game on the paired TV, or (null) send the TV back to its QR home (hosts).",
+        "operationId": "put_tv_target_api_v1_games_tv_target_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TvTargetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TvTargetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Tv Target",
+        "tags": [
+          "games"
+        ]
+      }
+    },
     "/api/v1/games/{game_id}": {
       "get": {
         "description": "The snapshot: revealed notes only, never an anonymous note's author.",
@@ -7480,6 +7930,126 @@
           }
         },
         "summary": "Get Game",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/bingo/check": {
+      "post": {
+        "description": "Verify a player's spoken \"bingo\" against the called numbers (hosts). A false claim\nchanges nothing; a true one records the win and, by config, ends the game.",
+        "operationId": "check_bingo_api_v1_games__game_id__bingo_check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BingoCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BingoCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Bingo",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/bingo/draw": {
+      "post": {
+        "description": "Call the next number (hosts). `expected_seq` is the count the host's screen showed; a\ndifferent count is 409 so a double tap or a second window cannot draw twice.",
+        "operationId": "draw_number_api_v1_games__game_id__bingo_draw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BingoDrawIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Draw Number",
         "tags": [
           "games"
         ]
@@ -7622,7 +8192,7 @@
         ]
       },
       "put": {
-        "description": "Mark a square on your own card. The mark that completes the pattern is the win.",
+        "description": "Mark a square on your own card. Thanksgiving: the mark that completes the pattern is the\nwin. Classic: only a called number can be marked (409), and only a host check wins.",
         "operationId": "mark_square_api_v1_games__game_id__bingo_mark__index__put",
         "parameters": [
           {
@@ -8057,9 +8627,159 @@
         ]
       }
     },
+    "/api/v1/games/{game_id}/jar/pause": {
+      "post": {
+        "description": "Hold the note on show (cycling jars; pausing a paused jar is a no-op).",
+        "operationId": "pause_jar_api_v1_games__game_id__jar_pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause Jar",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/jar/reshuffle": {
+      "post": {
+        "description": "A new grouped order, starting again from its first note.",
+        "operationId": "reshuffle_jar_api_v1_games__game_id__jar_reshuffle_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reshuffle Jar",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/jar/resume": {
+      "post": {
+        "description": "Carry on cycling; the held note gets a full turn (resuming a running jar is a no-op).",
+        "operationId": "resume_jar_api_v1_games__game_id__jar_resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Jar",
+        "tags": [
+          "games"
+        ]
+      }
+    },
     "/api/v1/games/{game_id}/jar/reveal-next": {
       "post": {
-        "description": "Show the next note on the TV.",
+        "description": "Show the next note on the TV (manual jars only; a cycling jar is 409).",
         "operationId": "reveal_next_api_v1_games__game_id__jar_reveal_next_post",
         "parameters": [
           {
@@ -8159,7 +8879,7 @@
     },
     "/api/v1/games/{game_id}/open": {
       "post": {
-        "description": "Let the family join (draft to open).",
+        "description": "Let the family join (draft to open). A classic game fixes its draw seed here.",
         "operationId": "open_game_api_v1_games__game_id__open_post",
         "parameters": [
           {
@@ -8601,6 +9321,65 @@
           }
         },
         "summary": "Start Round",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/scatter/rounds/{round_no}/review": {
+      "get": {
+        "description": "Only the answers that need a decision: near-duplicates and very short answers, with\nwrong letters and exact duplicates as information. Everything else counts automatically.",
+        "operationId": "review_api_v1_games__game_id__scatter_rounds__round_no__review_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "round_no",
+            "required": true,
+            "schema": {
+              "title": "Round No",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScatterReviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The round is not revealed yet"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review",
         "tags": [
           "games"
         ]

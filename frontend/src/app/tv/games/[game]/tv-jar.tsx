@@ -1,21 +1,32 @@
 "use client";
 
+import { TvGameFrame } from "@/components/games/tv-game-frame";
 import { Avatar } from "@/components/night/avatar";
+import { useJarCycle } from "@/hooks/use-jar-cycle";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { useWakeLock } from "@/hooks/use-wake-lock";
+import { jarStripPlayers } from "@/lib/game-layout";
 import { authorLine, jarProgress } from "@/lib/games";
+import { cycleCounter } from "@/lib/jar-cycle";
 
 /**
  * /tv/games/[game] for the Gratitude Jar (ADR-0018): while notes are being collected the TV shows
  * the count, then each note as the host reveals it, large and alone. The snapshot never holds an
  * unrevealed note, so nothing here can leak one. The note is announced politely for screen readers.
+ * Laid out on the TV game template; the footer strip is the people behind revealed notes.
  */
 export function TvJar({ gameId }: { gameId: string }) {
   const game = useLiveGame(gameId);
   useWakeLock();
   const data = game.data;
   const jar = data?.jar ?? null;
-  const note = jar?.current ?? null;
+  const cycling = jar?.mode === "cycle";
+  const cycle = useJarCycle(jar);
+  const note = cycling
+    ? data?.status === "live"
+      ? (jar?.revealed[cycle.index] ?? null)
+      : null
+    : (jar?.current ?? null);
 
   if (game.error) {
     return (
@@ -27,13 +38,17 @@ export function TvJar({ gameId }: { gameId: string }) {
   }
 
   return (
-    <div
-      className="m-auto flex w-full max-w-[60em] flex-col items-center gap-[1.5em] px-[1em] text-center"
-      data-testid="tv-jar"
-      data-status={data?.status}
-      data-live={game.live}
+    <TvGameFrame
+      title={data?.title ?? "Gratitude jar"}
+      players={jarStripPlayers(jar?.revealed ?? [])}
+      emptyPlayersText="Names appear here as notes are revealed"
+      maxWidth="60em"
+      attrs={{
+        "data-testid": "tv-jar",
+        "data-status": data?.status,
+        "data-live": game.live,
+      }}
     >
-      <h1 className="tv-title">{data?.title ?? "Gratitude jar"}</h1>
       {data?.status === "open" ? (
         <p className="tv-body text-muted-foreground" data-testid="tv-jar-collecting">
           Add a note from your phone: Games, then {data.title}.
@@ -42,12 +57,13 @@ export function TvJar({ gameId }: { gameId: string }) {
           </span>
         </p>
       ) : null}
-      <div aria-live="polite" className="w-full">
+      {/* A manual reveal is announced; a cycling note every few seconds would be noise. */}
+      <div aria-live={cycling ? "off" : "polite"} className="w-full">
         {note ? (
           <figure
             key={note.id}
             data-testid="tv-note"
-            className="flex flex-col items-center gap-[0.75em] rounded-[1em] border border-foreground/10 bg-card p-[1.5em] marquee-glow"
+            className="flex flex-col items-center gap-[0.75em] rounded-[1em] border border-foreground/10 bg-card p-[1.5em] marquee-glow motion-safe:animate-in motion-safe:duration-700 motion-safe:fade-in"
           >
             <blockquote className="tv-display">{note.body}</blockquote>
             <figcaption className="tv-body flex items-center gap-[0.5em] text-muted-foreground">
@@ -61,11 +77,26 @@ export function TvJar({ gameId }: { gameId: string }) {
               {authorLine(note.author)}
             </figcaption>
           </figure>
-        ) : data?.status === "live" ? (
+        ) : data?.status === "live" && !cycling ? (
           <p className="tv-body text-muted-foreground">Here comes the first note…</p>
         ) : null}
       </div>
-      {data?.status === "live" && jar ? (
+      {data?.status === "live" && jar && cycling ? (
+        <p
+          className="tv-body flex items-center gap-[0.75em] text-muted-foreground"
+          data-testid="tv-jar-progress"
+        >
+          {cycleCounter(cycle.index, cycle.count)}
+          {cycle.paused ? (
+            <span
+              data-testid="tv-jar-paused"
+              className="rounded-full bg-muted px-[0.75em] py-[0.15em] text-foreground"
+            >
+              Paused
+            </span>
+          ) : null}
+        </p>
+      ) : data?.status === "live" && jar ? (
         <p className="tv-body text-muted-foreground" data-testid="tv-jar-progress">
           {jarProgress(jar.note_count, jar.revealed_count)}
         </p>
@@ -73,6 +104,6 @@ export function TvJar({ gameId }: { gameId: string }) {
       {data?.status === "ended" ? (
         <p className="tv-body text-muted-foreground">That is every note. Thank you, everyone.</p>
       ) : null}
-    </div>
+    </TvGameFrame>
   );
 }

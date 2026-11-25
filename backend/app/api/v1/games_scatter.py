@@ -20,6 +20,7 @@ from app.schemas.games import (
     ScatterDrawOut,
     ScatterJoinIn,
     ScatterOwnAnswerOut,
+    ScatterReviewOut,
     ScatterRoundIn,
     ScatterSubmitIn,
     ScatterVerdictIn,
@@ -92,6 +93,23 @@ async def reveal(game_id: uuid.UUID, account: CanHost, db: AccountDb) -> GameOut
     except ServiceError as err:
         raise_http(err)
     return await snapshot(db, account.household_id, game_id)
+
+
+@router.get(
+    "/{game_id}/scatter/rounds/{round_no}/review",
+    response_model=ScatterReviewOut,
+    responses={**HOST, 409: {"description": "The round is not revealed yet"}},
+)
+async def review(
+    game_id: uuid.UUID, round_no: int, account: CanHost, db: AccountDb
+) -> ScatterReviewOut:
+    """Only the answers that need a decision: near-duplicates and very short answers, with
+    wrong letters and exact duplicates as information. Everything else counts automatically."""
+    try:
+        view = await scatter_service.review(db, account.household_id, game_id, round_no)
+    except ServiceError as err:
+        raise_http(err)
+    return ScatterReviewOut.model_validate(view, from_attributes=True)
 
 
 @router.put(

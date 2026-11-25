@@ -81,3 +81,113 @@ export function bingoStatusLine(status: string, joined: boolean): string {
   if (status === "live") return joined ? "Tap each square as it happens." : "The round is on.";
   return "That round is over.";
 }
+
+// ---- Classic host-called bingo (ADR-0018 amendment 2026-11-25, part A) ----
+
+export type BingoMode = "thanksgiving" | "classic";
+export const MODE_COPY: Record<BingoMode, { name: string; blurb: string }> = {
+  classic: { name: "Classic", blurb: "You draw numbers, everyone marks them, you check a bingo." },
+  thanksgiving: {
+    name: "Thanksgiving",
+    blurb: "Tap squares as things happen at the table. First line wins.",
+  },
+};
+export const BINGO_LETTERS = ["B", "I", "N", "G", "O"] as const;
+export const NUMBERS_PER_COLUMN = 15;
+/** How many recent calls the phone and the TV list under the last call. */
+export const RECENT_CALLS = 5;
+
+export interface CallLike {
+  seq: number;
+  value: number;
+  label: string;
+}
+
+/** "B 7": the letter and number apart so the TV can set them big. */
+export function spacedLabel(call: Pick<CallLike, "label">): string {
+  return call.label.replace(/^([BINGO])/, "$1 ");
+}
+
+/** The called numbers as a set for O(1) lookups. */
+export function calledSet(calls: readonly Pick<CallLike, "value">[]): ReadonlySet<number> {
+  return new Set(calls.map((c) => c.value));
+}
+
+/** The board's five rows (B, I, N, G, O), each holding that letter's 15 numbers. */
+export function boardRows(): { letter: string; values: number[] }[] {
+  return BINGO_LETTERS.map((letter, row) => ({
+    letter,
+    values: Array.from({ length: NUMBERS_PER_COLUMN }, (_, i) => row * NUMBERS_PER_COLUMN + i + 1),
+  }));
+}
+
+/** The calls before the last one (which has its own big display), newest first, at most `n`. */
+export function recentCalls<T extends CallLike>(calls: readonly T[], n = RECENT_CALLS): T[] {
+  return calls.slice(-(n + 1), -1).reverse();
+}
+
+/** Is this card square a number that has been called (the free centre always is)? */
+export function squareIsCalled(square: string, called: ReadonlySet<number>): boolean {
+  return square === FREE_LABEL || called.has(Number(square));
+}
+
+/** A square the phone can mark: the round is live and the number was called (or is free). */
+export function canMarkClassic(
+  status: string,
+  square: string,
+  called: ReadonlySet<number>,
+): boolean {
+  return status === "live" && square !== FREE_LABEL && squareIsCalled(square, called);
+}
+
+/** Why a tap on an uncalled square did nothing. */
+export function notCalledMessage(square: string): string {
+  return `${square} hasn't been called yet.`;
+}
+
+/** Screen-reader label for one classic square. */
+export function classicSquareLabel(
+  square: string,
+  index: number,
+  isMarked: boolean,
+  isCalled: boolean,
+): string {
+  const base = squareLabel(square, index, isMarked);
+  return square === FREE_LABEL || isCalled ? base : `${base}, not called yet`;
+}
+
+/** What the phone says under the title in a classic round. */
+export function classicStatusLine(status: string, joined: boolean, calls: number): string {
+  if (status === "live") {
+    if (!joined) return "The round is on.";
+    return calls === 0 ? "Waiting for the first number." : "Tap each number the host calls.";
+  }
+  return bingoStatusLine(status, joined);
+}
+
+export interface CheckResultLike {
+  valid: boolean;
+  win_mode: WinMode;
+  pattern: number[] | null;
+  missing: number;
+}
+
+const ROW_NAMES = ["top row", "second row", "middle row", "fourth row", "bottom row"];
+const COL_NAMES = ["B column", "I column", "N column", "G column", "O column"];
+
+/** Name the winning pattern for the host to read out: "top row", "B column", "diagonal". */
+export function patternName(pattern: readonly number[] | null): string {
+  if (!pattern) return "";
+  if (pattern.length === CARD_SIZE * CARD_SIZE) return "the whole card";
+  const rows = new Set(pattern.map((i) => Math.floor(i / CARD_SIZE)));
+  if (rows.size === 1) return ROW_NAMES[[...rows][0]];
+  const cols = new Set(pattern.map((i) => i % CARD_SIZE));
+  if (cols.size === 1) return COL_NAMES[[...cols][0]];
+  return "diagonal";
+}
+
+/** The host's inline answer to Check bingo: a quiet message either way, never an error. */
+export function checkResultLine(name: string, result: CheckResultLike): string {
+  if (result.valid) return `${name}: valid, ${patternName(result.pattern)}.`;
+  return `${name}: not yet, ${result.missing} away.`;
+}

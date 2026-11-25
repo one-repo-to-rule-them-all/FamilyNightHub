@@ -249,6 +249,7 @@ async def start_fresh(
         "pin_reset_requests",
         "gratitude_notes",
         "bingo_cards",
+        "bingo_calls",
         "game_players",
         "scatter_answers",
         "scatter_rounds",

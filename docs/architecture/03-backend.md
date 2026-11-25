@@ -21,34 +21,34 @@ backend/app/
 
 ## Route / service map
 
-| Area | Path prefix | Notes |
-|---|---|---|
-| Join | `GET /api/v1/csrf`, `POST /api/v1/join` | Issue the CSRF cookie; validate slug + night code, mint the device cookie (failure-budgeted) |
-| Auth | `/api/v1/auth/{login,password,magic-link,verify,me,logout}` | Password sign-in for admins and hosts, set/change password, forgot password (the magic link sets a new one), current account, logout ([ADR-0014](decisions/ADR-0014-passwords-and-person-pins.md)) |
-| Consent | `GET /api/v1/legal`, `POST /api/v1/auth/consent` | Current Terms/Privacy versions (public); accept them. `GET /auth/me` carries `consent`. See "Consent, export and deletion" ([ADR-0017](decisions/ADR-0017-consent-and-multi-household.md)) |
-| Household data | `GET /api/v1/admin/export`, `GET/POST/DELETE /api/v1/admin/household/deletion`, `DELETE /api/v1/admin/people/{id}` | Download everything (zip); schedule or cancel the household's deletion; erase a person (`admin:settings`, `admin:people`) |
-| Platform | `/api/v1/platform/{login,logout,me,households,exit}`, `POST …/households/{id}/{enter,disable,enable,rotate-slug}` | The platform owner ([ADR-0016](decisions/ADR-0016-platform-owner.md)): own cookie, metadata-only list, enter one household at a time. See "Platform owner" |
-| People/devices | `/api/v1/people`, `/api/v1/devices/me`, `POST /api/v1/devices/me/people`, `PUT/PATCH/DELETE /api/v1/devices/me/people/{id}`, `POST …/{id}/pin`, `POST …/{id}/forgot-pin` | Avatar grid with each tile's binding and PIN state; self-create a guest; claim or switch with the PIN; rename once; set/change PIN; ask for a PIN reset; unbind. See "People and PINs" |
-| Here tonight | `GET /api/v1/sessions/{id}/present` | Who's here (attendance plus anyone with a ballot), each with `voted`; avatars only, never ranks (any device or account). See "Here tonight" |
-| TV help count | `GET /api/v1/devices/me/help-count` | The TV (`is_tv`) only: `{count, first_name}` of pending person claims (never PIN resets); other phones 403 |
-| Join link | `GET /api/v1/devices/me/join-link` | The TV (`is_tv`) or a host account (`sessions:run`) reads `{join_slug, qr_includes_night_code}` to draw the join QR; other phones 403. The night code is never returned |
-| Profiles | `GET /api/v1/people/{id}/profile` | A person's revealed nights, picks, winners, ratings, albums and stats (any device or account of the household) |
-| Host devices | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}` | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it, unless `keep_session`: the host's laptop opening a TV window); review pending person claims (`devices:enroll` / `devices:approve`) |
-| Sessions | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET/PATCH /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}`, `PUT /sessions/{id}/slideshow` | Host (`sessions:run`): create (code shown once; `voting_method` defaults to the household's), change the voting method while `draft`, rotate code, shortlist, open/close voting, close the night, start/stop the TV slideshow. Snapshot and history: any device or account of the household |
-| Ballots | `PUT /api/v1/sessions/{id}/ballots`, `PUT …/ballots/proxy`, `GET …/ballots/mine`, `GET …/voters` | Phone casts/replaces a bound person's ballot; host proxy ballot (`ballots:proxy`); a phone reads back its own people's ballots; who has voted (avatars only) |
-| Live | `/api/v1/sse-tickets {session_id | game_id}`, `/api/v1/sessions/{id}/stream`, `/api/v1/games/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md), [ADR-0018](decisions/ADR-0018-games-tab.md) |
-| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next}`, `POST /games/{id}/{open,start}`, `POST …/bingo/join`, `GET …/bingo/mine`, `PUT/DELETE …/bingo/mark/{index}?person_id=` | Gratitude Jar and Thanksgiving Bingo ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate, reveal and end; a phone drops a note as a bound person; any device or account reads the snapshot. See "Games" |
-| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next}`, `GET …/scatter/draw`, `POST …/scatter/rounds`, `POST …/scatter/reveal`, `PUT …/scatter/answers/{aid}/verdict`, `POST …/scatter/join`, `PUT …/scatter/answers`, `GET …/scatter/answers/mine` | Gratitude Jar and Scattergories ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate or run rounds, reveal and end; a phone drops a note or answers as a bound person; any device or account reads the snapshot. See "Games" |
-| Photos | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}` | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below |
-| Ratings | `PUT /api/v1/sessions/{id}/ratings`, `PUT …/ratings/proxy`, `GET …/ratings/mine` | 1–5 per person, once the night is `tonight`/`closed`: a phone rates as its bound people, a host proxy-rates (`ballots:proxy`), a phone reads back its own people's scores. See "Ratings" |
-| Movies | `GET /api/v1/tmdb/search?q=` | TMDB search proxy for hosts (503 when TMDB is off or down). The library itself is admin-only (next rows) |
-| Admin people | `GET/POST /api/v1/admin/people`, `PATCH /admin/people/{id}`, `POST /admin/people/{id}/convert-to-member`, `POST /admin/people/merge`, `GET /admin/people/pin-resets`, `POST /admin/people/pin-resets/{id}/{approve,dismiss}` | Add, rename/re-avatar/recolour, guest → member, merge, the forgot-PIN queue (`admin:people`; hosts may add guests). See "People and devices admin" |
-| Admin devices | `GET /api/v1/admin/devices`, `PATCH /admin/devices/{id}`, `POST /admin/devices/{id}/revoke` | The "Devices" list with each device's people, label, revoke (`admin:devices`) |
-| Admin settings | `GET/PATCH /api/v1/admin/settings`, `POST /admin/join-slug/rotate` | Household defaults and the fridge-QR slug (`admin:settings`) |
-| Admin accounts | `GET/POST /api/v1/admin/accounts`, `PATCH/DELETE /admin/accounts/{id}`, `POST /admin/accounts/{id}/resend` | Hosts and admins: invite an adult by email with a role, list, change role, remove access, resend an invite (`admin:accounts`). See "Hosts and admins" ([ADR-0015](decisions/ADR-0015-inviting-hosts-and-admins.md)) |
-| Admin movies | `GET /api/v1/admin/movies?q=&owned=&watchlist=&blocked=&limit=&offset=`, `PATCH /admin/movies/{id}`, `POST /admin/movies/bulk`, `POST /admin/movies/bulk/confirm` | Library search/filter/paginate, flags, bulk add of owned titles through TMDB search (`admin:movies`). See "Library and history admin" |
-| Admin history | `POST /api/v1/admin/sessions/{id}/correct-winner` | Correct a past night's winner with a reason (`admin:history`); ranking and seed untouched. See "Library and history admin" |
-| Health | `/api/health` | DB + Redis |
+| Area           | Path prefix                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Notes                                                                                                                                                                                                                                                                                       |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Join           | `GET /api/v1/csrf`, `POST /api/v1/join`                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Issue the CSRF cookie; validate slug + night code, mint the device cookie (failure-budgeted)                                                                                                                                                                                                |
+| Auth           | `/api/v1/auth/{login,password,magic-link,verify,me,logout}`                                                                                                                                                                                                                                                                                                                                                                                                                              | Password sign-in for admins and hosts, set/change password, forgot password (the magic link sets a new one), current account, logout ([ADR-0014](decisions/ADR-0014-passwords-and-person-pins.md))                                                                                          |
+| Consent        | `GET /api/v1/legal`, `POST /api/v1/auth/consent`                                                                                                                                                                                                                                                                                                                                                                                                                                         | Current Terms/Privacy versions (public); accept them. `GET /auth/me` carries `consent`. See "Consent, export and deletion" ([ADR-0017](decisions/ADR-0017-consent-and-multi-household.md))                                                                                                  |
+| Household data | `GET /api/v1/admin/export`, `GET/POST/DELETE /api/v1/admin/household/deletion`, `DELETE /api/v1/admin/people/{id}`                                                                                                                                                                                                                                                                                                                                                                       | Download everything (zip); schedule or cancel the household's deletion; erase a person (`admin:settings`, `admin:people`)                                                                                                                                                                   |
+| Platform       | `/api/v1/platform/{login,logout,me,households,exit}`, `POST …/households/{id}/{enter,disable,enable,rotate-slug}`                                                                                                                                                                                                                                                                                                                                                                        | The platform owner ([ADR-0016](decisions/ADR-0016-platform-owner.md)): own cookie, metadata-only list, enter one household at a time. See "Platform owner"                                                                                                                                  |
+| People/devices | `/api/v1/people`, `/api/v1/devices/me`, `POST /api/v1/devices/me/people`, `PUT/PATCH/DELETE /api/v1/devices/me/people/{id}`, `POST …/{id}/pin`, `POST …/{id}/forgot-pin`                                                                                                                                                                                                                                                                                                                 | Avatar grid with each tile's binding and PIN state; self-create a guest; claim or switch with the PIN; rename once; set/change PIN; ask for a PIN reset; unbind. See "People and PINs"                                                                                                      |
+| Here tonight   | `GET /api/v1/sessions/{id}/present`                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Who's here (attendance plus anyone with a ballot), each with `voted`; avatars only, never ranks (any device or account). See "Here tonight"                                                                                                                                                 |
+| TV help count  | `GET /api/v1/devices/me/help-count`                                                                                                                                                                                                                                                                                                                                                                                                                                                      | The TV (`is_tv`) only: `{count, first_name}` of pending person claims (never PIN resets); other phones 403                                                                                                                                                                                  |
+| Join link      | `GET /api/v1/devices/me/join-link`                                                                                                                                                                                                                                                                                                                                                                                                                                                       | The TV (`is_tv`) or a host account (`sessions:run`) reads `{join_slug, qr_includes_night_code}` to draw the join QR; other phones 403. The night code is never returned                                                                                                                     |
+| Profiles       | `GET /api/v1/people/{id}/profile`                                                                                                                                                                                                                                                                                                                                                                                                                                                        | A person's revealed nights, picks, winners, ratings, albums and stats (any device or account of the household)                                                                                                                                                                              |
+| Host devices   | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}`                                                                                                                                                                                                                                                                                                                                                                   | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it, unless `keep_session`: the host's laptop opening a TV window); review pending person claims (`devices:enroll` / `devices:approve`)                                                       |
+| Sessions       | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET/PATCH /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}`, `PUT /sessions/{id}/slideshow`                                                                                                                                                                                        | Host (`sessions:run`): create (code shown once; `voting_method` defaults to the household's), change the voting method while `draft`, rotate code, shortlist, open/close voting, close the night, start/stop the TV slideshow. Snapshot and history: any device or account of the household |
+| Ballots        | `PUT /api/v1/sessions/{id}/ballots`, `PUT …/ballots/proxy`, `GET …/ballots/mine`, `GET …/voters`                                                                                                                                                                                                                                                                                                                                                                                         | Phone casts/replaces a bound person's ballot; host proxy ballot (`ballots:proxy`); a phone reads back its own people's ballots; who has voted (avatars only)                                                                                                                                |
+| Live           | `/api/v1/sse-tickets {session_id                                                                                                                                                                                                                                                                                                                                                                                                                                                         | game_id}`, `/api/v1/sessions/{id}/stream`, `/api/v1/games/{id}/stream`                                                                                                                                                                                                                      | [ADR-0004](decisions/ADR-0004-sse-live-updates.md), [ADR-0018](decisions/ADR-0018-games-tab.md) |
+| Games          | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next,pause,resume,reshuffle}`, `POST /games/{id}/{open,start}`, `POST …/bingo/join`, `GET …/bingo/mine`, `PUT/DELETE …/bingo/mark/{index}?person_id=`, `POST …/bingo/draw`, `POST …/bingo/check`                                                       | Gratitude Jar and Thanksgiving Bingo ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate, reveal and end; a phone drops a note as a bound person; any device or account reads the snapshot. See "Games"                                                  |
+| Games          | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next,pause,resume,reshuffle}`, `GET …/scatter/draw`, `POST …/scatter/rounds`, `POST …/scatter/reveal`, `PUT …/scatter/answers/{aid}/verdict`, `POST …/scatter/join`, `PUT …/scatter/answers`, `GET …/scatter/answers/mine`, `GET/PUT /games/tv-target` | Gratitude Jar and Scattergories ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate or run rounds, reveal and end; a phone drops a note or answers as a bound person; any device or account reads the snapshot. See "Games"                              |
+| Photos         | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}`                                                                                                                                                                                                                                                                                          | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below                                                                                                             |
+| Ratings        | `PUT /api/v1/sessions/{id}/ratings`, `PUT …/ratings/proxy`, `GET …/ratings/mine`                                                                                                                                                                                                                                                                                                                                                                                                         | 1–5 per person, once the night is `tonight`/`closed`: a phone rates as its bound people, a host proxy-rates (`ballots:proxy`), a phone reads back its own people's scores. See "Ratings"                                                                                                    |
+| Movies         | `GET /api/v1/tmdb/search?q=`                                                                                                                                                                                                                                                                                                                                                                                                                                                             | TMDB search proxy for hosts (503 when TMDB is off or down). The library itself is admin-only (next rows)                                                                                                                                                                                    |
+| Admin people   | `GET/POST /api/v1/admin/people`, `PATCH /admin/people/{id}`, `POST /admin/people/{id}/convert-to-member`, `POST /admin/people/merge`, `GET /admin/people/pin-resets`, `POST /admin/people/pin-resets/{id}/{approve,dismiss}`                                                                                                                                                                                                                                                             | Add, rename/re-avatar/recolour, guest → member, merge, the forgot-PIN queue (`admin:people`; hosts may add guests). See "People and devices admin"                                                                                                                                          |
+| Admin devices  | `GET /api/v1/admin/devices`, `PATCH /admin/devices/{id}`, `POST /admin/devices/{id}/revoke`                                                                                                                                                                                                                                                                                                                                                                                              | The "Devices" list with each device's people, label, revoke (`admin:devices`)                                                                                                                                                                                                               |
+| Admin settings | `GET/PATCH /api/v1/admin/settings`, `POST /admin/join-slug/rotate`                                                                                                                                                                                                                                                                                                                                                                                                                       | Household defaults and the fridge-QR slug (`admin:settings`)                                                                                                                                                                                                                                |
+| Admin accounts | `GET/POST /api/v1/admin/accounts`, `PATCH/DELETE /admin/accounts/{id}`, `POST /admin/accounts/{id}/resend`                                                                                                                                                                                                                                                                                                                                                                               | Hosts and admins: invite an adult by email with a role, list, change role, remove access, resend an invite (`admin:accounts`). See "Hosts and admins" ([ADR-0015](decisions/ADR-0015-inviting-hosts-and-admins.md))                                                                         |
+| Admin movies   | `GET /api/v1/admin/movies?q=&owned=&watchlist=&blocked=&limit=&offset=`, `PATCH /admin/movies/{id}`, `POST /admin/movies/bulk`, `POST /admin/movies/bulk/confirm`                                                                                                                                                                                                                                                                                                                        | Library search/filter/paginate, flags, bulk add of owned titles through TMDB search (`admin:movies`). See "Library and history admin"                                                                                                                                                       |
+| Admin history  | `POST /api/v1/admin/sessions/{id}/correct-winner`                                                                                                                                                                                                                                                                                                                                                                                                                                        | Correct a past night's winner with a reason (`admin:history`); ranking and seed untouched. See "Library and history admin"                                                                                                                                                                  |
+| Health         | `/api/health`                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | DB + Redis                                                                                                                                                                                                                                                                                  |
 
 ## Request lifecycle
 
@@ -75,11 +75,11 @@ per transaction, and queries also filter explicitly. Cross-household requests ge
 
 ## Auth & authorization
 
-| Principal | Credential | Where checked |
-|---|---|---|
-| Device | `fnh_device` httpOnly cookie (hashed with pepper in `devices.token_hash`) | `CurrentDevice` |
-| Person on a device | the device, plus the person's 6-digit PIN to claim or switch to them | `people_service.claim`, `require_can_act_as` |
-| Admin/host | `fnh_session` httpOnly cookie after username/email + password (the magic link only resets the password) | `CurrentAccount` |
+| Principal          | Credential                                                                                              | Where checked                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Device             | `fnh_device` httpOnly cookie (hashed with pepper in `devices.token_hash`)                               | `CurrentDevice`                              |
+| Person on a device | the device, plus the person's 6-digit PIN to claim or switch to them                                    | `people_service.claim`, `require_can_act_as` |
+| Admin/host         | `fnh_session` httpOnly cookie after username/email + password (the magic link only resets the password) | `CurrentAccount`                             |
 
 Both credentials are resolved to `(id, household_id)` by the ADR-0009 definer functions before
 any household transaction opens; everything after runs under RLS.
@@ -176,7 +176,7 @@ code (or a host enrollment) revives the same row, clears its `device_people` bin
 `is_tv`, and audits `device.rejoined`. Its people must be picked again with their PINs, and a
 TV needs a host to pair it again.
 
-**Rate limiting.** Join *failures* are counted per slug (`JOIN_FAILURE_LIMIT` per
+**Rate limiting.** Join _failures_ are counted per slug (`JOIN_FAILURE_LIMIT` per
 `JOIN_FAILURE_WINDOW_SECONDS`, default 30 per 15 min), never per client IP: a family shares one
 NAT address, and forwarded headers are spoofable (uvicorn does not trust them). Once a slug's
 budget is spent, joins get 429 with `Retry-After`, even with the right code, until the window
@@ -203,7 +203,7 @@ first"). The PIN is typed to claim or switch, not per vote; a kid's is typed by 
   → the first claim must set it (422 without one), but only if nobody else holds them, this phone
   already does, or an admin approved a reset that this phone asked for; otherwise `pending`.
 - **Wrong PIN**: counted in the request's transaction with the person row `FOR UPDATE`; the router
-  *returns* the error (403 `{"error": {"code": "wrong_pin", …, "attempts_left": n}}`) rather than
+  _returns_ the error (403 `{"error": {"code": "wrong_pin", …, "attempts_left": n}}`) rather than
   raising, so the count commits. At **5** the profile locks (`pin_locked_at`, 423 `pin_locked`)
   and every PIN check refuses, the right PIN included, until an admin resets it. The right PIN
   resets the count. A lock does not stop phones already current on the person. Audit:
@@ -223,7 +223,7 @@ first"). The PIN is typed to claim or switch, not per vote; a kid's is typed by 
   `can_rename` and `pin_reset` (`null`, `open`, or `approved_for_this_phone` while this phone
   may set the new PIN). Another household's or a merged person is 404 on every route above.
 
-**Here tonight** (`services/attendance_service.py`, guest-flow spec G8). A person is *here* once
+**Here tonight** (`services/attendance_service.py`, guest-flow spec G8). A person is _here_ once
 a phone that is currently acting as them (active, current, PIN set) mints an SSE ticket for a
 live night (`draft`/`voting`/`revealed`/`tonight`) or casts a ballot as them; that writes one
 `session_attendance` row per (night, person) and, only when the row is new, publishes
@@ -286,7 +286,7 @@ All under `/api/v1/admin/*` (`app/api/v1/admin/`), account-only: a device cookie
 the CSRF header and writes an audit row.
 
 - **People** (`services/people_admin_service.py`, `admin:people`). Create takes `{name,
-  avatar_emoji, color, is_guest}`. Names are whitespace-collapsed, 1–60 chars; the emoji is
+avatar_emoji, color, is_guest}`. Names are whitespace-collapsed, 1–60 chars; the emoji is
   1–16 code points with no whitespace and at least one non-ASCII character (ZWJ families and
   keycaps pass, words don't); colour is `#rrggbb`, stored lowercase. **Names are unique per
   household among unmerged people, case-insensitively** (guests included), checked under a
@@ -300,17 +300,17 @@ the CSRF header and writes an audit row.
   source gets `merged_into_id`. Collisions with the target's own rows go the target's way, so
   the result never depends on row order:
 
-  | Table | Unique key | Rule |
-  |---|---|---|
-  | `ballot_ranks` | (session, person, rank), (session, person, option) | In a night where the target has a ballot, the source's **whole** ballot is dropped (two partial ballots can't be mixed into a valid one); otherwise it moves |
-  | `ratings` | (session, person) | Target's rating wins |
-  | `photo_reactions` | (photo, person, emoji) | Duplicates collapse into the target's |
-  | `device_people` | (device, person) | Target's row is kept, upgraded to `active` if either was |
-  | `photos` | — | All move |
+  | Table             | Unique key                                         | Rule                                                                                                                                                         |
+  | ----------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | `ballot_ranks`    | (session, person, rank), (session, person, option) | In a night where the target has a ballot, the source's **whole** ballot is dropped (two partial ballots can't be mixed into a valid one); otherwise it moves |
+  | `ratings`         | (session, person)                                  | Target's rating wins                                                                                                                                         |
+  | `photo_reactions` | (photo, person, emoji)                             | Duplicates collapse into the target's                                                                                                                        |
+  | `device_people`   | (device, person)                                   | Target's row is kept, upgraded to `active` if either was                                                                                                     |
+  | `photos`          | —                                                  | All move                                                                                                                                                     |
 
   The target keeps its own name, avatar, colour and guest flag. People previously merged into
-  the source are repointed to the target, so `merged_into_id` is always one hop. Self-merge is
-  409. The response and the `person.merged` audit row carry moved/dropped counts per table.
+  the source are repointed to the target, so `merged_into_id` is always one hop. Self-merge is 409. The response and the `person.merged` audit row carry moved/dropped counts per table.
+
 - **Devices** (`services/device_admin_service.py`, `admin:devices`). The list returns every
   device (live first, most recently seen first, then revoked) with label, `is_tv`,
   `last_seen_at`, `revoked_at`, `expired` (live but past the idle window, shown as "Expired (not
@@ -370,7 +370,7 @@ permission 403, other household 404, CSRF on every mutation, an audit row per wr
   typed title with no TMDB id (`added_manual`, reusing an existing typed row of the same
   title/year) and `tmdb_unavailable` is true; after the first failure no further line calls
   TMDB, so a hung TMDB costs one timeout, not one per line. `POST /bulk/confirm {picks:
-  [{title, year?, tmdb_id?}]}` resolves the admin's answers: a `tmdb_id` is upserted and owned
+[{title, year?, tmdb_id?}]}` resolves the admin's answers: a `tmdb_id` is upserted and owned
   (a TMDB 404 comes back `not_found`; TMDB down → added as typed), no `tmdb_id` adds the title
   as typed. Both responses carry `attribution` (the TMDB notice). One audit row per call that
   owned something new: `movie.bulk_added` / `movie.bulk_confirmed` with per-status counts,
@@ -479,13 +479,13 @@ The table (`ratings`, unique (session, person), `check(score between 1 and 5)`) 
   Both are an upsert (`ON CONFLICT (session_id, person_id) DO UPDATE`): rating again replaces the
   score, and repeating it changes nothing.
 - **Who.** Only someone who took part in the night may rate it, by phone or by proxy (issue #91):
-  *attended* means a `session_attendance` row (G8) or a ballot, defined once as
+  _attended_ means a `session_attendance` row (G8) or a ballot, defined once as
   `attendance_service.attended_sql` / `attended`. Anyone else is 403 with code `not_attended`
   ("You weren't at this one."). The same predicate drives `/present` and the profile's nights.
-- **When.** Ratings are accepted once the night's *effective* status is `tonight` or `closed`
+- **When.** Ratings are accepted once the night's _effective_ status is `tonight` or `closed`
   (`domain/session_state.check_can_rate`), so a reveal counts once it has settled (the lazy
   `revealed → tonight` rule). Earlier statuses are 409 "Ratings open once tonight's movie is picked".
-  The session row is read `FOR SHARE`. The phone only *asks* after the movie (04-frontend.md), but
+  The session row is read `FOR SHARE`. The phone only _asks_ after the movie (04-frontend.md), but
   the server doesn't refuse a rating given during it.
 - **Reads.** `GET …/ratings/mine` returns `{person_id, score|null, attended}` for each person
   actively bound to the calling phone; the phone offers stars (and the rate prompt) only where
@@ -511,7 +511,7 @@ The table (`ratings`, unique (session, person), `check(score between 1 and 5)`) 
 Photo bytes never touch the API.
 
 - **Create** (`POST …/photos`, device, `{person_id, taken_on?}`): the person must be actively
-  bound to the device (403), and the night's *effective* status must be `tonight` or `closed`
+  bound to the device (403), and the night's _effective_ status must be `tonight` or `closed`
   (409 otherwise; a reveal counts once it has settled, `domain/session_state.check_photos_open`).
   Inserts a `pending` row with keys `households/{hid}/sessions/{sid}/{photo_id}.jpg` and
   `…_thumb.jpg` and returns two presigned PUTs (5 min, `Content-Type: image/jpeg` signed in, so
@@ -569,17 +569,17 @@ per-night counter (`INCR live_version:{id}`) for spotting duplicates and gaps; i
 snapshot version. Every event is a hint: clients refetch `GET /sessions/{id}` (or
 `…/voters`).
 
-| Type | Published by |
-|---|---|
-| `shortlist_changed` | add, remove, reorder an option |
-| `status_changed` | open voting; close the night; the host starts or stops the TV slideshow |
-| `ballot_count` | any ballot cast or replaced (phone or proxy) |
-| `revealed` | close-voting when it actually tallies (not the idempotent repeat) |
-| `photo_added` | a photo upload completes (`pending → ready`) |
-| `rating_count` | a rating set or replaced (phone or proxy) |
-| `winner_corrected` | an admin corrected the night's winner |
-| `presence` | someone is newly here tonight (a `session_attendance` row was created); refetch `GET …/present` |
-| `degraded` | the stream itself, never published |
+| Type                | Published by                                                                                    |
+| ------------------- | ----------------------------------------------------------------------------------------------- |
+| `shortlist_changed` | add, remove, reorder an option                                                                  |
+| `status_changed`    | open voting; close the night; the host starts or stops the TV slideshow                         |
+| `ballot_count`      | any ballot cast or replaced (phone or proxy)                                                    |
+| `revealed`          | close-voting when it actually tallies (not the idempotent repeat)                               |
+| `photo_added`       | a photo upload completes (`pending → ready`)                                                    |
+| `rating_count`      | a rating set or replaced (phone or proxy)                                                       |
+| `winner_corrected`  | an admin corrected the night's winner                                                           |
+| `presence`          | someone is newly here tonight (a `session_attendance` row was created); refetch `GET …/present` |
+| `degraded`          | the stream itself, never published                                                              |
 
 The lazy `revealed → tonight` settle publishes nothing: readers already see `tonight`. The
 worker's stale-night auto-close doesn't publish either (nobody is watching a day-old night).
@@ -718,7 +718,7 @@ deletes the bucket objects, then the household row, whose cascade empties every 
   only) is the platform's only cross-household read.
 - **Enter / exit** bind or drop one household in the cookie and audit `platform.entered` /
   `platform.exited` in it. While bound, `current_account` returns `AccountContext(…, role="admin",
-  via_platform=True)` for that household and the ordinary admin routes run under its GUC.
+via_platform=True)` for that household and the ordinary admin routes run under its GUC.
   `PLATFORM_DENIED` (`admin:accounts`, `sessions:run`, `ballots:proxy`) and `HouseholdAccount`
   (own password, consent, resolving PIN resets) are 403: they would name the operator in a
   household-scoped FK, or answer for the family. `account_db` sets `app.platform_account`, and
@@ -739,15 +739,27 @@ deletes the bucket objects, then the household row, whose cascade empties every 
 `scatter.py`, `scatter_categories.py`). Games are household-scoped and **not tied to a
 night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
 `created_by_account_id`, `reveal_seed`), `game_players` (roster), `gratitude_notes`,
-`bingo_cards`, `scatter_rounds` and `scatter_answers`.
+`bingo_cards`, `bingo_calls`, `scatter_rounds` and `scatter_answers`.
 
 - **Gratitude Jar.** Hosts create a jar (`open`). A phone drops a note as a person it is
   acting as (`require_can_act_as`, consent gate; 1-280 chars, whitespace collapsed; `anonymous`
   unless the jar's `allow_anonymous` is false). The author may delete their own note until it is
-  shown (anyone else's, or a shown one, is 404). **Start reveal** closes the jar, shuffles the
-  unhidden notes with `random.Random(seed)` over the sorted ids (`secrets.randbits(64)`; the
-  `X-FNH-Test-Seed` header pins it in `ENVIRONMENT=test`) and writes `reveal_position`;
-  **reveal next** sets `revealed_at` on the next one. The game row is read `FOR UPDATE` by hosts
+  shown (anyone else's, or a shown one, is 404). `config.reveal_mode` is `cycle` (the create
+  default) or `manual`; a config without the key is `manual`. **Start reveal** closes the jar and
+  orders the unhidden notes with a seed (`secrets.randbits(64)`; the `X-FNH-Test-Seed` header
+  pins it in `ENVIRONMENT=test`) into `reveal_position`. A **manual** jar shuffles them
+  (`jar.reveal_order`) and **reveal next** sets `revealed_at` on the next one. A **cycle** jar
+  (`config.cycle_seconds`, 5-60, default 12) orders them with `jar.group_order` (deterministic
+  keyword/word-overlap grouping, similar notes adjacent, no AI call), sets `revealed_at` on every
+  unhidden note at once and stores `games.cycle_anchor_at` (migration `0014_jar_cycle`, with
+  `cycle_paused_index`). **Pause** stores the index on show, **Resume** re-anchors so that note
+  gets a full dwell, **Reshuffle** regroups with a new seed and re-anchors; each is 409 on a
+  manual jar and `reveal-next` is 409 on a cycle jar. The snapshot's `jar.cycle` is
+  `{anchor_at, server_now, dwell_seconds, paused_index}` and `jar.revealed` is in cycle order, so
+  clients compute the index on show with `jar.cycle_index` (twin `lib/jar-cycle.ts`, shared
+  vectors `frontend/src/lib/jar-cycle.vectors.json`); there are no tick events. Start is the point
+  where text becomes visible to everyone; hiding afterwards drops a note from the next snapshot.
+  The game row is read `FOR UPDATE` by hosts
   and `FOR SHARE` by a dropped note, so they serialize. Hosts read every note's text in
   `/jar/moderation` and can hide one before it shows (idempotent); an anonymous note never
   carries its author, even there. The snapshot holds revealed, unhidden notes only, and counts.
@@ -768,6 +780,30 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   snapshot's `bingo` object has each player's avatar, `squares_from_bingo`, `won` and
   `finish_place`, never squares or marks; `/bingo/mine` returns only the cards of people bound to
   the caller's phone.
+- **Classic bingo (amendment 2026-11-25, part A).** `config.mode` is `thanksgiving` | `classic`
+  (create body `mode`, API default `thanksgiving`, fixed at creation; a stored config with no
+  mode is Thanksgiving; the host form preselects classic). The pure `domain/games/bingo_classic.py`
+  builds the card (`generate_classic_card`: five distinct numbers per B-I-N-G-O column from its
+  range of 15, FREE at index 12, stored as decimal text in `bingo_cards`), `call_order(seed)` (1-75
+  shuffled by `random.Random(seed)`), `called_mask` and `pattern`; `bingo.py` is untouched and still
+  owns masks and `has_win`. **Open** stores `games.reveal_seed` (`secrets.randbits(64)` or
+  `X-FNH-Test-Seed` in test; kept if already set), so the `n`-th call is `call_order(seed)[n]` and
+  no number repeats; the seed and unmade calls never leave the server. **Draw** (`POST
+…/bingo/draw {expected_seq}`, host) locks the game row, is 409 unless `live`, 409 when
+  `expected_seq` is not the number of calls already made (a double tap or second window inserts
+  nothing) or at 75, inserts the next `bingo_calls` row, audits `game.bingo_called` and publishes
+  `GAME_CHANGED`; it returns the snapshot. **Mark** is 409 ("That number hasn't been called.")
+  for an uncalled number, unmarking is always allowed, and the completing mark no longer wins.
+  **Check** (`POST …/bingo/check {person_id}`, host, `live` only, 404 for a player with no card)
+  computes `called_mask` from the card's squares and the called set (not `marked_mask`) and
+  returns `{valid, win_mode, pattern, missing}`; invalid changes nothing, publishes nothing and is
+  audited (`game.bingo_checked`); valid sets `won_at` once (checking a winner again is
+  idempotent), and with `end_on_first_win` ends the game in the same transaction under the same
+  lock order as `set_mark` (`game.ended` audited). Thanksgiving games answer both calls with 409
+  "This is a Thanksgiving round." The snapshot's `bingo` gains `mode`, `calls`
+  (`[{seq, value, label}]`) and `last_call`, and a player's `squares_from_bingo` comes from the
+  called mask. Export, Start fresh and `test_isolation`/`test_rls_coverage` cover `bingo_calls`;
+  person merge and delete leave it alone (no person column; it cascades with its game).
 - **Scattergories (slice C).** A host creates the game (`open`), people **join** the roster (as a
   person they act as; consent gate), and the host starts **rounds**: a random letter (`secrets`,
   or the `X-FNH-Test-Seed` seed; never Q U V X Y Z), 1-12 categories snapshotted into the round
@@ -782,9 +818,18 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   returns the phone's own. **Reveal** (host; early reveal also pulls `ends_at` to now) sets
   `revealed_at` and freezes the answers. Scores are **derived on read** by the pure
   `scatter.score_round` / `answer_points` (valid = starts with the letter after normalising and not
-  rejected; valid and unique in its category = 1) and never stored. The host may reject or
-  re-accept an answer after reveal (`host_verdict`; `PUT .../verdict`), and the leaderboard sums
-  the revealed rounds over the roster. Ending the game does not reveal an unrevealed round.
+  rejected; valid and matching no other valid answer in its category = 1) and never stored. Two
+  answers match when `normalize` agrees, or when `dedupe_key` (plural-folded: "potatoes" and
+  "potato") agrees unless the host _accepted_ either, which means "its own answer"; a typo pair
+  one edit apart (keys of 6+ characters) scores as written and is only flagged. The host may
+  reject, accept or clear an answer after reveal (`host_verdict`; `PUT .../verdict`), and the
+  leaderboard sums the revealed rounds over the roster. `GET /scatter/rounds/{n}/review` (host;
+  409 before reveal) is a read over the same rows: `scatter.review` partitions every answer once
+  into **needs_decision** (near-duplicates, answers under 3 letters), **informational** (exact
+  duplicates, wrong letters, host rejects) and an auto-accepted count. It writes, audits and
+  publishes nothing, and "Accept the rest" is client-side. The server stays the authority on the
+  letter; the phone's hint is a convenience. Category fit is not judged. Ending the game does not
+  reveal an unrevealed round.
 - **Events.** `game_changed` (status, reveal, hide, roster, a win, a round start, a verdict) and
   `game_activity` (a note dropped or taken back, a square marked, an answer saved) go to
   `game:{id}` after commit. `POST /sse-tickets` takes exactly one of `session_id` or
@@ -794,6 +839,12 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   roster rows, rounds and games; the export gains the six tables. Audit: `game.created`,
   `game.opened`, `game.started`, `game.reveal_started`, `game.note_revealed`, `game.note_hidden`,
   `game.round_started`, `game.round_revealed`, `game.answer_verdict`, `game.ended`.
+- **TV target** (ADR-0018 amendment 2026-11-25). `household_tv_target` holds the game a host
+  sent to the paired TV. `PUT /games/tv-target {game_id|null}` (`sessions:run`) sets or clears it
+  (other household's game 404, ended game 409, audit `game.shown_on_tv`); `GET /games/tv-target`
+  (any device or account) returns `{game_id}` and returns `null` once the game has ended. No
+  event: the TV polls the snapshot. The row cascades with its game, so person removal and Start
+  fresh need no code; it is in `NOT_EXPORTED`.
 
 ## Where business logic belongs
 

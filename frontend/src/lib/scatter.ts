@@ -64,9 +64,48 @@ export function canStartRound(categories: readonly string[]): boolean {
   return categories.length >= 1 && categories.length <= CATEGORY_MAX;
 }
 
-/** The draft as the PUT body: every category, a blank clearing it. */
-export function answerBody(draft: readonly string[]): { category_index: number; text: string }[] {
-  return draft.map((text, category_index) => ({ category_index, text: text.trim() }));
+const ARTICLES = new Set(["a", "an", "the"]);
+
+/**
+ * A port of the server's `scatter.normalize` for the phone hint only: casefold, strip accents and
+ * punctuation, drop leading a/an/the, collapse spaces. Both are tested against one shared vector
+ * file (backend/tests/vectors/scatter_normalize.json). The server stays the authority.
+ */
+export function normalize(text: string): string {
+  const kept = [...text.toLowerCase().normalize("NFKD")]
+    .filter((c) => /[\s\p{L}\p{N}]/u.test(c))
+    .join("");
+  const words = kept.split(/\s+/).filter(Boolean);
+  while (words.length > 1 && ARTICLES.has(words[0] as string)) words.shift();
+  return words.join(" ");
+}
+
+/** Does the answer start with the round's letter? An empty answer does not. */
+export function startsWithLetter(answer: string, letter: string): boolean {
+  return normalize(answer).startsWith(normalize(letter));
+}
+
+/** "Must start with P" once something is typed and it does not; null while fine or empty. */
+export function letterHint(answer: string, letter: string): string | null {
+  if (!answer.trim() || startsWithLetter(answer, letter)) return null;
+  return `Must start with ${letter}`;
+}
+
+/** What the phone sends for a field: an answer that fails the letter is sent as blank. */
+export function sendableText(text: string, letter?: string): string {
+  const clean = text.trim();
+  return letter !== undefined && !startsWithLetter(clean, letter) ? "" : clean;
+}
+
+/** The draft as the PUT body: every category, a blank clearing it (or a failing answer). */
+export function answerBody(
+  draft: readonly string[],
+  letter?: string,
+): { category_index: number; text: string }[] {
+  return draft.map((text, category_index) => ({
+    category_index,
+    text: sendableText(text, letter),
+  }));
 }
 
 /** Start the draft from what the server already has (a reload mid-round). */
@@ -79,10 +118,15 @@ export function draftFrom(
   return draft;
 }
 
-/** Has the draft changed since the server last confirmed it? */
-export function isDirty(draft: readonly string[], saved: readonly string[]): boolean {
+/** Has what would be sent changed since the server last confirmed it? */
+export function isDirty(
+  draft: readonly string[],
+  saved: readonly string[],
+  letter?: string,
+): boolean {
   return (
-    draft.length !== saved.length || draft.some((t, i) => t.trim() !== (saved[i] as string).trim())
+    draft.length !== saved.length ||
+    draft.some((t, i) => sendableText(t, letter) !== (saved[i] as string).trim())
   );
 }
 
@@ -134,4 +178,34 @@ export function nextVerdict(current: "accepted" | "rejected" | null): "accepted"
 /** Points, with the unit. */
 export function pointsLabel(points: number): string {
   return `${points} ${points === 1 ? "pt" : "pts"}`;
+}
+
+type Verdict = "accepted" | "rejected" | null;
+type ReviewKind =
+  "near_duplicate" | "short" | "duplicate" | "auto_rejected_letter" | "host_rejected";
+
+/** The card's heading, in plain words. */
+export function reviewTitle(kind: ReviewKind, merged: boolean): string {
+  if (kind === "short") return "Very short answer";
+  if (kind === "near_duplicate") return merged ? "Nearly the same answer" : "Possible typo";
+  return kind === "duplicate"
+    ? "Exact duplicate"
+    : kind === "host_rejected"
+      ? "You rejected"
+      : "Wrong letter";
+}
+
+/** True once every answer of a merged card was accepted ("counted separately"). */
+export function countedSeparately(answers: readonly { verdict: Verdict }[]): boolean {
+  return answers.length > 0 && answers.every((a) => a.verdict === "accepted");
+}
+
+/** "3 answers accepted automatically". */
+export function autoAcceptedLine(count: number): string {
+  return `${count} ${count === 1 ? "answer" : "answers"} accepted automatically`;
+}
+
+/** The collapsed section's label: "Wrong letter and exact duplicates (3)". */
+export function informationalLabel(answerCount: number): string {
+  return `Wrong letter and exact duplicates (${answerCount})`;
 }

@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Any
 
 import pytest
@@ -29,9 +30,19 @@ def _test_environment(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 async def _jar(host: Phone, **extra: Any) -> str:
-    resp = await host.post(GAMES, {"kind": "gratitude_jar", "title": "Thanksgiving", **extra})
+    """A manual jar by default: the original one-note-at-a-time flow. Cycle tests pass
+    `reveal_mode="cycle"`."""
+    body = {"kind": "gratitude_jar", "title": "Thanksgiving", "reveal_mode": "manual", **extra}
+    resp = await host.post(GAMES, body)
     assert resp.status_code == 201, resp.text
     return str(resp.json()["id"])
+
+
+async def _start(host: Phone, gid: str, seed: int = 7) -> Response:
+    return await host.client.post(
+        f"{GAMES}/{gid}/jar/start-reveal",
+        headers={"X-FNH-CSRF": await host.csrf(), "X-FNH-Test-Seed": str(seed)},
+    )
 
 
 @asynccontextmanager
@@ -272,3 +283,147 @@ async def test_the_export_includes_games_and_notes(two_households: Pair) -> None
         names = zipfile.ZipFile(io.BytesIO(resp.content)).namelist()
         for table in ("games", "game_players", "gratitude_notes"):
             assert f"tables/{table}.json" in names
+
+
+# ---- Auto-cycle (ADR-0018 amendment, part B) ----
+
+
+async def test_a_config_without_reveal_mode_is_manual_and_the_api_default_is_cycle(
+    two_households: Pair,
+) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        created = await host.post(GAMES, {"kind": "gratitude_jar", "title": "Default"})
+        assert created.json()["jar"]["mode"] == "cycle"
+        cfg = await _rows(a, "SELECT config FROM games WHERE id = :g", g=created.json()["id"])
+        assert cfg[0].config["reveal_mode"] == "cycle" and cfg[0].config["cycle_seconds"] == 12
+        bad = await host.post(GAMES, {"kind": "gratitude_jar", "title": "x", "cycle_seconds": 4})
+        assert bad.status_code == 422
+        gid = await _jar(host)
+        await _rows(a, "UPDATE games SET config = '{}'::jsonb WHERE id = :g RETURNING 1", g=gid)
+        assert (await host.client.get(f"{GAMES}/{gid}")).json()["jar"]["mode"] == "manual"
+
+
+async def test_start_shows_every_unhidden_note_in_a_stored_grouped_order(
+    two_households: Pair,
+) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        gid = await _jar(host, reveal_mode="cycle", cycle_seconds=9)
+        async with _player(a, host) as (p, sam):
+            for body in ("family", "football", "my family", "hide me", "pie"):
+                assert (await _drop(p, gid, sam, body, anonymous=body == "pie")).status_code == 201
+            before = (await p.client.get(f"{GAMES}/{gid}")).json()["jar"]
+            assert before["revealed"] == [] and before["cycle"] is None
+            assert before["note_count"] == 5
+            mod = (await host.client.get(f"{GAMES}/{gid}/jar/moderation")).json()
+            bad = next(n["id"] for n in mod if n["body"] == "hide me")
+            await _send(host, "POST", f"{GAMES}/{gid}/jar/notes/{bad}/hide")
+
+            snap = (await _start(host, gid)).json()["jar"]
+            assert snap["mode"] == "cycle" and snap["current"] is None
+            assert sorted(n["body"] for n in snap["revealed"]) == [
+                "family",
+                "football",
+                "my family",
+                "pie",
+            ]
+            order = [n["body"] for n in snap["revealed"]]
+            assert abs(order.index("family") - order.index("my family")) == 1
+            assert next(n for n in snap["revealed"] if n["body"] == "pie")["author"] is None
+            assert snap["cycle"]["dwell_seconds"] == 9 and snap["cycle"]["paused_index"] is None
+            assert snap["cycle"]["anchor_at"] and snap["cycle"]["server_now"]
+            # The hidden note never left the server, and a guest sees the same list.
+            guest = (await p.client.get(f"{GAMES}/{gid}")).json()["jar"]
+            assert "hide me" not in str(guest)
+            rows = await _rows(
+                a,
+                "SELECT revealed_at, reveal_position FROM gratitude_notes WHERE game_id = :g "
+                "AND hidden_at IS NULL ORDER BY reveal_position",
+                g=gid,
+            )
+            assert [r.reveal_position for r in rows] == [0, 1, 2, 3]
+            assert all(r.revealed_at is not None for r in rows)
+            # Next note does not exist in cycle mode.
+            assert (await _send(host, "POST", f"{GAMES}/{gid}/jar/reveal-next")).status_code == 409
+            assert (await _start(host, gid)).status_code == 409
+
+
+async def test_pause_resume_reshuffle_and_hide_move_the_cycle(two_households: Pair) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        gid = await _jar(host, reveal_mode="cycle")
+        post = f"{GAMES}/{gid}/jar"
+        # Not started yet.
+        assert (await _send(host, "POST", f"{post}/pause")).status_code == 409
+        async with _player(a, host) as (p, sam):
+            for i in range(4):
+                await _drop(p, gid, sam, f"note number {i}")
+            await _start(host, gid)
+            await _rows(
+                a,
+                "UPDATE games SET cycle_anchor_at = now() - interval '30 seconds' "
+                "WHERE id = :g RETURNING 1",
+                g=gid,
+            )
+            paused = (await _send(host, "POST", f"{post}/pause")).json()["jar"]["cycle"]
+            assert paused["paused_index"] == 2  # 30 s / 12 s -> third note
+            again = (await _send(host, "POST", f"{post}/pause")).json()["jar"]["cycle"]
+            assert again["paused_index"] == 2 and again["anchor_at"] == paused["anchor_at"]
+            resumed = (await _send(host, "POST", f"{post}/resume")).json()["jar"]["cycle"]
+            assert resumed["paused_index"] is None
+            gap = (
+                datetime.fromisoformat(resumed["server_now"])
+                - datetime.fromisoformat(resumed["anchor_at"])
+            ).total_seconds()
+            assert 24 <= gap < 36  # the held note (index 2) has just begun its dwell
+            assert (await _send(host, "POST", f"{post}/resume")).status_code == 200  # no-op
+
+            await _send(host, "POST", f"{post}/pause")
+            shuffled = await host.client.post(
+                f"{post}/reshuffle",
+                headers={"X-FNH-CSRF": await host.csrf(), "X-FNH-Test-Seed": "99"},
+            )
+            assert shuffled.json()["jar"]["cycle"]["paused_index"] == 0
+            ids = [n["id"] for n in shuffled.json()["jar"]["revealed"]]
+            await _send(host, "POST", f"{post}/resume")
+            await _send(host, "POST", f"{post}/notes/{ids[0]}/hide")
+            after = (await p.client.get(f"{GAMES}/{gid}")).json()["jar"]
+            assert [n["id"] for n in after["revealed"]] == ids[1:]
+            actions = [r.action for r in await _rows(a, "SELECT action FROM audit_events")]
+            assert "game.jar_reshuffled" in actions and "game.jar_paused" in actions
+        assert (await _send(host, "POST", f"{GAMES}/{gid}/end")).json()["status"] == "ended"
+        assert (await _send(host, "POST", f"{post}/pause")).status_code == 409
+
+
+async def test_manual_jars_refuse_the_cycle_controls(two_households: Pair) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        gid = await _jar(host)
+        async with _player(a, host) as (p, sam):
+            await _drop(p, gid, sam, "one")
+            await _start(host, gid)
+            for action in ("pause", "resume", "reshuffle"):
+                resp = await _send(host, "POST", f"{GAMES}/{gid}/jar/{action}")
+                assert resp.status_code == 409, action
+            snap = (await _send(host, "POST", f"{GAMES}/{gid}/jar/reveal-next")).json()["jar"]
+            assert snap["mode"] == "manual" and snap["cycle"] is None
+
+
+async def test_cycle_controls_are_host_only_and_household_scoped(two_households: Pair) -> None:
+    a, b = two_households
+    async with phone() as host_a, phone() as host_b:
+        await _host(host_a, a)
+        await _host(host_b, b)
+        gid = await _jar(host_a, reveal_mode="cycle")
+        async with _player(a, host_a) as (p, sam):
+            await _drop(p, gid, sam, "x")
+            await _start(host_a, gid)
+            for action in ("pause", "resume", "reshuffle"):
+                url = f"{GAMES}/{gid}/jar/{action}"
+                assert (await _send(host_b, "POST", url)).status_code == 404
+                assert (await _send(p, "POST", url)).status_code in (401, 403)

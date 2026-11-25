@@ -12,8 +12,10 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    ForeignKey,
     Integer,
     Numeric,
+    SmallInteger,
     String,
     UniqueConstraint,
     text,
@@ -34,6 +36,9 @@ class Game(Base):
         UniqueConstraint("id", "household_id"),
         CheckConstraint("kind IN ('gratitude_jar', 'bingo', 'scattergories')", name="kind"),
         CheckConstraint("status IN ('draft', 'open', 'live', 'ended')", name="status"),
+        CheckConstraint(
+            "cycle_paused_index IS NULL OR cycle_paused_index >= 0", name="cycle_paused_index"
+        ),
         scoped_fk("created_by_account_id", "accounts"),
     )
 
@@ -50,6 +55,9 @@ class Game(Base):
     created_at: Mapped[datetime] = created_at()
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Gratitude Jar auto-cycle (ADR-0018 amendment B); null for other games and manual jars.
+    cycle_anchor_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cycle_paused_index: Mapped[int | None] = mapped_column(Integer)
 
 
 class GamePlayer(Base):
@@ -110,6 +118,28 @@ class BingoCard(Base):
     created_at: Mapped[datetime] = created_at()
 
 
+class BingoCall(Base):
+    """One number called in a classic bingo game. No person column: it goes with its game."""
+
+    __tablename__ = "bingo_calls"
+    __table_args__ = (
+        UniqueConstraint("game_id", "seq"),
+        UniqueConstraint("game_id", "value"),
+        CheckConstraint("value BETWEEN 1 AND 75", name="value_range"),
+        CheckConstraint("seq >= 0", name="seq_nonneg"),
+        scoped_fk("game_id", "games", ondelete="CASCADE"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    household_id: Mapped[uuid.UUID] = household_fk()
+    game_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    seq: Mapped[int] = mapped_column(SmallInteger)
+    value: Mapped[int] = mapped_column(SmallInteger)
+    called_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
 class ScatterRound(Base):
     """One round of a scattergories game. `ends_at` is the server clock for the round;
     the effective state (running, closed, revealed) is derived from it on read."""
@@ -158,6 +188,22 @@ class ScatterAnswer(Base):
     text: Mapped[str] = mapped_column(String(60))
     host_verdict: Mapped[str | None] = mapped_column(String(10))
     created_at: Mapped[datetime] = created_at()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=sql_text("now()")
+    )
+
+
+class HouseholdTvTarget(Base):
+    """The game a host sent to the household's paired TV (ADR-0018 amendment). At most one row."""
+
+    __tablename__ = "household_tv_target"
+    __table_args__ = (scoped_fk("game_id", "games", ondelete="CASCADE"),)
+
+    household_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("households.id", ondelete="CASCADE"), primary_key=True
+    )
+    game_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    set_by_account_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=sql_text("now()")
     )

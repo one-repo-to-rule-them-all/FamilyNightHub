@@ -21,9 +21,14 @@ test.describe("scattergories", () => {
     // Host: start the game.
     const hostContext = await browser.newContext({ baseURL: origin });
     await signInAsHost(hostContext, night, origin);
-    const host = await hostContext.newPage();
-    await host.goto("/host/games");
-    await host.getByTestId("create-scatter").click();
+    const hub = await hostContext.newPage();
+    await hub.goto("/host/games");
+    // Creating a game opens its control page in a new tab; the hub tab stays put.
+    const [host] = await Promise.all([
+      hub.waitForEvent("popup"),
+      hub.getByTestId("create-scatter").click(),
+    ]);
+    await expect(hub).toHaveURL(/\/host\/games$/);
     await expect(host).toHaveURL(/\/host\/games\/[0-9a-f-]{36}$/);
     const gameId = host.url().split("/").pop()!;
     const hostScreen = host.getByTestId("host-game");
@@ -60,15 +65,20 @@ test.describe("scattergories", () => {
     // Phone: answer both categories with words that start with the round's letter.
     const letter = ((await page.getByTestId("scatter-letter").textContent()) ?? "").trim();
     expect(letter).toMatch(/^[A-Z]$/);
+    // The phone says so, as text, as soon as the first letter is wrong, and does not send it.
+    await page.getByTestId("scatter-input-1").fill(`Z${letter}`);
+    await expect(page.getByTestId("scatter-hint-1")).toContainText(`Must start with ${letter}`);
+    await expectNoAxeViolations(page);
     await page.getByTestId("scatter-input-0").fill(`${letter}ie`);
     await page.getByTestId("scatter-input-1").fill(`${letter}am`);
+    await expect(page.getByTestId("scatter-hint-1")).toHaveCount(0);
     await page.getByTestId("primary-action").click();
     await expect(page.getByTestId("scatter-saved")).toContainText("Saved", POLL);
 
     // Nobody sees an answer before the reveal: the host sees only that Ava answered.
     await expect(host.getByTestId("scatter-player")).toContainText("2 of 2 answered", POLL);
-    await expect(host.getByText(`${letter}ie`)).toHaveCount(0);
-    await expect(tv.getByText(`${letter}ie`)).toHaveCount(0);
+    await expect(host.getByText(`${letter}ie`, { exact: true })).toHaveCount(0);
+    await expect(tv.getByText(`${letter}ie`, { exact: true })).toHaveCount(0);
 
     // Reveal early: answers, scores and the leaderboard appear on every screen.
     await host.getByTestId("scatter-reveal").click();
@@ -83,10 +93,21 @@ test.describe("scattergories", () => {
     await expect(page.getByTestId("scatter-standing-points").first()).toContainText("2 pts", POLL);
     await expectNoAxeViolations(page);
 
-    // The host rejects one answer: the score re-derives for everyone.
+    // The host's review lists only what needs a decision: here nothing, both answers count.
+    await expect(host.getByTestId("scatter-review")).toHaveAttribute("data-needs", "0", POLL);
+    await expect(host.getByTestId("review-auto")).toContainText("2 answers accepted automatically");
+    await expect(host.getByTestId("review-card")).toHaveCount(0);
+
+    // Category fit is the host's call, one tap away: reject one answer, the score re-derives.
+    await host.getByTestId("review-show-all").click();
     await host.getByTestId("reject-answer").first().click();
     await expect(page.getByTestId("scatter-standing-points").first()).toContainText("1 pt", POLL);
     await expect(tv.getByTestId("scatter-standing-points").first()).toContainText("1 pt", POLL);
+
+    // Accept the rest closes the review without writing anything.
+    await host.getByTestId("review-accept-rest").click();
+    await expect(host.getByTestId("review-closed")).toBeVisible();
+    await expect(page.getByTestId("scatter-standing-points").first()).toContainText("1 pt");
 
     await host.getByTestId("end-game").click();
     await expect(screen).toHaveAttribute("data-status", "ended", POLL);

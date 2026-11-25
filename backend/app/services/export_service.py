@@ -51,6 +51,7 @@ TABLES = (
     "game_players",
     "gratitude_notes",
     "bingo_cards",
+    "bingo_calls",
     "scatter_rounds",
     "scatter_answers",
     "audit_events",
@@ -62,8 +63,9 @@ ORDER_BY = {
     "session_attendance": "first_seen_at, id",
     "game_players": "joined_at, id",
     "scatter_rounds": "started_at, id",
+    "bingo_calls": "seq",
 }
-NOT_EXPORTED = frozenset({"magic_links", "photo_deletions"})
+NOT_EXPORTED = frozenset({"magic_links", "photo_deletions", "household_tv_target"})
 SECRET_COLUMNS = frozenset({"token_hash", "password_hash", "pin_hash", "night_code_hash"})
 
 README = """Family Night export: {household}
