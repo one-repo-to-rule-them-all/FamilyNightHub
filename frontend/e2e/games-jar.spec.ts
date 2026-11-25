@@ -79,6 +79,16 @@ test.describe("gratitude jar", () => {
     await expect.poll(async () => tv.getByTestId("tv-note").innerText(), POLL).not.toBe(first);
     await expect(tv.getByTestId("tv-jar-progress")).toContainText("of 2");
     await expect(page.getByTestId("jar-cycle-counter")).toContainText("of 2");
+    // A note fades in on every change; scan once the (finite) animations have settled, or axe
+    // reads the half-transparent text as low contrast.
+    await page.evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+          .map((a) => a.finished),
+      ),
+    );
     await expectNoAxeViolations(page);
 
     // Pause holds the note on both screens; Resume lets it go on.
@@ -86,8 +96,8 @@ test.describe("gratitude jar", () => {
     await expect(tv.getByTestId("tv-jar-paused")).toBeVisible(POLL);
     await expect(page.getByTestId("jar-paused")).toBeVisible(POLL);
     const held = await tv.getByTestId("tv-note").innerText();
-    await page.waitForTimeout(6_000);
-    expect(await tv.getByTestId("tv-note").innerText()).toBe(held);
+    // The paused badge is the server-confirmed state; the note on screen is the one being held.
+    await expect.poll(async () => tv.getByTestId("tv-note").innerText()).toBe(held);
     await host.getByTestId("jar-resume").click();
     await expect(tv.getByTestId("tv-jar-paused")).toHaveCount(0, POLL);
 

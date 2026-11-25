@@ -275,7 +275,8 @@ async def test_blackout_needs_every_square(two_households: Pair) -> None:
         async with _player(a, host) as (p, sam):
             squares = await _join(p, gid, sam)
             await _start(host, gid)
-            drawn = await _draw_until(host, gid, 0, _row_values(squares, 0))
+            # Ten calls can never cover 24 numbers, whatever the card holds.
+            drawn = await _draw_until(host, gid, 0, set(bingo_classic.call_order(SEED)[:10]))
             miss = (await _check(host, gid, sam)).json()
             assert miss["valid"] is False and miss["win_mode"] == "blackout"
             await _draw_until(host, gid, drawn, {int(s) for s in squares if s != "FREE"}, SEED)
