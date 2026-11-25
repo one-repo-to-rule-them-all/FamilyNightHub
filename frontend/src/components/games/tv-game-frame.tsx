@@ -40,7 +40,7 @@ export function TvGameFrame({
       className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-[1em] text-center"
       style={{ maxWidth }}
     >
-      <header className="tv-clear-corner shrink-0">
+      <header className="tv-clear-corner-centered shrink-0">
         <h1 className="tv-title">{title}</h1>
         {subtitle ? (
           <div className="tv-body mt-[0.3em] text-muted-foreground">{subtitle}</div>

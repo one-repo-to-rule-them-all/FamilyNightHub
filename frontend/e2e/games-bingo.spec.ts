@@ -50,6 +50,10 @@ test.describe("thanksgiving bingo", () => {
     await pairAsTv(tv);
     await tv.goto(`/tv/games/${gameId}`);
     await expect(tv.getByTestId("tv-bingo")).toHaveAttribute("data-live", "ready", POLL);
+    // The title stays centred in the window even while the Full screen corner shows.
+    const heading = await tv.getByRole("heading", { level: 1 }).boundingBox();
+    const width = tv.viewportSize()?.width ?? 0;
+    expect(Math.abs(heading!.x + heading!.width / 2 - width / 2)).toBeLessThan(8);
     await expect(tv.getByTestId("tv-bingo-player")).toHaveCount(0);
 
     // Phone: join as the first person and take a seat.

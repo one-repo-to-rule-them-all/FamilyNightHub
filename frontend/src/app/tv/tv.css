@@ -15,6 +15,11 @@
   margin-right: 14em;
 }
 
+/* A centred header (the games' frame) clears the corner on both sides, so it stays centred. */
+.tv-screen:has(.tv-corner) .tv-clear-corner-centered {
+  margin-inline: 14em;
+}
+
 .tv-display {
   font-size: 4.5em;
   font-weight: 650;
