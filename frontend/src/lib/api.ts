@@ -61,6 +61,8 @@ export type GameSummary = Schemas["GameSummaryOut"];
 export type JarNote = Schemas["JarNoteOut"];
 export type OwnJarNote = Schemas["OwnNoteOut"];
 export type ModerationNote = Schemas["ModerationNoteOut"];
+export type BingoCard = Schemas["BingoCardOut"];
+export type BingoPlayer = Schemas["BingoPlayerOut"];
 export type AccountRole = AdminAccount["role"];
 export type Profile = Schemas["ProfileOut"];
 export type ProfileNight = Schemas["ProfileNightOut"];
@@ -292,7 +294,9 @@ export const api = {
   // Games (ADR-0018). Reads work for any household viewer; hosting is `sessions:run`.
   games: () => request<GameSummary[]>("GET", "/games"),
   game: (gameId: string) => request<Game>("GET", `/games/${encodeURIComponent(gameId)}`),
-  createGame: (body: Schemas["GameCreateIn"]) => request<Game>("POST", "/games", body),
+  createGame: (
+    body: Pick<Schemas["GameCreateIn"], "kind" | "title"> & Partial<Schemas["GameCreateIn"]>,
+  ) => request<Game>("POST", "/games", body),
   endGame: (gameId: string) => request<Game>("POST", `/games/${encodeURIComponent(gameId)}/end`),
   sseGameTicket: (gameId: string) =>
     request<Schemas["SseTicketOut"]>("POST", "/sse-tickets", { game_id: gameId }),
@@ -316,6 +320,20 @@ export const api = {
     request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/start-reveal`),
   jarRevealNext: (gameId: string) =>
     request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/reveal-next`),
+  openGame: (gameId: string) => request<Game>("POST", `/games/${encodeURIComponent(gameId)}/open`),
+  startGame: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/start`),
+  joinBingo: (gameId: string, personId: string) =>
+    request<BingoCard>("POST", `/games/${encodeURIComponent(gameId)}/bingo/join`, {
+      person_id: personId,
+    }),
+  myBingoCards: (gameId: string) =>
+    request<BingoCard[]>("GET", `/games/${encodeURIComponent(gameId)}/bingo/mine`),
+  markBingoSquare: (gameId: string, index: number, personId: string, marked: boolean) =>
+    request<BingoCard>(
+      marked ? "PUT" : "DELETE",
+      `/games/${encodeURIComponent(gameId)}/bingo/mark/${index}?person_id=${encodeURIComponent(personId)}`,
+    ),
 
   // Nights (host + TV screens). Mutations are host-only; reads work for any household viewer.
   createNight: (body: Schemas["SessionCreateIn"]) =>

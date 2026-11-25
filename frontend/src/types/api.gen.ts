@@ -980,7 +980,7 @@ export interface paths {
         put?: never;
         /**
          * Create Game
-         * @description Start a game (hosts). Only the Gratitude Jar exists so far.
+         * @description Create a game (hosts): a jar opens at once, a bingo round starts as a draft.
          */
         post: operations["create_game_api_v1_games_post"];
         delete?: never;
@@ -1001,6 +1001,70 @@ export interface paths {
          * @description The snapshot: revealed notes only, never an anonymous note's author.
          */
         get: operations["get_game_api_v1_games__game_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/bingo/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join Bingo
+         * @description Take a seat as a person bound to this phone and get a card (idempotent).
+         */
+        post: operations["join_bingo_api_v1_games__game_id__bingo_join_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/bingo/mark/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark Square
+         * @description Mark a square on your own card. The mark that completes the pattern is the win.
+         */
+        put: operations["mark_square_api_v1_games__game_id__bingo_mark__index__put"];
+        post?: never;
+        /**
+         * Unmark Square
+         * @description Take a mark back. A win already recorded stays.
+         */
+        delete: operations["unmark_square_api_v1_games__game_id__bingo_mark__index__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/bingo/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Cards
+         * @description The cards of the people this phone is acting as. Nobody else's card is readable.
+         */
+        get: operations["my_cards_api_v1_games__game_id__bingo_mine_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1164,6 +1228,46 @@ export interface paths {
          * @description Stop taking notes and fix a shuffled order for the reveal.
          */
         post: operations["start_reveal_api_v1_games__game_id__jar_start_reveal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Game
+         * @description Let the family join (draft to open).
+         */
+        post: operations["open_game_api_v1_games__game_id__open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Round
+         * @description Start the round: squares can be marked (open to live).
+         */
+        post: operations["start_round_api_v1_games__game_id__start_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2238,6 +2342,66 @@ export interface components {
              */
             status: "active" | "pending";
         };
+        /** BingoCardOut */
+        BingoCardOut: {
+            /** Finish Place */
+            finish_place: number | null;
+            /** Marked */
+            marked: number[];
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Squares */
+            squares: string[];
+            /** Squares From Bingo */
+            squares_from_bingo: number;
+            /** Won */
+            won: boolean;
+        };
+        /** BingoJoinIn */
+        BingoJoinIn: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** BingoOut */
+        BingoOut: {
+            /** End On First Win */
+            end_on_first_win: boolean;
+            /** Free Center */
+            free_center: boolean;
+            /** Players */
+            players: components["schemas"]["BingoPlayerOut"][];
+            /**
+             * Win Mode
+             * @enum {string}
+             */
+            win_mode: "line" | "blackout";
+        };
+        /** BingoPlayerOut */
+        BingoPlayerOut: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /** Finish Place */
+            finish_place: number | null;
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Squares From Bingo */
+            squares_from_bingo: number;
+            /** Won */
+            won: boolean;
+        };
         /**
          * BulkAddIn
          * @description Typed titles, one per line in the UI ("Title (year)" parsed client-side).
@@ -2458,17 +2622,34 @@ export interface components {
              */
             allow_anonymous: boolean;
             /**
+             * End On First Win
+             * @default true
+             */
+            end_on_first_win: boolean;
+            /**
+             * Free Center
+             * @default true
+             */
+            free_center: boolean;
+            /**
              * Kind
              * @enum {string}
              */
             kind: "gratitude_jar" | "bingo" | "scattergories";
             /** Title */
             title: string;
+            /**
+             * Win Mode
+             * @default line
+             * @enum {string}
+             */
+            win_mode: "line" | "blackout";
         };
         /** GameOut */
         GameOut: {
             /** Allow Anonymous */
             allow_anonymous: boolean;
+            bingo?: components["schemas"]["BingoOut"] | null;
             /**
              * Created At
              * Format: date-time
@@ -5851,6 +6032,210 @@ export interface operations {
             };
         };
     };
+    join_bingo_api_v1_games__game_id__bingo_join_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BingoJoinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BingoCardOut"];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_square_api_v1_games__game_id__bingo_mark__index__put: {
+        parameters: {
+            query: {
+                person_id: string;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BingoCardOut"];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unmark_square_api_v1_games__game_id__bingo_mark__index__delete: {
+        parameters: {
+            query: {
+                person_id: string;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BingoCardOut"];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_cards_api_v1_games__game_id__bingo_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BingoCardOut"][];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     end_game_api_v1_games__game_id__end_post: {
         parameters: {
             query?: never;
@@ -6141,6 +6526,96 @@ export interface operations {
         };
     };
     start_reveal_api_v1_games__game_id__jar_start_reveal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_game_api_v1_games__game_id__open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_round_api_v1_games__game_id__start_post: {
         parameters: {
             query?: never;
             header?: never;

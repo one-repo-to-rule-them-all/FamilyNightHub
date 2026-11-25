@@ -37,7 +37,7 @@ backend/app/
 | Sessions | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET/PATCH /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}`, `PUT /sessions/{id}/slideshow` | Host (`sessions:run`): create (code shown once; `voting_method` defaults to the household's), change the voting method while `draft`, rotate code, shortlist, open/close voting, close the night, start/stop the TV slideshow. Snapshot and history: any device or account of the household |
 | Ballots | `PUT /api/v1/sessions/{id}/ballots`, `PUT …/ballots/proxy`, `GET …/ballots/mine`, `GET …/voters` | Phone casts/replaces a bound person's ballot; host proxy ballot (`ballots:proxy`); a phone reads back its own people's ballots; who has voted (avatars only) |
 | Live | `/api/v1/sse-tickets {session_id | game_id}`, `/api/v1/sessions/{id}/stream`, `/api/v1/games/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md), [ADR-0018](decisions/ADR-0018-games-tab.md) |
-| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next}` | Gratitude Jar ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate, reveal and end; a phone drops a note as a bound person; any device or account reads the snapshot. See "Games" |
+| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next}`, `POST /games/{id}/{open,start}`, `POST …/bingo/join`, `GET …/bingo/mine`, `PUT/DELETE …/bingo/mark/{index}?person_id=` | Gratitude Jar and Thanksgiving Bingo ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate, reveal and end; a phone drops a note as a bound person; any device or account reads the snapshot. See "Games" |
 | Photos | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}` | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below |
 | Ratings | `PUT /api/v1/sessions/{id}/ratings`, `PUT …/ratings/proxy`, `GET …/ratings/mine` | 1–5 per person, once the night is `tonight`/`closed`: a phone rates as its bound people, a host proxy-rates (`ballots:proxy`), a phone reads back its own people's scores. See "Ratings" |
 | Movies | `GET /api/v1/tmdb/search?q=` | TMDB search proxy for hosts (503 when TMDB is off or down). The library itself is admin-only (next rows) |
@@ -733,9 +733,9 @@ deletes the bucket objects, then the household row, whose cascade empties every 
 ## Games
 
 [ADR-0018](decisions/ADR-0018-games-tab.md); `services/games_service.py`, `api/v1/games.py`,
-`domain/games/jar.py`. Games are household-scoped and **not tied to a night**: `games`
+`domain/games/jar.py`, `bingo.py`, `bingo_pool.py`. Games are household-scoped and **not tied to a night**: `games`
 (`kind`, `status` `draft/open/live/ended`, `config`, `created_by_account_id`, `reveal_seed`),
-`game_players` (roster, used from the bingo slice) and `gratitude_notes`.
+`game_players` (roster), `gratitude_notes` and `bingo_cards`.
 
 - **Gratitude Jar.** Hosts create a jar (`open`). A phone drops a note as a person it is
   acting as (`require_can_act_as`, consent gate; 1-280 chars, whitespace collapsed; `anonymous`
@@ -747,13 +747,31 @@ deletes the bucket objects, then the household row, whose cascade empties every 
   and `FOR SHARE` by a dropped note, so they serialize. Hosts read every note's text in
   `/jar/moderation` and can hide one before it shows (idempotent); an anonymous note never
   carries its author, even there. The snapshot holds revealed, unhidden notes only, and counts.
-- **Events.** `game_changed` (status, reveal, hide) and `game_activity` (a note dropped or
-  taken back) go to `game:{id}` after commit. `POST /sse-tickets` takes exactly one of
+- **Thanksgiving Bingo (slice B).** A host creates a round with `config` `win_mode`
+  (`line`|`blackout`), `free_center` and `end_on_first_win` (defaults line, true, true); it starts
+  as a `draft`, **open** (`POST /open`, idempotent) lets people join, **start** (`POST /start`)
+  makes it `live`, and `/end` ends it any time. **Join** (`/bingo/join`, as a person this phone
+  acts as, consent gate) draws 24 distinct squares from `bingo_pool.THANKSGIVING_POOL` with
+  `random.Random(seed ^ person.int)` (the seed is `secrets.randbits(64)`, pinned by
+  `X-FNH-Test-Seed` in test), inserts FREE at index 12 when `free_center`, stores the 25 strings in
+  `bingo_cards` and a `game_players` row; joining again returns the same card. **Mark/unmark**
+  (`PUT`/`DELETE …/bingo/mark/{0..24}?person_id=`) is idempotent, own card only, 409 unless the
+  round is `live`, and runs under the game row's `FOR UPDATE` then the card's. The completing mark
+  is the win (no buzz): `won_at` is `clock_timestamp()` (not `now()`, which is the transaction start
+  and could order two winners backwards), and with `end_on_first_win` the same transaction ends the
+  game, so of two phones completing at once one wins and the other gets 409. Otherwise the round
+  continues and `finish_place` is the `won_at` order. A recorded win survives an unmark. The
+  snapshot's `bingo` object has each player's avatar, `squares_from_bingo`, `won` and
+  `finish_place`, never squares or marks; `/bingo/mine` returns only the cards of people bound to
+  the caller's phone.
+- **Events.** `game_changed` (status, reveal, hide, roster, a win) and `game_activity` (a note
+  dropped or taken back, a square marked) go to `game:{id}` after commit. `POST /sse-tickets` takes exactly one of
   `session_id` or `game_id`; tickets carry a `scope`, and a night's stream refuses a game's
   ticket and the reverse.
-- **Lifecycle.** Merging people moves their notes and keeps the target's roster row; removing a
-  person (and Start fresh) deletes notes, roster rows and games; the export gains the three
-  tables. Audit: `game.created`, `game.reveal_started`, `game.note_revealed`,
+- **Lifecycle.** Merging people moves their notes and keeps the target's roster row and bingo
+  card (the source's card is dropped where the target has one); removing a person (and Start
+  fresh) deletes notes, cards, roster rows and games; the export gains the four tables. Audit:
+  `game.created`, `game.opened`, `game.started`, `game.reveal_started`, `game.note_revealed`,
   `game.note_hidden`, `game.ended`.
 
 ## Where business logic belongs

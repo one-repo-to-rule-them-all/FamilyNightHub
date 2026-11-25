@@ -21,6 +21,11 @@ class GameCreateIn(BaseModel):
     title: str = Field(min_length=1, max_length=80)
     # Gratitude Jar: may a note be dropped without a name on it?
     allow_anonymous: bool = True
+    # Bingo: what counts as a win, whether the middle square is free, and whether the first
+    # win ends the round.
+    win_mode: Literal["line", "blackout"] = "line"
+    free_center: bool = True
+    end_on_first_win: bool = True
 
 
 class JarAuthorOut(BaseModel):
@@ -55,9 +60,44 @@ class GameSummaryOut(BaseModel):
     created_at: datetime
 
 
+class BingoPlayerOut(BaseModel):
+    person_id: uuid.UUID
+    name: str
+    avatar_emoji: str
+    color: str
+    # The fewest unmarked squares in any one winning pattern (0 = won). Never which squares.
+    squares_from_bingo: int
+    won: bool
+    # 1 for the first finished card, 2 for the next; null until a card wins.
+    finish_place: int | None
+
+
+class BingoOut(BaseModel):
+    win_mode: Literal["line", "blackout"]
+    free_center: bool
+    end_on_first_win: bool
+    players: list[BingoPlayerOut]
+
+
 class GameOut(GameSummaryOut):
     allow_anonymous: bool
     jar: JarOut | None
+    bingo: BingoOut | None = None
+
+
+class BingoJoinIn(BaseModel):
+    person_id: uuid.UUID
+
+
+class BingoCardOut(BaseModel):
+    person_id: uuid.UUID
+    # 25 squares, row-major; the free centre reads "FREE".
+    squares: list[str]
+    # Indexes of the marked squares.
+    marked: list[int]
+    squares_from_bingo: int
+    won: bool
+    finish_place: int | None
 
 
 class NoteIn(BaseModel):

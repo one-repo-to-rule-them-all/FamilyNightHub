@@ -42,7 +42,7 @@ describe("games", () => {
   });
 
   it("only offers the jar so far", () => {
-    expect(PLAYABLE).toEqual(["gratitude_jar"]);
+    expect(PLAYABLE).toEqual(["gratitude_jar", "bingo"]);
     expect(KIND_COPY.gratitude_jar.name).toBe("Gratitude jar");
   });
 });

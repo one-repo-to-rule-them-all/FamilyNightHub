@@ -28,6 +28,7 @@ PostgreSQL 16 on Fly, SQLAlchemy 2 async, Alembic. Object storage on Tigris (S3 
 | `games` | yes | ADR-0018: `kind` (`gratitude_jar`/`bingo`/`scattergories`), `title`, `status` (`draft`/`open`/`live`/`ended`), `config jsonb`, `created_by_account_id`, `reveal_seed`, `started_at`/`ended_at`. Not tied to a night (migration `0009_games_core`) |
 | `game_players` | yes | The game's roster: `game_id`, `person_id`, `joined_at`; unique per pair (used from the bingo slice) |
 | `gratitude_notes` | yes | A jar note: `game_id`, `person_id` (the author; never exposed for `anonymous` notes), `body` (1-280), `anonymous`, `reveal_position` (unique per game), `revealed_at`, `hidden_at` |
+| `bingo_cards` | yes | ADR-0018 slice B (migration `0010_bingo`): `game_id`, `person_id`, `squares text[25]` (snapshot of the pool at join), `marked_mask` (25-bit int, bit i = square i), `won_at`; unique per (game, person) |
 | `audit_events` | yes | Who did what (session transitions, winner corrections, merges, revokes, deletes) |
 | `failed_jobs` | no (global) | ARQ dead letters: job name/id/try and a truncated error. Never job args |
 | `backup_runs` | no (global) | One row per backup run (`kind` photos/pg_dump, counts, errors) |
