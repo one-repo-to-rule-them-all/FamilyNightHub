@@ -694,7 +694,7 @@ win patterns differ.
    on an uncalled picture is 409 "That card hasn't been called."; unmarking is always allowed;
    marking never wins.
 7. **Claims are verbal; the host checks.** Players shout "¡Lotería!". `POST
-   /games/{id}/loteria/check {person_id}` verifies against the **called set** and the pattern,
+/games/{id}/loteria/check {person_id}` verifies against the **called set** and the pattern,
    never the player's taps, and returns `{valid, pattern: [indices] | null, missing}`. Invalid: no
    state change, no event, audited. Valid: `won_at = clock_timestamp()` if unset, and with
    `end_on_first_win` the game ends in the same transaction.
@@ -715,7 +715,7 @@ win patterns differ.
     card huge, called list, per-player **Check**), TV `tv-loteria.tsx` (current card very large,
     recent cards, a 54-card called board, winner), all on the shared frames, ADR-0008 tokens, an
     `aria-live` region for each call and the winner. `PLAYABLE` and `KIND_COPY` gain `loteria`.
-12. **Not in v1.** The spoken *canto* (rhyme) and audio, undo of a draw, a phone "¡Lotería!"
+12. **Not in v1.** The spoken _canto_ (rhyme) and audio, undo of a draw, a phone "¡Lotería!"
     button, custom patterns, 4 x 4 vs 5 x 5 choice, artwork beyond emoji.
 
 **Test plan** (targeted only). Pure modules at 100% with Hypothesis (tabla is 16 distinct deck ids;
@@ -731,10 +731,23 @@ and vice versa; cross-household 404. Vitest for the deck mirror and helpers; one
   choices at creation.
 - **L2.** A valid check ends the round: **yes** (used, as bingo A1); tickable off at creation.
 - **L3.** Pictures: **emoji + Spanish name** (used). Original illustrated cards would be a later
-  art task; the *canto* (traditional rhyme, audio) is deferred.
+  art task; the _canto_ (traditional rhyme, audio) is deferred.
 - **L4.** Deck spelling and English glosses follow the list the owner supplied (e.g. "El Violoncello",
   "Las Jaras", "El Negrito", "El Apache"). Some traditional names are dated or sensitive; the
   owner may want to rename or drop a few. They live in one data file.
 - **L5.** Reroll is unlimited before the host starts (used); the same call as bingo's reroll.
 - **L6.** Storage reuses the `bingo_cards`/`bingo_calls` tables (used; reasoning in point 4).
   Say if you would rather have dedicated tables.
+
+### Amendment 2026-11-26: card reroll
+
+Owner request: players may reroll their own bingo card. `POST /games/{id}/bingo/reroll` (body
+`{person_id}`, both modes) replaces the caller's own card in place while the game is `open`, as
+often as they like. The `bingo_cards` row is updated (`squares`, `marked_mask` back to the free
+centre's mask, `won_at` stays null), so there is no migration and no counter. It is 409 once the
+game is `draft`, `live` or `ended`, 403 for a person this phone does not act as, 404 across
+households, and behind the same consent gate as join. The seed follows join's pattern
+(`tie_seed`, pinned by `X-FNH-Test-Seed` in test) with the old squares mixed in, and a guard loop
+means the new card always differs from the old one. It publishes `game.activity` because the host's
+"N to go" changes. Nobody else's card is touched. The phone shows a **New card** button only while
+the game is open and the person has a card.

@@ -349,6 +349,10 @@ export const api = {
     request<BingoCard>("POST", `/games/${encodeURIComponent(gameId)}/bingo/join`, {
       person_id: personId,
     }),
+  rerollBingoCard: (gameId: string, personId: string) =>
+    request<BingoCard>("POST", `/games/${encodeURIComponent(gameId)}/bingo/reroll`, {
+      person_id: personId,
+    }),
   myBingoCards: (gameId: string) =>
     request<BingoCard[]>("GET", `/games/${encodeURIComponent(gameId)}/bingo/mine`),
   markBingoSquare: (gameId: string, index: number, personId: string, marked: boolean) =>

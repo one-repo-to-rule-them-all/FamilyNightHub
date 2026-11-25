@@ -14,6 +14,7 @@ import pytest
 
 from app.core.config import settings
 from app.domain.games import bingo_classic
+from app.realtime import events as rt_events
 from app.services import games_service
 from tests.integration.phones import Phone, phone
 from tests.integration.seed import SeededHousehold
@@ -360,3 +361,88 @@ async def test_the_games_list_says_which_kind_of_bingo(two_households: Pair) -> 
         assert modes[classic] == "classic"
         assert modes[old] == "thanksgiving"
         assert modes[jar] is None
+
+
+async def _reroll(p: Phone, gid: str, person: uuid.UUID, seed: str | None = None) -> Any:
+    headers = {TEST_SEED: seed} if seed is not None else {}
+    return await _send(
+        p, "POST", f"{GAMES}/{gid}/bingo/reroll", {"person_id": str(person)}, **headers
+    )
+
+
+async def test_reroll_swaps_only_my_card_and_keeps_columns_valid(
+    two_households: Pair, events: list[tuple[str, str]]
+) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        gid = await _classic(host)
+        async with _player(a, host, "Sam") as (p, sam), _player(a, host, "Kim") as (q, kim):
+            first = await _join(p, gid, sam)
+            kims = await _join(q, gid, kim)
+            seen = {tuple(first)}
+            for _ in range(3):  # as many times as they like
+                resp = await _reroll(p, gid, sam)
+                assert resp.status_code == 200, resp.text
+                new = resp.json()["squares"]
+                assert tuple(new) not in seen
+                seen.add(tuple(new))
+                assert new[12] == "FREE" and resp.json()["marked"] == [12]
+                for col in range(5):
+                    vals = [int(new[col + 5 * r]) for r in range(5) if new[col + 5 * r] != "FREE"]
+                    assert len(set(vals)) == len(vals)
+                    assert all(col * 15 < v <= (col + 1) * 15 for v in vals)
+            mine = (await p.client.get(f"{GAMES}/{gid}/bingo/mine")).json()
+            assert mine[0]["squares"] == new
+            assert (await q.client.get(f"{GAMES}/{gid}/bingo/mine")).json()[0]["squares"] == kims
+            assert (gid, rt_events.GAME_ACTIVITY) in events
+
+
+async def test_reroll_with_the_join_seed_pinned_still_differs(two_households: Pair) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        gid = await _classic(host)
+        async with _player(a, host) as (p, sam):
+            resp = await _send(
+                p, "POST", f"{GAMES}/{gid}/bingo/join", {"person_id": str(sam)}, **{TEST_SEED: "7"}
+            )
+            old = resp.json()["squares"]
+            r1 = (await _reroll(p, gid, sam, "7")).json()["squares"]
+            assert r1 != old
+            assert (await _reroll(p, gid, sam, "7")).json()["squares"] != r1
+
+
+async def test_reroll_resets_marks_and_is_refused_once_live_or_ended(two_households: Pair) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        gid = await _classic(host)
+        async with _player(a, host) as (p, sam):
+            squares = await _join(p, gid, sam)
+            assert (await _reroll(p, gid, sam)).status_code == 200
+            await _start(host, gid)
+            resp = await _reroll(p, gid, sam)
+            assert resp.status_code == 409 and "started" in resp.text
+            mine = (await p.client.get(f"{GAMES}/{gid}/bingo/mine")).json()[0]
+            assert mine["squares"] != squares  # the earlier reroll stuck
+            await _send(host, "POST", f"{GAMES}/{gid}/end")
+            assert (await _reroll(p, gid, sam)).status_code == 409
+
+
+async def test_reroll_refused_in_draft_for_others_and_across_households(
+    two_households: Pair,
+) -> None:
+    a, b = two_households
+    async with phone() as host, phone() as other:
+        await _host(host, a)
+        await _host(other, b)
+        draft = (await host.post(GAMES, {"kind": "bingo", "title": "B", "mode": "classic"})).json()
+        gid = await _classic(host)
+        async with _player(a, host, "Sam") as (p, sam), _player(a, host, "Kim") as (q, kim):
+            await _join(p, gid, sam)
+            await _join(q, gid, kim)
+            assert (await _reroll(p, draft["id"], sam)).status_code == 409
+            assert (await _reroll(p, gid, kim)).status_code == 403  # not this phone's person
+            async with _player(b, other, "Bob") as (pb, bob):
+                assert (await _reroll(pb, gid, bob)).status_code == 404

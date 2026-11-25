@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import random
 import uuid
+import zlib
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -967,6 +968,61 @@ async def join(
         publish_game_after_commit(db, game_id, events.GAME_CHANGED)
     row = (await db.execute(_CARD, {"g": game_id, "p": person_id})).one()
     return _card(row, game, await _finish_places(db, game_id), await _called_set(db, game))
+
+
+async def reroll_card(
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    game_id: uuid.UUID,
+    *,
+    device_id: uuid.UUID,
+    person_id: uuid.UUID,
+    seed: int,
+) -> OwnCard:
+    """Replace your own card with a fresh one, any number of times, while the round is `open`
+    (before the host starts it). Marks reset to the free centre's initial mask. The seed follows
+    `join`'s pattern but also mixes in the current squares, so a pinned seed equal to the join
+    seed still yields a different card; a guard loop makes "differs from the old card" certain."""
+    game = await _load(db, household_id, game_id, lock="UPDATE")
+    _require_bingo(game)
+    await consent_service.require_household_consent(db)
+    await people_service.require_can_act_as(db, device_id, person_id)
+    if game.status != "open":
+        raise Conflict(
+            "The round is over."
+            if game.status == "ended"
+            else "The round has started, so cards are locked."
+            if game.status == "live"
+            else "The game isn't open for players yet."
+        )
+    row = (
+        await db.execute(text(str(_CARD) + " FOR UPDATE"), {"g": game_id, "p": person_id})
+    ).first()
+    if row is None:
+        raise NotFound("You haven't joined this game.")
+    free = bool(game.config.get("free_center", True))
+    old = list(row.squares)
+    base = seed ^ person_id.int ^ zlib.crc32("|".join(old).encode())
+    squares = old
+    for attempt in range(16):
+        rng = random.Random(base + attempt)
+        squares = (
+            bingo_classic.generate_classic_card(rng, free)
+            if _mode(game) == "classic"
+            else bingo.generate_card(bingo_pool.THANKSGIVING_POOL, rng, free)
+        )
+        if squares != old:
+            break
+    await db.execute(
+        text(
+            "UPDATE bingo_cards SET squares = :squares, marked_mask = :mask "
+            "WHERE game_id = :g AND person_id = :p"
+        ),
+        {"squares": squares, "mask": bingo.initial_mask(free), "g": game_id, "p": person_id},
+    )
+    publish_game_after_commit(db, game_id, events.GAME_ACTIVITY)
+    fresh = (await db.execute(_CARD, {"g": game_id, "p": person_id})).one()
+    return _card(fresh, game, await _finish_places(db, game_id), await _called_set(db, game))
 
 
 async def my_cards(

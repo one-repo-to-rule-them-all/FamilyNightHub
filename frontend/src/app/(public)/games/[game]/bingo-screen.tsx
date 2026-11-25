@@ -23,6 +23,7 @@ import {
   classicStatusLine,
   FREE_LABEL,
   markedSet,
+  markedToGo,
   notCalledMessage,
   progressLabel,
   rankPlayers,
@@ -77,6 +78,20 @@ export function BingoScreen({ gameId }: { gameId: string }) {
         (old ?? []).map((c) => (c.person_id === next.person_id ? next : c)),
       );
       void queryClient.invalidateQueries({ queryKey: ["game", gameId] });
+    },
+  });
+
+  const reroll = useMutation<BingoCard, ApiError>({
+    mutationFn: () => {
+      if (!current) throw new Error("Pick who you are first");
+      return api.rerollBingoCard(gameId, current.id);
+    },
+    onSuccess: (next) => {
+      queryClient.setQueryData<BingoCard[]>(cardKey, (old) =>
+        (old ?? []).map((c) => (c.person_id === next.person_id ? next : c)),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["game", gameId] });
+      setHint("You have a new card.");
     },
   });
 
@@ -184,7 +199,9 @@ export function BingoScreen({ gameId }: { gameId: string }) {
             <>
               <p className="text-sm text-muted-foreground" data-testid="bingo-progress">
                 {progressLabel({
-                  squares_from_bingo: card.squares_from_bingo,
+                  squares_from_bingo: classic
+                    ? markedToGo(card.marked, data.bingo?.win_mode ?? "line")
+                    : card.squares_from_bingo,
                   won: card.won,
                 })}
               </p>
@@ -273,6 +290,23 @@ export function BingoScreen({ gameId }: { gameId: string }) {
                 {hint}
               </p>
               <ApiErrorNotice error={mark.error} />
+              {data.status === "open" ? (
+                <>
+                  <ApiErrorNotice error={reroll.error} />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    data-testid="bingo-reroll"
+                    aria-label="New card: replaces your current card with a new one"
+                    className="min-h-14 w-full text-lg"
+                    disabled={reroll.isPending}
+                    onClick={() => reroll.mutate()}
+                  >
+                    New card
+                  </Button>
+                </>
+              ) : null}
             </>
           ) : null}
         </>
