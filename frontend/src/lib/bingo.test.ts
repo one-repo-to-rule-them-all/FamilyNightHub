@@ -74,3 +74,83 @@ describe("bingo", () => {
     expect(bingoStatusLine("ended", true)).toMatch(/over/);
   });
 });
+
+import {
+  boardRows,
+  calledSet,
+  canMarkClassic,
+  checkResultLine,
+  classicSquareLabel,
+  classicStatusLine,
+  notCalledMessage,
+  patternName,
+  recentCalls,
+  spacedLabel,
+  squareIsCalled,
+} from "./bingo";
+
+describe("classic bingo", () => {
+  const call = (seq: number, value: number) => ({ seq, value, label: `X${value}` });
+
+  it("spaces the letter from the number", () => {
+    expect(spacedLabel({ label: "B7" })).toBe("B 7");
+    expect(spacedLabel({ label: "G52" })).toBe("G 52");
+  });
+
+  it("builds the 5 x 15 board", () => {
+    const rows = boardRows();
+    expect(rows.map((r) => r.letter).join("")).toBe("BINGO");
+    expect(rows.every((r) => r.values.length === 15)).toBe(true);
+    expect(rows[0].values[0]).toBe(1);
+    expect(rows[4].values[14]).toBe(75);
+  });
+
+  it("lists the five before the last call, newest first", () => {
+    const calls = [1, 2, 3, 4, 5, 6, 7].map((v, i) => call(i, v));
+    expect(recentCalls(calls).map((c) => c.value)).toEqual([6, 5, 4, 3, 2]);
+    expect(recentCalls(calls.slice(0, 1))).toEqual([]);
+    expect(recentCalls([])).toEqual([]);
+  });
+
+  it("only called numbers (and the free centre) can be marked, and only while live", () => {
+    const called = calledSet([call(0, 7)]);
+    expect(squareIsCalled("7", called)).toBe(true);
+    expect(squareIsCalled("8", called)).toBe(false);
+    expect(squareIsCalled("FREE", called)).toBe(true);
+    expect(canMarkClassic("live", "7", called)).toBe(true);
+    expect(canMarkClassic("live", "8", called)).toBe(false);
+    expect(canMarkClassic("live", "FREE", called)).toBe(false);
+    expect(canMarkClassic("open", "7", called)).toBe(false);
+    expect(notCalledMessage("8")).toBe("8 hasn't been called yet.");
+  });
+
+  it("labels an uncalled square for screen readers", () => {
+    expect(classicSquareLabel("8", 0, false, false)).toContain("not called yet");
+    expect(classicSquareLabel("7", 0, true, true)).not.toContain("not called yet");
+    expect(classicSquareLabel("FREE", 12, true, false)).not.toContain("not called yet");
+  });
+
+  it("describes the round for the phone", () => {
+    expect(classicStatusLine("live", true, 0)).toMatch(/first number/);
+    expect(classicStatusLine("live", true, 3)).toMatch(/Tap each number/);
+    expect(classicStatusLine("live", false, 3)).toBe("The round is on.");
+    expect(classicStatusLine("open", false, 0)).toBe(bingoStatusLine("open", false));
+  });
+
+  it("names the winning pattern for the host", () => {
+    expect(patternName(null)).toBe("");
+    expect(patternName([0, 1, 2, 3, 4])).toBe("top row");
+    expect(patternName([10, 11, 12, 13, 14])).toBe("middle row");
+    expect(patternName([2, 7, 12, 17, 22])).toBe("N column");
+    expect(patternName([0, 6, 12, 18, 24])).toBe("diagonal");
+    expect(patternName(Array.from({ length: 25 }, (_, i) => i))).toBe("the whole card");
+  });
+
+  it("words a check as a quiet message", () => {
+    const base = { win_mode: "line" as const, pattern: null, missing: 2, valid: false };
+    expect(checkResultLine("Sam", base)).toBe("Sam: not yet, 2 away.");
+    expect(checkResultLine("Sam", { ...base, valid: true, pattern: [0, 1, 2, 3, 4] })).toBe(
+      "Sam: valid, top row.",
+    );
+  });
+});

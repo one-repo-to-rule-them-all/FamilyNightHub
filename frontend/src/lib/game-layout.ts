@@ -53,13 +53,21 @@ interface BingoLike {
   won: boolean;
 }
 
-export function bingoStripPlayers(players: readonly BingoLike[]): StripPlayer[] {
+/**
+ * `progress: false` leaves out the "2 away" chip (classic bingo on the TV: it would spoil the
+ * suspense); a winner still reads "Bingo!".
+ */
+export function bingoStripPlayers(
+  players: readonly BingoLike[],
+  options: { progress?: boolean } = {},
+): StripPlayer[] {
+  const progress = options.progress ?? true;
   return players.map((p) => ({
     id: p.person_id,
     name: p.name,
     emoji: p.avatar_emoji,
     color: p.color,
-    chip: progressLabel(p),
+    chip: progress || p.won ? progressLabel(p) : undefined,
     highlight: p.won,
   }));
 }

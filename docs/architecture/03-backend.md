@@ -37,7 +37,7 @@ backend/app/
 | Sessions | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET/PATCH /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}`, `PUT /sessions/{id}/slideshow` | Host (`sessions:run`): create (code shown once; `voting_method` defaults to the household's), change the voting method while `draft`, rotate code, shortlist, open/close voting, close the night, start/stop the TV slideshow. Snapshot and history: any device or account of the household |
 | Ballots | `PUT /api/v1/sessions/{id}/ballots`, `PUT …/ballots/proxy`, `GET …/ballots/mine`, `GET …/voters` | Phone casts/replaces a bound person's ballot; host proxy ballot (`ballots:proxy`); a phone reads back its own people's ballots; who has voted (avatars only) |
 | Live | `/api/v1/sse-tickets {session_id | game_id}`, `/api/v1/sessions/{id}/stream`, `/api/v1/games/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md), [ADR-0018](decisions/ADR-0018-games-tab.md) |
-| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next}`, `POST /games/{id}/{open,start}`, `POST …/bingo/join`, `GET …/bingo/mine`, `PUT/DELETE …/bingo/mark/{index}?person_id=` | Gratitude Jar and Thanksgiving Bingo ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate, reveal and end; a phone drops a note as a bound person; any device or account reads the snapshot. See "Games" |
+| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next}`, `POST /games/{id}/{open,start}`, `POST …/bingo/join`, `GET …/bingo/mine`, `PUT/DELETE …/bingo/mark/{index}?person_id=`, `POST …/bingo/draw`, `POST …/bingo/check` | Gratitude Jar and Thanksgiving Bingo ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate, reveal and end; a phone drops a note as a bound person; any device or account reads the snapshot. See "Games" |
 | Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next}`, `GET …/scatter/draw`, `POST …/scatter/rounds`, `POST …/scatter/reveal`, `PUT …/scatter/answers/{aid}/verdict`, `POST …/scatter/join`, `PUT …/scatter/answers`, `GET …/scatter/answers/mine`, `GET/PUT /games/tv-target` | Gratitude Jar and Scattergories ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate or run rounds, reveal and end; a phone drops a note or answers as a bound person; any device or account reads the snapshot. See "Games" |
 | Photos | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}` | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below |
 | Ratings | `PUT /api/v1/sessions/{id}/ratings`, `PUT …/ratings/proxy`, `GET …/ratings/mine` | 1–5 per person, once the night is `tonight`/`closed`: a phone rates as its bound people, a host proxy-rates (`ballots:proxy`), a phone reads back its own people's scores. See "Ratings" |
@@ -739,7 +739,7 @@ deletes the bucket objects, then the household row, whose cascade empties every 
 `scatter.py`, `scatter_categories.py`). Games are household-scoped and **not tied to a
 night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
 `created_by_account_id`, `reveal_seed`), `game_players` (roster), `gratitude_notes`,
-`bingo_cards`, `scatter_rounds` and `scatter_answers`.
+`bingo_cards`, `bingo_calls`, `scatter_rounds` and `scatter_answers`.
 
 - **Gratitude Jar.** Hosts create a jar (`open`). A phone drops a note as a person it is
   acting as (`require_can_act_as`, consent gate; 1-280 chars, whitespace collapsed; `anonymous`
@@ -768,6 +768,30 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   snapshot's `bingo` object has each player's avatar, `squares_from_bingo`, `won` and
   `finish_place`, never squares or marks; `/bingo/mine` returns only the cards of people bound to
   the caller's phone.
+- **Classic bingo (amendment 2026-11-25, part A).** `config.mode` is `thanksgiving` | `classic`
+  (create body `mode`, API default `thanksgiving`, fixed at creation; a stored config with no
+  mode is Thanksgiving; the host form preselects classic). The pure `domain/games/bingo_classic.py`
+  builds the card (`generate_classic_card`: five distinct numbers per B-I-N-G-O column from its
+  range of 15, FREE at index 12, stored as decimal text in `bingo_cards`), `call_order(seed)` (1-75
+  shuffled by `random.Random(seed)`), `called_mask` and `pattern`; `bingo.py` is untouched and still
+  owns masks and `has_win`. **Open** stores `games.reveal_seed` (`secrets.randbits(64)` or
+  `X-FNH-Test-Seed` in test; kept if already set), so the `n`-th call is `call_order(seed)[n]` and
+  no number repeats; the seed and unmade calls never leave the server. **Draw** (`POST
+  …/bingo/draw {expected_seq}`, host) locks the game row, is 409 unless `live`, 409 when
+  `expected_seq` is not the number of calls already made (a double tap or second window inserts
+  nothing) or at 75, inserts the next `bingo_calls` row, audits `game.bingo_called` and publishes
+  `GAME_CHANGED`; it returns the snapshot. **Mark** is 409 ("That number hasn't been called.")
+  for an uncalled number, unmarking is always allowed, and the completing mark no longer wins.
+  **Check** (`POST …/bingo/check {person_id}`, host, `live` only, 404 for a player with no card)
+  computes `called_mask` from the card's squares and the called set (not `marked_mask`) and
+  returns `{valid, win_mode, pattern, missing}`; invalid changes nothing, publishes nothing and is
+  audited (`game.bingo_checked`); valid sets `won_at` once (checking a winner again is
+  idempotent), and with `end_on_first_win` ends the game in the same transaction under the same
+  lock order as `set_mark` (`game.ended` audited). Thanksgiving games answer both calls with 409
+  "This is a Thanksgiving round." The snapshot's `bingo` gains `mode`, `calls`
+  (`[{seq, value, label}]`) and `last_call`, and a player's `squares_from_bingo` comes from the
+  called mask. Export, Start fresh and `test_isolation`/`test_rls_coverage` cover `bingo_calls`;
+  person merge and delete leave it alone (no person column; it cascades with its game).
 - **Scattergories (slice C).** A host creates the game (`open`), people **join** the roster (as a
   person they act as; consent gate), and the host starts **rounds**: a random letter (`secrets`,
   or the `X-FNH-Test-Seed` seed; never Q U V X Y Z), 1-12 categories snapshotted into the round

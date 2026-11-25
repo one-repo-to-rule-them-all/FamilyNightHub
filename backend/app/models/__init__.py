@@ -2,6 +2,7 @@
 
 from app.models.base import Base
 from app.models.games import (
+    BingoCall,
     Game,
     GamePlayer,
     GratitudeNote,
@@ -52,6 +53,7 @@ __all__ = [
     "GamePlayer",
     "ScatterAnswer",
     "ScatterRound",
+    "BingoCall",
     "GratitudeNote",
     "Household",
     "HouseholdConsent",
