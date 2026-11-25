@@ -77,6 +77,8 @@ function CyclingJar({
         aria-atomic="true"
         data-testid="jar-cycle"
         data-index={position}
+        // Room for two lines, so "Hold this note" stays put as notes of different length change.
+        className="flex min-h-44 flex-col justify-center"
       >
         <NoteCard key={shown.id} note={shown} featured fade />
       </div>
@@ -130,6 +132,8 @@ export function JarScreen({ gameId }: { gameId: string }) {
     },
     onSuccess: () => {
       setBody("");
+      // Each note chooses for itself: don't carry "keep my name off it" to the next one.
+      setAnonymous(false);
       refresh();
     },
   });

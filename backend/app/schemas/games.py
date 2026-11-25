@@ -79,6 +79,8 @@ class GameSummaryOut(BaseModel):
     title: str
     status: GameStatus
     created_at: datetime
+    # Bingo only: which kind of bingo this is, so a list can say "Classic bingo". Null otherwise.
+    mode: Literal["thanksgiving", "classic"] | None = None
 
 
 class BingoPlayerOut(BaseModel):

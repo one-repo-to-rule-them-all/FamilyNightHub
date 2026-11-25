@@ -84,6 +84,7 @@ def _summary(g: games_service.GameRow) -> GameSummaryOut:
         title=g.title,
         status=g.status,
         created_at=g.created_at,
+        mode=(g.config.get("mode", "thanksgiving") if g.kind == "bingo" else None),
     )
 
 
