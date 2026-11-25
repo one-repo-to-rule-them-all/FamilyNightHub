@@ -2,7 +2,9 @@
 # this one). Deployed images come from backend/Dockerfile and frontend/Dockerfile.
 # Shape copied from OrderUp docker-compose.yml @ 2f86cd8 (bind-mounted source, issue #81).
 #
-# Services still to land in later PRs: web.
+# The web frontend is not a service here: run it locally with `npm run dev` in frontend/
+# (http://localhost:3000), which proxies /api/* to the API. Only the backing services and the
+# API run in compose.
 services:
   db:
     image: postgres:16

@@ -11,8 +11,8 @@ See [ADR-0001](decisions/ADR-0001-fly-fastapi-postgres-hosting.md).
 | URL(s) | http://localhost:3000 | `fnh-web-staging.fly.dev` | `fnh-web.fly.dev` (+ custom domain later) |
 | Infra layer | `docker-compose.yml` + override | `deploy/staging/*.fly.toml` | `deploy/prod/*.fly.toml` |
 | Image source | local build | GHCR image built in CI | same image digest promoted from staging |
-| Datastore | `postgres:16` container | Fly Postgres (small) | Fly Postgres (small, daily snapshots) |
-| Cache/queue | `redis:7` container | Upstash (free tier) | Upstash |
+| Datastore | `postgres:16` container | self-operated Postgres, Flycast-only (scaled to zero when idle) | self-operated Postgres, Flycast-only (daily volume snapshots) |
+| Cache/queue | `redis:7` container | Upstash (pay-as-you-go) | Upstash Fixed 250 MB |
 | Object storage | SeaweedFS container (S3 API) | Tigris bucket `fnh-rbj-photos-staging` | Tigris `fnh-rbj-photos` + `fnh-rbj-photos-backup` |
 | TMDB | fake server (`tmdb-fake` service) | real API key | real API key |
 | Email | MailHog | provider sandbox | provider |
