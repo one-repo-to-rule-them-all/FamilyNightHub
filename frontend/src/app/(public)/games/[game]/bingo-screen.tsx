@@ -23,6 +23,7 @@ import {
   classicStatusLine,
   FREE_LABEL,
   markedSet,
+  markedToGo,
   notCalledMessage,
   progressLabel,
   rankPlayers,
@@ -198,7 +199,9 @@ export function BingoScreen({ gameId }: { gameId: string }) {
             <>
               <p className="text-sm text-muted-foreground" data-testid="bingo-progress">
                 {progressLabel({
-                  squares_from_bingo: card.squares_from_bingo,
+                  squares_from_bingo: classic
+                    ? markedToGo(card.marked, data.bingo?.win_mode ?? "line")
+                    : card.squares_from_bingo,
                   won: card.won,
                 })}
               </p>

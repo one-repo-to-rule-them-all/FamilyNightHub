@@ -5,6 +5,7 @@ import {
   callParts,
   canTapSquare,
   markedSet,
+  markedToGo,
   progressLabel,
   rankPlayers,
   squareLabel,
@@ -164,5 +165,24 @@ describe("callParts", () => {
 
   it("leaves anything else as the number", () => {
     expect(callParts({ label: "FREE" })).toEqual({ letter: "", number: "FREE" });
+  });
+});
+
+describe("markedToGo", () => {
+  it("counts the squares left to mark in the nearest line", () => {
+    expect(markedToGo([12], "line")).toBe(4);
+    expect(markedToGo([12, 0, 6], "line")).toBe(2);
+    expect(markedToGo([0, 1, 2, 3, 4], "line")).toBe(0);
+    expect(markedToGo([2, 7, 12, 17], "line")).toBe(1);
+  });
+
+  it("counts a blackout as every square", () => {
+    expect(markedToGo([12], "blackout")).toBe(24);
+    expect(
+      markedToGo(
+        Array.from({ length: 25 }, (_, i) => i),
+        "blackout",
+      ),
+    ).toBe(0);
   });
 });
