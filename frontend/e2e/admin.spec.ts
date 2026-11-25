@@ -88,7 +88,7 @@ test("an admin manages people, devices and settings", async ({ browser, baseURL 
   const merge = admin.getByTestId("merge-confirm");
   await expect(merge.getByRole("heading")).toHaveText("Merge Nana into Grandma?");
   await expect(merge).toContainText("ballots, ratings, photos, photo reactions and phone bindings");
-  await expect(merge).toContainText("Nobody is ever deleted");
+  await expect(merge).toContainText("Merging deletes nothing");
   await expectNoAxeViolations(admin);
   await merge.getByRole("button", { name: "Merge into Grandma" }).click();
   await expect(admin.getByTestId("people-notice")).toHaveText(

@@ -27,8 +27,20 @@ END
 $$;
 GRANT fnh_resolver TO fnh;
 
+-- ADR-0016: NOLOGIN owner of platform_list_households(), the platform's one cross-household
+-- read (metadata and counts only). Migration 0008 creates it too if this didn't run.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fnh_platform') THEN
+        CREATE ROLE fnh_platform NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+    END IF;
+END
+$$;
+GRANT fnh_platform TO fnh;
+
 GRANT USAGE ON SCHEMA public TO fnh_app;
 GRANT USAGE ON SCHEMA public TO fnh_resolver;
+GRANT USAGE ON SCHEMA public TO fnh_platform;
 -- ALTER FUNCTION ... OWNER TO fnh_resolver also requires the NEW owner to hold CREATE on the
 -- function's schema (superusers skip that check). Locally and in CI the owner `fnh` is the
 -- superuser, so only a deployed database, where `fnh` is an ordinary CREATEROLE role, hits
@@ -36,6 +48,7 @@ GRANT USAGE ON SCHEMA public TO fnh_resolver;
 -- NOLOGIN and only runs the fixed bodies of its definer functions, so this widens nothing a
 -- client can reach.
 GRANT CREATE ON SCHEMA public TO fnh_resolver;
+GRANT CREATE ON SCHEMA public TO fnh_platform;
 
 -- Tables created later by the owner auto-grant DML to the app role, so each migration
 -- only needs to carry its RLS policy (enforced by tests/integration/test_rls_coverage.py).

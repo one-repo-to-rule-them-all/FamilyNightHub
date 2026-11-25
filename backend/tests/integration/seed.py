@@ -16,6 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import household_session
+from app.domain.legal import PRIVACY_VERSION, TERMS_VERSION
 
 
 @dataclass
@@ -152,6 +153,17 @@ async def seed_household(tag: str) -> SeededHousehold:
             household_id=hid,
             session_id=ids["session"],
             person_id=ids["person"],
+        )
+        # ADR-0017: an admin's guardian acceptance of the current versions opens the gate.
+        ids["household_consent"] = await _insert(
+            s,
+            "household_consents",
+            household_id=hid,
+            account_id=ids["account"],
+            role="admin",
+            terms_version=TERMS_VERSION,
+            privacy_version=PRIVACY_VERSION,
+            guardian=True,
         )
         ids["audit_event"] = await _insert(
             s, "audit_events", household_id=hid, action="seed", target_type="household"

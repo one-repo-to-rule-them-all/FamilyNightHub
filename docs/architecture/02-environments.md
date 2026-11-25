@@ -87,8 +87,8 @@ All three apps run `shared-cpu-1x`/512 MB in `dfw`.
 | `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` (photos bucket, read/write; unset endpoint or keys = photo routes answer 503) | fly secrets; the non-secret `STORAGE_ENDPOINT`, `STORAGE_BUCKET`, `STORAGE_REGION` sit in `api.fly.toml`/`worker.fly.toml` `[env]` (unset, the bucket would default to production's `fnh-rbj-photos`); `STORAGE_PUBLIC_ENDPOINT` is local-only | api, worker |
 | `BACKUP_STORAGE_*` (backup bucket, write-only) | fly secrets | **worker only** |
 | `TMDB_READ_TOKEN` (with plain-env `TMDB_BASE_URL`; unset token = search off, typed titles only) | fly secrets | api only (never `NEXT_PUBLIC_*`) |
-| `SESSION_SECRET`, `DEVICE_TOKEN_PEPPER` | fly secrets | api; the **worker** also needs its **own random** values (unused, but Settings refuses to load in staging/production without non-placeholder ones, so the worker would crash-loop) |
-| `EMAIL_API_KEY` (SMTP password; STARTTLS on 587, no implicit TLS) with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `EMAIL_FROM` | fly secrets (provider-specific, set at provisioning); `EMAIL_MODE=smtp` and `SMTP_STARTTLS=true` in `api.fly.toml` | api only (the worker sends no email) |
+| `SESSION_SECRET`, `DEVICE_TOKEN_PEPPER`, `PLATFORM_SESSION_SECRET` (ADR-0016, signs `fnh_platform`) | fly secrets | api; the **worker** also needs its **own random** values (unused, but Settings refuses to load in staging/production without non-placeholder ones, so the worker would crash-loop) |
+| `EMAIL_API_KEY` (SMTP password; STARTTLS on 587, no implicit TLS) with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `EMAIL_FROM` | fly secrets (provider-specific, set at provisioning); `EMAIL_MODE=smtp` and `SMTP_STARTTLS=true` in `api.fly.toml` | api; the worker only for `remind_disabled_households` (ADR-0017 §4), which logs instead of sending until the worker has these too |
 | `SENTRY_DSN` | fly secrets | all |
 | `API_INTERNAL_URL` (not secret) | `web.fly.toml` `[env]` | web (server only, read at boot) |
 | `FLY_API_TOKEN` | GitHub environment secret (`staging`, `production`) | deploy workflow |

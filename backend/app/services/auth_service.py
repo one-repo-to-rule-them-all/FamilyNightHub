@@ -26,7 +26,7 @@ from app.core.database import AsyncSessionLocal, household_session
 from app.core.security import hash_magic_link_token, new_token
 from app.domain import credentials
 from app.integrations.email import Email
-from app.services.errors import Forbidden, Invalid, ServiceError
+from app.services.errors import Forbidden, HouseholdDisabled, Invalid, ServiceError
 
 
 class InvalidLink(ServiceError):
@@ -126,6 +126,7 @@ async def login(found: SignedIn | None, password: str) -> SignedIn:
             if stored is None:
                 await hashing.verify_password(None, password)
             raise InvalidCredentials(found.account_id)
+        await require_enabled(db)
         if hashing.needs_rehash(stored):
             await db.execute(
                 text("UPDATE accounts SET password_hash = :h WHERE id = :a"),
@@ -133,6 +134,12 @@ async def login(found: SignedIn | None, password: str) -> SignedIn:
             )
         await _audit_sign_in(db, found, "password")
     return found
+
+
+async def require_enabled(db: AsyncSession) -> None:
+    """ADR-0016: the request's household hasn't been switched off by the operator."""
+    if await db.scalar(text("SELECT disabled_at IS NOT NULL FROM households")):
+        raise HouseholdDisabled
 
 
 async def _audit_sign_in(db: AsyncSession, signed_in: SignedIn, method: str) -> None:
@@ -272,6 +279,7 @@ async def verify_magic_link(token: str, new_password: str) -> SignedIn:
         ).first()
         if consumed is None:
             raise InvalidLink
+        await require_enabled(db)
         signed_in = SignedIn(account_id=found.account_id, household_id=found.household_id)
         # An invited account (issue #71) sets its first password here: audited as "invite".
         had_password = await db.scalar(

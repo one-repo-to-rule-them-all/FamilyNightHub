@@ -33,3 +33,12 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
 def has_permission(role: str, permission: Permission) -> bool:
     """Unknown roles get nothing (fail closed)."""
     return permission in ROLE_PERMISSIONS.get(role, frozenset())  # type: ignore[call-overload]
+
+
+# ADR-0016 §5: a platform operator acting inside a household is an admin minus these. Account
+# management, so no standing admin is left behind; and the writes that name the acting account
+# in a household-scoped foreign key (a night's host, a proxy ballot), which an account from
+# another household can't satisfy.
+PLATFORM_DENIED: frozenset[Permission] = frozenset(
+    {"admin:accounts", "sessions:run", "ballots:proxy"}
+)

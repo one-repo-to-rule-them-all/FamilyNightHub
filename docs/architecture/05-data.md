@@ -6,7 +6,8 @@ PostgreSQL 16 on Fly, SQLAlchemy 2 async, Alembic. Object storage on Tigris (S3 
 
 | Table | Household-scoped? | Purpose |
 |---|---|---|
-| `households` | root (RLS on `id`) | Name, `join_slug` (rotatable). Slug lookup before auth goes through ADR-0009 |
+| `households` | root (RLS on `id`) | Name, `join_slug` (rotatable), `deletion_requested_at`/`deletion_requested_by`/`delete_after` (ADR-0017 §4), `disabled_at`/`disable_reminded_at` (ADR-0016). Slug lookup before auth goes through ADR-0009 |
+| `household_consents` | yes | ADR-0017 §2: `account_id`, `role`, `terms_version`, `privacy_version`, `guardian`, `accepted_at`. Append-only: `fnh_app` has no UPDATE/DELETE |
 | `accounts` | yes | Admin/host logins (email and `username` each unique case-insensitively across households, argon2id `password_hash` + `password_changed_at`, role `admin`/`host`, `disabled_at`) |
 | `magic_links` | yes | Hashed single-use tokens, 15-min expiry |
 | `people` | yes | Name, `avatar_emoji`, `color`, `is_guest`, `merged_into_id`; ADR-0014: `pin_hash` (argon2id of the peppered PIN), `pin_set_at`, `pin_failed_attempts`, `pin_locked_at`, `name_changed_at` (rename once) |
@@ -27,6 +28,8 @@ PostgreSQL 16 on Fly, SQLAlchemy 2 async, Alembic. Object storage on Tigris (S3 
 | `audit_events` | yes | Who did what (session transitions, winner corrections, merges, revokes, deletes) |
 | `failed_jobs` | no (global) | ARQ dead letters: job name/id/try and a truncated error. Never job args |
 | `backup_runs` | no (global) | One row per backup run (`kind` photos/pg_dump, counts, errors) |
+| `platform_operators` | no (global) | ADR-0016: `account_id` (PK, FK accounts), `granted_at`, `granted_by`. `fnh_app` SELECT only; the CLI writes it as the owner |
+| `platform_audit_events` | no (global) | ADR-0016: every platform action (`account_id`, `household_ref` as a bare id, `action`, `data`). `fnh_app` SELECT/INSERT only |
 
 ## Key relationships
 
@@ -124,5 +127,6 @@ case-insensitively, enforced by the service rather than an index. Revoked device
 ## What's intentionally **not** here / **not** built yet
 
 - No original photos, no video, no EXIF beyond `taken_at`.
-- No cross-household tables except `tmdb_cache`, `failed_jobs` and `backup_runs` (no household data in any).
+- No cross-household tables except `tmdb_cache`, `failed_jobs`, `backup_runs`, `platform_operators` and `platform_audit_events` (no household data in any).
+- One more definer role: `fnh_platform` owns `platform_list_households()` (metadata and counts only; ADR-0016), with column grants and `platform_metadata` SELECT policies on six tables. `test_rls_coverage.py` pins it.
 - No analytics tables. History pages query sessions directly.

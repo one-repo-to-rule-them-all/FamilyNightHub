@@ -188,6 +188,7 @@ secret just turns that feature off. Leaving out a required one stops the app boo
         DATABASE_URL='<from step 3>' MIGRATION_DATABASE_URL='<from step 3>' \
         REDIS_URL='<from step 4>' \
         SESSION_SECRET="$(openssl rand -hex 32)" DEVICE_TOKEN_PEPPER="$(openssl rand -hex 32)" \
+        PLATFORM_SESSION_SECRET="$(openssl rand -hex 32)" \
         SMTP_HOST=smtp.resend.com SMTP_PORT=587 SMTP_USERNAME=resend \
         EMAIL_API_KEY='<step 6>' EMAIL_FROM='Family Night <movie-night@<domain>>' \
         STORAGE_ACCESS_KEY_ID='<step 5 API key>' STORAGE_SECRET_ACCESS_KEY='<step 5 API secret>' \
@@ -203,6 +204,7 @@ secret just turns that feature off. Leaving out a required one stops the app boo
       fly secrets set -a fnh-worker-staging --stage \
         DATABASE_URL='<from step 3>' REDIS_URL='<from step 4>' \
         SESSION_SECRET="$(openssl rand -hex 32)" DEVICE_TOKEN_PEPPER="$(openssl rand -hex 32)" \
+        PLATFORM_SESSION_SECRET="$(openssl rand -hex 32)" \
         STORAGE_ACCESS_KEY_ID='<step 5 API key>' STORAGE_SECRET_ACCESS_KEY='<step 5 API secret>' \
         SENTRY_DSN='<optional>'
       # production only, and only here:
@@ -285,9 +287,20 @@ secret just turns that feature off. Leaving out a required one stops the app boo
       a link that works once for 72 hours and choose their own password from it. Nobody else
       (not the owner, not Claude, not the CLI) sets or sees that password. The row shows
       **Invited** until they finish, then **Active**; use **Resend invite** if the link expires.
-      The bootstrap account (`rbjengineeringservices.llc@gmail.com`) stays the family admin;
-      the platform-owner role is a separate, not-yet-approved decision
-      ([ADR-0016](../architecture/decisions/ADR-0016-platform-owner.md)).
+      The bootstrap account (`rbjengineeringservices.llc@gmail.com`) stays the family admin.
+- [ ] 🌐 **Accept the Terms** ([ADR-0017](../architecture/decisions/ADR-0017-consent-and-multi-household.md)).
+      The first portal visit shows the consent screen. Until the admin accepts (as a parent or
+      guardian), new people, phones and photos are refused.
+- [ ] ⌨️ **Make the owner the platform operator** ([ADR-0016](../architecture/decisions/ADR-0016-platform-owner.md)),
+      after the bootstrap account has a password. In the same `fly ssh console`:
+
+      ```bash
+      python -m app.cli grant-platform --email rbjengineeringservices.llc@gmail.com \
+        --by "<your name>, <date>"
+      ```
+
+      Then sign in at `/platform/login`. Every later household is created from `/platform`,
+      not with `bootstrap`.
 
 ## 12. Smoke checks on staging (🌐 on a phone)
 

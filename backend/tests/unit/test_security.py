@@ -35,7 +35,14 @@ def test_csrf_matches(cookie: str | None, header: str | None, ok: bool) -> None:
 def test_deployed_environments_refuse_placeholder_secrets(env: str) -> None:
     with pytest.raises(ValidationError, match="placeholder secrets"):
         Settings(ENVIRONMENT=env)  # type: ignore[arg-type]
-    Settings(ENVIRONMENT=env, SESSION_SECRET="real", DEVICE_TOKEN_PEPPER="real")  # type: ignore[arg-type]
+    with pytest.raises(ValidationError, match="PLATFORM_SESSION_SECRET"):
+        Settings(ENVIRONMENT=env, SESSION_SECRET="real", DEVICE_TOKEN_PEPPER="real")  # type: ignore[arg-type]
+    Settings(
+        ENVIRONMENT=env,  # type: ignore[arg-type]
+        SESSION_SECRET="real",
+        DEVICE_TOKEN_PEPPER="real",
+        PLATFORM_SESSION_SECRET="real",
+    )
 
 
 def test_development_allows_placeholders() -> None:

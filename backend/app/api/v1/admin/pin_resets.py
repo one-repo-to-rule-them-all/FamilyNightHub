@@ -7,7 +7,13 @@ from typing import Annotated, Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.dependencies import AccountContext, AccountDb, CsrfProtected, require_permission
+from app.core.dependencies import (
+    AccountContext,
+    AccountDb,
+    CsrfProtected,
+    require_household_account,
+    require_permission,
+)
 from app.schemas.admin import PinResetCountOut, PinResetOut
 from app.services import people_admin_service
 from app.services.errors import Conflict, NotFound, ServiceError
@@ -15,6 +21,8 @@ from app.services.errors import Conflict, NotFound, ServiceError
 router = APIRouter(prefix="/people/pin-resets", tags=["admin"])
 
 CanManagePeople = Annotated[AccountContext, Depends(require_permission("admin:people"))]
+# Resolving names the admin in a household-scoped FK: the household's own admins only.
+CanResolve = Annotated[AccountContext, Depends(require_household_account)]
 
 RESOLVE: dict[int | str, dict[str, Any]] = {
     404: {"description": "No such request in this household"},
@@ -64,7 +72,7 @@ async def count_pin_resets(account: CanManagePeople, db: AccountDb) -> PinResetC
     responses=RESOLVE,
 )
 async def approve_pin_reset(
-    request_id: uuid.UUID, account: CanManagePeople, db: AccountDb
+    request_id: uuid.UUID, account: CanManagePeople, _own: CanResolve, db: AccountDb
 ) -> PinResetOut:
     """Clear the person's PIN, failure count and lock. No PIN is set or revealed: the person
     chooses a new one on their next claim."""
@@ -84,7 +92,7 @@ async def approve_pin_reset(
     responses=RESOLVE,
 )
 async def dismiss_pin_reset(
-    request_id: uuid.UUID, account: CanManagePeople, db: AccountDb
+    request_id: uuid.UUID, account: CanManagePeople, _own: CanResolve, db: AccountDb
 ) -> PinResetOut:
     try:
         reset = await people_admin_service.dismiss_pin_reset(

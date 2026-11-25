@@ -16,7 +16,15 @@ pytestmark = pytest.mark.integration
 
 # Tables that deliberately carry no household data and no RLS. Adding one is a reviewed
 # decision: it becomes readable by fnh_app with no GUC.
-GLOBAL_TABLES = {"alembic_version", "tmdb_cache", "failed_jobs", "backup_runs"}
+GLOBAL_TABLES = {
+    "alembic_version",
+    "tmdb_cache",
+    "failed_jobs",
+    "backup_runs",
+    # ADR-0016: who is an operator, and what operators did. Ids and actions, no family data.
+    "platform_operators",
+    "platform_audit_events",
+}
 
 RESOLVER_FUNCTIONS = {
     "auth_resolve_device",
@@ -26,6 +34,8 @@ RESOLVER_FUNCTIONS = {
     "auth_resolve_household_by_slug",
     "worker_list_household_ids",
 }
+# ADR-0016: the platform's one cross-household read, metadata and counts only.
+PLATFORM_FUNCTIONS = {"platform_list_households"}
 
 
 async def _rows(sql: str) -> list[dict[str, object]]:
@@ -48,7 +58,7 @@ async def test_every_household_table_forces_rls_with_isolation_policy() -> None:
         """
     )
     scoped = [t for t in tables if t["scoped"] or t["table"] == "households"]
-    assert len(scoped) == 18, sorted(str(t["table"]) for t in scoped)
+    assert len(scoped) == 19, sorted(str(t["table"]) for t in scoped)
 
     unprotected = [t["table"] for t in scoped if not (t["enabled"] and t["forced"] and t["policy"])]
     assert unprotected == [], f"household tables missing FORCE RLS + policy: {unprotected}"
@@ -80,9 +90,10 @@ async def test_pre_auth_surface_is_exactly_the_resolver_functions() -> None:
         WHERE n.nspname = 'public' AND p.prosecdef
         """
     )
-    assert {f["name"] for f in fns} == RESOLVER_FUNCTIONS
+    assert {f["name"] for f in fns} == RESOLVER_FUNCTIONS | PLATFORM_FUNCTIONS
     for f in fns:
-        assert f["owner"] == "fnh_resolver", f
+        owner = "fnh_platform" if f["name"] in PLATFORM_FUNCTIONS else "fnh_resolver"
+        assert f["owner"] == owner, f
         assert f["config"] == ["search_path=pg_catalog, public"], f
         assert f["app_exec"] is True, f
         assert f["public_exec"] is False, f
@@ -134,4 +145,63 @@ async def test_resolver_column_grants_are_narrow() -> None:
         "pin": False,
         "photos": False,
         "resets": False,
+    }
+
+
+async def test_platform_role_is_read_only_and_sees_metadata_only() -> None:
+    """ADR-0016 §3: fnh_platform reads counts and timestamps, never names, photos or keys."""
+    [role] = await _rows(
+        "SELECT rolcanlogin, rolbypassrls, rolsuper FROM pg_roles WHERE rolname = 'fnh_platform'"
+    )
+    assert role == {"rolcanlogin": False, "rolbypassrls": False, "rolsuper": False}
+    writable = await _rows(
+        """
+        SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind = 'r'
+          AND has_table_privilege('fnh_platform', c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE')
+        """
+    )
+    assert writable == []
+    [row] = await _rows(
+        """
+        SELECT has_column_privilege('fnh_platform', 'households', 'name', 'SELECT') AS hh_name,
+               has_column_privilege('fnh_platform', 'households', 'join_slug', 'SELECT') AS slug,
+               has_column_privilege('fnh_platform', 'people', 'name', 'SELECT') AS person,
+               has_column_privilege('fnh_platform', 'photos', 'object_key', 'SELECT') AS photo,
+               has_column_privilege('fnh_platform', 'audit_events', 'data', 'SELECT') AS audit,
+               has_table_privilege('fnh_platform', 'accounts', 'SELECT') AS accounts,
+               has_table_privilege('fnh_platform', 'ballot_ranks', 'SELECT') AS ballots,
+               pg_has_role('fnh_app', 'fnh_platform', 'MEMBER') AS app_is_member
+        """
+    )
+    assert row == {
+        "hh_name": True,
+        "slug": False,
+        "person": False,
+        "photo": False,
+        "audit": False,
+        "accounts": False,
+        "ballots": False,
+        "app_is_member": False,
+    }
+
+
+async def test_the_app_can_read_but_never_make_an_operator() -> None:
+    [row] = await _rows(
+        """
+        SELECT has_table_privilege('fnh_app', 'platform_operators', 'SELECT') AS read,
+               has_table_privilege('fnh_app', 'platform_operators', 'INSERT') AS ins,
+               has_table_privilege('fnh_app', 'platform_operators', 'UPDATE') AS upd,
+               has_table_privilege('fnh_app', 'platform_operators', 'DELETE') AS del,
+               has_table_privilege('fnh_app', 'platform_audit_events', 'INSERT') AS audit_in,
+               has_table_privilege('fnh_app', 'platform_audit_events', 'UPDATE') AS audit_up
+        """
+    )
+    assert row == {
+        "read": True,
+        "ins": False,
+        "upd": False,
+        "del": False,
+        "audit_in": True,
+        "audit_up": False,
     }

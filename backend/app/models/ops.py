@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, Integer, String, Text
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -70,3 +70,30 @@ class BackupRun(Base):
     objects_copied: Mapped[int] = mapped_column(Integer, server_default="0")
     bytes_copied: Mapped[int] = mapped_column(BigInteger, server_default="0")
     errors: Mapped[int] = mapped_column(Integer, server_default="0")
+
+
+class PlatformOperator(Base):
+    """ADR-0016: who may sign in to /platform. Global (no household data). fnh_app can only
+    read it; `python -m app.cli grant-platform` writes it as the owner."""
+
+    __tablename__ = "platform_operators"
+
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="CASCADE"), primary_key=True
+    )
+    granted_at: Mapped[datetime] = created_at()
+    granted_by: Mapped[str] = mapped_column(String(120))
+
+
+class PlatformAuditEvent(Base):
+    """ADR-0016 §6: every platform action. Global; `household_ref` is a bare id, not a
+    household scope. fnh_app may insert and read, never edit."""
+
+    __tablename__ = "platform_audit_events"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    account_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    household_ref: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+    action: Mapped[str] = mapped_column(String(64))
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    created_at: Mapped[datetime] = created_at()

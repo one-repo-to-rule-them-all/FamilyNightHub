@@ -1,8 +1,9 @@
 """Admin side of people (ADR-0002, 05-data.md "Conventions"): add, edit, guests, merge.
 
-People are never deleted. A merge repoints every row that names the source person to the
-target, in the request's one transaction, then sets `merged_into_id` on the source so it
-drops out of every list (`merged_into_id IS NULL` is the "live person" filter everywhere).
+A merge repoints every row that names the source person to the target, in the request's one
+transaction, then sets `merged_into_id` on the source so it drops out of every list
+(`merged_into_id IS NULL` is the "live person" filter everywhere). The other way out is a
+**delete** (`removal_service`, ADR-0017 §4), which erases the person outright.
 
 Names are unique per household among live people, case-insensitively ("Sam" and "sam"
 are one avatar tile to a five-year-old). The check runs under a per-household advisory
@@ -20,6 +21,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services import consent_service
 from app.services.errors import Conflict, NotFound
 
 
@@ -159,6 +161,7 @@ async def create(
     color: str,
     is_guest: bool,
 ) -> Person:
+    await consent_service.require_household_consent(db)
     await lock_names(db, household_id)
     await require_unique_name(db, name)
     row = (
