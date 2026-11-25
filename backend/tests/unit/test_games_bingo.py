@@ -111,4 +111,47 @@ def test_known_values():
 
 def test_unknown_mode():
     with pytest.raises(ValueError):
-        has_win(0, "x")  # type: ignore[arg-type]
+        has_win(0, "plus")  # type: ignore[arg-type]
+
+
+# --- more win patterns (ADR-0018 amendment 2026-11-26) ---
+
+from app.domain.games.bingo import CORNERS, STAMPS, X_MASK, patterns  # noqa: E402
+
+NEW_MODES = ["corners", "x", "stamp"]
+
+
+def test_new_pattern_masks() -> None:
+    assert CORNERS.bit_count() == 4 and CORNERS == sum(1 << i for i in (0, 4, 20, 24))
+    assert X_MASK.bit_count() == 9 and X_MASK & (1 << CENTER)
+    assert len(STAMPS) == 4 and all(s.bit_count() == 4 for s in STAMPS)
+    assert sorted(i for i in range(CELLS) if STAMPS[0] >> i & 1) == [0, 1, 5, 6]
+    assert sorted(i for i in range(CELLS) if STAMPS[3] >> i & 1) == [18, 19, 23, 24]
+    assert patterns("corners") == (CORNERS,) and patterns("x") == (X_MASK,)
+
+
+@given(masks)
+def test_stamp_wins_when_any_one_block_is_full(mask: int) -> None:
+    assert has_win(mask, "stamp") == any(mask & s == s for s in STAMPS)
+    assert has_win(mask, "corners") == (mask & CORNERS == CORNERS)
+    assert has_win(mask, "x") == (mask & X_MASK == X_MASK)
+
+
+@pytest.mark.parametrize("mode", NEW_MODES)
+@given(mask=masks)
+def test_squares_from_bingo_matches_brute_force(mode: str, mask: int) -> None:
+    pats = {
+        "corners": [[0, 4, 20, 24]],
+        "x": [[0, 6, 12, 18, 24, 4, 8, 16, 20]],
+        "stamp": [[0, 1, 5, 6], [3, 4, 8, 9], [15, 16, 20, 21], [18, 19, 23, 24]],
+    }[mode]
+    oracle = min(sum(1 for i in p if not mask >> i & 1) for p in pats)
+    assert squares_from_bingo(mask, mode) == oracle  # type: ignore[arg-type]
+    assert (oracle == 0) == has_win(mask, mode)  # type: ignore[arg-type]
+
+
+def test_free_centre_counts_toward_x_only() -> None:
+    start = initial_mask(True)
+    assert squares_from_bingo(start, "x") == 8
+    assert squares_from_bingo(start, "corners") == 4
+    assert squares_from_bingo(start, "stamp") == 4

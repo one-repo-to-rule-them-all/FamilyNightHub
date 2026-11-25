@@ -764,7 +764,7 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   `/jar/moderation` and can hide one before it shows (idempotent); an anonymous note never
   carries its author, even there. The snapshot holds revealed, unhidden notes only, and counts.
 - **Thanksgiving Bingo (slice B).** A host creates a round with `config` `win_mode`
-  (`line`|`blackout`), `free_center` and `end_on_first_win` (defaults line, true, true); it starts
+  (`line`|`blackout`|`corners`|`x`|`stamp`; see ADR-0018 amendment 2026-11-26), `free_center` and `end_on_first_win` (defaults line, true, true); it starts
   as a `draft`, **open** (`POST /open`, idempotent) lets people join, **start** (`POST /start`)
   makes it `live`, and `/end` ends it any time. **Join** (`/bingo/join`, as a person this phone
   acts as, consent gate) draws 24 distinct squares from `bingo_pool.THANKSGIVING_POOL` with

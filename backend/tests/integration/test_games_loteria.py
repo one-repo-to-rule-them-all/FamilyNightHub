@@ -177,7 +177,7 @@ async def test_a_false_check_changes_nothing_then_a_true_one_wins(
     a, _ = two_households
     async with phone() as host:
         await _host(host, a)
-        gid = await _create(host)
+        gid = await _create(host, pattern="line")
         async with _player(a, host) as (p, sam):
             squares = await _join(p, gid, sam)
             await _start(host, gid)
@@ -292,7 +292,7 @@ async def test_loteria_and_bingo_routes_do_not_mix_and_bad_pattern_is_422(
         bad = await host.post(GAMES, {"kind": "loteria", "title": "x", "pattern": "zz"})
         assert bad.status_code == 422
         game = (await host.client.get(f"{GAMES}/{gid}")).json()
-        assert game["kind"] == "loteria" and game["loteria"]["pattern"] == "line"
+        assert game["kind"] == "loteria" and game["loteria"]["pattern"] == "full"
         assert game["bingo"] is None
 
 

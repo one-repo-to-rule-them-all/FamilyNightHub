@@ -37,7 +37,7 @@ _AUDIT = text(
 # The jar (A), bingo (B) and scattergories (C).
 AVAILABLE_KINDS = frozenset({"gratitude_jar", "bingo", "scattergories", "loteria"})
 LOTERIA_PATTERNS = frozenset({"line", "corners", "center", "full"})
-WIN_MODES = frozenset({"line", "blackout"})
+WIN_MODES = frozenset(bingo.WIN_MODE_VALUES)
 BINGO_MODES = frozenset({"thanksgiving", "classic"})
 
 
@@ -215,13 +215,13 @@ async def create_game(
     mode: str = "thanksgiving",
     reveal_mode: str = "cycle",
     cycle_seconds: int = jar.CYCLE_SECONDS_DEFAULT,
-    pattern: str = "line",
+    pattern: str = "full",
 ) -> GameRow:
     if kind not in AVAILABLE_KINDS:
         raise Invalid("That game isn't available yet.")
     if kind == "bingo":
         if win_mode not in WIN_MODES:
-            raise Invalid("Pick line or blackout.")
+            raise Invalid("Pick line, blackout, corners, x or stamp.")
         if mode not in BINGO_MODES:
             raise Invalid("Pick classic or Thanksgiving bingo.")
         config: dict[str, Any] = {
@@ -766,7 +766,8 @@ def _require_bingo(game: GameRow) -> None:
 
 
 def _win_mode(game: GameRow) -> bingo.WinMode:
-    return "blackout" if game.config.get("win_mode") == "blackout" else "line"
+    mode = game.config.get("win_mode")
+    return mode if mode in bingo.WIN_MODE_VALUES else "line"
 
 
 def _mode(game: GameRow) -> str:

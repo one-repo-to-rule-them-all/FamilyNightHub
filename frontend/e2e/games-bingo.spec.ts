@@ -29,6 +29,8 @@ test.describe("thanksgiving bingo", () => {
     await hub.getByTestId("bingo-title").fill("E2E bingo");
     // The form preselects classic this year; this spec plays the Thanksgiving mode.
     await hub.getByTestId("bingo-mode-thanksgiving").check();
+    // This spec also covers a non-default pattern: the four corners win.
+    await hub.getByTestId("win-mode-corners").check();
     // Creating a game opens its control page in a new tab; the hub tab stays put.
     const [host] = await Promise.all([
       hub.waitForEvent("popup"),
@@ -86,15 +88,16 @@ test.describe("thanksgiving bingo", () => {
     await expect(screen).toHaveAttribute("data-status", "live", POLL);
     await expect(page.getByTestId("bingo-reroll")).toHaveCount(0);
 
-    // Mark the top row: four marks, then the fifth completes it.
-    for (let i = 0; i < 4; i++) {
+    // Mark three corners; the fourth completes the pattern.
+    await expect(tv.getByTestId("tv-bingo-mode")).toContainText("Four corners", POLL);
+    for (const i of [0, 4, 20]) {
       const square = page.getByTestId("bingo-square").nth(i);
       await square.click();
       await expect(square).toHaveAttribute("aria-pressed", "true", POLL);
     }
     await expect(page.getByTestId("bingo-progress")).toContainText("1 away", POLL);
     await expect(tv.getByTestId("tv-bingo-player")).toContainText("1 away", POLL);
-    await page.getByTestId("bingo-square").nth(4).click();
+    await page.getByTestId("bingo-square").nth(24).click();
 
     // The server decided: the round is over and everyone sees who won.
     await expect(screen).toHaveAttribute("data-status", "ended", POLL);

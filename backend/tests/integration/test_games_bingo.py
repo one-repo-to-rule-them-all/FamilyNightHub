@@ -199,6 +199,40 @@ async def test_blackout_needs_every_square_and_the_round_can_keep_going(
             assert (await _mark(p, gid, sam, 3, "DELETE")).json()["won"] is True
 
 
+@pytest.mark.parametrize(
+    ("mode", "wins", "short"),
+    [
+        ("corners", [0, 4, 20, 24], [0, 4, 20]),
+        ("x", [0, 4, 6, 8, 16, 18, 20, 24], [0, 4, 6, 8, 16, 18, 20]),
+        ("stamp", [18, 19, 23, 24], [18, 19, 23]),
+    ],
+)
+async def test_new_win_patterns_end_the_round(
+    two_households: Pair, mode: str, wins: list[int], short: list[int]
+) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        gid = await _bingo(host, win_mode=mode)
+        async with _player(a, host) as (p, sam):
+            await _join(p, gid, sam)
+            await _start(host, gid)
+            for i in short:
+                assert (await _mark(p, gid, sam, i)).json()["won"] is False
+            last = [i for i in wins if i not in short][0]
+            assert (await _mark(p, gid, sam, last)).json()["won"] is True
+            snap = (await host.client.get(f"{GAMES}/{gid}")).json()
+            assert snap["status"] == "ended" and snap["bingo"]["win_mode"] == mode
+
+
+async def test_unknown_win_mode_is_rejected(two_households: Pair) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        resp = await host.post(GAMES, {"kind": "bingo", "title": "B", "win_mode": "plus"})
+        assert resp.status_code == 422
+
+
 async def test_without_a_free_centre_every_square_is_blank(two_households: Pair) -> None:
     a, _ = two_households
     async with phone() as host:

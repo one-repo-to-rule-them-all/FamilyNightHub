@@ -727,14 +727,15 @@ and vice versa; cross-household 404. Vitest for the deck mirror and helpers; one
 
 **OPEN (owner), with the default used.**
 
-- **L1.** Default pattern: **line** (used). Four corners, centre four and full "Lotería" are host
-  choices at creation.
-- **L2.** A valid check ends the round: **yes** (used, as bingo A1); tickable off at creation.
+- **L1.** Default pattern: **Full tabla (owner, 2026-11-26)**. Line, four corners and centre four
+  are host choices at creation.
+- **L2.** A valid check ends the round: **yes, the first win ends it (owner, 2026-11-26)**;
+  tickable off at creation.
 - **L3.** Pictures: **emoji + Spanish name** (used). Original illustrated cards would be a later
   art task; the _canto_ (traditional rhyme, audio) is deferred.
 - **L4.** Deck spelling and English glosses follow the list the owner supplied (e.g. "El Violoncello",
-  "Las Jaras", "El Negrito", "El Apache"). Some traditional names are dated or sensitive; the
-  owner may want to rename or drop a few. They live in one data file.
+  "Las Jaras", "El Negrito", "El Apache"): **keep the traditional deck as supplied (owner,
+  2026-11-26)**. They live in one data file.
 - **L5.** Reroll is unlimited before the host starts (used); the same call as bingo's reroll.
 - **L6.** Storage reuses the `bingo_cards`/`bingo_calls` tables (used; reasoning in point 4).
   Say if you would rather have dedicated tables.
@@ -751,3 +752,19 @@ households, and behind the same consent gate as join. The seed follows join's pa
 means the new card always differs from the old one. It publishes `game.activity` because the host's
 "N to go" changes. Nobody else's card is touched. The phone shows a **New card** button only while
 the game is open and the person has a card.
+
+### Amendment 2026-11-26: more bingo win patterns
+
+`config.win_mode` (classic and Thanksgiving share it) grows from `line | blackout` to
+`line | blackout | corners | x | stamp`, chosen by the host at creation (default still `line`;
+existing games are unchanged). `corners` is the four corner squares; `x` is both diagonals (9
+squares); `stamp` is any one 2x2 block in a corner of the card (four candidate masks). The masks
+live in `domain/games/bingo.py` (`patterns(mode)`), and `has_win`, `squares_from_bingo` and
+classic's `bingo_classic.pattern` all read that one list, so the host Check and Thanksgiving's
+automatic win agree. A pattern that includes the centre (`x`) counts the free square as marked.
+The phone's own "to go" count (`markedToGo`, `winPatterns` in `lib/bingo.ts`) mirrors the server.
+Validation is `WIN_MODES` in the service (422 from the schema otherwise). No migration.
+
+Also decided the same day: Lotería's default pattern is the full tabla (L1), and on the classic
+phone screen the "Last call" block is compact and the separate progress line is gone (kept as
+visually hidden live text for screen readers; the player strip and the host's Check carry it).

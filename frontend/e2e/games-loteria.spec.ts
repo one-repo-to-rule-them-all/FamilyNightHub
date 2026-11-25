@@ -27,6 +27,7 @@ test.describe("loteria", () => {
     const hub = await hostContext.newPage();
     await hub.goto("/host/games");
     await hub.getByTestId("loteria-title").fill("E2E Loteria");
+    await hub.getByTestId("loteria-pattern-line").check(); // the default is the full tabla
     const [host] = await Promise.all([
       hub.waitForEvent("popup"),
       hub.getByTestId("create-loteria").click(),

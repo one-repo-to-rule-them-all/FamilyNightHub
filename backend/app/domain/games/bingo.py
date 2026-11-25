@@ -10,7 +10,8 @@ import random
 from collections.abc import Sequence
 from typing import Literal
 
-WinMode = Literal["line", "blackout"]
+WinMode = Literal["line", "blackout", "corners", "x", "stamp"]
+WIN_MODE_VALUES: tuple[str, ...] = ("line", "blackout", "corners", "x", "stamp")
 
 SIZE = 5
 CELLS = SIZE * SIZE
@@ -32,6 +33,15 @@ LINES: tuple[int, ...] = (
     *(_mask([r * SIZE + c for r in range(SIZE)]) for c in range(SIZE)),
     _mask([i * SIZE + i for i in range(SIZE)]),
     _mask([i * SIZE + (SIZE - 1 - i) for i in range(SIZE)]),
+)
+CORNERS: int = _mask([0, SIZE - 1, CELLS - SIZE, CELLS - 1])
+# Both diagonals together: the letter X (9 squares, the centre is shared).
+X_MASK: int = LINES[-2] | LINES[-1]
+# A 2x2 "postage stamp" block in any one corner of the card.
+STAMPS: tuple[int, ...] = tuple(
+    _mask([(r + dr) * SIZE + c + dc for dr in (0, 1) for dc in (0, 1)])
+    for r in (0, SIZE - 2)
+    for c in (0, SIZE - 2)
 )
 
 
@@ -65,11 +75,22 @@ def toggle_mark(mask: int, index: int, free_center: bool = True) -> int:
     return toggle(mask, index)
 
 
+def patterns(win_mode: WinMode) -> tuple[int, ...]:
+    """The winning masks for a mode (any one of them wins)."""
+    return _patterns(win_mode)
+
+
 def _patterns(win_mode: WinMode) -> tuple[int, ...]:
     if win_mode == "line":
         return LINES
     if win_mode == "blackout":
         return (FULL_MASK,)
+    if win_mode == "corners":
+        return (CORNERS,)
+    if win_mode == "x":
+        return (X_MASK,)
+    if win_mode == "stamp":
+        return STAMPS
     raise ValueError(f"unknown win_mode {win_mode!r}")
 
 
