@@ -33,6 +33,13 @@ export function kindName(kind: GameKind, mode?: "thanksgiving" | "classic" | nul
   return KIND_COPY[kind].name;
 }
 
+/** The jar's seconds-per-note box: whole seconds, 5 to 60; anything unreadable is 12. */
+export function clampCycleSeconds(text: string): number {
+  const n = Math.round(Number(text));
+  if (!text.trim() || !Number.isFinite(n)) return 12;
+  return Math.min(60, Math.max(5, n));
+}
+
 export function statusLabel(kind: GameKind, status: GameStatus): string {
   if (kind === "gratitude_jar") {
     if (status === "open") return "Collecting notes";

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, type ApiError, type Game, type GameSummary } from "@/lib/api";
 import { type BingoMode, MODE_COPY, WIN_MODE_COPY, type WinMode } from "@/lib/bingo";
-import { KIND_COPY, kindName, PLAYABLE, statusLabel } from "@/lib/games";
+import { clampCycleSeconds, KIND_COPY, kindName, PLAYABLE, statusLabel } from "@/lib/games";
 
 /** One named tab for a game's control page, so the Family Night hub tab stays where it is. */
 export const GAME_WINDOW_NAME = "fnh-game";
@@ -51,7 +51,9 @@ export function GamesAdmin() {
   // This year the family plays classic bingo; Thanksgiving mode stays one tap away.
   const [bingoMode, setBingoMode] = useState<BingoMode>("classic");
   const [bingoTitle, setBingoTitle] = useState("Family bingo");
-  const [cycleSeconds, setCycleSeconds] = useState(12);
+  // Kept as text while typing: clamping each keystroke turned "12" into "52" (the "1" became 5).
+  const [cycleSecondsText, setCycleSecondsText] = useState("12");
+  const cycleSeconds = clampCycleSeconds(cycleSecondsText);
   const [winMode, setWinMode] = useState<WinMode>("line");
   const [freeCenter, setFreeCenter] = useState(true);
   const [endOnFirstWin, setEndOnFirstWin] = useState(true);
@@ -138,10 +140,9 @@ export function GamesAdmin() {
           inputMode="numeric"
           min={5}
           max={60}
-          value={cycleSeconds}
-          onChange={(event) =>
-            setCycleSeconds(Math.min(60, Math.max(5, Math.round(Number(event.target.value)) || 12)))
-          }
+          value={cycleSecondsText}
+          onChange={(event) => setCycleSecondsText(event.target.value)}
+          onBlur={() => setCycleSecondsText(String(cycleSeconds))}
         />
         <label className="flex min-h-11 items-center gap-3">
           <input

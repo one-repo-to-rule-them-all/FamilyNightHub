@@ -13,7 +13,9 @@ import { useLiveGame } from "@/hooks/use-live-game";
 import { usePhonePeople } from "@/hooks/use-phone";
 import { api, type ApiError, type BingoCard } from "@/lib/api";
 import {
+  BINGO_LETTERS,
   bingoStatusLine,
+  callParts,
   calledSet,
   canTapSquare,
   canMarkClassic,
@@ -21,6 +23,7 @@ import {
   classicStatusLine,
   FREE_LABEL,
   markedSet,
+  markedToGo,
   notCalledMessage,
   progressLabel,
   rankPlayers,
@@ -75,6 +78,20 @@ export function BingoScreen({ gameId }: { gameId: string }) {
         (old ?? []).map((c) => (c.person_id === next.person_id ? next : c)),
       );
       void queryClient.invalidateQueries({ queryKey: ["game", gameId] });
+    },
+  });
+
+  const reroll = useMutation<BingoCard, ApiError>({
+    mutationFn: () => {
+      if (!current) throw new Error("Pick who you are first");
+      return api.rerollBingoCard(gameId, current.id);
+    },
+    onSuccess: (next) => {
+      queryClient.setQueryData<BingoCard[]>(cardKey, (old) =>
+        (old ?? []).map((c) => (c.person_id === next.person_id ? next : c)),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["game", gameId] });
+      setHint("You have a new card.");
     },
   });
 
@@ -156,12 +173,24 @@ export function BingoScreen({ gameId }: { gameId: string }) {
               >
                 {last ? spacedLabel(last) : "—"}
               </p>
-              <p className="text-sm text-muted-foreground" data-testid="bingo-recent-calls">
-                {recentCalls(calls).length > 0
-                  ? `Before: ${recentCalls(calls)
-                      .map((c) => c.label)
-                      .join(", ")}`
-                  : "Numbers show up here as the host calls them."}
+              <p className="text-base text-muted-foreground" data-testid="bingo-recent-calls">
+                {recentCalls(calls).length > 0 ? (
+                  <>
+                    Before:{" "}
+                    {recentCalls(calls).map((c, i) => {
+                      const { letter, number } = callParts(c);
+                      return (
+                        <span key={c.seq} className="whitespace-nowrap">
+                          {i > 0 ? ", " : ""}
+                          <strong className="font-bold text-foreground">{letter}</strong>
+                          <span className="text-foreground">{number}</span>
+                        </span>
+                      );
+                    })}
+                  </>
+                ) : (
+                  "Numbers show up here as the host calls them."
+                )}
               </p>
             </div>
           ) : null}
@@ -170,10 +199,23 @@ export function BingoScreen({ gameId }: { gameId: string }) {
             <>
               <p className="text-sm text-muted-foreground" data-testid="bingo-progress">
                 {progressLabel({
-                  squares_from_bingo: card.squares_from_bingo,
+                  squares_from_bingo: classic
+                    ? markedToGo(card.marked, data.bingo?.win_mode ?? "line")
+                    : card.squares_from_bingo,
                   won: card.won,
                 })}
               </p>
+              {classic ? (
+                <div
+                  aria-hidden
+                  data-testid="bingo-card-header"
+                  className="-mb-1 grid grid-cols-5 gap-1.5 text-center font-heading text-2xl font-bold"
+                >
+                  {BINGO_LETTERS.map((letter) => (
+                    <span key={letter}>{letter}</span>
+                  ))}
+                </div>
+              ) : null}
               <ul
                 className="grid grid-cols-5 gap-1.5"
                 aria-label="Your bingo card"
@@ -248,6 +290,23 @@ export function BingoScreen({ gameId }: { gameId: string }) {
                 {hint}
               </p>
               <ApiErrorNotice error={mark.error} />
+              {data.status === "open" ? (
+                <>
+                  <ApiErrorNotice error={reroll.error} />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    data-testid="bingo-reroll"
+                    aria-label="New card: replaces your current card with a new one"
+                    className="min-h-14 w-full text-lg"
+                    disabled={reroll.isPending}
+                    onClick={() => reroll.mutate()}
+                  >
+                    New card
+                  </Button>
+                </>
+              ) : null}
             </>
           ) : null}
         </>

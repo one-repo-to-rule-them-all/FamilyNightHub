@@ -73,8 +73,18 @@ test.describe("thanksgiving bingo", () => {
 
     // Open but not live: squares are not tappable yet.
     await expect(page.getByTestId("bingo-square").nth(0)).toBeDisabled();
+
+    // A player can swap for a new card until the host starts the round.
+    const squares = page.getByTestId("bingo-square");
+    const before = (await squares.allTextContents()).join(",");
+    await page.getByTestId("bingo-reroll").click();
+    await expect(page.getByTestId("bingo-hint")).toHaveText("You have a new card.", POLL);
+    expect((await squares.allTextContents()).join(",")).not.toBe(before);
+    await expect(squares.nth(12)).toHaveAttribute("aria-pressed", "true");
+
     await host.getByTestId("start-round").click();
     await expect(screen).toHaveAttribute("data-status", "live", POLL);
+    await expect(page.getByTestId("bingo-reroll")).toHaveCount(0);
 
     // Mark the top row: four marks, then the fifth completes it.
     for (let i = 0; i < 4; i++) {

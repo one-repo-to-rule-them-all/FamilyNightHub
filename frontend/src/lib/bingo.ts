@@ -108,6 +108,34 @@ export function spacedLabel(call: Pick<CallLike, "label">): string {
   return call.label.replace(/^([BINGO])/, "$1 ");
 }
 
+const CARD_LINES: readonly (readonly number[])[] = [
+  ...Array.from({ length: CARD_SIZE }, (_, r) =>
+    Array.from({ length: CARD_SIZE }, (_, c) => r * CARD_SIZE + c),
+  ),
+  ...Array.from({ length: CARD_SIZE }, (_, c) =>
+    Array.from({ length: CARD_SIZE }, (_, r) => r * CARD_SIZE + c),
+  ),
+  Array.from({ length: CARD_SIZE }, (_, i) => i * CARD_SIZE + i),
+  Array.from({ length: CARD_SIZE }, (_, i) => i * CARD_SIZE + (CARD_SIZE - 1 - i)),
+];
+
+/**
+ * How many squares a player still has to MARK to complete a pattern. A classic round's server
+ * count follows the host's called numbers; the player's own count should follow their taps, or
+ * tapping looks like it does nothing. (The free centre is in `marked` when the round has one.)
+ */
+export function markedToGo(marked: readonly number[], winMode: "line" | "blackout"): number {
+  const set = new Set(marked);
+  if (winMode === "blackout") return CARD_SIZE * CARD_SIZE - set.size;
+  return Math.min(...CARD_LINES.map((line) => line.filter((i) => !set.has(i)).length));
+}
+
+/** A call split for display: "N34" is the letter "N" and the number "34". */
+export function callParts(call: Pick<CallLike, "label">): { letter: string; number: string } {
+  const match = /^([BINGO])(\d+)$/.exec(call.label);
+  return match ? { letter: match[1], number: match[2] } : { letter: "", number: call.label };
+}
+
 /** The called numbers as a set for O(1) lookups. */
 export function calledSet(calls: readonly Pick<CallLike, "value">[]): ReadonlySet<number> {
   return new Set(calls.map((c) => c.value));

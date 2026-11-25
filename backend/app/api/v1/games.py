@@ -488,6 +488,34 @@ async def join_bingo(
     return BingoCardOut(**card.__dict__)
 
 
+@router.post(
+    "/{game_id}/bingo/reroll",
+    response_model=BingoCardOut,
+    dependencies=[CsrfProtected],
+    responses=PLAYER,
+)
+async def reroll_bingo_card(
+    game_id: uuid.UUID,
+    body: BingoJoinIn,
+    device: CurrentDevice,
+    db: DeviceDb,
+    x_fnh_test_seed: Annotated[str | None, Header(include_in_schema=False)] = None,
+) -> BingoCardOut:
+    """Replace your own card with a fresh one while the round is still open (not yet started)."""
+    try:
+        card = await games_service.reroll_card(
+            db,
+            device.household_id,
+            game_id,
+            device_id=device.device_id,
+            person_id=body.person_id,
+            seed=tie_seed(x_fnh_test_seed),
+        )
+    except ServiceError as err:
+        raise_http(err)
+    return BingoCardOut(**card.__dict__)
+
+
 @router.get("/{game_id}/bingo/mine", response_model=list[BingoCardOut], responses=NOT_FOUND)
 async def my_cards(game_id: uuid.UUID, device: CurrentDevice, db: DeviceDb) -> list[BingoCardOut]:
     """The cards of the people this phone is acting as. Nobody else's card is readable."""

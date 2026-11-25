@@ -57,17 +57,26 @@ test.describe("classic bingo", () => {
     await page.getByTestId("primary-action").click();
     const squares = page.getByTestId("bingo-square");
     await expect(squares).toHaveCount(25);
-    const labels = await squares.evaluateAll((els) =>
+    let labels = await squares.evaluateAll((els) =>
       els.map((el) => el.textContent?.trim() ?? ""),
     );
     expect(labels[12]).toBe("FREE");
     expect(labels.filter((l) => /^\d+$/.test(l))).toHaveLength(24);
     await expect(host.getByTestId("host-bingo-player")).toHaveCount(1, POLL);
 
+    // Before the host starts the round a player can swap for a new card (own card, marks reset).
+    const before = labels.join(",");
+    await page.getByTestId("bingo-reroll").click();
+    await expect(page.getByTestId("bingo-hint")).toHaveText("You have a new card.", POLL);
+    labels = await squares.evaluateAll((els) => els.map((el) => el.textContent?.trim() ?? ""));
+    expect(labels.join(",")).not.toBe(before);
+    expect(labels[12]).toBe("FREE");
+
     // Round starts; nothing is called yet, so no number is markable.
     await host.getByTestId("start-round").click();
     await expect(screen).toHaveAttribute("data-status", "live", POLL);
     await expect(host.getByTestId("host-draw")).toBeVisible(POLL);
+    await expect(page.getByTestId("bingo-reroll")).toHaveCount(0);
     await expect(squares.nth(0)).toHaveAttribute("aria-disabled", "true");
 
     // Host draws until a number on this card has been called (never more than 75 draws).
