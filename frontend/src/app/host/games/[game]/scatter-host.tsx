@@ -1,17 +1,18 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Ban, Check, Dices, Eye, Play, Square } from "lucide-react";
+import { Dices, Eye, Play, Square } from "lucide-react";
 import { useState } from "react";
 
 import { ShowOnTvButton } from "@/components/games/show-on-tv-button";
 import { ApiErrorNotice } from "@/components/api-error-notice";
-import { Countdown, Leaderboard, LetterTile, Results } from "@/components/games/scatter-parts";
+import { Countdown, Leaderboard, LetterTile } from "@/components/games/scatter-parts";
+import { ScatterReviewPanel } from "@/components/games/scatter-review";
 import { HostGameFrame } from "@/components/games/host-game-frame";
 import { Button } from "@/components/ui/button";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { useScatterClock } from "@/hooks/use-scatter-clock";
-import { api, type ApiError, type Game, type ScatterAnswer } from "@/lib/api";
+import { api, type ApiError, type Game } from "@/lib/api";
 import { playerCountLabel, scatterStripPlayers } from "@/lib/game-layout";
 import { statusLabel } from "@/lib/games";
 import {
@@ -19,7 +20,6 @@ import {
   categoriesToText,
   DEFAULT_DURATION,
   DURATIONS,
-  nextVerdict,
   parseCategories,
   roundHeading,
   stateLabel,
@@ -113,8 +113,8 @@ function RoundSetup({ gameId, nextRound }: { gameId: string; nextRound: number }
 
 /**
  * Run a Scattergories game (ADR-0018 slice C): set up each round, watch the clock and who has
- * answered (never what), reveal, reject or re-accept answers, start the next round, end it. The
- * server derives every score, so a verdict just refetches the snapshot.
+ * answered (never what), reveal, review only the answers that need a decision, start the next
+ * round, end it. The server derives every score, so a verdict just refetches the snapshot.
  */
 export function ScatterHost({ gameId }: { gameId: string }) {
   const queryClient = useQueryClient();
@@ -122,18 +122,14 @@ export function ScatterHost({ gameId }: { gameId: string }) {
   const data = game.data;
   const scatter = data?.scatter ?? undefined;
   const { state, seconds, round } = useScatterClock(scatter, game.dataUpdatedAt);
+  // The round whose review the host closed with "Accept the rest" (view state only).
+  const [reviewed, setReviewed] = useState<number | null>(null);
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["game", gameId] });
 
   const step = useMutation<Game, ApiError, "reveal" | "end">({
     mutationFn: (action) => (action === "reveal" ? api.revealScatter(gameId) : api.endGame(gameId)),
     onSuccess: refresh,
   });
-  const judge = useMutation<Game, ApiError, { answer: ScatterAnswer }>({
-    mutationFn: ({ answer }) =>
-      api.setScatterVerdict(gameId, answer.answer_id, nextVerdict(answer.verdict)),
-    onSuccess: refresh,
-  });
-
   const lastRevealed = scatter?.revealed.at(-1);
   const ended = data?.status === "ended";
   const between = !ended && (state === "lobby" || state === "revealed");
@@ -191,7 +187,7 @@ export function ScatterHost({ gameId }: { gameId: string }) {
             ) : null}
             <ShowOnTvButton gameId={gameId} />
           </div>
-          <ApiErrorNotice error={step.error ?? judge.error} />
+          <ApiErrorNotice error={step.error} />
 
           {round && (state === "running" || state === "closed") ? (
             <section className="flex flex-col gap-3" aria-label="Round in progress">
@@ -215,25 +211,26 @@ export function ScatterHost({ gameId }: { gameId: string }) {
               <h2 className="text-lg font-medium">
                 {roundHeading(lastRevealed.round_no, lastRevealed.letter)} results
               </h2>
-              <p className="text-sm text-muted-foreground">
-                Reject an answer that does not fit, or accept it back. Scores update at once.
-              </p>
-              <Results
-                round={lastRevealed}
-                standings={scatter.leaderboard}
-                action={(answer) => (
-                  <Button
-                    variant="ghost"
-                    size="icon-lg"
-                    data-testid={answer.verdict === "rejected" ? "accept-answer" : "reject-answer"}
-                    aria-label={`${answer.verdict === "rejected" ? "Accept" : "Reject"}: ${answer.text}`}
-                    disabled={judge.isPending}
-                    onClick={() => judge.mutate({ answer })}
+              {reviewed === lastRevealed.round_no ? (
+                <p className="text-sm text-muted-foreground" data-testid="review-closed">
+                  Review closed. Every answer you did not change counts as it is.{" "}
+                  <button
+                    type="button"
+                    className="min-h-11 font-medium underline"
+                    onClick={() => setReviewed(null)}
                   >
-                    {answer.verdict === "rejected" ? <Check aria-hidden /> : <Ban aria-hidden />}
-                  </Button>
-                )}
-              />
+                    Review again
+                  </button>
+                </p>
+              ) : (
+                <ScatterReviewPanel
+                  key={lastRevealed.round_no}
+                  gameId={gameId}
+                  round={lastRevealed}
+                  standings={scatter.leaderboard}
+                  onDone={() => setReviewed(lastRevealed.round_no)}
+                />
+              )}
             </section>
           ) : null}
 

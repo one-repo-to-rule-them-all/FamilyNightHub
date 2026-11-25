@@ -1,22 +1,33 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import {
   answerBody,
   answeredLine,
   answerNote,
+  autoAcceptedLine,
   byCategory,
   canAnswer,
   canStartRound,
   categoriesToText,
   clockOffsetMs,
+  countedSeparately,
   draftFrom,
   formatClock,
+  informationalLabel,
   isDirty,
+  letterHint,
   nextVerdict,
+  normalize,
   parseCategories,
   pointsLabel,
+  reviewTitle,
   roundHeading,
   secondsLeft,
+  sendableText,
+  startsWithLetter,
   stateLabel,
   timeFraction,
 } from "./scatter";
@@ -118,5 +129,65 @@ describe("scatter results", () => {
     expect(nextVerdict("rejected")).toBe("accepted");
     expect(pointsLabel(1)).toBe("1 pt");
     expect(pointsLabel(0)).toBe("0 pts");
+  });
+});
+
+const vectors = JSON.parse(
+  readFileSync(
+    fileURLToPath(new URL("../../../backend/tests/vectors/scatter_normalize.json", import.meta.url)),
+    "utf-8",
+  ),
+) as {
+  normalize: { text: string; key: string }[];
+  starts_with: { text: string; letter: string; ok: boolean }[];
+};
+
+describe("scatter phone validation (a convenience; the server decides)", () => {
+  it("normalises exactly as the server does, on the shared vectors", () => {
+    for (const v of vectors.normalize) expect(normalize(v.text), JSON.stringify(v.text)).toBe(v.key);
+  });
+
+  it("checks the first letter on the shared vectors", () => {
+    for (const v of vectors.starts_with) {
+      expect(startsWithLetter(v.text, v.letter), JSON.stringify(v.text)).toBe(v.ok);
+    }
+  });
+
+  it("hints only when something is typed and it is wrong", () => {
+    expect(letterHint("", "P")).toBeNull();
+    expect(letterHint("   ", "P")).toBeNull();
+    expect(letterHint("Pie", "P")).toBeNull();
+    expect(letterHint("Apple", "P")).toBe("Must start with P");
+  });
+
+  it("sends a failing answer as blank and keeps the field dirty-free", () => {
+    expect(sendableText(" Pie ", "P")).toBe("Pie");
+    expect(sendableText("Apple", "P")).toBe("");
+    expect(sendableText(" Apple ")).toBe("Apple");
+    expect(answerBody(["Pie", "Apple", ""], "P")).toEqual([
+      { category_index: 0, text: "Pie" },
+      { category_index: 1, text: "" },
+      { category_index: 2, text: "" },
+    ]);
+    // The wrong-letter text never reaches the server, so it is not "unsaved".
+    expect(isDirty(["Apple"], [""], "P")).toBe(false);
+    expect(isDirty(["Pie"], [""], "P")).toBe(true);
+  });
+});
+
+describe("scatter review labels", () => {
+  it("names each card and counts", () => {
+    expect(reviewTitle("short", false)).toBe("Very short answer");
+    expect(reviewTitle("near_duplicate", true)).toBe("Nearly the same answer");
+    expect(reviewTitle("near_duplicate", false)).toBe("Possible typo");
+    expect(reviewTitle("duplicate", false)).toBe("Exact duplicate");
+    expect(reviewTitle("host_rejected", false)).toBe("You rejected");
+    expect(reviewTitle("auto_rejected_letter", false)).toBe("Wrong letter");
+    expect(autoAcceptedLine(1)).toBe("1 answer accepted automatically");
+    expect(autoAcceptedLine(5)).toBe("5 answers accepted automatically");
+    expect(informationalLabel(3)).toBe("Wrong letter and exact duplicates (3)");
+    expect(countedSeparately([])).toBe(false);
+    expect(countedSeparately([{ verdict: "accepted" }, { verdict: null }])).toBe(false);
+    expect(countedSeparately([{ verdict: "accepted" }, { verdict: "accepted" }])).toBe(true);
   });
 });

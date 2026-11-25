@@ -229,6 +229,42 @@ class ScatterVerdictIn(BaseModel):
     verdict: Verdict | None
 
 
+ScatterReviewKind = Literal[
+    "near_duplicate", "short", "duplicate", "auto_rejected_letter", "host_rejected"
+]
+
+
+class ScatterReviewAnswerOut(BaseModel):
+    answer_id: uuid.UUID
+    person_id: uuid.UUID
+    name: str
+    text: str
+    verdict: Verdict | None
+    points: int
+
+
+class ScatterReviewItemOut(BaseModel):
+    kind: ScatterReviewKind
+    category_index: int
+    category: str
+    # True when the plural rule merged these answers (both 0 until the host counts them
+    # separately); false for a typo match, which scores as written.
+    merged: bool
+    answers: list[ScatterReviewAnswerOut]
+
+
+class ScatterReviewOut(BaseModel):
+    """What a revealed round needs from the host (ADR-0018 amendment, part C). Computed from
+    the same rows as scoring and never stored."""
+
+    round_no: int
+    letter: str
+    needs_decision: list[ScatterReviewItemOut]
+    informational: list[ScatterReviewItemOut]
+    auto_accepted_count: int
+    total: int
+
+
 GameOut.model_rebuild()
 
 

@@ -67,6 +67,8 @@ export type ScatterState = Schemas["ScatterOut"];
 export type ScatterRevealed = Schemas["ScatterRevealedOut"];
 export type ScatterAnswer = Schemas["ScatterAnswerOut"];
 export type OwnScatterAnswer = Schemas["ScatterOwnAnswerOut"];
+export type ScatterReview = Schemas["ScatterReviewOut"];
+export type ScatterReviewItem = Schemas["ScatterReviewItemOut"];
 export type AccountRole = AdminAccount["role"];
 export type Profile = Schemas["ProfileOut"];
 export type ProfileNight = Schemas["ProfileNightOut"];
@@ -354,6 +356,11 @@ export const api = {
     request<Game>("POST", `/games/${encodeURIComponent(gameId)}/scatter/rounds`, body),
   revealScatter: (gameId: string) =>
     request<Game>("POST", `/games/${encodeURIComponent(gameId)}/scatter/reveal`),
+  scatterReview: (gameId: string, roundNo: number) =>
+    request<ScatterReview>(
+      "GET",
+      `/games/${encodeURIComponent(gameId)}/scatter/rounds/${roundNo}/review`,
+    ),
   setScatterVerdict: (gameId: string, answerId: string, verdict: "accepted" | "rejected" | null) =>
     request<Game>(
       "PUT",

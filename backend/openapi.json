@@ -4058,6 +4058,145 @@
         "title": "ScatterRevealedOut",
         "type": "object"
       },
+      "ScatterReviewAnswerOut": {
+        "properties": {
+          "answer_id": {
+            "format": "uuid",
+            "title": "Answer Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "enum": [
+                  "accepted",
+                  "rejected"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict"
+          }
+        },
+        "required": [
+          "answer_id",
+          "person_id",
+          "name",
+          "text",
+          "verdict",
+          "points"
+        ],
+        "title": "ScatterReviewAnswerOut",
+        "type": "object"
+      },
+      "ScatterReviewItemOut": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/ScatterReviewAnswerOut"
+            },
+            "title": "Answers",
+            "type": "array"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "category_index": {
+            "title": "Category Index",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "near_duplicate",
+              "short",
+              "duplicate",
+              "auto_rejected_letter",
+              "host_rejected"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "merged": {
+            "title": "Merged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "category_index",
+          "category",
+          "merged",
+          "answers"
+        ],
+        "title": "ScatterReviewItemOut",
+        "type": "object"
+      },
+      "ScatterReviewOut": {
+        "description": "What a revealed round needs from the host (ADR-0018 amendment, part C). Computed from\nthe same rows as scoring and never stored.",
+        "properties": {
+          "auto_accepted_count": {
+            "title": "Auto Accepted Count",
+            "type": "integer"
+          },
+          "informational": {
+            "items": {
+              "$ref": "#/components/schemas/ScatterReviewItemOut"
+            },
+            "title": "Informational",
+            "type": "array"
+          },
+          "letter": {
+            "title": "Letter",
+            "type": "string"
+          },
+          "needs_decision": {
+            "items": {
+              "$ref": "#/components/schemas/ScatterReviewItemOut"
+            },
+            "title": "Needs Decision",
+            "type": "array"
+          },
+          "round_no": {
+            "title": "Round No",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "round_no",
+          "letter",
+          "needs_decision",
+          "informational",
+          "auto_accepted_count",
+          "total"
+        ],
+        "title": "ScatterReviewOut",
+        "type": "object"
+      },
       "ScatterRoundIn": {
         "properties": {
           "categories": {
@@ -8709,6 +8848,65 @@
           }
         },
         "summary": "Start Round",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/scatter/rounds/{round_no}/review": {
+      "get": {
+        "description": "Only the answers that need a decision: near-duplicates and very short answers, with\nwrong letters and exact duplicates as information. Everything else counts automatically.",
+        "operationId": "review_api_v1_games__game_id__scatter_rounds__round_no__review_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "round_no",
+            "required": true,
+            "schema": {
+              "title": "Round No",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScatterReviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The round is not revealed yet"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review",
         "tags": [
           "games"
         ]

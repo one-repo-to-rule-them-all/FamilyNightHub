@@ -782,9 +782,18 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   returns the phone's own. **Reveal** (host; early reveal also pulls `ends_at` to now) sets
   `revealed_at` and freezes the answers. Scores are **derived on read** by the pure
   `scatter.score_round` / `answer_points` (valid = starts with the letter after normalising and not
-  rejected; valid and unique in its category = 1) and never stored. The host may reject or
-  re-accept an answer after reveal (`host_verdict`; `PUT .../verdict`), and the leaderboard sums
-  the revealed rounds over the roster. Ending the game does not reveal an unrevealed round.
+  rejected; valid and matching no other valid answer in its category = 1) and never stored. Two
+  answers match when `normalize` agrees, or when `dedupe_key` (plural-folded: "potatoes" and
+  "potato") agrees unless the host *accepted* either, which means "its own answer"; a typo pair
+  one edit apart (keys of 6+ characters) scores as written and is only flagged. The host may
+  reject, accept or clear an answer after reveal (`host_verdict`; `PUT .../verdict`), and the
+  leaderboard sums the revealed rounds over the roster. `GET /scatter/rounds/{n}/review` (host;
+  409 before reveal) is a read over the same rows: `scatter.review` partitions every answer once
+  into **needs_decision** (near-duplicates, answers under 3 letters), **informational** (exact
+  duplicates, wrong letters, host rejects) and an auto-accepted count. It writes, audits and
+  publishes nothing, and "Accept the rest" is client-side. The server stays the authority on the
+  letter; the phone's hint is a convenience. Category fit is not judged. Ending the game does not
+  reveal an unrevealed round.
 - **Events.** `game_changed` (status, reveal, hide, roster, a win, a round start, a verdict) and
   `game_activity` (a note dropped or taken back, a square marked, an answer saved) go to
   `game:{id}` after commit. `POST /sse-tickets` takes exactly one of `session_id` or

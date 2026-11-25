@@ -1,0 +1,48 @@
+{
+  "_note": "Shared by backend/tests/unit/test_games_scatter_review.py and frontend/src/lib/scatter.test.ts. normalize and starts_with are ported to TypeScript for the phone hint; dedupe is server only.",
+  "normalize": [
+    { "text": "  The   Sweet-Potato Pie! ", "key": "sweetpotato pie" },
+    { "text": "Café", "key": "cafe" },
+    { "text": "An apple", "key": "apple" },
+    { "text": "A the an Pear", "key": "pear" },
+    { "text": "the", "key": "the" },
+    { "text": "the the pie", "key": "pie" },
+    { "text": "Ñandú", "key": "nandu" },
+    { "text": "ÑOQUI", "key": "noqui" },
+    { "text": "P.I.E", "key": "pie" },
+    { "text": "  ", "key": "" },
+    { "text": "", "key": "" },
+    { "text": "!!!", "key": "" },
+    { "text": "7 up", "key": "7 up" }
+  ],
+  "starts_with": [
+    { "text": "Pie", "letter": "P", "ok": true },
+    { "text": "pie", "letter": "P", "ok": true },
+    { "text": "The Pie", "letter": "P", "ok": true },
+    { "text": "an pear", "letter": "P", "ok": true },
+    { "text": "Éclair", "letter": "E", "ok": true },
+    { "text": "Ñandú", "letter": "N", "ok": true },
+    { "text": "...Pie", "letter": "P", "ok": true },
+    { "text": "Apple", "letter": "P", "ok": false },
+    { "text": "the apple", "letter": "T", "ok": false },
+    { "text": "the", "letter": "T", "ok": true },
+    { "text": "", "letter": "P", "ok": false },
+    { "text": "   ", "letter": "P", "ok": false }
+  ],
+  "dedupe": [
+    { "text": "mashed potatoes", "key": "mashed potato" },
+    { "text": "mashed potato", "key": "mashed potato" },
+    { "text": "Mashed Potato!", "key": "mashed potato" },
+    { "text": "cherries", "key": "cherry" },
+    { "text": "boxes", "key": "box" },
+    { "text": "sandwiches", "key": "sandwich" },
+    { "text": "dishes", "key": "dish" },
+    { "text": "classes", "key": "class" },
+    { "text": "pies", "key": "pie" },
+    { "text": "bus", "key": "bus" },
+    { "text": "glass", "key": "glass" },
+    { "text": "cactus", "key": "cactus" },
+    { "text": "iris", "key": "iris" },
+    { "text": "the pancakes", "key": "pancake" }
+  ]
+}

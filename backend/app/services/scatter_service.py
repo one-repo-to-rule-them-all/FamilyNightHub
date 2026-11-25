@@ -8,8 +8,8 @@ locally. Players submit or replace answers until `ends_at` plus a 2-second grace
 
 Answers are visible to nobody, the host included, until the host reveals. Reveal freezes them.
 Scores are derived on read by the pure `scatter.score_round` rules and never stored, so a host
-verdict can never leave a stale score. Reading, hosting and the snapshot share the pure module;
-the service only moves rows.
+verdict can never leave a stale score. `review` lists only what needs a human decision.
+Reading, hosting and the snapshot share the pure module; the service only moves rows.
 """
 
 from __future__ import annotations
@@ -400,6 +400,100 @@ async def set_verdict(
         {"answer_id": str(answer_id), "verdict": verdict},
     )
     publish_game_after_commit(db, game_id, events.GAME_CHANGED)
+
+
+@dataclass(frozen=True)
+class ReviewAnswerView:
+    answer_id: uuid.UUID
+    person_id: uuid.UUID
+    name: str
+    text: str
+    verdict: str | None
+    points: int
+
+
+@dataclass(frozen=True)
+class ReviewItemView:
+    kind: str
+    category_index: int
+    category: str
+    merged: bool
+    answers: list[ReviewAnswerView]
+
+
+@dataclass(frozen=True)
+class ReviewView:
+    round_no: int
+    letter: str
+    needs_decision: list[ReviewItemView]
+    informational: list[ReviewItemView]
+    auto_accepted_count: int
+    total: int
+
+
+async def review(
+    db: AsyncSession, household_id: uuid.UUID, game_id: uuid.UUID, round_no: int
+) -> ReviewView:
+    """What a revealed round needs from the host. A read: no write, no event, no audit row."""
+    _require_scatter(await _load(db, household_id, game_id))
+    rnd = (
+        await db.execute(
+            text(
+                "SELECT id, round_no, letter, categories, revealed_at FROM scatter_rounds "
+                "WHERE game_id = :g AND round_no = :n"
+            ),
+            {"g": game_id, "n": round_no},
+        )
+    ).first()
+    if rnd is None:
+        raise NotFound("Round not found")
+    if rnd.revealed_at is None:
+        raise Conflict("Reveal the round first.")
+    rows = list(
+        await db.execute(
+            text(
+                "SELECT a.id, a.person_id, a.category_index, a.text, a.host_verdict, p.name "
+                "FROM scatter_answers a JOIN people p ON p.id = a.person_id "
+                "AND p.household_id = a.household_id WHERE a.round_id = :r "
+                "ORDER BY a.category_index, a.created_at, a.id"
+            ),
+            {"r": rnd.id},
+        )
+    )
+    pairs = [(str(r.person_id), r.category_index, r.text) for r in rows]
+    verdicts = {(str(r.person_id), r.category_index): r.host_verdict for r in rows}
+    points = scatter.answer_points(pairs, verdicts, letter=rnd.letter)
+    by_key = {(str(r.person_id), r.category_index): r for r in rows}
+    result = scatter.review(pairs, verdicts, letter=rnd.letter)
+
+    def view(item: scatter.ReviewItem) -> ReviewItemView:
+        loose = {scatter.dedupe_key(by_key[k].text) for k in item.answers}
+        return ReviewItemView(
+            item.kind,
+            item.category_index,
+            rnd.categories[item.category_index],
+            item.kind == scatter.NEAR_DUPLICATE and len(loose) < len(item.answers),
+            [
+                ReviewAnswerView(
+                    by_key[k].id,
+                    by_key[k].person_id,
+                    by_key[k].name,
+                    by_key[k].text,
+                    by_key[k].host_verdict,
+                    points[k],
+                )
+                for k in item.answers
+            ],
+        )
+
+    return ReviewView(
+        rnd.round_no,
+        rnd.letter,
+        [view(i) for i in result.needs_decision],
+        [view(i) for i in result.informational],
+        len(result.auto_accepted),
+        len(rows),
+    )
 
 
 async def state(db: AsyncSession, game_id: uuid.UUID) -> ScatterState:
