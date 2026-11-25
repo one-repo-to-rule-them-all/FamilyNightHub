@@ -641,3 +641,16 @@ QR** returns the TV to whatever it would show with nothing sent: with a night in
 the night's QR screen; with no night but an open or live game, the TV settles on that game again.
 The target is not exported (it is a transient screen pointer, not household content) and is
 removed with its game (cascade, so person delete and Start fresh need no extra code).
+
+### Amendment 2026-11-26: card reroll
+
+Owner request: players may reroll their own bingo card. `POST /games/{id}/bingo/reroll` (body
+`{person_id}`, both modes) replaces the caller's own card in place while the game is `open`, as
+often as they like. The `bingo_cards` row is updated (`squares`, `marked_mask` back to the free
+centre's mask, `won_at` stays null), so there is no migration and no counter. It is 409 once the
+game is `draft`, `live` or `ended`, 403 for a person this phone does not act as, 404 across
+households, and behind the same consent gate as join. The seed follows join's pattern
+(`tie_seed`, pinned by `X-FNH-Test-Seed` in test) with the old squares mixed in, and a guard loop
+means the new card always differs from the old one. It publishes `game.activity` because the host's
+"N to go" changes. Nobody else's card is touched. The phone shows a **New card** button only while
+the game is open and the person has a card.

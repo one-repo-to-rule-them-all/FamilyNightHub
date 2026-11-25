@@ -346,3 +346,56 @@ def test_the_pool_can_fill_a_card() -> None:
     from app.domain.games import bingo_pool
 
     assert len(set(bingo_pool.THANKSGIVING_POOL)) >= bingo.CELLS
+
+
+async def _reroll(p: Phone, gid: str, person: uuid.UUID, seed: str = "1") -> Response:
+    return await _send(
+        p,
+        "POST",
+        f"{GAMES}/{gid}/bingo/reroll",
+        {"person_id": str(person)},
+        **{"X-FNH-Test-Seed": seed},
+    )
+
+
+async def test_reroll_replaces_only_my_card_while_open_and_resets_marks(
+    two_households: Pair,
+) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        gid = await _bingo(host, start=False)
+        assert (await _reroll(host, gid, uuid.uuid4())).status_code in (401, 403)
+        await _send(host, "POST", f"{GAMES}/{gid}/open")
+        async with _player(a, host, "Sam") as (p, sam), _player(a, host, "Kim") as (q, kim):
+            old = (await _join(p, gid, sam, "1")).json()["squares"]
+            kims = (await _join(q, gid, kim, "1")).json()["squares"]
+            for _ in range(2):  # no limit
+                resp = await _reroll(p, gid, sam, "1")  # same seed as the join: still new
+                assert resp.status_code == 200, resp.text
+                new = resp.json()
+                assert new["squares"] != old and len(set(new["squares"])) == 25
+                assert new["marked"] == [12] and not new["won"]
+                old = new["squares"]
+            assert (await q.client.get(f"{GAMES}/{gid}/bingo/mine")).json()[0]["squares"] == kims
+            assert (await _reroll(p, gid, kim)).status_code == 403  # someone else's card
+
+
+async def test_reroll_is_refused_once_live_or_ended_and_across_households(
+    two_households: Pair,
+) -> None:
+    a, b = two_households
+    async with phone() as host, phone() as other:
+        await _host(host, a)
+        await _host(other, b)
+        draft = await _bingo(host, start=False)
+        gid = await _bingo(host)
+        async with _player(a, host) as (p, sam), _player(b, other, "Bob") as (pb, bob):
+            await _join(p, gid, sam)
+            assert (await _reroll(p, draft, sam)).status_code == 409
+            assert (await _reroll(pb, gid, bob)).status_code == 404
+            await _start(host, gid)
+            resp = await _reroll(p, gid, sam)
+            assert resp.status_code == 409 and "started" in resp.text
+            await _send(host, "POST", f"{GAMES}/{gid}/end")
+            assert (await _reroll(p, gid, sam)).status_code == 409

@@ -80,6 +80,20 @@ export function BingoScreen({ gameId }: { gameId: string }) {
     },
   });
 
+  const reroll = useMutation<BingoCard, ApiError>({
+    mutationFn: () => {
+      if (!current) throw new Error("Pick who you are first");
+      return api.rerollBingoCard(gameId, current.id);
+    },
+    onSuccess: (next) => {
+      queryClient.setQueryData<BingoCard[]>(cardKey, (old) =>
+        (old ?? []).map((c) => (c.person_id === next.person_id ? next : c)),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["game", gameId] });
+      setHint("You have a new card.");
+    },
+  });
+
   const data = game.data;
   const players = data?.bingo?.players ?? [];
   const announcement = winnerLine(winnerNames(players));
@@ -273,6 +287,23 @@ export function BingoScreen({ gameId }: { gameId: string }) {
                 {hint}
               </p>
               <ApiErrorNotice error={mark.error} />
+              {data.status === "open" ? (
+                <>
+                  <ApiErrorNotice error={reroll.error} />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    data-testid="bingo-reroll"
+                    aria-label="New card: replaces your current card with a new one"
+                    className="min-h-14 w-full text-lg"
+                    disabled={reroll.isPending}
+                    onClick={() => reroll.mutate()}
+                  >
+                    New card
+                  </Button>
+                </>
+              ) : null}
             </>
           ) : null}
         </>

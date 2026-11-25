@@ -8345,6 +8345,69 @@
         ]
       }
     },
+    "/api/v1/games/{game_id}/bingo/reroll": {
+      "post": {
+        "description": "Replace your own card with a fresh one while the round is still open (not yet started).",
+        "operationId": "reroll_bingo_card_api_v1_games__game_id__bingo_reroll_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BingoJoinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BingoCardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't acting as that person, or consent is needed"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reroll Bingo Card",
+        "tags": [
+          "games"
+        ]
+      }
+    },
     "/api/v1/games/{game_id}/end": {
       "post": {
         "description": "End the game (idempotent).",
