@@ -26,6 +26,9 @@ class GameCreateIn(BaseModel):
     win_mode: Literal["line", "blackout"] = "line"
     free_center: bool = True
     end_on_first_win: bool = True
+    # Bingo mode: Thanksgiving (honour-system marks, the API default) or classic (host-called
+    # numbers). Fixed at creation.
+    mode: Literal["thanksgiving", "classic"] = "thanksgiving"
 
 
 class JarAuthorOut(BaseModel):
@@ -72,7 +75,18 @@ class BingoPlayerOut(BaseModel):
     finish_place: int | None
 
 
+class BingoCallOut(BaseModel):
+    seq: int
+    value: int
+    # "B7", "G52".
+    label: str
+
+
 class BingoOut(BaseModel):
+    mode: Literal["thanksgiving", "classic"] = "thanksgiving"
+    # Classic only: the numbers called so far, in call order. Never a future call.
+    calls: list[BingoCallOut] = []
+    last_call: BingoCallOut | None = None
     win_mode: Literal["line", "blackout"]
     free_center: bool
     end_on_first_win: bool
@@ -88,6 +102,24 @@ class GameOut(GameSummaryOut):
 
 class BingoJoinIn(BaseModel):
     person_id: uuid.UUID
+
+
+class BingoDrawIn(BaseModel):
+    # How many calls the host's screen showed; a different server count is 409.
+    expected_seq: int = Field(ge=0, le=75)
+
+
+class BingoCheckIn(BaseModel):
+    person_id: uuid.UUID
+
+
+class BingoCheckOut(BaseModel):
+    valid: bool
+    win_mode: Literal["line", "blackout"]
+    # Indices of the first complete line (or all 25) when valid, else null.
+    pattern: list[int] | None
+    # Squares still to be called in the closest pattern (0 when valid).
+    missing: int
 
 
 class BingoCardOut(BaseModel):

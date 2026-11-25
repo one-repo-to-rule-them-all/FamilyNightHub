@@ -39,6 +39,7 @@ SCOPED_TABLES = (
     "game_players",
     "gratitude_notes",
     "bingo_cards",
+    "bingo_calls",
     "scatter_rounds",
     "scatter_answers",
     "household_tv_target",

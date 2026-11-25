@@ -66,6 +66,21 @@ describe("bingoStripPlayers", () => {
   });
 });
 
+describe("bingoStripPlayers without progress", () => {
+  it("drops the chip until a player wins", () => {
+    const base = { avatar_emoji: "🦊", color: "#fff" };
+    const out = bingoStripPlayers(
+      [
+        { ...base, person_id: "a", name: "Ana", squares_from_bingo: 1, won: false },
+        { ...base, person_id: "b", name: "Bo", squares_from_bingo: 0, won: true },
+      ],
+      { progress: false },
+    );
+    expect(out[0]!.chip).toBeUndefined();
+    expect(out[1]!.chip).toBe("Bingo!");
+  });
+});
+
 describe("scatterStripPlayers", () => {
   const players = [{ person_id: "a", name: "Ana", avatar_emoji: "🦊", color: "#fff", answered: 2 }];
 

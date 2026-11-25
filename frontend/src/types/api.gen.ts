@@ -1034,6 +1034,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/bingo/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Bingo
+         * @description Verify a player's spoken "bingo" against the called numbers (hosts). A false claim
+         *     changes nothing; a true one records the win and, by config, ends the game.
+         */
+        post: operations["check_bingo_api_v1_games__game_id__bingo_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/bingo/draw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Draw Number
+         * @description Call the next number (hosts). `expected_seq` is the count the host's screen showed; a
+         *     different count is 409 so a double tap or a second window cannot draw twice.
+         */
+        post: operations["draw_number_api_v1_games__game_id__bingo_draw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}/bingo/join": {
         parameters: {
             query?: never;
@@ -1064,7 +1106,8 @@ export interface paths {
         get?: never;
         /**
          * Mark Square
-         * @description Mark a square on your own card. The mark that completes the pattern is the win.
+         * @description Mark a square on your own card. Thanksgiving: the mark that completes the pattern is the
+         *     win. Classic: only a called number can be marked (409), and only a host check wins.
          */
         put: operations["mark_square_api_v1_games__game_id__bingo_mark__index__put"];
         post?: never;
@@ -1270,7 +1313,7 @@ export interface paths {
         put?: never;
         /**
          * Open Game
-         * @description Let the family join (draft to open).
+         * @description Let the family join (draft to open). A classic game fixes its draw seed here.
          */
         post: operations["open_game_api_v1_games__game_id__open_post"];
         delete?: never;
@@ -2528,6 +2571,15 @@ export interface components {
              */
             status: "active" | "pending";
         };
+        /** BingoCallOut */
+        BingoCallOut: {
+            /** Label */
+            label: string;
+            /** Seq */
+            seq: number;
+            /** Value */
+            value: number;
+        };
         /** BingoCardOut */
         BingoCardOut: {
             /** Finish Place */
@@ -2546,6 +2598,33 @@ export interface components {
             /** Won */
             won: boolean;
         };
+        /** BingoCheckIn */
+        BingoCheckIn: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** BingoCheckOut */
+        BingoCheckOut: {
+            /** Missing */
+            missing: number;
+            /** Pattern */
+            pattern: number[] | null;
+            /** Valid */
+            valid: boolean;
+            /**
+             * Win Mode
+             * @enum {string}
+             */
+            win_mode: "line" | "blackout";
+        };
+        /** BingoDrawIn */
+        BingoDrawIn: {
+            /** Expected Seq */
+            expected_seq: number;
+        };
         /** BingoJoinIn */
         BingoJoinIn: {
             /**
@@ -2556,10 +2635,22 @@ export interface components {
         };
         /** BingoOut */
         BingoOut: {
+            /**
+             * Calls
+             * @default []
+             */
+            calls: components["schemas"]["BingoCallOut"][];
             /** End On First Win */
             end_on_first_win: boolean;
             /** Free Center */
             free_center: boolean;
+            last_call?: components["schemas"]["BingoCallOut"] | null;
+            /**
+             * Mode
+             * @default thanksgiving
+             * @enum {string}
+             */
+            mode: "thanksgiving" | "classic";
             /** Players */
             players: components["schemas"]["BingoPlayerOut"][];
             /**
@@ -2822,6 +2913,12 @@ export interface components {
              * @enum {string}
              */
             kind: "gratitude_jar" | "bingo" | "scattergories";
+            /**
+             * Mode
+             * @default thanksgiving
+             * @enum {string}
+             */
+            mode: "thanksgiving" | "classic";
             /** Title */
             title: string;
             /**
@@ -6517,6 +6614,104 @@ export interface operations {
             };
             /** @description No such night (or option/movie) in this household */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_bingo_api_v1_games__game_id__bingo_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BingoCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BingoCheckOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draw_number_api_v1_games__game_id__bingo_draw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BingoDrawIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

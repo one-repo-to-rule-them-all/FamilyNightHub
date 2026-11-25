@@ -27,6 +27,8 @@ test.describe("thanksgiving bingo", () => {
     const hub = await hostContext.newPage();
     await hub.goto("/host/games");
     await hub.getByTestId("bingo-title").fill("E2E bingo");
+    // The form preselects classic this year; this spec plays the Thanksgiving mode.
+    await hub.getByTestId("bingo-mode-thanksgiving").check();
     // Creating a game opens its control page in a new tab; the hub tab stays put.
     const [host] = await Promise.all([
       hub.waitForEvent("popup"),

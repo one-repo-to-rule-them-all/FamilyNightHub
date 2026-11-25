@@ -483,6 +483,29 @@
         "title": "BindingOut",
         "type": "object"
       },
+      "BingoCallOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "value": {
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq",
+          "value",
+          "label"
+        ],
+        "title": "BingoCallOut",
+        "type": "object"
+      },
       "BingoCardOut": {
         "properties": {
           "finish_place": {
@@ -535,6 +558,77 @@
         "title": "BingoCardOut",
         "type": "object"
       },
+      "BingoCheckIn": {
+        "properties": {
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id"
+        ],
+        "title": "BingoCheckIn",
+        "type": "object"
+      },
+      "BingoCheckOut": {
+        "properties": {
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "pattern": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pattern"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          },
+          "win_mode": {
+            "enum": [
+              "line",
+              "blackout"
+            ],
+            "title": "Win Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "valid",
+          "win_mode",
+          "pattern",
+          "missing"
+        ],
+        "title": "BingoCheckOut",
+        "type": "object"
+      },
+      "BingoDrawIn": {
+        "properties": {
+          "expected_seq": {
+            "maximum": 75.0,
+            "minimum": 0.0,
+            "title": "Expected Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_seq"
+        ],
+        "title": "BingoDrawIn",
+        "type": "object"
+      },
       "BingoJoinIn": {
         "properties": {
           "person_id": {
@@ -551,6 +645,14 @@
       },
       "BingoOut": {
         "properties": {
+          "calls": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/BingoCallOut"
+            },
+            "title": "Calls",
+            "type": "array"
+          },
           "end_on_first_win": {
             "title": "End On First Win",
             "type": "boolean"
@@ -558,6 +660,25 @@
           "free_center": {
             "title": "Free Center",
             "type": "boolean"
+          },
+          "last_call": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BingoCallOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode": {
+            "default": "thanksgiving",
+            "enum": [
+              "thanksgiving",
+              "classic"
+            ],
+            "title": "Mode",
+            "type": "string"
           },
           "players": {
             "items": {
@@ -1203,6 +1324,15 @@
               "scattergories"
             ],
             "title": "Kind",
+            "type": "string"
+          },
+          "mode": {
+            "default": "thanksgiving",
+            "enum": [
+              "thanksgiving",
+              "classic"
+            ],
+            "title": "Mode",
             "type": "string"
           },
           "title": {
@@ -7732,6 +7862,126 @@
         ]
       }
     },
+    "/api/v1/games/{game_id}/bingo/check": {
+      "post": {
+        "description": "Verify a player's spoken \"bingo\" against the called numbers (hosts). A false claim\nchanges nothing; a true one records the win and, by config, ends the game.",
+        "operationId": "check_bingo_api_v1_games__game_id__bingo_check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BingoCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BingoCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Bingo",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/bingo/draw": {
+      "post": {
+        "description": "Call the next number (hosts). `expected_seq` is the count the host's screen showed; a\ndifferent count is 409 so a double tap or a second window cannot draw twice.",
+        "operationId": "draw_number_api_v1_games__game_id__bingo_draw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BingoDrawIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Draw Number",
+        "tags": [
+          "games"
+        ]
+      }
+    },
     "/api/v1/games/{game_id}/bingo/join": {
       "post": {
         "description": "Take a seat as a person bound to this phone and get a card (idempotent).",
@@ -7869,7 +8119,7 @@
         ]
       },
       "put": {
-        "description": "Mark a square on your own card. The mark that completes the pattern is the win.",
+        "description": "Mark a square on your own card. Thanksgiving: the mark that completes the pattern is the\nwin. Classic: only a called number can be marked (409), and only a host check wins.",
         "operationId": "mark_square_api_v1_games__game_id__bingo_mark__index__put",
         "parameters": [
           {
@@ -8406,7 +8656,7 @@
     },
     "/api/v1/games/{game_id}/open": {
       "post": {
-        "description": "Let the family join (draft to open).",
+        "description": "Let the family join (draft to open). A classic game fixes its draw seed here.",
         "operationId": "open_game_api_v1_games__game_id__open_post",
         "parameters": [
           {

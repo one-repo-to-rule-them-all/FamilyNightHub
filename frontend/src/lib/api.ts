@@ -63,6 +63,7 @@ export type OwnJarNote = Schemas["OwnNoteOut"];
 export type ModerationNote = Schemas["ModerationNoteOut"];
 export type BingoCard = Schemas["BingoCardOut"];
 export type BingoPlayer = Schemas["BingoPlayerOut"];
+export type BingoCheckResult = Schemas["BingoCheckOut"];
 export type ScatterState = Schemas["ScatterOut"];
 export type ScatterRevealed = Schemas["ScatterRevealedOut"];
 export type ScatterAnswer = Schemas["ScatterAnswerOut"];
@@ -345,6 +346,17 @@ export const api = {
       marked ? "PUT" : "DELETE",
       `/games/${encodeURIComponent(gameId)}/bingo/mark/${index}?person_id=${encodeURIComponent(personId)}`,
     ),
+
+  // Classic bingo (hosts): call the next number (`expectedSeq` is the count the screen showed)
+  // and check a spoken "bingo" against the called numbers.
+  drawBingo: (gameId: string, expectedSeq: number) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/bingo/draw`, {
+      expected_seq: expectedSeq,
+    }),
+  checkBingo: (gameId: string, personId: string) =>
+    request<BingoCheckResult>("POST", `/games/${encodeURIComponent(gameId)}/bingo/check`, {
+      person_id: personId,
+    }),
 
   // Scattergories (ADR-0018 slice C). The timer is `ends_at` + `server_now` on the snapshot.
   scatterDraw: (gameId: string, count: number) =>

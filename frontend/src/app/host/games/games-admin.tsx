@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, type ApiError, type Game, type GameSummary } from "@/lib/api";
-import { WIN_MODE_COPY, type WinMode } from "@/lib/bingo";
+import { type BingoMode, MODE_COPY, WIN_MODE_COPY, type WinMode } from "@/lib/bingo";
 import { KIND_COPY, PLAYABLE, statusLabel } from "@/lib/games";
 
 /** One named tab for a game's control page, so the Family Night hub tab stays where it is. */
@@ -48,7 +48,9 @@ export function GamesAdmin() {
   };
   const [title, setTitle] = useState("Thanksgiving gratitude jar");
   const [allowAnonymous, setAllowAnonymous] = useState(true);
-  const [bingoTitle, setBingoTitle] = useState("Thanksgiving bingo");
+  // This year the family plays classic bingo; Thanksgiving mode stays one tap away.
+  const [bingoMode, setBingoMode] = useState<BingoMode>("classic");
+  const [bingoTitle, setBingoTitle] = useState("Family bingo");
   const [winMode, setWinMode] = useState<WinMode>("line");
   const [freeCenter, setFreeCenter] = useState(true);
   const [endOnFirstWin, setEndOnFirstWin] = useState(true);
@@ -75,6 +77,7 @@ export function GamesAdmin() {
       api.createGame({
         kind: "bingo",
         title: bingoTitle,
+        mode: bingoMode,
         win_mode: winMode,
         free_center: freeCenter,
         end_on_first_win: endOnFirstWin,
@@ -159,6 +162,25 @@ export function GamesAdmin() {
           maxLength={80}
           onChange={(event) => setBingoTitle(event.target.value)}
         />
+        <fieldset className="flex flex-col gap-1">
+          <legend className="text-sm font-medium">Kind of bingo</legend>
+          {(Object.keys(MODE_COPY) as BingoMode[]).map((mode) => (
+            <label key={mode} className="flex min-h-11 items-center gap-3">
+              <input
+                type="radio"
+                name="bingo-mode"
+                data-testid={`bingo-mode-${mode}`}
+                checked={bingoMode === mode}
+                onChange={() => setBingoMode(mode)}
+                className="size-5 accent-[var(--accent-cinema)]"
+              />
+              <span>
+                {MODE_COPY[mode].name}
+                <span className="block text-sm text-muted-foreground">{MODE_COPY[mode].blurb}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
         <fieldset className="flex flex-col gap-1">
           <legend className="text-sm font-medium">What wins</legend>
           {(Object.keys(WIN_MODE_COPY) as WinMode[]).map((mode) => (

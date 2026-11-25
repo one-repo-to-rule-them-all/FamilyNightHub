@@ -24,7 +24,11 @@ from app.core.dependencies import (
     require_permission,
 )
 from app.schemas.games import (
+    BingoCallOut,
     BingoCardOut,
+    BingoCheckIn,
+    BingoCheckOut,
+    BingoDrawIn,
     BingoJoinIn,
     BingoOut,
     BingoPlayerOut,
@@ -113,6 +117,11 @@ def _out(
         bingo=None
         if bingo_state is None
         else BingoOut(
+            mode="classic" if bingo_state.mode == "classic" else "thanksgiving",
+            calls=[BingoCallOut(**c.__dict__) for c in bingo_state.calls],
+            last_call=None
+            if not bingo_state.calls
+            else BingoCallOut(**bingo_state.calls[-1].__dict__),
             win_mode="blackout" if bingo_state.win_mode == "blackout" else "line",
             free_center=bingo_state.free_center,
             end_on_first_win=bingo_state.end_on_first_win,
@@ -170,6 +179,7 @@ async def create_game(body: GameCreateIn, account: CanHost, db: AccountDb) -> Ga
             win_mode=body.win_mode,
             free_center=body.free_center,
             end_on_first_win=body.end_on_first_win,
+            mode=body.mode,
         )
     except ServiceError as err:
         raise_http(err)
@@ -364,10 +374,17 @@ async def reveal_next(game_id: uuid.UUID, account: CanHost, db: AccountDb) -> Ga
 @router.post(
     "/{game_id}/open", response_model=GameOut, dependencies=[CsrfProtected], responses=HOST
 )
-async def open_game(game_id: uuid.UUID, account: CanHost, db: AccountDb) -> GameOut:
-    """Let the family join (draft to open)."""
+async def open_game(
+    game_id: uuid.UUID,
+    account: CanHost,
+    db: AccountDb,
+    x_fnh_test_seed: Annotated[str | None, Header(include_in_schema=False)] = None,
+) -> GameOut:
+    """Let the family join (draft to open). A classic game fixes its draw seed here."""
     try:
-        await games_service.open_game(db, account.household_id, account.account_id, game_id)
+        await games_service.open_game(
+            db, account.household_id, account.account_id, game_id, seed=tie_seed(x_fnh_test_seed)
+        )
     except ServiceError as err:
         raise_http(err)
     return await _snapshot(db, account.household_id, game_id)
@@ -457,7 +474,8 @@ async def mark_square(
     device: CurrentDevice,
     db: DeviceDb,
 ) -> BingoCardOut:
-    """Mark a square on your own card. The mark that completes the pattern is the win."""
+    """Mark a square on your own card. Thanksgiving: the mark that completes the pattern is the
+    win. Classic: only a called number can be marked (409), and only a host check wins."""
     return await _mark(game_id, index, person_id, device, db, True)
 
 
@@ -476,3 +494,51 @@ async def unmark_square(
 ) -> BingoCardOut:
     """Take a mark back. A win already recorded stays."""
     return await _mark(game_id, index, person_id, device, db, False)
+
+
+# ---- Classic bingo: the host's draw and check ----
+
+
+@router.post(
+    "/{game_id}/bingo/draw",
+    response_model=GameOut,
+    dependencies=[CsrfProtected],
+    responses=HOST,
+)
+async def draw_number(
+    game_id: uuid.UUID, body: BingoDrawIn, account: CanHost, db: AccountDb
+) -> GameOut:
+    """Call the next number (hosts). `expected_seq` is the count the host's screen showed; a
+    different count is 409 so a double tap or a second window cannot draw twice."""
+    try:
+        await games_service.draw(
+            db, account.household_id, account.account_id, game_id, expected_seq=body.expected_seq
+        )
+    except ServiceError as err:
+        raise_http(err)
+    return await _snapshot(db, account.household_id, game_id)
+
+
+@router.post(
+    "/{game_id}/bingo/check",
+    response_model=BingoCheckOut,
+    dependencies=[CsrfProtected],
+    responses=HOST,
+)
+async def check_bingo(
+    game_id: uuid.UUID, body: BingoCheckIn, account: CanHost, db: AccountDb
+) -> BingoCheckOut:
+    """Verify a player's spoken "bingo" against the called numbers (hosts). A false claim
+    changes nothing; a true one records the win and, by config, ends the game."""
+    try:
+        result = await games_service.check(
+            db, account.household_id, account.account_id, game_id, person_id=body.person_id
+        )
+    except ServiceError as err:
+        raise_http(err)
+    return BingoCheckOut(
+        valid=result.valid,
+        win_mode="blackout" if result.win_mode == "blackout" else "line",
+        pattern=result.pattern,
+        missing=result.missing,
+    )
