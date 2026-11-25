@@ -39,6 +39,9 @@ from app.schemas.games import (
     JarCycleOut,
     JarNoteOut,
     JarOut,
+    LoteriaCallOut,
+    LoteriaOut,
+    LoteriaPlayerOut,
     ModerationNoteOut,
     NoteIn,
     OwnNoteOut,
@@ -52,7 +55,7 @@ from app.schemas.games import (
     TvTargetIn,
     TvTargetOut,
 )
-from app.services import games_service, scatter_service
+from app.services import games_service, loteria_service, scatter_service
 from app.services.errors import ServiceError
 
 router = APIRouter(prefix="/games", tags=["games"])
@@ -107,11 +110,23 @@ def _scatter(s: scatter_service.ScatterState) -> ScatterOut:
     )
 
 
+def loteria_out(s: loteria_service.State) -> LoteriaOut:
+    calls = [LoteriaCallOut(**c.__dict__) for c in s.calls]
+    return LoteriaOut(
+        pattern=s.pattern,
+        end_on_first_win=s.end_on_first_win,
+        calls=calls,
+        last_call=calls[-1] if calls else None,
+        players=[LoteriaPlayerOut(**p.__dict__) for p in s.players],
+    )
+
+
 def _out(
     game: games_service.GameRow,
     jar_state: games_service.JarState | None,
     bingo_state: games_service.BingoState | None = None,
     scatter: ScatterOut | None = None,
+    loteria: LoteriaOut | None = None,
 ) -> GameOut:
     return GameOut(
         **_summary(game).model_dump(),
@@ -141,6 +156,7 @@ def _out(
             revealed=[_note(n) for n in jar_state.revealed],
         ),
         scatter=scatter,
+        loteria=loteria,
     )
 
 
@@ -148,9 +164,16 @@ async def _snapshot(db: Any, household_id: uuid.UUID, game_id: uuid.UUID) -> Gam
     try:
         game, jar_state, bingo_state = await games_service.snapshot(db, household_id, game_id)
         scatter = await scatter_service.state(db, game_id) if game.kind == "scattergories" else None
+        lot = await loteria_service.state(db, game) if game.kind == "loteria" else None
     except ServiceError as err:
         raise_http(err)
-    return _out(game, jar_state, bingo_state, None if scatter is None else _scatter(scatter))
+    return _out(
+        game,
+        jar_state,
+        bingo_state,
+        None if scatter is None else _scatter(scatter),
+        None if lot is None else loteria_out(lot),
+    )
 
 
 # Shared with the scattergories router.
@@ -186,6 +209,7 @@ async def create_game(body: GameCreateIn, account: CanHost, db: AccountDb) -> Ga
             mode=body.mode,
             reveal_mode=body.reveal_mode,
             cycle_seconds=body.cycle_seconds,
+            pattern=body.pattern,
         )
     except ServiceError as err:
         raise_http(err)

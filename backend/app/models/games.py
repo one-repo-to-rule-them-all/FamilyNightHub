@@ -26,7 +26,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, created_at, household_fk, scoped_fk, uuid_pk
 
-GAME_KINDS = ("gratitude_jar", "bingo", "scattergories")
+GAME_KINDS = ("gratitude_jar", "bingo", "scattergories", "loteria")
 GAME_STATUSES = ("draft", "open", "live", "ended")
 
 
@@ -34,7 +34,9 @@ class Game(Base):
     __tablename__ = "games"
     __table_args__ = (
         UniqueConstraint("id", "household_id"),
-        CheckConstraint("kind IN ('gratitude_jar', 'bingo', 'scattergories')", name="kind"),
+        CheckConstraint(
+            "kind IN ('gratitude_jar', 'bingo', 'scattergories', 'loteria')", name="kind"
+        ),
         CheckConstraint("status IN ('draft', 'open', 'live', 'ended')", name="status"),
         CheckConstraint(
             "cycle_paused_index IS NULL OR cycle_paused_index >= 0", name="cycle_paused_index"
@@ -102,7 +104,7 @@ class BingoCard(Base):
     __tablename__ = "bingo_cards"
     __table_args__ = (
         UniqueConstraint("game_id", "person_id"),
-        CheckConstraint("cardinality(squares) = 25", name="squares_25"),
+        CheckConstraint("cardinality(squares) IN (16, 25)", name="squares_count"),
         CheckConstraint("marked_mask BETWEEN 0 AND 33554431", name="marked_mask_range"),
         scoped_fk("game_id", "games", ondelete="CASCADE"),
         scoped_fk("person_id", "people"),

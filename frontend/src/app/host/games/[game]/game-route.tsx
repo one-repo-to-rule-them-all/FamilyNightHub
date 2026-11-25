@@ -8,6 +8,7 @@ import { GameLoading } from "@/components/games/game-loading";
 
 import { BingoHost } from "./bingo-host";
 import { JarHost } from "./jar-host";
+import { LoteriaHost } from "./loteria-host";
 import { ScatterHost } from "./scatter-host";
 
 /** Picks the host's control surface for a game's kind (one shared `["game", id]` query). */
@@ -18,6 +19,7 @@ export function HostGameRoute({ gameId }: { gameId: string }) {
   });
   if (game.data?.kind === "bingo") return <BingoHost gameId={gameId} />;
   if (game.data?.kind === "scattergories") return <ScatterHost gameId={gameId} />;
+  if (game.data?.kind === "loteria") return <LoteriaHost gameId={gameId} />;
   // Until the kind is known, show nothing game-specific: the jar screens fire jar-only
   // requests (a 404 on a bingo round) and flash for a moment.
   if (game.isPending) {

@@ -52,8 +52,8 @@ describe("games", () => {
     expect(authorLine(null)).toBe("— Someone in the family");
   });
 
-  it("only offers the jar so far", () => {
-    expect(PLAYABLE).toEqual(["gratitude_jar", "bingo", "scattergories"]);
+  it("offers every playable kind", () => {
+    expect(PLAYABLE).toEqual(["gratitude_jar", "bingo", "scattergories", "loteria"]);
     expect(KIND_COPY.gratitude_jar.name).toBe("Gratitude jar");
   });
 

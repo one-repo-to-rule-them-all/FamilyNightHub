@@ -1328,7 +1328,8 @@
             "enum": [
               "gratitude_jar",
               "bingo",
-              "scattergories"
+              "scattergories",
+              "loteria"
             ],
             "title": "Kind",
             "type": "string"
@@ -1340,6 +1341,17 @@
               "classic"
             ],
             "title": "Mode",
+            "type": "string"
+          },
+          "pattern": {
+            "default": "line",
+            "enum": [
+              "line",
+              "corners",
+              "center",
+              "full"
+            ],
+            "title": "Pattern",
             "type": "string"
           },
           "reveal_mode": {
@@ -1414,10 +1426,21 @@
             "enum": [
               "gratitude_jar",
               "bingo",
-              "scattergories"
+              "scattergories",
+              "loteria"
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "loteria": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoteriaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "mode": {
             "anyOf": [
@@ -1487,7 +1510,8 @@
             "enum": [
               "gratitude_jar",
               "bingo",
-              "scattergories"
+              "scattergories",
+              "loteria"
             ],
             "title": "Kind",
             "type": "string"
@@ -2100,6 +2124,279 @@
           "password"
         ],
         "title": "LoginIn",
+        "type": "object"
+      },
+      "LoteriaCallOut": {
+        "properties": {
+          "card_id": {
+            "title": "Card Id",
+            "type": "integer"
+          },
+          "emoji": {
+            "title": "Emoji",
+            "type": "string"
+          },
+          "name_en": {
+            "title": "Name En",
+            "type": "string"
+          },
+          "name_es": {
+            "title": "Name Es",
+            "type": "string"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq",
+          "card_id",
+          "name_es",
+          "name_en",
+          "emoji"
+        ],
+        "title": "LoteriaCallOut",
+        "type": "object"
+      },
+      "LoteriaCheckIn": {
+        "properties": {
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id"
+        ],
+        "title": "LoteriaCheckIn",
+        "type": "object"
+      },
+      "LoteriaCheckOut": {
+        "properties": {
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "pattern": {
+            "enum": [
+              "line",
+              "corners",
+              "center",
+              "full"
+            ],
+            "title": "Pattern",
+            "type": "string"
+          },
+          "squares": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Squares"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid",
+          "pattern",
+          "squares",
+          "missing"
+        ],
+        "title": "LoteriaCheckOut",
+        "type": "object"
+      },
+      "LoteriaDrawIn": {
+        "properties": {
+          "expected_seq": {
+            "maximum": 54.0,
+            "minimum": 0.0,
+            "title": "Expected Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_seq"
+        ],
+        "title": "LoteriaDrawIn",
+        "type": "object"
+      },
+      "LoteriaJoinIn": {
+        "properties": {
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id"
+        ],
+        "title": "LoteriaJoinIn",
+        "type": "object"
+      },
+      "LoteriaOut": {
+        "properties": {
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/LoteriaCallOut"
+            },
+            "title": "Calls",
+            "type": "array"
+          },
+          "end_on_first_win": {
+            "title": "End On First Win",
+            "type": "boolean"
+          },
+          "last_call": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoteriaCallOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pattern": {
+            "enum": [
+              "line",
+              "corners",
+              "center",
+              "full"
+            ],
+            "title": "Pattern",
+            "type": "string"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/LoteriaPlayerOut"
+            },
+            "title": "Players",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pattern",
+          "end_on_first_win",
+          "calls",
+          "players"
+        ],
+        "title": "LoteriaOut",
+        "type": "object"
+      },
+      "LoteriaPlayerOut": {
+        "properties": {
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "finish_place": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Place"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "won": {
+            "title": "Won",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "person_id",
+          "name",
+          "avatar_emoji",
+          "color",
+          "missing",
+          "won",
+          "finish_place"
+        ],
+        "title": "LoteriaPlayerOut",
+        "type": "object"
+      },
+      "LoteriaTablaOut": {
+        "properties": {
+          "finish_place": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Place"
+          },
+          "marked": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Marked",
+            "type": "array"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          },
+          "squares": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Squares",
+            "type": "array"
+          },
+          "won": {
+            "title": "Won",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "person_id",
+          "squares",
+          "marked",
+          "missing",
+          "won",
+          "finish_place"
+        ],
+        "title": "LoteriaTablaOut",
         "type": "object"
       },
       "MagicLinkIn": {
@@ -9216,6 +9513,549 @@
           }
         },
         "summary": "Start Reveal",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/loteria/check": {
+      "post": {
+        "description": "Verify a player's spoken \"Loteria!\" against the called cards (hosts). A false claim\nchanges nothing; a true one records the win and, by config, ends the game.",
+        "operationId": "check_loteria_api_v1_games__game_id__loteria_check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoteriaCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteriaCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Loteria",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/loteria/draw": {
+      "post": {
+        "description": "Call the next card (hosts). `expected_seq` is the count the host's screen showed; a\ndifferent count is 409 so a double tap or a second window cannot draw twice.",
+        "operationId": "draw_card_api_v1_games__game_id__loteria_draw_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoteriaDrawIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Draw Card",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/loteria/join": {
+      "post": {
+        "description": "Take a seat as a person bound to this phone and get a tabla (idempotent).",
+        "operationId": "join_loteria_api_v1_games__game_id__loteria_join_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoteriaJoinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteriaTablaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't acting as that person, or consent is needed"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Join Loteria",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/loteria/mark/{index}": {
+      "delete": {
+        "description": "Take a mark back. A win already recorded stays.",
+        "operationId": "unmark_square_api_v1_games__game_id__loteria_mark__index__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "index",
+            "required": true,
+            "schema": {
+              "maximum": 15,
+              "minimum": 0,
+              "title": "Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteriaTablaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't acting as that person, or consent is needed"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unmark Square",
+        "tags": [
+          "games"
+        ]
+      },
+      "put": {
+        "description": "Mark a picture on your own tabla. Only a called card can be marked (409).",
+        "operationId": "mark_square_api_v1_games__game_id__loteria_mark__index__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "index",
+            "required": true,
+            "schema": {
+              "maximum": 15,
+              "minimum": 0,
+              "title": "Index",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteriaTablaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't acting as that person, or consent is needed"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Square",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/loteria/mine": {
+      "get": {
+        "description": "The tablas of the people this phone is acting as. Nobody else's is readable.",
+        "operationId": "my_tablas_api_v1_games__game_id__loteria_mine_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LoteriaTablaOut"
+                  },
+                  "title": "Response My Tablas Api V1 Games  Game Id  Loteria Mine Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "My Tablas",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/loteria/open": {
+      "post": {
+        "description": "Let the family join (draft to open). Fixes the draw seed.",
+        "operationId": "open_loteria_api_v1_games__game_id__loteria_open_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Loteria",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/loteria/reroll": {
+      "post": {
+        "description": "A new tabla, as often as you like while the game is open; 409 once it has started.",
+        "operationId": "reroll_loteria_api_v1_games__game_id__loteria_reroll_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoteriaJoinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteriaTablaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "This phone isn't acting as that person, or consent is needed"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reroll Loteria",
+        "tags": [
+          "games"
+        ]
+      }
+    },
+    "/api/v1/games/{game_id}/loteria/start": {
+      "post": {
+        "description": "Start the round: cards can be drawn and marked, tablas are fixed (open to live).",
+        "operationId": "start_loteria_api_v1_games__game_id__loteria_start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night (or option/movie) in this household"
+          },
+          "409": {
+            "description": "The game is not in a state that allows this"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Loteria",
         "tags": [
           "games"
         ]
