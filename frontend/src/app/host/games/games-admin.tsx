@@ -14,7 +14,7 @@ import { api, type ApiError, type Game, type GameSummary } from "@/lib/api";
 import { WIN_MODE_COPY, type WinMode } from "@/lib/bingo";
 import { KIND_COPY, PLAYABLE, statusLabel } from "@/lib/games";
 
-/** Start a Gratitude Jar or a bingo round and list the household's games. */
+/** Start a Gratitude Jar, a bingo round or Scattergories and list the household's games. */
 export function GamesAdmin() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -24,15 +24,20 @@ export function GamesAdmin() {
   const [winMode, setWinMode] = useState<WinMode>("line");
   const [freeCenter, setFreeCenter] = useState(true);
   const [endOnFirstWin, setEndOnFirstWin] = useState(true);
+  const [scatterTitle, setScatterTitle] = useState("Thanksgiving scattergories");
 
   const games = useQuery<GameSummary[], ApiError>({
     queryKey: ["games"],
     queryFn: api.games,
     refetchInterval: 10_000,
   });
-  const create = useMutation<Game, ApiError>({
-    mutationFn: () =>
-      api.createGame({ kind: "gratitude_jar", title, allow_anonymous: allowAnonymous }),
+  const create = useMutation<Game, ApiError, "gratitude_jar" | "scattergories">({
+    mutationFn: (kind) =>
+      api.createGame(
+        kind === "gratitude_jar"
+          ? { kind, title, allow_anonymous: allowAnonymous }
+          : { kind, title: scatterTitle, allow_anonymous: true },
+      ),
     onSuccess: (game) => {
       void queryClient.invalidateQueries({ queryKey: ["games"] });
       router.push(`/host/games/${game.id}`);
@@ -62,7 +67,7 @@ export function GamesAdmin() {
         className="flex flex-col gap-3 rounded-2xl border border-foreground/10 bg-card p-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (title.trim() && !create.isPending) create.mutate();
+          if (title.trim() && !create.isPending) create.mutate("gratitude_jar");
         }}
       >
         <h2 className="text-lg font-medium">
@@ -159,6 +164,32 @@ export function GamesAdmin() {
           disabled={!bingoTitle.trim() || createBingo.isPending}
         >
           <Plus aria-hidden /> Start bingo
+        </Button>
+      </form>
+
+      <form
+        className="flex flex-col gap-3 rounded-2xl border border-foreground/10 bg-card p-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (scatterTitle.trim() && !create.isPending) create.mutate("scattergories");
+        }}
+      >
+        <h2 className="text-lg font-medium">Start {KIND_COPY.scattergories.name.toLowerCase()}</h2>
+        <p className="text-sm text-muted-foreground">{KIND_COPY.scattergories.blurb}</p>
+        <Label htmlFor="scatter-title">Name</Label>
+        <Input
+          id="scatter-title"
+          data-testid="scatter-title"
+          value={scatterTitle}
+          maxLength={80}
+          onChange={(event) => setScatterTitle(event.target.value)}
+        />
+        <Button
+          type="submit"
+          data-testid="create-scatter"
+          disabled={!scatterTitle.trim() || create.isPending}
+        >
+          <Plus aria-hidden /> Start scattergories
         </Button>
       </form>
 

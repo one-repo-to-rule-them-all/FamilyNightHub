@@ -33,6 +33,7 @@ export default defineConfig({
           functions: 100,
           statements: 100,
         },
+        "src/lib/scatter.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/bulk-titles.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/photos/album.ts": { lines: 100, branches: 100, functions: 100, statements: 100 },
         "src/lib/photos/queue.ts": { lines: 100 },

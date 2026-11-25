@@ -24,8 +24,8 @@ export const KIND_COPY: Record<GameKind, { name: string; blurb: string }> = {
   },
 };
 
-/** The jar and bingo are playable; scattergories ships with its slice. */
-export const PLAYABLE: readonly GameKind[] = ["gratitude_jar", "bingo"];
+/** Every kind is playable. */
+export const PLAYABLE: readonly GameKind[] = ["gratitude_jar", "bingo", "scattergories"];
 
 export function statusLabel(kind: GameKind, status: GameStatus): string {
   if (kind === "gratitude_jar") {
@@ -35,6 +35,7 @@ export function statusLabel(kind: GameKind, status: GameStatus): string {
   }
   if (status === "ended") return "Finished";
   if (status === "draft") return "Setting up";
+  if (kind === "scattergories") return status === "live" ? "Playing" : "Waiting to start";
   return status === "live" ? "Live" : "Open";
 }
 

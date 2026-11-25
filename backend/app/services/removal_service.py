@@ -180,6 +180,7 @@ async def remove_person(
         "gratitude_notes",
         "bingo_cards",
         "game_players",
+        "scatter_answers",
     ):
         await run(f"DELETE FROM {table} WHERE person_id IN :ids")
     await run("DELETE FROM device_people WHERE person_id IN :ids")
@@ -249,6 +250,8 @@ async def start_fresh(
         "gratitude_notes",
         "bingo_cards",
         "game_players",
+        "scatter_answers",
+        "scatter_rounds",
         "games",
         "options",
         "sessions",

@@ -6,6 +6,7 @@ import { api, type ApiError, type Game } from "@/lib/api";
 
 import { BingoScreen } from "./bingo-screen";
 import { JarScreen } from "./jar-screen";
+import { ScatterScreen } from "./scatter-screen";
 
 /**
  * Picks the phone screen for a game's kind. It reads the same `["game", id]` query the live hook
@@ -17,5 +18,6 @@ export function GameRoute({ gameId }: { gameId: string }) {
     queryFn: () => api.game(gameId),
   });
   if (game.data?.kind === "bingo") return <BingoScreen gameId={gameId} />;
+  if (game.data?.kind === "scattergories") return <ScatterScreen gameId={gameId} />;
   return <JarScreen gameId={gameId} />;
 }

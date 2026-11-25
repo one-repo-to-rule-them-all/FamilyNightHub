@@ -33,8 +33,8 @@ _AUDIT = text(
     "target_id, data) VALUES (:h, :a, :action, 'game', :t, :data)"
 ).bindparams(bindparam("data", type_=JSONB))
 
-# The jar (slice A) and bingo (slice B); scattergories arrives with slice C.
-AVAILABLE_KINDS = frozenset({"gratitude_jar", "bingo"})
+# The jar (A), bingo (B) and scattergories (C).
+AVAILABLE_KINDS = frozenset({"gratitude_jar", "bingo", "scattergories"})
 WIN_MODES = frozenset({"line", "blackout"})
 
 

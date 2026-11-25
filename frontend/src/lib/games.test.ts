@@ -19,6 +19,9 @@ describe("games", () => {
     expect(statusLabel("bingo", "live")).toBe("Live");
     expect(statusLabel("bingo", "open")).toBe("Open");
     expect(statusLabel("bingo", "ended")).toBe("Finished");
+    expect(statusLabel("scattergories", "open")).toBe("Waiting to start");
+    expect(statusLabel("scattergories", "live")).toBe("Playing");
+    expect(statusLabel("scattergories", "ended")).toBe("Finished");
   });
 
   it("counts characters and flags a note over the limit", () => {
@@ -42,7 +45,7 @@ describe("games", () => {
   });
 
   it("only offers the jar so far", () => {
-    expect(PLAYABLE).toEqual(["gratitude_jar", "bingo"]);
+    expect(PLAYABLE).toEqual(["gratitude_jar", "bingo", "scattergories"]);
     expect(KIND_COPY.gratitude_jar.name).toBe("Gratitude jar");
   });
 });

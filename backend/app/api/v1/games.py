@@ -37,8 +37,15 @@ from app.schemas.games import (
     ModerationNoteOut,
     NoteIn,
     OwnNoteOut,
+    ScatterAnswerOut,
+    ScatterOut,
+    ScatterPlayerOut,
+    ScatterRevealedOut,
+    ScatterRoundOut,
+    ScatterScoreOut,
+    ScatterStandingOut,
 )
-from app.services import games_service
+from app.services import games_service, scatter_service
 from app.services.errors import ServiceError
 
 router = APIRouter(prefix="/games", tags=["games"])
@@ -73,10 +80,30 @@ def _summary(g: games_service.GameRow) -> GameSummaryOut:
     )
 
 
+def _scatter(s: scatter_service.ScatterState) -> ScatterOut:
+    return ScatterOut(
+        server_now=s.server_now,
+        current=None if s.current is None else ScatterRoundOut(**s.current.__dict__),
+        players=[ScatterPlayerOut(**p.__dict__) for p in s.players],
+        revealed=[
+            ScatterRevealedOut(
+                round_no=r.round_no,
+                letter=r.letter,
+                categories=r.categories,
+                answers=[ScatterAnswerOut(**a.__dict__) for a in r.answers],
+                scores=[ScatterScoreOut(person_id=k, points=v) for k, v in r.scores.items()],
+            )
+            for r in s.revealed
+        ],
+        leaderboard=[ScatterStandingOut(**t.__dict__) for t in s.leaderboard],
+    )
+
+
 def _out(
     game: games_service.GameRow,
     jar_state: games_service.JarState | None,
     bingo_state: games_service.BingoState | None = None,
+    scatter: ScatterOut | None = None,
 ) -> GameOut:
     return GameOut(
         **_summary(game).model_dump(),
@@ -98,15 +125,21 @@ def _out(
             current=None if jar_state.current is None else _note(jar_state.current),
             revealed=[_note(n) for n in jar_state.revealed],
         ),
+        scatter=scatter,
     )
 
 
 async def _snapshot(db: Any, household_id: uuid.UUID, game_id: uuid.UUID) -> GameOut:
     try:
         game, jar_state, bingo_state = await games_service.snapshot(db, household_id, game_id)
+        scatter = await scatter_service.state(db, game_id) if game.kind == "scattergories" else None
     except ServiceError as err:
         raise_http(err)
-    return _out(game, jar_state, bingo_state)
+    return _out(game, jar_state, bingo_state, None if scatter is None else _scatter(scatter))
+
+
+# Shared with the scattergories router.
+snapshot = _snapshot
 
 
 @router.get("", response_model=list[GameSummaryOut])
@@ -123,7 +156,7 @@ async def list_games(viewer: CurrentViewer, db: ViewerDb) -> list[GameSummaryOut
     responses={422: {"description": "That game isn't available yet"}},
 )
 async def create_game(body: GameCreateIn, account: CanHost, db: AccountDb) -> GameOut:
-    """Create a game (hosts): a jar opens at once, a bingo round starts as a draft."""
+    """Create a game (hosts): a jar opens at once; bingo and scattergories start as drafts."""
     try:
         game = await games_service.create_game(
             db,
