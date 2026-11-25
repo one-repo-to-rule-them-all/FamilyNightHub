@@ -113,6 +113,7 @@ async def seed(
     providers: list[int] | None = None,
     pins: bool = False,
     attended: bool = False,
+    reel: bool = False,
 ) -> dict[str, object]:
     household = f"E2E {slug}"
     email = f"host-{slug}@e2e.test"
@@ -185,6 +186,8 @@ async def seed(
                     ),
                     {"s": session_id, "h": created.household_id},
                 )
+    if reel:
+        await _seed_reel(created)
     return {
         "slug": slug,
         "nightCode": code,
@@ -249,6 +252,65 @@ async def _seed_night(
     return session_id
 
 
+async def _seed_reel(created: Bootstrapped) -> None:
+    """Night reel fixtures (--reel): a finished jar with one named and one anonymous note, and a
+    finished classic bingo round that Ava won."""
+    squares = "ARRAY[" + ",".join(f"'s{i}'" for i in range(25)) + "]"
+    async with household_session(created.household_id) as db:
+        ava = (
+            await db.execute(
+                text("SELECT id FROM people WHERE household_id = :h AND name = 'Ava'"),
+                {"h": created.household_id},
+            )
+        ).scalar_one()
+        ids: dict[str, uuid.UUID] = {}
+        for key, kind, title, config in (
+            ("jar", "gratitude_jar", "Reel jar", "{}"),
+            ("bingo", "bingo", "Reel bingo", '{"mode": "classic"}'),
+        ):
+            ids[key] = (
+                await db.execute(
+                    text(
+                        "INSERT INTO games (household_id, kind, title, status, config, "
+                        "created_by_account_id, ended_at) VALUES (:h, :k, :t, 'ended', "
+                        "CAST(:c AS jsonb), :a, now()) RETURNING id"
+                    ),
+                    {
+                        "h": created.household_id,
+                        "k": kind,
+                        "t": title,
+                        "c": config,
+                        "a": created.account_id,
+                    },
+                )
+            ).scalar_one()
+        for pos, (body, anonymous) in enumerate(
+            (("Reel quote from Ava", False), ("Reel quote kept anonymous", True))
+        ):
+            await db.execute(
+                text(
+                    "INSERT INTO gratitude_notes (household_id, game_id, person_id, body, "
+                    "anonymous, reveal_position, revealed_at) "
+                    "VALUES (:h, :g, :p, :b, :an, :pos, now() - interval '10 minutes')"
+                ),
+                {
+                    "h": created.household_id,
+                    "g": ids["jar"],
+                    "p": ava,
+                    "b": body,
+                    "an": anonymous,
+                    "pos": pos,
+                },
+            )
+        await db.execute(
+            text(
+                "INSERT INTO bingo_cards (household_id, game_id, person_id, squares, won_at) "
+                f"VALUES (:h, :g, :p, {squares}, now() - interval '5 minutes')"
+            ),
+            {"h": created.household_id, "g": ids["bingo"], "p": ava},
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--slug", required=True)
@@ -261,6 +323,7 @@ def main() -> int:
     parser.add_argument("--providers", default="", help="TMDB provider ids, e.g. 337,8")
     parser.add_argument("--pins", action="store_true", help=f"every person's PIN is {E2E_PIN}")
     parser.add_argument("--attended", action="store_true", help="everyone was at the night")
+    parser.add_argument("--reel", action="store_true", help="a finished jar and a bingo win")
     args = parser.parse_args()
     if args.tonight and args.movies < 2:
         parser.error("--tonight needs --movies 2 or more")
@@ -280,6 +343,7 @@ def main() -> int:
         providers,
         args.pins,
         args.attended,
+        args.reel,
     )
     print(json.dumps(asyncio.run(seeded)))
     return 0

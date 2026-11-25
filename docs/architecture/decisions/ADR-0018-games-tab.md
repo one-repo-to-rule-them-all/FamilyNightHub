@@ -751,3 +751,76 @@ households, and behind the same consent gate as join. The seed follows join's pa
 means the new card always differs from the old one. It publishes `game.activity` because the host's
 "N to go" changes. Nobody else's card is touched. The phone shows a **New card** button only while
 the game is open and the person has a card.
+
+---
+
+## Amendment 2026-11-26: Night reel
+
+<!-- Appended section: written by the games-night-reel session; the rest of this ADR is untouched. -->
+
+**Context.** On staging the owner asked for "a single endpoint/URL that acts like the host panel,
+like a night reel, that shows all the quotes from the games and the winners of each game", showing
+winners and images in random order. Today an ended Gratitude Jar's TV says only "That is every
+note. Thank you, everyone.", and no screen recaps across games.
+
+**Decision.**
+
+1. **One read-only endpoint, no migration.** `GET /api/v1/reel?window=tonight|all` (any device or
+   account, `ViewerDb`) derives slides from tables that already exist: `gratitude_notes`,
+   `bingo_cards.won_at`, `scatter_rounds`/`scatter_answers` (scored by the existing pure rules via
+   `scatter_service.state`) and `photos`. Nothing is written, nothing is audited, no event is
+   published. Cross-household isolation is the same FORCE RLS plus explicit `household_id`
+   predicates every other read uses.
+2. **Slide kinds.** `quote` (a revealed, unhidden note; ended jars included; an anonymous note
+   carries no author), `winner` (a bingo card with `won_at`, classic and Thanksgiving; a
+   scattergories round's top scorers with points > 0), `leaderboard` (a scattergories game's
+   standings, top 5, `final` once the game has ended) and `photo` (status `ready` only, with a
+   presigned GET minted per request after the household check, ADR-0005). Hidden notes and hidden
+   photos are never listed, so the reel only shows what the household's moderation already allows.
+   Winners are provided through a small kind -> provider registry in `reel_service`, so Lotería
+   registers its provider when it merges (`kind = 'loteria'` does not exist on this branch).
+3. **Window.** `tonight` (default) is a rolling **last 12 hours** from the server clock; `all` is
+   no lower bound (for next year). A rolling window needs no new "night started" state and works
+   when the host never starts a movie night. Items are filtered on the moment they happened: a
+   note's `revealed_at`, a card's `won_at`, a round's `revealed_at`, a photo's `created_at`. Size
+   caps keep a long `all` response small (200 quotes, 60 photos, a signed URL each).
+4. **Shuffle and cycle, no tick events.** The server returns `items` in a seeded order, an
+   `anchor` and `dwell_seconds` (12). Each item's sort key is `sha256(seed:item_id)`, so a new
+   item lands at an arbitrary place without reshuffling the others and a 30 s refetch does not
+   reorder the show. The seed is derived from the household and the UTC day; in test
+   `X-FNH-Test-Seed` pins it (the voting tie-break pattern, ADR-0006). The anchor is the start of
+   that UTC day. The client works out the index locally with `cycleIndex` (the jar's arithmetic)
+   from `server_now`, `anchor` and `dwell_seconds`.
+5. **Refresh.** The reel has no game id, so there is no game channel to hint on; the TV refetches
+   every 30 s (and when the tab becomes visible). Events stay hints elsewhere; here the snapshot
+   is the only truth. A household-level hint is a later addition that changes nothing in the API.
+6. **TV page.** `/tv/reel` on the shared TV frame: big `tv-*` type, a "3 of 14" progress hint,
+   `prefers-reduced-motion` honoured, a polite `aria-live` region, Screen Wake Lock. An empty
+   reel says so kindly. The ended jar's own TV view keeps cycling its notes locally instead of
+   the thank-you line (add-only).
+7. **Host entry.** The Games area gets a **Night reel** card: open the reel, and choose the
+   window. **Show on TV** for the reel is deferred (see OPEN 3).
+
+**OPEN (the default used is stated; the owner reviews after).**
+
+- **OPEN 1: window.** Default: rolling last 12 hours, plus `all`. Alternative: since the host's
+  night started, or a host-picked date.
+- **OPEN 2: remove a slide from the reel.** Default: only the existing hide controls (hide a
+  note, hide a photo). No per-slide host "remove from reel" for winners or leaderboards (it would
+  need a table or a column). Add one if a result should not be shown.
+- **OPEN 3: Show on TV for the reel.** `household_tv_target.game_id` is a non-null FK to `games`,
+  so a reel target needs a migration (a nullable `game_id` plus a `kind` column) and edits to the
+  shared tv-target API and `/tv` routing that other sessions are touching. Default: deferred. Open
+  `/tv/reel` on the paired TV's browser (the Night reel card shows the link to copy).
+- **OPEN 4: dwell.** Default: one dwell of 12 s for every slide kind. Alternative: longer for
+  quotes, shorter for photos.
+- **OPEN 5: movie-night winners.** Default: not included (not cheap: a night's winner is a
+  voting-method result, ADR-0006, not a stored row).
+- **OPEN 6: ordering on change.** When the slide list changes size the local index jumps (it is
+  `elapsed / dwell` modulo the count). Default: accepted; new content is rare during a night.
+- **OPEN 7: leaderboard timing.** Default: a scattergories leaderboard appears as soon as one
+  round is revealed (`final: false` until the game ends), not only when the game ends.
+
+**Consequences.** No schema change, so no migration and nothing to roll back. The per-request cost
+is a handful of indexed reads plus up to 60 presigns, only while a TV is polling. Lotería adds one
+provider function and one registry line.
