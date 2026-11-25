@@ -19,7 +19,7 @@ test.describe("thanksgiving bingo", () => {
   }) => {
     test.slow();
     const origin = baseURL as string;
-    const night = seedNight({ movies: 2, pins: true });
+    const night = seedNight({ movies: 2 });
 
     // Host: create the round (a draft) and open it for players.
     const hostContext = await browser.newContext({ baseURL: origin });

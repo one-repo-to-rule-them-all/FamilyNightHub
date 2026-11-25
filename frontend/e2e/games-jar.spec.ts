@@ -1,4 +1,4 @@
-import { expectNoAxeViolations, signInAsHost } from "./support/host";
+import { expectNoAxeViolations, pairAsTv, signInAsHost } from "./support/host";
 import { joinAs } from "./support/phones";
 import { expect, seedNight, test } from "./support/seed";
 
@@ -18,7 +18,7 @@ test.describe("gratitude jar", () => {
   }) => {
     test.slow();
     const origin = baseURL as string;
-    const night = seedNight({ movies: 2, pins: true });
+    const night = seedNight({ movies: 2 });
 
     // Host: start the jar.
     const hostContext = await browser.newContext({ baseURL: origin });
@@ -53,7 +53,10 @@ test.describe("gratitude jar", () => {
     await expect(host.getByText("Name kept off")).toBeVisible();
 
     // TV: a second window on the game's screen.
-    const tv = await hostContext.newPage();
+    const tvContext = await browser.newContext({ baseURL: origin });
+    await signInAsHost(tvContext, night, origin);
+    const tv = await tvContext.newPage();
+    await pairAsTv(tv);
     await tv.goto(`/tv/games/${gameId}`);
     await expect(tv.getByTestId("tv-jar")).toHaveAttribute("data-live", "ready", POLL);
     await expect(tv.getByTestId("tv-note")).toHaveCount(0);

@@ -1,4 +1,4 @@
-import { expectNoAxeViolations, signInAsHost } from "./support/host";
+import { expectNoAxeViolations, pairAsTv, signInAsHost } from "./support/host";
 import { joinAs } from "./support/phones";
 import { expect, seedNight, test } from "./support/seed";
 
@@ -16,7 +16,7 @@ test.describe("scattergories", () => {
   test("play a round on a phone and reveal it on the TV", async ({ browser, page, baseURL }) => {
     test.slow();
     const origin = baseURL as string;
-    const night = seedNight({ movies: 2, pins: true });
+    const night = seedNight({ movies: 2 });
 
     // Host: start the game.
     const hostContext = await browser.newContext({ baseURL: origin });
@@ -42,7 +42,10 @@ test.describe("scattergories", () => {
     await expect(host.getByTestId("host-scatter-status")).toContainText("1 player", POLL);
 
     // TV: a second window on the game's screen.
-    const tv = await hostContext.newPage();
+    const tvContext = await browser.newContext({ baseURL: origin });
+    await signInAsHost(tvContext, night, origin);
+    const tv = await tvContext.newPage();
+    await pairAsTv(tv);
     await tv.goto(`/tv/games/${gameId}`);
     await expect(tv.getByTestId("tv-scatter")).toHaveAttribute("data-live", "ready", POLL);
 
