@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api, type ApiError, type Game } from "@/lib/api";
 
+import { GameLoading } from "@/components/games/game-loading";
+
 import { BingoHost } from "./bingo-host";
 import { JarHost } from "./jar-host";
 import { ScatterHost } from "./scatter-host";
@@ -16,5 +18,10 @@ export function HostGameRoute({ gameId }: { gameId: string }) {
   });
   if (game.data?.kind === "bingo") return <BingoHost gameId={gameId} />;
   if (game.data?.kind === "scattergories") return <ScatterHost gameId={gameId} />;
+  // Until the kind is known, show nothing game-specific: the jar screens fire jar-only
+  // requests (a 404 on a bingo round) and flash for a moment.
+  if (game.isPending) {
+    return <GameLoading />;
+  }
   return <JarHost gameId={gameId} />;
 }
