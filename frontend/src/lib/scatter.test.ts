@@ -134,7 +134,9 @@ describe("scatter results", () => {
 
 const vectors = JSON.parse(
   readFileSync(
-    fileURLToPath(new URL("../../../backend/tests/vectors/scatter_normalize.json", import.meta.url)),
+    fileURLToPath(
+      new URL("../../../backend/tests/vectors/scatter_normalize.json", import.meta.url),
+    ),
     "utf-8",
   ),
 ) as {
@@ -144,7 +146,8 @@ const vectors = JSON.parse(
 
 describe("scatter phone validation (a convenience; the server decides)", () => {
   it("normalises exactly as the server does, on the shared vectors", () => {
-    for (const v of vectors.normalize) expect(normalize(v.text), JSON.stringify(v.text)).toBe(v.key);
+    for (const v of vectors.normalize)
+      expect(normalize(v.text), JSON.stringify(v.text)).toBe(v.key);
   });
 
   it("checks the first letter on the shared vectors", () => {

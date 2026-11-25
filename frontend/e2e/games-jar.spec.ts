@@ -6,12 +6,13 @@ import { expect, seedNight, test } from "./support/seed";
 const POLL = { timeout: 15_000 };
 
 /**
- * Gratitude Jar (ADR-0018 slice A): the host starts a jar, a phone drops a note (one named, one
- * anonymous), the host starts the reveal, and the notes appear one at a time on the phone and
- * the TV screen. Every wait is on a server-confirmed state (`data-live`, `data-status`).
+ * Gratitude Jar (ADR-0018, amendment part B): the host starts a jar (5 seconds a note), a phone
+ * drops two notes (one named, one anonymous), the host presses Start, and the notes then cycle on
+ * the phone and the TV with no further click. Pause holds both; End finishes. Every wait is on a
+ * server-confirmed state (`data-live`, `data-status`) or on the cycle itself.
  */
 test.describe("gratitude jar", () => {
-  test("drop notes on a phone, reveal them one by one on the TV", async ({
+  test("drop notes on a phone, then they cycle by themselves on the phone and the TV", async ({
     browser,
     page,
     baseURL,
@@ -26,6 +27,7 @@ test.describe("gratitude jar", () => {
     const hub = await hostContext.newPage();
     await hub.goto("/host/games");
     await hub.getByTestId("game-title").fill("E2E jar");
+    await hub.getByTestId("jar-cycle-seconds").fill("5");
     // Creating a game opens its control page in a new tab; the hub tab stays put.
     const [host] = await Promise.all([
       hub.waitForEvent("popup"),
@@ -66,16 +68,28 @@ test.describe("gratitude jar", () => {
     await expect(tv.getByTestId("tv-jar")).toHaveAttribute("data-live", "ready", POLL);
     await expect(tv.getByTestId("tv-note")).toHaveCount(0);
 
-    // Reveal: nothing on the TV until the host shows a note.
+    // Start: nothing on the TV until the host presses it, then it cycles with no more clicks.
+    await expect(host.getByTestId("jar-start-warning")).toBeVisible();
     await host.getByTestId("start-reveal").click();
     await expect(screen).toHaveAttribute("data-status", "live", POLL);
-    await expect(tv.getByTestId("tv-note")).toHaveCount(0);
-    await host.getByTestId("reveal-next").click();
     await expect(tv.getByTestId("tv-note")).toHaveCount(1, POLL);
     await expect(page.getByTestId("jar-note")).toHaveCount(1, POLL);
-    await host.getByTestId("reveal-next").click();
-    await expect(page.getByTestId("jar-progress")).toContainText("2 of 2 revealed", POLL);
-    await expect(tv.getByTestId("tv-jar-progress")).toContainText("2 of 2 revealed", POLL);
+    const first = await tv.getByTestId("tv-note").innerText();
+    // Two notes at 5 s each: the other note shows up by itself.
+    await expect.poll(async () => tv.getByTestId("tv-note").innerText(), POLL).not.toBe(first);
+    await expect(tv.getByTestId("tv-jar-progress")).toContainText("of 2");
+    await expect(page.getByTestId("jar-cycle-counter")).toContainText("of 2");
+    await expectNoAxeViolations(page);
+
+    // Pause holds the note on both screens; Resume lets it go on.
+    await host.getByTestId("jar-pause").click();
+    await expect(tv.getByTestId("tv-jar-paused")).toBeVisible(POLL);
+    await expect(page.getByTestId("jar-paused")).toBeVisible(POLL);
+    const held = await tv.getByTestId("tv-note").innerText();
+    await page.waitForTimeout(6_000);
+    expect(await tv.getByTestId("tv-note").innerText()).toBe(held);
+    await host.getByTestId("jar-resume").click();
+    await expect(tv.getByTestId("tv-jar-paused")).toHaveCount(0, POLL);
 
     await host.getByTestId("end-game").click();
     await expect(screen).toHaveAttribute("data-status", "ended", POLL);

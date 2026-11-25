@@ -36,6 +36,9 @@ class Game(Base):
         UniqueConstraint("id", "household_id"),
         CheckConstraint("kind IN ('gratitude_jar', 'bingo', 'scattergories')", name="kind"),
         CheckConstraint("status IN ('draft', 'open', 'live', 'ended')", name="status"),
+        CheckConstraint(
+            "cycle_paused_index IS NULL OR cycle_paused_index >= 0", name="cycle_paused_index"
+        ),
         scoped_fk("created_by_account_id", "accounts"),
     )
 
@@ -52,6 +55,9 @@ class Game(Base):
     created_at: Mapped[datetime] = created_at()
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Gratitude Jar auto-cycle (ADR-0018 amendment B); null for other games and manual jars.
+    cycle_anchor_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cycle_paused_index: Mapped[int | None] = mapped_column(Integer)
 
 
 class GamePlayer(Base):

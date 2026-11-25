@@ -9,21 +9,25 @@ import { ApiErrorNotice } from "@/components/api-error-notice";
 import { PhoneGameFrame } from "@/components/games/phone-game-frame";
 import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
+import { useJarCycle } from "@/hooks/use-jar-cycle";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { usePhonePeople } from "@/hooks/use-phone";
 import { api, type ApiError, type JarNote, type OwnJarNote } from "@/lib/api";
 import { jarStripPlayers } from "@/lib/game-layout";
-import { authorLine, canSendNote, jarProgress, noteCounter, statusLabel } from "@/lib/games";
+import { authorLine, canSendNote, jarStatusLine, noteCounter, statusLabel } from "@/lib/games";
+import { cycleCounter } from "@/lib/jar-cycle";
 import { cn } from "@/lib/utils";
 
 /** One revealed note, big enough to read across a room. */
-function NoteCard({ note, featured }: { note: JarNote; featured?: boolean }) {
+function NoteCard({ note, featured, fade }: { note: JarNote; featured?: boolean; fade?: boolean }) {
   return (
     <figure
       data-testid="jar-note"
       className={cn(
         "flex flex-col gap-2 rounded-2xl border border-foreground/10 bg-card p-4",
         featured && "p-6 marquee-glow",
+        // A soft cross-fade as the next note arrives; instant under prefers-reduced-motion.
+        fade && "motion-safe:animate-in motion-safe:duration-500 motion-safe:fade-in",
       )}
     >
       <blockquote className={cn("text-lg", featured && "text-2xl font-medium")}>
@@ -36,6 +40,67 @@ function NoteCard({ note, featured }: { note: JarNote; featured?: boolean }) {
         {authorLine(note.author)}
       </figcaption>
     </figure>
+  );
+}
+
+/**
+ * The cycling jar on a phone: one note at a time on the server's clock, announced politely, with
+ * a local Hold. Holding keeps this phone on one note while the TV carries on; it sends nothing.
+ */
+function CyclingJar({
+  notes,
+  index,
+  paused,
+  heldId,
+  onHold,
+}: {
+  notes: JarNote[];
+  index: number;
+  paused: boolean;
+  heldId: string | null;
+  onHold: (id: string | null) => void;
+}) {
+  const held = heldId ? notes.find((n) => n.id === heldId) : undefined;
+  const shown = held ?? notes[index];
+  if (!shown) {
+    return (
+      <p className="rounded-2xl bg-muted p-6 text-center text-lg">
+        Every note was taken out of the jar.
+      </p>
+    );
+  }
+  const position = held ? notes.indexOf(held) : index;
+  return (
+    <section className="flex flex-col gap-3" aria-label="Notes" data-testid="jar-reveal">
+      <div
+        aria-live={held ? "off" : "polite"}
+        aria-atomic="true"
+        data-testid="jar-cycle"
+        data-index={position}
+      >
+        <NoteCard key={shown.id} note={shown} featured fade />
+      </div>
+      <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+        <span data-testid="jar-cycle-counter">{cycleCounter(position, notes.length)}</span>
+        {paused ? (
+          <span
+            data-testid="jar-paused"
+            className="rounded-full bg-muted px-3 py-1 text-foreground"
+          >
+            Paused
+          </span>
+        ) : null}
+      </div>
+      <Button
+        variant="secondary"
+        size="tap"
+        data-testid="jar-hold"
+        aria-pressed={held !== undefined}
+        onClick={() => onHold(held ? null : shown.id)}
+      >
+        {held ? "Let it move on" : "Hold this note"}
+      </Button>
+    </section>
   );
 }
 
@@ -74,6 +139,9 @@ export function JarScreen({ gameId }: { gameId: string }) {
   });
 
   const data = game.data;
+  const cycle = useJarCycle(data?.jar);
+  // A phone can hold the note it is on; nothing is sent. Let go by tapping again.
+  const [heldId, setHeldId] = useState<string | null>(null);
   const counter = noteCounter(body);
   const ready = data?.status === "open" && current && canSendNote(body) && !drop.isPending;
 
@@ -83,7 +151,7 @@ export function JarScreen({ gameId }: { gameId: string }) {
       status={
         data
           ? `${statusLabel(data.kind, data.status)}${
-              data.jar ? ` · ${jarProgress(data.jar.note_count, data.jar.revealed_count)}` : ""
+              data.jar ? ` · ${jarStatusLine(data.jar, cycle)}` : ""
             }`
           : undefined
       }
@@ -159,7 +227,28 @@ export function JarScreen({ gameId }: { gameId: string }) {
             </form>
           ) : null}
 
-          {data.jar && data.status !== "open" ? (
+          {data.jar?.mode === "cycle" && data.status === "live" ? (
+            <CyclingJar
+              notes={data.jar.revealed}
+              index={cycle.index}
+              paused={cycle.paused}
+              heldId={heldId}
+              onHold={setHeldId}
+            />
+          ) : null}
+
+          {data.jar?.mode === "cycle" && data.status === "ended" ? (
+            <section className="flex flex-col gap-3" aria-label="Notes" data-testid="jar-reveal">
+              <p className="rounded-2xl bg-muted p-6 text-center text-lg">
+                That is every note. Thank you, everyone.
+              </p>
+              {data.jar.revealed.map((note) => (
+                <NoteCard key={note.id} note={note} />
+              ))}
+            </section>
+          ) : null}
+
+          {data.jar && data.jar.mode !== "cycle" && data.status !== "open" ? (
             <section className="flex flex-col gap-3" aria-label="Notes" data-testid="jar-reveal">
               {data.jar.current ? (
                 <NoteCard note={data.jar.current} featured />

@@ -66,12 +66,22 @@ class ShownNote:
 
 
 @dataclass(frozen=True)
+class JarCycle:
+    anchor_at: datetime
+    server_now: datetime
+    dwell_seconds: int
+    paused_index: int | None
+
+
+@dataclass(frozen=True)
 class JarState:
     note_count: int
     revealed_count: int
     remaining: int
     current: ShownNote | None
     revealed: list[ShownNote]
+    mode: str = "manual"
+    cycle: JarCycle | None = None
 
 
 @dataclass(frozen=True)
@@ -201,6 +211,8 @@ async def create_game(
     free_center: bool = True,
     end_on_first_win: bool = True,
     mode: str = "thanksgiving",
+    reveal_mode: str = "cycle",
+    cycle_seconds: int = jar.CYCLE_SECONDS_DEFAULT,
 ) -> GameRow:
     if kind not in AVAILABLE_KINDS:
         raise Invalid("That game isn't available yet.")
@@ -218,6 +230,15 @@ async def create_game(
         status = "draft"  # the host opens it when the family is ready to join
     else:
         config = {"allow_anonymous": allow_anonymous}
+        if kind == "gratitude_jar":
+            if reveal_mode not in ("cycle", "manual"):
+                raise Invalid("Pick cycle or manual.")
+            if not jar.CYCLE_SECONDS_MIN <= cycle_seconds <= jar.CYCLE_SECONDS_MAX:
+                raise Invalid(
+                    f"Pick {jar.CYCLE_SECONDS_MIN} to {jar.CYCLE_SECONDS_MAX} seconds a note."
+                )
+            config["reveal_mode"] = reveal_mode
+            config["cycle_seconds"] = cycle_seconds
         status = "open"
     clean = " ".join(title.split())
     if not clean:
@@ -272,7 +293,18 @@ async def _shown(db: AsyncSession, game_id: uuid.UUID) -> list[ShownNote]:
     ]
 
 
-async def jar_state(db: AsyncSession, game_id: uuid.UUID) -> JarState:
+def jar_mode(game: GameRow) -> str:
+    """A stored config with no `reveal_mode` is a manual jar (as built before the cycle)."""
+    return "cycle" if game.config.get("reveal_mode") == "cycle" else "manual"
+
+
+def _dwell(game: GameRow) -> int:
+    raw = game.config.get("cycle_seconds", jar.CYCLE_SECONDS_DEFAULT)
+    return raw if isinstance(raw, int) else jar.CYCLE_SECONDS_DEFAULT
+
+
+async def jar_state(db: AsyncSession, game: GameRow) -> JarState:
+    game_id = game.id
     shown = await _shown(db, game_id)
     counts = (
         await db.execute(
@@ -284,12 +316,30 @@ async def jar_state(db: AsyncSession, game_id: uuid.UUID) -> JarState:
             {"g": game_id},
         )
     ).one()
+    mode = jar_mode(game)
+    cycle: JarCycle | None = None
+    if mode == "cycle":
+        row = (
+            await db.execute(
+                text(
+                    "SELECT cycle_anchor_at, cycle_paused_index, clock_timestamp() AS server_now "
+                    "FROM games WHERE id = :g"
+                ),
+                {"g": game_id},
+            )
+        ).one()
+        if row.cycle_anchor_at is not None:
+            cycle = JarCycle(
+                row.cycle_anchor_at, row.server_now, _dwell(game), row.cycle_paused_index
+            )
     return JarState(
         note_count=counts.total,
         revealed_count=counts.done,
         remaining=counts.total - counts.done,
-        current=shown[-1] if shown else None,
+        current=None if mode == "cycle" or not shown else shown[-1],
         revealed=shown,
+        mode=mode,
+        cycle=cycle,
     )
 
 
@@ -299,7 +349,7 @@ async def snapshot(
     game = await _load(db, household_id, game_id)
     return (
         game,
-        await jar_state(db, game_id) if game.kind == "gratitude_jar" else None,
+        await jar_state(db, game) if game.kind == "gratitude_jar" else None,
         await bingo_state(db, game) if game.kind == "bingo" else None,
     )
 
@@ -453,6 +503,29 @@ async def hide_note(
     publish_game_after_commit(db, game_id, events.GAME_CHANGED)
 
 
+async def _reorder(db: AsyncSession, game_id: uuid.UUID, seed: int, *, only_revealed: bool) -> None:
+    """Group similar notes and store the order. Positions are cleared first because
+    (game_id, reveal_position) is unique."""
+    rows = list(
+        await db.execute(
+            text(
+                "SELECT id, body FROM gratitude_notes WHERE game_id = :g AND hidden_at IS NULL"
+                + (" AND revealed_at IS NOT NULL" if only_revealed else "")
+            ),
+            {"g": game_id},
+        )
+    )
+    await db.execute(
+        text("UPDATE gratitude_notes SET reveal_position = NULL WHERE game_id = :g"),
+        {"g": game_id},
+    )
+    for position, note_id in enumerate(jar.group_order([(r.id, r.body) for r in rows], seed)):
+        await db.execute(
+            text("UPDATE gratitude_notes SET reveal_position = :pos WHERE id = :n"),
+            {"pos": position, "n": note_id},
+        )
+
+
 async def start_reveal(
     db: AsyncSession,
     household_id: uuid.UUID,
@@ -461,13 +534,15 @@ async def start_reveal(
     *,
     seed: int,
 ) -> None:
-    """Close the jar to new notes and fix a shuffled order for the unhidden ones."""
+    """Close the jar to new notes and fix an order for the unhidden ones. A cycle jar also
+    shows every one of them from now on and anchors the cycle clock."""
     game = await _load(db, household_id, game_id, lock="UPDATE")
     _require_jar(game)
     if game.status == "live":
         raise Conflict("The reveal has already started.")
     if game.status != "open":
         raise Conflict("The jar is over.")
+    cycling = jar_mode(game) == "cycle"
     ids = [
         r.id
         for r in await db.execute(
@@ -477,14 +552,28 @@ async def start_reveal(
     ]
     if not ids:
         raise Conflict("Nothing in the jar yet.")
-    for position, note_id in enumerate(jar.reveal_order(ids, seed)):
+    if cycling:
+        await _reorder(db, game_id, seed, only_revealed=False)
         await db.execute(
-            text("UPDATE gratitude_notes SET reveal_position = :pos WHERE id = :n"),
-            {"pos": position, "n": note_id},
+            text(
+                "UPDATE gratitude_notes SET revealed_at = now() "
+                "WHERE game_id = :g AND hidden_at IS NULL"
+            ),
+            {"g": game_id},
         )
+    else:
+        for position, note_id in enumerate(jar.reveal_order(ids, seed)):
+            await db.execute(
+                text("UPDATE gratitude_notes SET reveal_position = :pos WHERE id = :n"),
+                {"pos": position, "n": note_id},
+            )
     await db.execute(
-        text("UPDATE games SET status = 'live', reveal_seed = :seed WHERE id = :g"),
-        {"seed": seed, "g": game_id},
+        text(
+            "UPDATE games SET status = 'live', reveal_seed = :seed, "
+            "cycle_anchor_at = CASE WHEN :cycling THEN now() END, cycle_paused_index = NULL "
+            "WHERE id = :g"
+        ),
+        {"seed": seed, "g": game_id, "cycling": cycling},
     )
     await _audit(db, household_id, account_id, "game.reveal_started", game_id, {"notes": len(ids)})
     publish_game_after_commit(db, game_id, events.GAME_CHANGED)
@@ -495,6 +584,8 @@ async def reveal_next(
 ) -> None:
     game = await _load(db, household_id, game_id, lock="UPDATE")
     _require_jar(game)
+    if jar_mode(game) == "cycle":
+        raise Conflict("This jar shows its notes by itself.")
     if game.status == "open":
         raise Conflict("Start the reveal first.")
     if game.status != "live":
@@ -511,6 +602,89 @@ async def reveal_next(
     if shown is None:
         raise Conflict("That's every note.")
     await _audit(db, household_id, account_id, "game.note_revealed", game_id)
+    publish_game_after_commit(db, game_id, events.GAME_CHANGED)
+
+
+async def _live_cycle(
+    db: AsyncSession, household_id: uuid.UUID, game_id: uuid.UUID
+) -> tuple[GameRow, Any]:
+    """The locked cycling jar with its clock row, or Conflict."""
+    game = await _load(db, household_id, game_id, lock="UPDATE")
+    _require_jar(game)
+    if jar_mode(game) != "cycle":
+        raise Conflict("This jar shows its notes one at a time.")
+    if game.status != "live":
+        raise Conflict("The jar hasn't started." if game.status == "open" else "The jar is over.")
+    clock = (
+        await db.execute(
+            text(
+                "SELECT extract(epoch FROM now())::float8 AS now_s, "
+                "extract(epoch FROM cycle_anchor_at)::float8 AS anchor_s, "
+                "cycle_paused_index, "
+                "(SELECT count(*) FROM gratitude_notes WHERE game_id = :g "
+                " AND hidden_at IS NULL AND revealed_at IS NOT NULL) AS shown "
+                "FROM games WHERE id = :g"
+            ),
+            {"g": game_id},
+        )
+    ).one()
+    return game, clock
+
+
+async def pause_cycle(
+    db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, game_id: uuid.UUID
+) -> None:
+    """Hold the note on show. Pausing a paused jar changes nothing."""
+    game, clock = await _live_cycle(db, household_id, game_id)
+    if not jar.can_pause(clock.cycle_paused_index):
+        return
+    index = jar.cycle_index(clock.now_s, clock.anchor_s, _dwell(game), clock.shown, None)
+    await db.execute(
+        text("UPDATE games SET cycle_paused_index = :i WHERE id = :g"), {"i": index, "g": game_id}
+    )
+    await _audit(db, household_id, account_id, "game.jar_paused", game_id, {"index": index})
+    publish_game_after_commit(db, game_id, events.GAME_CHANGED)
+
+
+async def resume_cycle(
+    db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UUID, game_id: uuid.UUID
+) -> None:
+    """Re-anchor so the held note gets a full dwell. Resuming a running jar changes nothing."""
+    game, clock = await _live_cycle(db, household_id, game_id)
+    if not jar.can_resume(clock.cycle_paused_index):
+        return
+    index = jar.cycle_index(0, 0, _dwell(game), clock.shown, clock.cycle_paused_index)
+    await db.execute(
+        text(
+            "UPDATE games SET cycle_paused_index = NULL, "
+            "cycle_anchor_at = now() - make_interval(secs => :s) WHERE id = :g"
+        ),
+        {"s": float(index * _dwell(game)), "g": game_id},
+    )
+    await _audit(db, household_id, account_id, "game.jar_resumed", game_id, {"index": index})
+    publish_game_after_commit(db, game_id, events.GAME_CHANGED)
+
+
+async def reshuffle_cycle(
+    db: AsyncSession,
+    household_id: uuid.UUID,
+    account_id: uuid.UUID,
+    game_id: uuid.UUID,
+    *,
+    seed: int,
+) -> None:
+    """A new grouped order from the first note. A paused jar stays paused, on the first."""
+    _game_row, clock = await _live_cycle(db, household_id, game_id)
+    await _reorder(db, game_id, seed, only_revealed=True)
+    paused = clock.cycle_paused_index is not None
+    await db.execute(
+        text(
+            "UPDATE games SET reveal_seed = :seed, cycle_anchor_at = now(), "
+            "cycle_paused_index = CASE WHEN :paused THEN 0 END WHERE id = :g"
+        ),
+        {"seed": seed, "paused": paused, "g": game_id},
+    )
+    await _audit(db, household_id, account_id, "game.jar_reshuffled", game_id)
     publish_game_after_commit(db, game_id, events.GAME_CHANGED)
 
 
