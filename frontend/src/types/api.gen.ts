@@ -1419,6 +1419,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/scatter/rounds/{round_no}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Review
+         * @description Only the answers that need a decision: near-duplicates and very short answers, with
+         *     wrong letters and exact duplicates as information. Everything else counts automatically.
+         */
+        get: operations["review_api_v1_games__game_id__scatter_rounds__round_no__review_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}/start": {
         parameters: {
             query?: never;
@@ -3945,6 +3966,62 @@ export interface components {
             round_no: number;
             /** Scores */
             scores: components["schemas"]["ScatterScoreOut"][];
+        };
+        /** ScatterReviewAnswerOut */
+        ScatterReviewAnswerOut: {
+            /**
+             * Answer Id
+             * Format: uuid
+             */
+            answer_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Points */
+            points: number;
+            /** Text */
+            text: string;
+            /** Verdict */
+            verdict: ("accepted" | "rejected") | null;
+        };
+        /** ScatterReviewItemOut */
+        ScatterReviewItemOut: {
+            /** Answers */
+            answers: components["schemas"]["ScatterReviewAnswerOut"][];
+            /** Category */
+            category: string;
+            /** Category Index */
+            category_index: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "near_duplicate" | "short" | "duplicate" | "auto_rejected_letter" | "host_rejected";
+            /** Merged */
+            merged: boolean;
+        };
+        /**
+         * ScatterReviewOut
+         * @description What a revealed round needs from the host (ADR-0018 amendment, part C). Computed from
+         *     the same rows as scoring and never stored.
+         */
+        ScatterReviewOut: {
+            /** Auto Accepted Count */
+            auto_accepted_count: number;
+            /** Informational */
+            informational: components["schemas"]["ScatterReviewItemOut"][];
+            /** Letter */
+            letter: string;
+            /** Needs Decision */
+            needs_decision: components["schemas"]["ScatterReviewItemOut"][];
+            /** Round No */
+            round_no: number;
+            /** Total */
+            total: number;
         };
         /** ScatterRoundIn */
         ScatterRoundIn: {
@@ -7364,6 +7441,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    review_api_v1_games__game_id__scatter_rounds__round_no__review_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+                round_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScatterReviewOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The round is not revealed yet */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

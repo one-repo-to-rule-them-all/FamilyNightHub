@@ -348,6 +348,9 @@ async def test_another_household_cannot_see_or_run_a_scattergories_game(
                 host_b, method, path, {"verdict": "rejected"} if method == "PUT" else {}
             )
             assert r.status_code == 404, (method, path)
+        assert (
+            await host_b.client.get(f"{GAMES}/{gid}/scatter/rounds/1/review")
+        ).status_code == 404
         async with _player(b, host_b, "Outsider") as (p, outsider):
             assert (await _join(p, gid, outsider)).status_code == 404
             assert (await _answer(p, gid, outsider, "Pie")).status_code == 404
@@ -403,3 +406,59 @@ async def test_the_export_includes_scattergories_tables(two_households: Pair) ->
         names = zipfile.ZipFile(io.BytesIO(resp.content)).namelist()
         for table in ("scatter_rounds", "scatter_answers"):
             assert f"tables/{table}.json" in names
+
+
+async def test_review_lists_only_what_needs_a_decision(two_households: Pair) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        gid = await _game(host)
+        async with (
+            _player(a, host, "Sam") as (p1, sam),
+            _player(a, host, "Max") as (p2, max_),
+            _player(a, host, "Kim") as (p3, kim),
+        ):
+            for p, who in ((p1, sam), (p2, max_), (p3, kim)):
+                await _join(p, gid, who)
+            snap = await _round(host, gid, seed=3, categories=["One", "Two", "Three", "Four"])
+            letter = snap["scatter"]["current"]["letter"]
+            review_path = f"{GAMES}/{gid}/scatter/rounds/1/review"
+            # Not revealed yet: 409. A guest phone is not a host.
+            assert (await host.client.get(review_path)).status_code == 409
+            assert (await p1.client.get(review_path)).status_code in (401, 403)
+            # cat0 plural pair, cat1 typo pair, cat2 short, cat3 unique / wrong letter / dupe.
+            await _answer(
+                p1, gid, sam, f"{letter}otatoes", f"{letter}umkin pie", f"{letter}b", "1 x"
+            )
+            await _answer(
+                p2, gid, max_, f"{letter}otato", f"{letter}umpkin pie", "", f"{letter}uniq"
+            )
+            await _answer(p3, gid, kim, "", "", "", "zzz")
+            shown = await _reveal(host, gid)
+            by_person = {s["person_id"]: s["points"] for s in shown["scatter"]["leaderboard"]}
+            # plural pair 0 each; typo pair 1 each; short counts as written (1); unique 1
+            assert by_person[str(sam)] == 2 and by_person[str(max_)] == 2
+            resp = await host.client.get(review_path)
+            assert resp.status_code == 200, resp.text
+            body = resp.json()
+            kinds = [(i["kind"], i["category_index"]) for i in body["needs_decision"]]
+            assert kinds == [("near_duplicate", 0), ("near_duplicate", 1), ("short", 2)]
+            plural = body["needs_decision"][0]
+            assert {x["name"] for x in plural["answers"]} == {"Sam", "Max"}
+            assert all(x["points"] == 0 for x in plural["answers"]) and plural["merged"]
+            typo = body["needs_decision"][1]
+            assert not typo["merged"] and all(x["points"] == 1 for x in typo["answers"])
+            assert [i["kind"] for i in body["informational"]] == ["auto_rejected_letter"]
+            assert body["total"] == 8 and body["auto_accepted_count"] == 1
+            assert (
+                await host.client.get(f"{GAMES}/{gid}/scatter/rounds/9/review")
+            ).status_code == 404
+
+            # Count separately = accept one: both score 1 and the card stays for undo.
+            ids = {x["person_id"]: x["answer_id"] for x in plural["answers"]}
+            path = f"{GAMES}/{gid}/scatter/answers/{ids[str(max_)]}/verdict"
+            out = await _send(host, "PUT", path, {"verdict": "accepted"})
+            board = {t["person_id"]: t["points"] for t in out.json()["scatter"]["leaderboard"]}
+            assert board[str(sam)] == 3 and board[str(max_)] == 3
+            again = (await host.client.get(review_path)).json()
+            assert again["needs_decision"][0]["kind"] == "near_duplicate"

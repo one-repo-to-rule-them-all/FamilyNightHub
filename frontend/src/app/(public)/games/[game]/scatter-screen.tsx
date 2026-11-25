@@ -22,6 +22,7 @@ import {
   canAnswer,
   draftFrom,
   isDirty,
+  letterHint,
   roundHeading,
   stateLabel,
 } from "@/lib/scatter";
@@ -36,6 +37,7 @@ import { cn } from "@/lib/utils";
 function AnswerSheet({
   gameId,
   personId,
+  letter,
   categories,
   saved,
   seconds,
@@ -43,6 +45,7 @@ function AnswerSheet({
 }: {
   gameId: string;
   personId: string;
+  letter: string;
   categories: string[];
   saved: string[];
   seconds: number;
@@ -51,11 +54,11 @@ function AnswerSheet({
   const queryClient = useQueryClient();
   const [edits, setEdits] = useState<Record<number, string>>({});
   const draft = saved.map((text, i) => edits[i] ?? text);
-  const dirty = isDirty(draft, saved);
+  const dirty = isDirty(draft, saved, letter);
 
   const save = useMutation<OwnScatterAnswer[], ApiError>({
     mutationFn: () =>
-      api.submitScatter(gameId, { person_id: personId, answers: answerBody(draft) }),
+      api.submitScatter(gameId, { person_id: personId, answers: answerBody(draft, letter) }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["game", gameId] }),
   });
 
@@ -78,28 +81,45 @@ function AnswerSheet({
         if (canType && dirty && !save.isPending) save.mutate();
       }}
     >
-      {categories.map((category, i) => (
-        <div key={category} className="flex flex-col gap-1">
-          <label htmlFor={`scatter-${i}`} className="text-base font-medium">
-            {i + 1}. {category}
-          </label>
-          <input
-            id={`scatter-${i}`}
-            data-testid={`scatter-input-${i}`}
-            value={draft[i] ?? ""}
-            maxLength={ANSWER_MAX}
-            disabled={!canType}
-            autoComplete="off"
-            autoCapitalize="words"
-            enterKeyHint={i === categories.length - 1 ? "done" : "next"}
-            onChange={(event) => setEdits((prev) => ({ ...prev, [i]: event.target.value }))}
-            onBlur={() => {
-              if (canType && dirty && !save.isPending) save.mutate();
-            }}
-            className="h-14 w-full rounded-xl border border-input bg-transparent px-4 text-lg outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60"
-          />
-        </div>
-      ))}
+      {categories.map((category, i) => {
+        const hint = letterHint(draft[i] ?? "", letter);
+        return (
+          <div key={category} className="flex flex-col gap-1">
+            <label htmlFor={`scatter-${i}`} className="text-base font-medium">
+              {i + 1}. {category}
+            </label>
+            <input
+              id={`scatter-${i}`}
+              data-testid={`scatter-input-${i}`}
+              value={draft[i] ?? ""}
+              maxLength={ANSWER_MAX}
+              disabled={!canType}
+              autoComplete="off"
+              autoCapitalize="words"
+              enterKeyHint={i === categories.length - 1 ? "done" : "next"}
+              onChange={(event) => setEdits((prev) => ({ ...prev, [i]: event.target.value }))}
+              onBlur={() => {
+                if (canType && dirty && !save.isPending) save.mutate();
+              }}
+              aria-invalid={hint ? true : undefined}
+              aria-describedby={hint ? `scatter-hint-${i}` : undefined}
+              className={cn(
+                "h-14 w-full rounded-xl border border-input bg-transparent px-4 text-lg outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-60",
+                hint && "border-destructive",
+              )}
+            />
+            {hint ? (
+              <p
+                id={`scatter-hint-${i}`}
+                data-testid={`scatter-hint-${i}`}
+                className="text-sm font-medium text-destructive"
+              >
+                {hint}. It won&apos;t count.
+              </p>
+            ) : null}
+          </div>
+        );
+      })}
       <ApiErrorNotice error={save.error} />
       <p
         className="flex items-center gap-2 text-sm text-muted-foreground"
@@ -260,6 +280,7 @@ export function ScatterScreen({ gameId }: { gameId: string }) {
                   key={`${round.round_no}-${me.id}`}
                   gameId={gameId}
                   personId={me.id}
+                  letter={round.letter}
                   categories={round.categories}
                   saved={saved}
                   seconds={seconds}
