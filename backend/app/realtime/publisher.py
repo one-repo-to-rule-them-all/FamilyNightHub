@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import after_commit
 from app.core.redis import get_redis
-from app.realtime.events import SESSION, assert_registered
+from app.realtime.events import GAME, GAME_EVENTS, SESSION, SESSION_EVENTS, assert_registered
 
 log = structlog.get_logger()
 
@@ -36,6 +36,15 @@ VERSION_TTL_SECONDS = 2 * 24 * 3600
 
 def session_channel(session_id: uuid.UUID) -> str:
     return f"{SESSION}:{session_id}"
+
+
+def game_channel(game_id: uuid.UUID) -> str:
+    return f"{GAME}:{game_id}"
+
+
+def channel_for(scope: str, target_id: uuid.UUID) -> str:
+    """The pub/sub channel for a ticket scope (`session` or `game`, ADR-0018)."""
+    return game_channel(target_id) if scope == GAME else session_channel(target_id)
 
 
 def _version_key(session_id: uuid.UUID) -> str:
@@ -48,10 +57,15 @@ def event_payload(event_type: str, session_id: uuid.UUID, version: int) -> str:
 
 
 async def publish_session_event(
-    session_id: uuid.UUID, event_type: str, *, redis: Redis | None = None
+    session_id: uuid.UUID,
+    event_type: str,
+    *,
+    redis: Redis | None = None,
+    scope: str = SESSION,
 ) -> None:
     """PUBLISH one hint now. Call only after the change is committed (or use
-    `publish_after_commit`). Never raises on Redis errors."""
+    `publish_after_commit`). Never raises on Redis errors. `scope` picks the channel: a
+    night (`session`, the default) or a game (`game`, ADR-0018)."""
     assert_registered(event_type)
     try:
         client = redis or get_redis()
@@ -60,7 +74,7 @@ async def publish_session_event(
             pipe.expire(_version_key(session_id), VERSION_TTL_SECONDS)
             version, _ = await pipe.execute()
         await client.publish(
-            session_channel(session_id), event_payload(event_type, session_id, int(version))
+            channel_for(scope, session_id), event_payload(event_type, session_id, int(version))
         )
     except Exception as exc:  # noqa: BLE001 - a lost hint must never fail a committed write
         # Not `event=`: structlog reserves it (OrderUp note).
@@ -75,8 +89,22 @@ async def publish_session_event(
 def publish_after_commit(db: AsyncSession, session_id: uuid.UUID, event_type: str) -> None:
     """Queue a hint to go out once `db`'s transaction commits (nothing on rollback)."""
     assert_registered(event_type)
+    if event_type not in SESSION_EVENTS:
+        raise ValueError(f"{event_type!r} is not a night event")
 
     async def publish() -> None:
         await publish_session_event(session_id, event_type)
+
+    after_commit(db, publish)
+
+
+def publish_game_after_commit(db: AsyncSession, game_id: uuid.UUID, event_type: str) -> None:
+    """Queue a hint on `game:{id}` for after `db` commits (nothing on rollback)."""
+    assert_registered(event_type)
+    if event_type not in GAME_EVENTS:
+        raise ValueError(f"{event_type!r} is not a game event")
+
+    async def publish() -> None:
+        await publish_session_event(game_id, event_type, scope=GAME)
 
     after_commit(db, publish)

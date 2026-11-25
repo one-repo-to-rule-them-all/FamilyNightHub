@@ -39,7 +39,9 @@ def now() -> float:
 @dataclass(frozen=True)
 class TicketClaims:
     household_id: uuid.UUID
+    # The night's id, or the game's when `scope` is "game" (ADR-0018).
     session_id: uuid.UUID
+    scope: str = "session"
 
 
 def ticket_key(ticket: str) -> str:
@@ -52,6 +54,7 @@ async def mint_ticket(
     *,
     redis: Redis | None = None,
     clock: Clock | None = None,
+    scope: str = "session",
 ) -> str:
     """Store a fresh single-use ticket for one night of one household and return it."""
     ticket = secrets.token_urlsafe(32)
@@ -59,6 +62,7 @@ async def mint_ticket(
         {
             "household_id": str(household_id),
             "session_id": str(session_id),
+            "scope": scope,
             "exp": (clock or now)() + TICKET_TTL_SECONDS,
         }
     )
@@ -77,7 +81,11 @@ async def consume_ticket(
         return None
     try:
         data = json.loads(raw)
-        claims = TicketClaims(uuid.UUID(data["household_id"]), uuid.UUID(data["session_id"]))
+        claims = TicketClaims(
+            uuid.UUID(data["household_id"]),
+            uuid.UUID(data["session_id"]),
+            str(data.get("scope", "session")),
+        )
         expires_at = float(data["exp"])
     except (TypeError, ValueError, KeyError):
         return None

@@ -25,7 +25,7 @@ RATING_COUNT = "rating_count"  # someone rated the night; refetch the family ave
 WINNER_CORRECTED = "winner_corrected"  # an admin corrected the night's winner (ADR-0006)
 PRESENCE = "presence"  # someone new is here tonight; refetch GET …/present (G8)
 
-PUBLISHED_EVENTS: frozenset[str] = frozenset(
+SESSION_EVENTS: frozenset[str] = frozenset(
     {
         STATUS_CHANGED,
         SHORTLIST_CHANGED,
@@ -37,6 +37,14 @@ PUBLISHED_EVENTS: frozenset[str] = frozenset(
         PRESENCE,
     }
 )
+
+# Games (ADR-0018) publish on their own channel `game:{id}`. Still hints only.
+GAME = "game"
+GAME_CHANGED = "game_changed"  # status, config, roster or a reveal changed; refetch the snapshot
+GAME_ACTIVITY = "game_activity"  # a note was dropped, a mark made, an answer sent; refetch counts
+GAME_EVENTS: frozenset[str] = frozenset({GAME_CHANGED, GAME_ACTIVITY})
+
+PUBLISHED_EVENTS: frozenset[str] = SESSION_EVENTS | GAME_EVENTS
 
 # Synthesized by the stream itself, never published: the Redis subscription gave up, so
 # the client should fall back to polling and re-ticket.

@@ -308,6 +308,54 @@ async def merge(
     await db.execute(
         text("UPDATE session_attendance SET person_id = :dst WHERE person_id = :src"), params
     )
+    # Games (ADR-0018): notes always move; a roster row is one per (game, person), the
+    # target's wins.
+    await db.execute(
+        text(
+            """
+            DELETE FROM game_players s WHERE s.person_id = :src AND EXISTS (
+                SELECT 1 FROM game_players t
+                WHERE t.person_id = :dst AND t.game_id = s.game_id
+            )
+            """
+        ),
+        params,
+    )
+    await db.execute(
+        text("UPDATE game_players SET person_id = :dst WHERE person_id = :src"), params
+    )
+    # A bingo card is one per (game, person): the target's card wins, the source's is dropped.
+    await db.execute(
+        text(
+            """
+            DELETE FROM bingo_cards s WHERE s.person_id = :src AND EXISTS (
+                SELECT 1 FROM bingo_cards t
+                WHERE t.person_id = :dst AND t.game_id = s.game_id
+            )
+            """
+        ),
+        params,
+    )
+    await db.execute(text("UPDATE bingo_cards SET person_id = :dst WHERE person_id = :src"), params)
+    await db.execute(
+        text("UPDATE gratitude_notes SET person_id = :dst WHERE person_id = :src"), params
+    )
+    # Scattergories answers: one per (round, person, category); the target's wins.
+    await db.execute(
+        text(
+            """
+            DELETE FROM scatter_answers s WHERE s.person_id = :src AND EXISTS (
+                SELECT 1 FROM scatter_answers t
+                WHERE t.person_id = :dst AND t.round_id = s.round_id
+                  AND t.category_index = s.category_index
+            )
+            """
+        ),
+        params,
+    )
+    await db.execute(
+        text("UPDATE scatter_answers SET person_id = :dst WHERE person_id = :src"), params
+    )
     photos_moved = await count(
         "UPDATE photos SET person_id = :dst WHERE person_id = :src RETURNING id"
     )

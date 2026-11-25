@@ -13,11 +13,12 @@ export type NightStatus = "draft" | "voting" | "revealed" | "tonight" | "closed"
 // ---------------------------------------------------------------------------------------------
 // Navigation (§3.1)
 
-export type NavKey = "home" | "people" | "phones" | "library" | "history" | "settings";
+export type NavKey = "home" | "games" | "people" | "phones" | "library" | "history" | "settings";
 export type NavItem = { key: NavKey; href: string; label: string; adminOnly: boolean };
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { key: "home", href: "/host", label: "Home", adminOnly: false },
+  { key: "games", href: "/host/games", label: "Games", adminOnly: false },
   { key: "people", href: "/admin/people", label: "People", adminOnly: true },
   { key: "phones", href: "/admin/devices", label: "Phones", adminOnly: true },
   { key: "library", href: "/admin/movies", label: "Library", adminOnly: true },
@@ -42,6 +43,7 @@ export function phoneTabs(role: Role): { tabs: NavItem[]; more: NavItem[] } {
 
 /** The nav item a pathname belongs to; a night being run (`/host/{id}`) counts as Home. */
 export function activeNav(pathname: string): NavKey | null {
+  if (pathname === "/host/games" || pathname.startsWith("/host/games/")) return "games";
   if (pathname === "/host" || pathname.startsWith("/host/")) return "home";
   const match = NAV_ITEMS.find(
     (item) =>

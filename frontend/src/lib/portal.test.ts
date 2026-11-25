@@ -76,25 +76,28 @@ describe("nav", () => {
   it("filters by role", () => {
     expect(navFor("admin").map((i) => i.key)).toEqual([
       "home",
+      "games",
       "people",
       "phones",
       "library",
       "history",
       "settings",
     ]);
-    expect(navFor("host").map((i) => i.key)).toEqual(["home", "history", "settings"]);
+    expect(navFor("host").map((i) => i.key)).toEqual(["home", "games", "history", "settings"]);
   });
 
   it("splits phone tabs and More", () => {
     const admin = phoneTabs("admin");
     expect(admin.tabs.map((i) => i.key)).toEqual(["home", "people", "library", "history"]);
-    expect(admin.more.map((i) => i.key)).toEqual(["phones", "settings"]);
-    expect(phoneTabs("host").more.map((i) => i.key)).toEqual(["settings"]);
+    expect(admin.more.map((i) => i.key)).toEqual(["games", "phones", "settings"]);
+    expect(phoneTabs("host").more.map((i) => i.key)).toEqual(["games", "settings"]);
   });
 
   it("maps a pathname to its item", () => {
     expect(activeNav("/host")).toBe("home");
     expect(activeNav("/host/abc")).toBe("home");
+    expect(activeNav("/host/games")).toBe("games");
+    expect(activeNav("/host/games/abc")).toBe("games");
     expect(activeNav("/admin/people")).toBe("people");
     expect(activeNav("/admin/devices/x")).toBe("phones");
     expect(activeNav("/tv")).toBeNull();

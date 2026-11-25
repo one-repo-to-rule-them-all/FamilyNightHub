@@ -36,7 +36,9 @@ backend/app/
 | Host devices | `POST /api/v1/devices/enroll`, `GET /api/v1/devices/claims`, `POST /api/v1/devices/{id}/people/{pid}/{approve,reject}` | Host lets a browser in without the code (`as_tv` pairs the TV and clears the host session from it, unless `keep_session`: the host's laptop opening a TV window); review pending person claims (`devices:enroll` / `devices:approve`) |
 | Sessions | `POST /api/v1/sessions`, `GET /sessions[?status=&limit=]`, `GET/PATCH /sessions/{id}`, `POST /sessions/{id}/night-code`, `POST/DELETE /sessions/{id}/options[/{oid}]`, `PUT /sessions/{id}/options/order`, `POST /sessions/{id}/{open-voting,close-voting,close}`, `PUT /sessions/{id}/slideshow` | Host (`sessions:run`): create (code shown once; `voting_method` defaults to the household's), change the voting method while `draft`, rotate code, shortlist, open/close voting, close the night, start/stop the TV slideshow. Snapshot and history: any device or account of the household |
 | Ballots | `PUT /api/v1/sessions/{id}/ballots`, `PUT …/ballots/proxy`, `GET …/ballots/mine`, `GET …/voters` | Phone casts/replaces a bound person's ballot; host proxy ballot (`ballots:proxy`); a phone reads back its own people's ballots; who has voted (avatars only) |
-| Live | `/api/v1/sse-tickets`, `/api/v1/sessions/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md) |
+| Live | `/api/v1/sse-tickets {session_id | game_id}`, `/api/v1/sessions/{id}/stream`, `/api/v1/games/{id}/stream` | [ADR-0004](decisions/ADR-0004-sse-live-updates.md), [ADR-0018](decisions/ADR-0018-games-tab.md) |
+| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next}`, `POST /games/{id}/{open,start}`, `POST …/bingo/join`, `GET …/bingo/mine`, `PUT/DELETE …/bingo/mark/{index}?person_id=` | Gratitude Jar and Thanksgiving Bingo ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate, reveal and end; a phone drops a note as a bound person; any device or account reads the snapshot. See "Games" |
+| Games | `GET/POST /api/v1/games`, `GET /games/{id}`, `POST /games/{id}/end`, `POST/DELETE /games/{id}/jar/notes[/{nid}]`, `GET …/jar/notes/mine`, `GET …/jar/moderation`, `POST …/jar/notes/{nid}/hide`, `POST …/jar/{start-reveal,reveal-next}`, `GET …/scatter/draw`, `POST …/scatter/rounds`, `POST …/scatter/reveal`, `PUT …/scatter/answers/{aid}/verdict`, `POST …/scatter/join`, `PUT …/scatter/answers`, `GET …/scatter/answers/mine` | Gratitude Jar and Scattergories ([ADR-0018](decisions/ADR-0018-games-tab.md)): hosts (`sessions:run`) create, moderate or run rounds, reveal and end; a phone drops a note or answers as a bound person; any device or account reads the snapshot. See "Games" |
 | Photos | `POST/GET /api/v1/sessions/{id}/photos`, `POST …/photos/{pid}/complete`, `PUT/DELETE …/photos/{pid}/reactions/{emoji}?person_id=`, `POST …/photos/{pid}/{hide,unhide}`, `DELETE …/photos/{pid}` | Device: presign, complete, react (as a bound person). Album: any device or account. Hosts hide/unhide (`sessions:run`), admins hard-delete (`admin:photos`). See "Photos" below |
 | Ratings | `PUT /api/v1/sessions/{id}/ratings`, `PUT …/ratings/proxy`, `GET …/ratings/mine` | 1–5 per person, once the night is `tonight`/`closed`: a phone rates as its bound people, a host proxy-rates (`ballots:proxy`), a phone reads back its own people's scores. See "Ratings" |
 | Movies | `GET /api/v1/tmdb/search?q=` | TMDB search proxy for hosts (503 when TMDB is off or down). The library itself is admin-only (next rows) |
@@ -728,6 +730,70 @@ deletes the bucket objects, then the household row, whose cascade empties every 
   sign-ins, magic-link verifies and joins are 403 `household_disabled` after the credential
   checks out, and its accounts' sessions stop on their next request), rotate the join slug.
   Every action writes a global `platform_audit_events` row.
+
+## Games
+
+[ADR-0018](decisions/ADR-0018-games-tab.md); `services/games_service.py`, `api/v1/games.py`,
+`services/games_service.py`, `services/scatter_service.py`, `api/v1/games.py`,
+`api/v1/games_scatter.py`, `domain/games/` (`jar.py`, `bingo.py`, `bingo_pool.py`,
+`scatter.py`, `scatter_categories.py`). Games are household-scoped and **not tied to a
+night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
+`created_by_account_id`, `reveal_seed`), `game_players` (roster), `gratitude_notes`,
+`bingo_cards`, `scatter_rounds` and `scatter_answers`.
+
+- **Gratitude Jar.** Hosts create a jar (`open`). A phone drops a note as a person it is
+  acting as (`require_can_act_as`, consent gate; 1-280 chars, whitespace collapsed; `anonymous`
+  unless the jar's `allow_anonymous` is false). The author may delete their own note until it is
+  shown (anyone else's, or a shown one, is 404). **Start reveal** closes the jar, shuffles the
+  unhidden notes with `random.Random(seed)` over the sorted ids (`secrets.randbits(64)`; the
+  `X-FNH-Test-Seed` header pins it in `ENVIRONMENT=test`) and writes `reveal_position`;
+  **reveal next** sets `revealed_at` on the next one. The game row is read `FOR UPDATE` by hosts
+  and `FOR SHARE` by a dropped note, so they serialize. Hosts read every note's text in
+  `/jar/moderation` and can hide one before it shows (idempotent); an anonymous note never
+  carries its author, even there. The snapshot holds revealed, unhidden notes only, and counts.
+- **Thanksgiving Bingo (slice B).** A host creates a round with `config` `win_mode`
+  (`line`|`blackout`), `free_center` and `end_on_first_win` (defaults line, true, true); it starts
+  as a `draft`, **open** (`POST /open`, idempotent) lets people join, **start** (`POST /start`)
+  makes it `live`, and `/end` ends it any time. **Join** (`/bingo/join`, as a person this phone
+  acts as, consent gate) draws 24 distinct squares from `bingo_pool.THANKSGIVING_POOL` with
+  `random.Random(seed ^ person.int)` (the seed is `secrets.randbits(64)`, pinned by
+  `X-FNH-Test-Seed` in test), inserts FREE at index 12 when `free_center`, stores the 25 strings in
+  `bingo_cards` and a `game_players` row; joining again returns the same card. **Mark/unmark**
+  (`PUT`/`DELETE …/bingo/mark/{0..24}?person_id=`) is idempotent, own card only, 409 unless the
+  round is `live`, and runs under the game row's `FOR UPDATE` then the card's. The completing mark
+  is the win (no buzz): `won_at` is `clock_timestamp()` (not `now()`, which is the transaction start
+  and could order two winners backwards), and with `end_on_first_win` the same transaction ends the
+  game, so of two phones completing at once one wins and the other gets 409. Otherwise the round
+  continues and `finish_place` is the `won_at` order. A recorded win survives an unmark. The
+  snapshot's `bingo` object has each player's avatar, `squares_from_bingo`, `won` and
+  `finish_place`, never squares or marks; `/bingo/mine` returns only the cards of people bound to
+  the caller's phone.
+- **Scattergories (slice C).** A host creates the game (`open`), people **join** the roster (as a
+  person they act as; consent gate), and the host starts **rounds**: a random letter (`secrets`,
+  or the `X-FNH-Test-Seed` seed; never Q U V X Y Z), 1-12 categories snapshotted into the round
+  (`GET /scatter/draw` offers a themed draw to edit first; blanks and case-insensitive repeats
+  collapse) and a 10-900 s duration. A round starts only when the previous one is revealed. The
+  server stores `ends_at` and is the clock: **no tick events**. The snapshot carries `ends_at`
+  and `server_now`; clients count down locally, and the round's effective state (`running` →
+  `closed` → `revealed`) is derived from `ends_at` on read, so no job exists. `PUT /scatter/answers`
+  saves or replaces answers (a blank clears one) until `ends_at` plus a 2 s grace, then 409; it
+  also 409s before joining or once revealed. **Answers are visible to nobody, the host included,
+  until reveal**: the snapshot carries only per-player `answered` counts, and `/answers/mine`
+  returns the phone's own. **Reveal** (host; early reveal also pulls `ends_at` to now) sets
+  `revealed_at` and freezes the answers. Scores are **derived on read** by the pure
+  `scatter.score_round` / `answer_points` (valid = starts with the letter after normalising and not
+  rejected; valid and unique in its category = 1) and never stored. The host may reject or
+  re-accept an answer after reveal (`host_verdict`; `PUT .../verdict`), and the leaderboard sums
+  the revealed rounds over the roster. Ending the game does not reveal an unrevealed round.
+- **Events.** `game_changed` (status, reveal, hide, roster, a win, a round start, a verdict) and
+  `game_activity` (a note dropped or taken back, a square marked, an answer saved) go to
+  `game:{id}` after commit. `POST /sse-tickets` takes exactly one of `session_id` or
+  `game_id`; tickets carry a `scope`, and a night's stream refuses a game's ticket and the reverse.
+- **Lifecycle.** Merging people moves their notes, keeps the target's roster row, bingo card and
+  answer where both have one; removing a person (and Start fresh) deletes notes, cards, answers,
+  roster rows, rounds and games; the export gains the six tables. Audit: `game.created`,
+  `game.opened`, `game.started`, `game.reveal_started`, `game.note_revealed`, `game.note_hidden`,
+  `game.round_started`, `game.round_revealed`, `game.answer_verdict`, `game.ended`.
 
 ## Where business logic belongs
 

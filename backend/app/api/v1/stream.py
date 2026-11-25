@@ -42,7 +42,7 @@ from app.api.v1.sessions import NOT_FOUND, raise_http
 from app.core.dependencies import CsrfProtected, CurrentViewer, ViewerDb
 from app.core.redis import get_redis
 from app.realtime.events import DEGRADED
-from app.realtime.publisher import session_channel
+from app.realtime.publisher import channel_for
 from app.realtime.tickets import TICKET_TTL_SECONDS, consume_ticket
 from app.schemas.live import SseTicketIn, SseTicketOut
 from app.services import attendance_service, live_service
@@ -90,13 +90,14 @@ async def event_stream(
     max_seconds: float | None = None,
     poll: float | None = None,
     clock: Callable[[], float] | None = None,
+    scope: str = "session",
 ) -> AsyncGenerator[str, None]:
     heartbeat = HEARTBEAT_SECONDS if heartbeat is None else heartbeat
     max_seconds = MAX_STREAM_SECONDS if max_seconds is None else max_seconds
     poll = POLL_SECONDS if poll is None else poll
     clock = clock or anyio.current_time
     sid = str(session_id)
-    channel = session_channel(session_id)
+    channel = channel_for(scope, session_id)
     pubsub = (redis or get_redis()).pubsub()
     deadline = clock() + max_seconds
     try:
@@ -163,9 +164,13 @@ class LiveStreamResponse(StreamingResponse):
     responses=NOT_FOUND,
 )
 async def create_sse_ticket(body: SseTicketIn, viewer: CurrentViewer, db: ViewerDb) -> SseTicketOut:
-    """A 60s single-use ticket for this night's live stream. Another household's night
-    (or an unknown one) is 404."""
+    """A 60s single-use ticket for this night's (or, with `game_id`, this game's) live stream.
+    Another household's night or game (or an unknown one) is 404."""
     try:
+        if body.game_id is not None:
+            ticket = await live_service.issue_game_ticket(db, viewer.household_id, body.game_id)
+            return SseTicketOut(ticket=ticket, expires_in=TICKET_TTL_SECONDS)
+        assert body.session_id is not None  # SseTicketIn guarantees exactly one id
         ticket = await live_service.issue_ticket(db, viewer.household_id, body.session_id)
     except NotFound as err:
         raise_http(err)
@@ -189,8 +194,30 @@ async def stream_session(
     session_id: uuid.UUID, ticket: Annotated[str, Query(max_length=128)]
 ) -> LiveStreamResponse:
     claims = await consume_ticket(ticket)
-    if claims is None or claims.session_id != session_id:
+    if claims is None or claims.session_id != session_id or claims.scope != "session":
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid, expired or used ticket")
     return LiveStreamResponse(
         event_stream(claims.session_id), media_type="text/event-stream", headers=SSE_HEADERS
+    )
+
+
+@router.get(
+    "/games/{game_id}/stream",
+    response_class=LiveStreamResponse,
+    responses={
+        200: {"content": {"text/event-stream": {}}, "description": "Live hints for the game"},
+        401: {"description": "Ticket invalid, expired, already used or for another game"},
+    },
+)
+async def stream_game(
+    game_id: uuid.UUID, ticket: Annotated[str, Query(max_length=128)]
+) -> LiveStreamResponse:
+    """The game twin of the night stream (ADR-0018): the same hints-only contract on `game:{id}`."""
+    claims = await consume_ticket(ticket)
+    if claims is None or claims.session_id != game_id or claims.scope != "game":
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid, expired or used ticket")
+    return LiveStreamResponse(
+        event_stream(claims.session_id, scope="game"),
+        media_type="text/event-stream",
+        headers=SSE_HEADERS,
     )
