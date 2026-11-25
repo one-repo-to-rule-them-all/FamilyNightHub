@@ -42,7 +42,7 @@ The numbered docs go **broad → narrow**.
 | Admins invite hosts and admins by email; invitees choose their own password; the last admin can't be removed | [`ADR-0015`](decisions/ADR-0015-inviting-hosts-and-admins.md) |
 | Platform owner: a super-admin who enters one household at a time, never bypassing RLS (accepted and built) | [`ADR-0016`](decisions/ADR-0016-platform-owner.md) |
 | Consent, privacy and deletion before a second household: operator-created households, a consent gate, export and delete | [`ADR-0017`](decisions/ADR-0017-consent-and-multi-household.md) |
-| Games tab: household-scoped party games (Gratitude Jar built; Bingo and Scattergories planned), a game channel on SSE, host moderation | [`ADR-0018`](decisions/ADR-0018-games-tab.md) |
+| Games tab: household-scoped party games (all three games built; amended 2026-11-25: classic bingo, jar auto-cycle, lighter scattergories review), a game channel on SSE, host moderation | [`ADR-0018`](decisions/ADR-0018-games-tab.md) |
 
 ## The 30-second mental model
 
