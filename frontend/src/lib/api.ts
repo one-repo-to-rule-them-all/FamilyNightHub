@@ -64,6 +64,10 @@ export type ModerationNote = Schemas["ModerationNoteOut"];
 export type BingoCard = Schemas["BingoCardOut"];
 export type BingoPlayer = Schemas["BingoPlayerOut"];
 export type BingoCheckResult = Schemas["BingoCheckOut"];
+export type LoteriaTabla = Schemas["LoteriaTablaOut"];
+export type LoteriaPlayer = Schemas["LoteriaPlayerOut"];
+export type LoteriaCall = Schemas["LoteriaCallOut"];
+export type LoteriaCheckResult = Schemas["LoteriaCheckOut"];
 export type ScatterState = Schemas["ScatterOut"];
 export type ScatterRevealed = Schemas["ScatterRevealedOut"];
 export type ScatterAnswer = Schemas["ScatterAnswerOut"];
@@ -365,6 +369,36 @@ export const api = {
     }),
   checkBingo: (gameId: string, personId: string) =>
     request<BingoCheckResult>("POST", `/games/${encodeURIComponent(gameId)}/bingo/check`, {
+      person_id: personId,
+    }),
+
+  // Lotería (ADR-0018 amendment 2026-11-26). Hosts open, start, draw and check; a phone joins,
+  // rerolls its tabla while the game is open and marks called pictures.
+  openLoteria: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/loteria/open`),
+  startLoteria: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/loteria/start`),
+  joinLoteria: (gameId: string, personId: string) =>
+    request<LoteriaTabla>("POST", `/games/${encodeURIComponent(gameId)}/loteria/join`, {
+      person_id: personId,
+    }),
+  rerollLoteria: (gameId: string, personId: string) =>
+    request<LoteriaTabla>("POST", `/games/${encodeURIComponent(gameId)}/loteria/reroll`, {
+      person_id: personId,
+    }),
+  myLoteriaTablas: (gameId: string) =>
+    request<LoteriaTabla[]>("GET", `/games/${encodeURIComponent(gameId)}/loteria/mine`),
+  markLoteriaSquare: (gameId: string, index: number, personId: string, marked: boolean) =>
+    request<LoteriaTabla>(
+      marked ? "PUT" : "DELETE",
+      `/games/${encodeURIComponent(gameId)}/loteria/mark/${index}?person_id=${encodeURIComponent(personId)}`,
+    ),
+  drawLoteria: (gameId: string, expectedSeq: number) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/loteria/draw`, {
+      expected_seq: expectedSeq,
+    }),
+  checkLoteria: (gameId: string, personId: string) =>
+    request<LoteriaCheckResult>("POST", `/games/${encodeURIComponent(gameId)}/loteria/check`, {
       person_id: personId,
     }),
 

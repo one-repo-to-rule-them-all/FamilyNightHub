@@ -11,6 +11,7 @@ import { GameLoading } from "@/components/games/game-loading";
 
 import { TvBingo } from "./tv-bingo";
 import { TvJar } from "./tv-jar";
+import { TvLoteria } from "./tv-loteria";
 import { TvScatter } from "./tv-scatter";
 
 /**
@@ -39,6 +40,7 @@ export function TvGameRoute({ gameId }: { gameId: string }) {
   });
   if (game.data?.kind === "bingo") return <TvBingo gameId={gameId} />;
   if (game.data?.kind === "scattergories") return <TvScatter gameId={gameId} />;
+  if (game.data?.kind === "loteria") return <TvLoteria gameId={gameId} />;
   // Until the kind is known, show nothing game-specific: the jar screens fire jar-only
   // requests (a 404 on a bingo round) and flash for a moment.
   if (game.isPending) {

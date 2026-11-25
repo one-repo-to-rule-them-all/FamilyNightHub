@@ -35,7 +35,8 @@ _AUDIT = text(
 ).bindparams(bindparam("data", type_=JSONB))
 
 # The jar (A), bingo (B) and scattergories (C).
-AVAILABLE_KINDS = frozenset({"gratitude_jar", "bingo", "scattergories"})
+AVAILABLE_KINDS = frozenset({"gratitude_jar", "bingo", "scattergories", "loteria"})
+LOTERIA_PATTERNS = frozenset({"line", "corners", "center", "full"})
 WIN_MODES = frozenset({"line", "blackout"})
 BINGO_MODES = frozenset({"thanksgiving", "classic"})
 
@@ -214,6 +215,7 @@ async def create_game(
     mode: str = "thanksgiving",
     reveal_mode: str = "cycle",
     cycle_seconds: int = jar.CYCLE_SECONDS_DEFAULT,
+    pattern: str = "line",
 ) -> GameRow:
     if kind not in AVAILABLE_KINDS:
         raise Invalid("That game isn't available yet.")
@@ -229,6 +231,11 @@ async def create_game(
             "end_on_first_win": end_on_first_win,
         }
         status = "draft"  # the host opens it when the family is ready to join
+    elif kind == "loteria":
+        if pattern not in LOTERIA_PATTERNS:
+            raise Invalid("Pick line, four corners, centre four or full tabla.")
+        config = {"pattern": pattern, "end_on_first_win": end_on_first_win}
+        status = "draft"
     else:
         config = {"allow_anonymous": allow_anonymous}
         if kind == "gratitude_jar":

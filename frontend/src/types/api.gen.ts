@@ -1382,6 +1382,172 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/loteria/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Loteria
+         * @description Verify a player's spoken "Loteria!" against the called cards (hosts). A false claim
+         *     changes nothing; a true one records the win and, by config, ends the game.
+         */
+        post: operations["check_loteria_api_v1_games__game_id__loteria_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/draw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Draw Card
+         * @description Call the next card (hosts). `expected_seq` is the count the host's screen showed; a
+         *     different count is 409 so a double tap or a second window cannot draw twice.
+         */
+        post: operations["draw_card_api_v1_games__game_id__loteria_draw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join Loteria
+         * @description Take a seat as a person bound to this phone and get a tabla (idempotent).
+         */
+        post: operations["join_loteria_api_v1_games__game_id__loteria_join_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/mark/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark Square
+         * @description Mark a picture on your own tabla. Only a called card can be marked (409).
+         */
+        put: operations["mark_square_api_v1_games__game_id__loteria_mark__index__put"];
+        post?: never;
+        /**
+         * Unmark Square
+         * @description Take a mark back. A win already recorded stays.
+         */
+        delete: operations["unmark_square_api_v1_games__game_id__loteria_mark__index__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Tablas
+         * @description The tablas of the people this phone is acting as. Nobody else's is readable.
+         */
+        get: operations["my_tablas_api_v1_games__game_id__loteria_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Loteria
+         * @description Let the family join (draft to open). Fixes the draw seed.
+         */
+        post: operations["open_loteria_api_v1_games__game_id__loteria_open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/reroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reroll Loteria
+         * @description A new tabla, as often as you like while the game is open; 409 once it has started.
+         */
+        post: operations["reroll_loteria_api_v1_games__game_id__loteria_reroll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Loteria
+         * @description Start the round: cards can be drawn and marked, tablas are fixed (open to live).
+         */
+        post: operations["start_loteria_api_v1_games__game_id__loteria_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}/open": {
         parameters: {
             query?: never;
@@ -2997,13 +3163,19 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "gratitude_jar" | "bingo" | "scattergories";
+            kind: "gratitude_jar" | "bingo" | "scattergories" | "loteria";
             /**
              * Mode
              * @default thanksgiving
              * @enum {string}
              */
             mode: "thanksgiving" | "classic";
+            /**
+             * Pattern
+             * @default line
+             * @enum {string}
+             */
+            pattern: "line" | "corners" | "center" | "full";
             /**
              * Reveal Mode
              * @default cycle
@@ -3039,7 +3211,8 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "gratitude_jar" | "bingo" | "scattergories";
+            kind: "gratitude_jar" | "bingo" | "scattergories" | "loteria";
+            loteria?: components["schemas"]["LoteriaOut"] | null;
             /** Mode */
             mode?: ("thanksgiving" | "classic") | null;
             scatter?: components["schemas"]["ScatterOut"] | null;
@@ -3067,7 +3240,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "gratitude_jar" | "bingo" | "scattergories";
+            kind: "gratitude_jar" | "bingo" | "scattergories" | "loteria";
             /** Mode */
             mode?: ("thanksgiving" | "classic") | null;
             /**
@@ -3290,6 +3463,107 @@ export interface components {
             password: string;
             /** Username Or Email */
             username_or_email: string;
+        };
+        /** LoteriaCallOut */
+        LoteriaCallOut: {
+            /** Card Id */
+            card_id: number;
+            /** Emoji */
+            emoji: string;
+            /** Name En */
+            name_en: string;
+            /** Name Es */
+            name_es: string;
+            /** Seq */
+            seq: number;
+        };
+        /** LoteriaCheckIn */
+        LoteriaCheckIn: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** LoteriaCheckOut */
+        LoteriaCheckOut: {
+            /** Missing */
+            missing: number;
+            /**
+             * Pattern
+             * @enum {string}
+             */
+            pattern: "line" | "corners" | "center" | "full";
+            /** Squares */
+            squares: number[] | null;
+            /** Valid */
+            valid: boolean;
+        };
+        /** LoteriaDrawIn */
+        LoteriaDrawIn: {
+            /** Expected Seq */
+            expected_seq: number;
+        };
+        /** LoteriaJoinIn */
+        LoteriaJoinIn: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** LoteriaOut */
+        LoteriaOut: {
+            /** Calls */
+            calls: components["schemas"]["LoteriaCallOut"][];
+            /** End On First Win */
+            end_on_first_win: boolean;
+            last_call?: components["schemas"]["LoteriaCallOut"] | null;
+            /**
+             * Pattern
+             * @enum {string}
+             */
+            pattern: "line" | "corners" | "center" | "full";
+            /** Players */
+            players: components["schemas"]["LoteriaPlayerOut"][];
+        };
+        /** LoteriaPlayerOut */
+        LoteriaPlayerOut: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /** Finish Place */
+            finish_place: number | null;
+            /** Missing */
+            missing: number;
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Won */
+            won: boolean;
+        };
+        /** LoteriaTablaOut */
+        LoteriaTablaOut: {
+            /** Finish Place */
+            finish_place: number | null;
+            /** Marked */
+            marked: number[];
+            /** Missing */
+            missing: number;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Squares */
+            squares: number[];
+            /** Won */
+            won: boolean;
         };
         /** MagicLinkIn */
         MagicLinkIn: {
@@ -7537,6 +7811,454 @@ export interface operations {
         };
     };
     start_reveal_api_v1_games__game_id__jar_start_reveal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_loteria_api_v1_games__game_id__loteria_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoteriaCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteriaCheckOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draw_card_api_v1_games__game_id__loteria_draw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoteriaDrawIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    join_loteria_api_v1_games__game_id__loteria_join_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoteriaJoinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteriaTablaOut"];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_square_api_v1_games__game_id__loteria_mark__index__put: {
+        parameters: {
+            query: {
+                person_id: string;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteriaTablaOut"];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unmark_square_api_v1_games__game_id__loteria_mark__index__delete: {
+        parameters: {
+            query: {
+                person_id: string;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteriaTablaOut"];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_tablas_api_v1_games__game_id__loteria_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteriaTablaOut"][];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_loteria_api_v1_games__game_id__loteria_open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reroll_loteria_api_v1_games__game_id__loteria_reroll_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoteriaJoinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteriaTablaOut"];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_loteria_api_v1_games__game_id__loteria_start_post: {
         parameters: {
             query?: never;
             header?: never;

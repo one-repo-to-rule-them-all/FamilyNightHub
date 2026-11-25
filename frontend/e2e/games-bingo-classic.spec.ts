@@ -57,9 +57,7 @@ test.describe("classic bingo", () => {
     await page.getByTestId("primary-action").click();
     const squares = page.getByTestId("bingo-square");
     await expect(squares).toHaveCount(25);
-    let labels = await squares.evaluateAll((els) =>
-      els.map((el) => el.textContent?.trim() ?? ""),
-    );
+    let labels = await squares.evaluateAll((els) => els.map((el) => el.textContent?.trim() ?? ""));
     expect(labels[12]).toBe("FREE");
     expect(labels.filter((l) => /^\d+$/.test(l))).toHaveLength(24);
     await expect(host.getByTestId("host-bingo-player")).toHaveCount(1, POLL);

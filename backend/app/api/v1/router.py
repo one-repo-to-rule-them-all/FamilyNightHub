@@ -8,6 +8,7 @@ from app.api.v1 import (
     ballots,
     device_admin,
     games,
+    games_loteria,
     games_scatter,
     join,
     legal,
@@ -26,6 +27,7 @@ api_router.include_router(auth.router)
 api_router.include_router(ballots.router)
 api_router.include_router(device_admin.router)
 api_router.include_router(games.router)
+api_router.include_router(games_loteria.router)
 api_router.include_router(games_scatter.router)
 api_router.include_router(join.router)
 api_router.include_router(legal.router)
