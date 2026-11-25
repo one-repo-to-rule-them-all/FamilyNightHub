@@ -61,6 +61,10 @@ export type GameSummary = Schemas["GameSummaryOut"];
 export type JarNote = Schemas["JarNoteOut"];
 export type OwnJarNote = Schemas["OwnNoteOut"];
 export type ModerationNote = Schemas["ModerationNoteOut"];
+export type ScatterState = Schemas["ScatterOut"];
+export type ScatterRevealed = Schemas["ScatterRevealedOut"];
+export type ScatterAnswer = Schemas["ScatterAnswerOut"];
+export type OwnScatterAnswer = Schemas["ScatterOwnAnswerOut"];
 export type AccountRole = AdminAccount["role"];
 export type Profile = Schemas["ProfileOut"];
 export type ProfileNight = Schemas["ProfileNightOut"];
@@ -316,6 +320,35 @@ export const api = {
     request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/start-reveal`),
   jarRevealNext: (gameId: string) =>
     request<Game>("POST", `/games/${encodeURIComponent(gameId)}/jar/reveal-next`),
+
+  // Scattergories (ADR-0018 slice C). The timer is `ends_at` + `server_now` on the snapshot.
+  scatterDraw: (gameId: string, count: number) =>
+    request<Schemas["ScatterDrawOut"]>(
+      "GET",
+      `/games/${encodeURIComponent(gameId)}/scatter/draw?count=${count}`,
+    ),
+  startScatterRound: (gameId: string, body: Schemas["ScatterRoundIn"]) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/scatter/rounds`, body),
+  revealScatter: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/scatter/reveal`),
+  setScatterVerdict: (gameId: string, answerId: string, verdict: "accepted" | "rejected" | null) =>
+    request<Game>(
+      "PUT",
+      `/games/${encodeURIComponent(gameId)}/scatter/answers/${encodeURIComponent(answerId)}/verdict`,
+      { verdict },
+    ),
+  joinScatter: (gameId: string, personId: string) =>
+    request<void>("POST", `/games/${encodeURIComponent(gameId)}/scatter/join`, {
+      person_id: personId,
+    }),
+  submitScatter: (gameId: string, body: Schemas["ScatterSubmitIn"]) =>
+    request<OwnScatterAnswer[]>(
+      "PUT",
+      `/games/${encodeURIComponent(gameId)}/scatter/answers`,
+      body,
+    ),
+  myScatterAnswers: (gameId: string) =>
+    request<OwnScatterAnswer[]>("GET", `/games/${encodeURIComponent(gameId)}/scatter/answers/mine`),
 
   // Nights (host + TV screens). Mutations are host-only; reads work for any household viewer.
   createNight: (body: Schemas["SessionCreateIn"]) =>

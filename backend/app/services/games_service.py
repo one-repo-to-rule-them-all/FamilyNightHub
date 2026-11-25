@@ -32,8 +32,8 @@ _AUDIT = text(
     "target_id, data) VALUES (:h, :a, :action, 'game', :t, :data)"
 ).bindparams(bindparam("data", type_=JSONB))
 
-# Only the jar exists so far (slice A); the other kinds arrive with their slices.
-AVAILABLE_KINDS = frozenset({"gratitude_jar"})
+# The jar (slice A) and scattergories (slice C); bingo arrives with slice B.
+AVAILABLE_KINDS = frozenset({"gratitude_jar", "scattergories"})
 
 
 @dataclass(frozen=True)

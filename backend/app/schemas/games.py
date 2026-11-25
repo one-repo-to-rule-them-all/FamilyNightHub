@@ -58,6 +58,7 @@ class GameSummaryOut(BaseModel):
 class GameOut(GameSummaryOut):
     allow_anonymous: bool
     jar: JarOut | None
+    scatter: ScatterOut | None = None
 
 
 class NoteIn(BaseModel):
@@ -82,3 +83,110 @@ class ModerationNoteOut(BaseModel):
     author: JarAuthorOut | None
     revealed_at: datetime | None
     hidden_at: datetime | None
+
+
+# ---- Scattergories (ADR-0018 slice C) ----
+
+ScatterState = Literal["lobby", "running", "closed", "revealed"]
+Verdict = Literal["accepted", "rejected"]
+
+
+class ScatterPlayerOut(BaseModel):
+    person_id: uuid.UUID
+    name: str
+    avatar_emoji: str
+    color: str
+    # How many categories this player has filled in this round, never what they wrote.
+    answered: int
+
+
+class ScatterRoundOut(BaseModel):
+    round_no: int
+    letter: str
+    categories: list[str]
+    duration_seconds: int
+    # The server's clock for this round. Clients count down locally against `server_now`.
+    ends_at: datetime
+    # `running` until `ends_at`, `closed` after it, `revealed` once the host revealed.
+    state: ScatterState
+
+
+class ScatterAnswerOut(BaseModel):
+    answer_id: uuid.UUID
+    person_id: uuid.UUID
+    category_index: int
+    text: str
+    valid: bool
+    point: int
+    verdict: Verdict | None
+
+
+class ScatterScoreOut(BaseModel):
+    person_id: uuid.UUID
+    points: int
+
+
+class ScatterRevealedOut(BaseModel):
+    round_no: int
+    letter: str
+    categories: list[str]
+    answers: list[ScatterAnswerOut]
+    scores: list[ScatterScoreOut]
+
+
+class ScatterStandingOut(BaseModel):
+    person_id: uuid.UUID
+    name: str
+    avatar_emoji: str
+    color: str
+    points: int
+
+
+class ScatterOut(BaseModel):
+    server_now: datetime
+    # The latest round (any state), or null before the first.
+    current: ScatterRoundOut | None
+    players: list[ScatterPlayerOut]
+    # Revealed rounds only: nobody sees an answer before the host reveals.
+    revealed: list[ScatterRevealedOut]
+    leaderboard: list[ScatterStandingOut]
+
+
+class ScatterJoinIn(BaseModel):
+    person_id: uuid.UUID
+
+
+class ScatterRoundIn(BaseModel):
+    # Omit to draw `count` categories at random.
+    categories: list[str] | None = Field(default=None, max_length=12)
+    count: int = Field(default=6, ge=1, le=12)
+    duration_seconds: int = Field(default=120, ge=10, le=900)
+
+
+class ScatterDrawOut(BaseModel):
+    categories: list[str]
+
+
+class ScatterAnswerIn(BaseModel):
+    category_index: int = Field(ge=0, le=11)
+    # Empty clears the answer.
+    text: str = Field(max_length=400)
+
+
+class ScatterSubmitIn(BaseModel):
+    person_id: uuid.UUID
+    answers: list[ScatterAnswerIn] = Field(max_length=12)
+
+
+class ScatterOwnAnswerOut(BaseModel):
+    person_id: uuid.UUID
+    round_no: int
+    category_index: int
+    text: str
+
+
+class ScatterVerdictIn(BaseModel):
+    verdict: Verdict | None
+
+
+GameOut.model_rebuild()

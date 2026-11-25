@@ -1,6 +1,6 @@
-import { TvJar } from "./tv-jar";
+import { TvGame } from "./tv-game";
 
 export default async function TvGamePage({ params }: { params: Promise<{ game: string }> }) {
   const { game } = await params;
-  return <TvJar gameId={game} />;
+  return <TvGame gameId={game} />;
 }

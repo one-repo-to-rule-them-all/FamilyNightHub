@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted (2026-11-24), with the review answers recorded at the end. Slice A (jar) built.
+Accepted (2026-11-24), with the review answers recorded at the end. Slice A (jar) built. Slice C (scattergories) built (migration `0011_scattergories`, parented on
+`0010_bingo`).
 Numbered 0018 because 0011 is claimed by the open room-types draft (PR #24) and 0012 is unused;
 that ADR is about *choosing* a game for a night, this one is about *playing* one, and they do not
 overlap.

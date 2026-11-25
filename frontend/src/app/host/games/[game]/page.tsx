@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { JarHost } from "./jar-host";
+import { GameHost } from "./game-host";
 
 export const metadata: Metadata = { title: "Run a game" };
 
@@ -8,7 +8,7 @@ export default async function HostGamePage({ params }: { params: Promise<{ game:
   const { game } = await params;
   return (
     <div className="mx-auto w-full max-w-2xl lg:mx-0">
-      <JarHost gameId={game} />
+      <GameHost gameId={game} />
     </div>
   );
 }

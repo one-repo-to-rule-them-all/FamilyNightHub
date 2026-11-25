@@ -980,7 +980,7 @@ export interface paths {
         put?: never;
         /**
          * Create Game
-         * @description Start a game (hosts). Only the Gratitude Jar exists so far.
+         * @description Start a game (hosts). The jar and scattergories exist so far.
          */
         post: operations["create_game_api_v1_games_post"];
         delete?: never;
@@ -1164,6 +1164,146 @@ export interface paths {
          * @description Stop taking notes and fix a shuffled order for the reveal.
          */
         post: operations["start_reveal_api_v1_games__game_id__jar_start_reveal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/scatter/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Submit
+         * @description Save or replace answers until time is up (plus a 2 s grace; 409 after). Blank clears.
+         */
+        put: operations["submit_api_v1_games__game_id__scatter_answers_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/scatter/answers/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Answers
+         * @description The latest round's answers from the people this phone is acting as.
+         */
+        get: operations["my_answers_api_v1_games__game_id__scatter_answers_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/scatter/answers/{answer_id}/verdict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Verdict
+         * @description Reject or re-accept an answer after reveal; scores re-derive on the next read.
+         */
+        put: operations["set_verdict_api_v1_games__game_id__scatter_answers__answer_id__verdict_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/scatter/draw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Draw
+         * @description A themed draw of categories for the host to edit before starting. Nothing is stored.
+         */
+        get: operations["draw_api_v1_games__game_id__scatter_draw_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/scatter/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join
+         * @description Join as a person bound to this phone (idempotent).
+         */
+        post: operations["join_api_v1_games__game_id__scatter_join_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/scatter/reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reveal
+         * @description Show every answer on every screen and freeze them (ends the round early if running).
+         */
+        post: operations["reveal_api_v1_games__game_id__scatter_reveal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/scatter/rounds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Round
+         * @description Start the next round: a random letter, the given (or drawn) categories, a duration.
+         */
+        post: operations["start_round_api_v1_games__game_id__scatter_rounds_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2485,6 +2625,7 @@ export interface components {
              * @enum {string}
              */
             kind: "gratitude_jar" | "bingo" | "scattergories";
+            scatter?: components["schemas"]["ScatterOut"] | null;
             /**
              * Status
              * @enum {string}
@@ -3497,6 +3638,184 @@ export interface components {
         ReorderIn: {
             /** Option Ids */
             option_ids: string[];
+        };
+        /** ScatterAnswerIn */
+        ScatterAnswerIn: {
+            /** Category Index */
+            category_index: number;
+            /** Text */
+            text: string;
+        };
+        /** ScatterAnswerOut */
+        ScatterAnswerOut: {
+            /**
+             * Answer Id
+             * Format: uuid
+             */
+            answer_id: string;
+            /** Category Index */
+            category_index: number;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Point */
+            point: number;
+            /** Text */
+            text: string;
+            /** Valid */
+            valid: boolean;
+            /** Verdict */
+            verdict: ("accepted" | "rejected") | null;
+        };
+        /** ScatterDrawOut */
+        ScatterDrawOut: {
+            /** Categories */
+            categories: string[];
+        };
+        /** ScatterJoinIn */
+        ScatterJoinIn: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** ScatterOut */
+        ScatterOut: {
+            current: components["schemas"]["ScatterRoundOut"] | null;
+            /** Leaderboard */
+            leaderboard: components["schemas"]["ScatterStandingOut"][];
+            /** Players */
+            players: components["schemas"]["ScatterPlayerOut"][];
+            /** Revealed */
+            revealed: components["schemas"]["ScatterRevealedOut"][];
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
+        };
+        /** ScatterOwnAnswerOut */
+        ScatterOwnAnswerOut: {
+            /** Category Index */
+            category_index: number;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Round No */
+            round_no: number;
+            /** Text */
+            text: string;
+        };
+        /** ScatterPlayerOut */
+        ScatterPlayerOut: {
+            /** Answered */
+            answered: number;
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** ScatterRevealedOut */
+        ScatterRevealedOut: {
+            /** Answers */
+            answers: components["schemas"]["ScatterAnswerOut"][];
+            /** Categories */
+            categories: string[];
+            /** Letter */
+            letter: string;
+            /** Round No */
+            round_no: number;
+            /** Scores */
+            scores: components["schemas"]["ScatterScoreOut"][];
+        };
+        /** ScatterRoundIn */
+        ScatterRoundIn: {
+            /** Categories */
+            categories?: string[] | null;
+            /**
+             * Count
+             * @default 6
+             */
+            count: number;
+            /**
+             * Duration Seconds
+             * @default 120
+             */
+            duration_seconds: number;
+        };
+        /** ScatterRoundOut */
+        ScatterRoundOut: {
+            /** Categories */
+            categories: string[];
+            /** Duration Seconds */
+            duration_seconds: number;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /** Letter */
+            letter: string;
+            /** Round No */
+            round_no: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "lobby" | "running" | "closed" | "revealed";
+        };
+        /** ScatterScoreOut */
+        ScatterScoreOut: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Points */
+            points: number;
+        };
+        /** ScatterStandingOut */
+        ScatterStandingOut: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Points */
+            points: number;
+        };
+        /** ScatterSubmitIn */
+        ScatterSubmitIn: {
+            /** Answers */
+            answers: components["schemas"]["ScatterAnswerIn"][];
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** ScatterVerdictIn */
+        ScatterVerdictIn: {
+            /** Verdict */
+            verdict: ("accepted" | "rejected") | null;
         };
         /**
          * SelfCreateIn
@@ -6182,6 +6501,334 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    submit_api_v1_games__game_id__scatter_answers_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScatterSubmitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScatterOwnAnswerOut"][];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A bad category or an over-long answer */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    my_answers_api_v1_games__game_id__scatter_answers_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScatterOwnAnswerOut"][];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_verdict_api_v1_games__game_id__scatter_answers__answer_id__verdict_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+                answer_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScatterVerdictIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draw_api_v1_games__game_id__scatter_draw_get: {
+        parameters: {
+            query?: {
+                count?: number;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScatterDrawOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    join_api_v1_games__game_id__scatter_join_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScatterJoinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reveal_api_v1_games__game_id__scatter_reveal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_round_api_v1_games__game_id__scatter_rounds_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScatterRoundIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad categories or duration */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

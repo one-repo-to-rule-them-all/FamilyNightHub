@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
-import { JarScreen } from "./jar-screen";
+import { GameScreen } from "./game-screen";
 
 export const metadata: Metadata = { title: "Game" };
 
 export default async function GamePage({ params }: { params: Promise<{ game: string }> }) {
   const { game } = await params;
-  return <JarScreen gameId={game} />;
+  return <GameScreen gameId={game} />;
 }

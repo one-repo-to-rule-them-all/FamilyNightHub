@@ -50,6 +50,8 @@ TABLES = (
     "games",
     "game_players",
     "gratitude_notes",
+    "scatter_rounds",
+    "scatter_answers",
     "audit_events",
 )
 # Tables without `created_at` sort by their own time column.
@@ -58,6 +60,7 @@ ORDER_BY = {
     "household_consents": "accepted_at, id",
     "session_attendance": "first_seen_at, id",
     "game_players": "joined_at, id",
+    "scatter_rounds": "started_at, id",
 }
 NOT_EXPORTED = frozenset({"magic_links", "photo_deletions"})
 SECRET_COLUMNS = frozenset({"token_hash", "password_hash", "pin_hash", "night_code_hash"})

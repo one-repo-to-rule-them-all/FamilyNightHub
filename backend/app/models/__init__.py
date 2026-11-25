@@ -1,7 +1,7 @@
 """ORM models. Every model module is imported here so Alembic sees the full metadata."""
 
 from app.models.base import Base
-from app.models.games import Game, GamePlayer, GratitudeNote
+from app.models.games import Game, GamePlayer, GratitudeNote, ScatterAnswer, ScatterRound
 from app.models.household import (
     Account,
     Device,
@@ -42,6 +42,8 @@ __all__ = [
     "FailedJob",
     "Game",
     "GamePlayer",
+    "ScatterAnswer",
+    "ScatterRound",
     "GratitudeNote",
     "Household",
     "HouseholdConsent",

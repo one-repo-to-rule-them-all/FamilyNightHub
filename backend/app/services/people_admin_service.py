@@ -327,6 +327,22 @@ async def merge(
     await db.execute(
         text("UPDATE gratitude_notes SET person_id = :dst WHERE person_id = :src"), params
     )
+    # Scattergories answers: one per (round, person, category); the target's wins.
+    await db.execute(
+        text(
+            """
+            DELETE FROM scatter_answers s WHERE s.person_id = :src AND EXISTS (
+                SELECT 1 FROM scatter_answers t
+                WHERE t.person_id = :dst AND t.round_id = s.round_id
+                  AND t.category_index = s.category_index
+            )
+            """
+        ),
+        params,
+    )
+    await db.execute(
+        text("UPDATE scatter_answers SET person_id = :dst WHERE person_id = :src"), params
+    )
     photos_moved = await count(
         "UPDATE photos SET person_id = :dst WHERE person_id = :src RETURNING id"
     )

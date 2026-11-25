@@ -174,6 +174,26 @@ async def seed_household(tag: str) -> SeededHousehold:
             person_id=ids["person"],
             body="Seed note",
         )
+        ids["scatter_round"] = await _insert(
+            s,
+            "scatter_rounds",
+            household_id=hid,
+            game_id=ids["game"],
+            round_no=1,
+            letter="P",
+            categories='["Pie flavors"]',
+            duration_seconds=60,
+            ends_at=now,
+        )
+        ids["scatter_answer"] = await _insert(
+            s,
+            "scatter_answers",
+            household_id=hid,
+            round_id=ids["scatter_round"],
+            person_id=ids["person"],
+            category_index=0,
+            text="Pumpkin",
+        )
         # ADR-0017: an admin's guardian acceptance of the current versions opens the gate.
         ids["household_consent"] = await _insert(
             s,
