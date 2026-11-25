@@ -6,6 +6,8 @@ import { type NextRequest, NextResponse } from "next/server";
  */
 const DEVICE_COOKIE = "fnh_device";
 const SESSION_COOKIE = "fnh_session";
+// ADR-0016: the platform operator's own session. Inside a household it opens the portal too.
+const PLATFORM_COOKIE = "fnh_platform";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -14,8 +16,12 @@ export function proxy(request: NextRequest) {
   if (pathname === "/who" && !has(DEVICE_COOKIE)) {
     return NextResponse.redirect(new URL("/", request.url));
   }
-  if ((pathname.startsWith("/host") || pathname.startsWith("/admin")) && !has(SESSION_COOKIE)) {
+  const portal = pathname.startsWith("/host") || pathname.startsWith("/admin");
+  if (portal && !has(SESSION_COOKIE) && !has(PLATFORM_COOKIE)) {
     return NextResponse.redirect(new URL("/login", request.url));
+  }
+  if (pathname === "/platform" && !has(PLATFORM_COOKIE)) {
+    return NextResponse.redirect(new URL("/platform/login", request.url));
   }
   if (pathname === "/login" && has(SESSION_COOKIE)) {
     return NextResponse.redirect(new URL("/host", request.url));
@@ -23,4 +29,6 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/who", "/host/:path*", "/admin/:path*", "/login"] };
+export const config = {
+  matcher: ["/who", "/host/:path*", "/admin/:path*", "/login", "/platform"],
+};

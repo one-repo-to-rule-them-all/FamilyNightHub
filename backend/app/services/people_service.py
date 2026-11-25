@@ -34,7 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import hashing
 from app.domain import credentials
-from app.services import people_admin_service
+from app.services import consent_service, people_admin_service
 from app.services.errors import (
     Conflict,
     Forbidden,
@@ -364,6 +364,7 @@ async def create_self(
 ) -> PersonTile:
     """A new profile from a phone that joined with the night code: always a guest (an admin
     converts or merges it later), bound and current here, PIN set in the same transaction."""
+    await consent_service.require_household_consent(db)
     await people_admin_service.lock_names(db, household_id)
     await people_admin_service.require_unique_name(db, name)
     person_id: uuid.UUID = (

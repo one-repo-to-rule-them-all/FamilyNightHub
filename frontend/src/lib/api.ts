@@ -22,6 +22,10 @@ export type Binding = Schemas["BindingOut"];
 export type Device = Schemas["DeviceOut"];
 export type JoinResult = Schemas["JoinOut"];
 export type Account = Schemas["AccountOut"];
+export type Consent = Schemas["ConsentOut"];
+export type HouseholdDeletion = Schemas["HouseholdDeletionOut"];
+export type PlatformMe = Schemas["PlatformMeOut"];
+export type PlatformHousehold = Schemas["PlatformHouseholdOut"];
 export type Night = Schemas["SessionOut"];
 export type NightOption = Schemas["OptionOut"];
 export type NightStatus = Night["status"];
@@ -252,6 +256,8 @@ export const api = {
   /** Consumes the emailed link: sets `new_password` and signs in. */
   verifyMagicLink: (body: Schemas["VerifyIn"]) => request<Account>("POST", "/auth/verify", body),
   me: () => request<Account>("GET", "/auth/me"),
+  /** Accept the current Terms and Privacy Policy (ADR-0017); admins also confirm guardianship. */
+  consent: (body: Schemas["ConsentIn"]) => request<Consent>("POST", "/auth/consent", body),
   logout: () => request<void>("POST", "/auth/logout"),
   /** The night as every screen sees it (no ballots; `result` only from reveal on). */
   night: (sessionId: string) => request<Night>("GET", `/sessions/${encodeURIComponent(sessionId)}`),
@@ -366,6 +372,37 @@ export const api = {
     request<AdminPerson>("PATCH", `/admin/people/${encodeURIComponent(personId)}`, body),
   convertToMember: (personId: string) =>
     request<AdminPerson>("POST", `/admin/people/${encodeURIComponent(personId)}/convert-to-member`),
+  /** Platform owner (ADR-0016): its own sign-in and `fnh_platform` cookie. */
+  platformLogin: (body: Schemas["PlatformLoginIn"]) =>
+    request<PlatformMe>("POST", "/platform/login", body),
+  platformLogout: () => request<void>("POST", "/platform/logout"),
+  platformMe: () => request<PlatformMe>("GET", "/platform/me"),
+  platformHouseholds: () => request<PlatformHousehold[]>("GET", "/platform/households"),
+  createHousehold: (body: Schemas["PlatformHouseholdIn"]) =>
+    request<PlatformHousehold>("POST", "/platform/households", body),
+  /** Bind the platform session to a household: the portal then acts as its admin. */
+  enterHousehold: (householdId: string) =>
+    request<PlatformMe>("POST", `/platform/households/${encodeURIComponent(householdId)}/enter`),
+  exitHousehold: () => request<PlatformMe>("POST", "/platform/exit"),
+  disableHousehold: (householdId: string, body: Schemas["PlatformDisableIn"]) =>
+    request<PlatformHousehold>(
+      "POST",
+      `/platform/households/${encodeURIComponent(householdId)}/disable`,
+      body,
+    ),
+  enableHousehold: (householdId: string) =>
+    request<PlatformHousehold>(
+      "POST",
+      `/platform/households/${encodeURIComponent(householdId)}/enable`,
+    ),
+  rotateHouseholdSlug: (householdId: string) =>
+    request<void>("POST", `/platform/households/${encodeURIComponent(householdId)}/rotate-slug`),
+  /** The household's scheduled deletion, if any (ADR-0017 §4). */
+  householdDeletion: () => request<HouseholdDeletion>("GET", "/admin/household/deletion"),
+  /** Schedules the delete 7 days out and emails every admin. */
+  scheduleHouseholdDeletion: (body: Schemas["HouseholdDeletionIn"]) =>
+    request<HouseholdDeletion>("POST", "/admin/household/deletion", body),
+  cancelHouseholdDeletion: () => request<HouseholdDeletion>("DELETE", "/admin/household/deletion"),
   /** Clears the PIN, count and lock, locked or not, and closes any open request as approved.
    *  No PIN is set or shown: the person picks a new one on their phone (`admin:people`). */
   resetPin: (personId: string) =>
@@ -373,7 +410,8 @@ export const api = {
   /** What removing this person would delete (#94), for the confirm dialog. */
   removalPreview: (personId: string) =>
     request<Removal>("GET", `/admin/people/${encodeURIComponent(personId)}/removal`),
-  /** Deletes the person and everything that is theirs (#94). Past winners stay. Can't be undone. */
+  /** Deletes the person and everything that is theirs (#94, ADR-0017 §4). Past winners stay.
+   *  Their name is also scrubbed from past audit rows. Can't be undone. */
   removePerson: (personId: string) =>
     request<Removal>("DELETE", `/admin/people/${encodeURIComponent(personId)}`),
   /** Clears every person, phone/TV and night (#94); the admin types the family name to confirm. */

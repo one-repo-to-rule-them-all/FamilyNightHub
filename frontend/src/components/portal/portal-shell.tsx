@@ -32,6 +32,8 @@ import {
   pastNights,
 } from "@/lib/portal-shell";
 
+import { ConsentGate } from "./consent-gate";
+import { PlatformBanner } from "./platform-banner";
 import { PortalSidebar, PortalTabBar } from "./portal-nav";
 
 function readHiddenRaw(): string | null {
@@ -176,6 +178,9 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
         />
       ) : null}
       <div className="flex min-w-0 flex-1 flex-col">
+        {me.data?.platform_access ? (
+          <PlatformBanner householdName={me.data.household_name} />
+        ) : null}
         <header className="flex h-14 items-center justify-between gap-3 border-b border-foreground/10 px-4 md:hidden">
           <span className="truncate font-heading font-semibold">
             {me.data?.household_name ?? "Family Night"}
@@ -185,7 +190,11 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           ) : null}
         </header>
         <main className="flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 pt-6 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] sm:px-6 md:px-8 md:pb-8">
-          {children}
+          {me.data && !me.data.consent.account_accepted ? (
+            <ConsentGate account={me.data} />
+          ) : (
+            children
+          )}
         </main>
       </div>
       {me.data ? (

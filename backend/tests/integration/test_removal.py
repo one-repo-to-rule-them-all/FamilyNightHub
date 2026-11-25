@@ -81,6 +81,41 @@ async def test_remove_deletes_the_person_and_everything_theirs(
         assert await _count(b, table) >= 1, table
 
 
+async def test_remove_scrubs_the_person_name_from_past_audit_rows(
+    two_households: Pair, fake: FakeStorage
+) -> None:
+    """ADR-0017 §4: a delete erases the person's name from earlier audit rows, keeping the
+    rows themselves as a record that something happened. The person.removed row (counts only,
+    no name) is written afterwards and survives."""
+    a, _ = two_households
+    kid = a.ids["person"]
+    await _sql(
+        a,
+        "INSERT INTO audit_events (household_id, actor_account_id, action, target_type, "
+        "target_id, data) VALUES (:h, :acct, 'person.renamed', 'person', :p, "
+        "CAST(:data AS jsonb))",
+        h=a.household_id,
+        acct=a.ids["account"],
+        p=kid,
+        data='{"from": "Jordan", "to": "Jo"}',
+    )
+    async with phone() as p:
+        _as_admin(p, a)
+        assert (await _delete(p, kid)).status_code == 200
+    rows = await _sql(
+        a, "SELECT action, data FROM audit_events WHERE target_id = :p ORDER BY action", p=kid
+    )
+    actions = {r.action for r in rows}
+    assert "person.renamed" in actions and "person.removed" in actions
+    for r in rows:
+        if r.action == "person.renamed":
+            assert r.data == {"redacted": True}
+        if r.action == "person.removed":
+            assert r.data["photos"] == 1
+    # No audit row for this person still carries their name.
+    assert all("from" not in r.data and "to" not in r.data for r in rows)
+
+
 async def test_remove_needs_photo_storage_only_when_they_shared_photos(
     two_households: Pair,
 ) -> None:

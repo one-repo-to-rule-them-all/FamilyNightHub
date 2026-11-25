@@ -64,6 +64,10 @@ class PhotoStorage(Protocol):
         """Idempotent: deleting a missing key succeeds."""
         ...
 
+    async def get(self, key: str) -> bytes | None:
+        """The object's bytes, or None if it does not exist. Photos are 10 MB at most."""
+        ...
+
 
 class ObjectStore(Protocol):
     async def delete_objects(self, keys: Sequence[str]) -> None:
@@ -145,6 +149,25 @@ class S3PhotoStorage:
         except BotoCoreError as err:
             raise StorageUnavailable(type(err).__name__) from err
         return ObjectInfo(size=int(resp["ContentLength"]), content_type=resp.get("ContentType"))
+
+    async def get(self, key: str) -> bytes | None:
+        def read() -> bytes:
+            body = self._s3.get_object(Bucket=self.bucket, Key=key)["Body"]
+            try:
+                data: bytes = body.read()
+            finally:
+                body.close()
+            return data
+
+        try:
+            return await asyncio.to_thread(read)
+        except ClientError as err:
+            code = str(err.response.get("Error", {}).get("Code", ""))
+            if code in ("404", "NoSuchKey", "NotFound"):
+                return None
+            raise StorageUnavailable(code) from err
+        except BotoCoreError as err:
+            raise StorageUnavailable(type(err).__name__) from err
 
     async def delete(self, key: str) -> None:
         try:

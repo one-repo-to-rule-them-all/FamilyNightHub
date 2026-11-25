@@ -460,9 +460,11 @@ function EditPerson({
         onSubmit={(draft) => save.mutate(draft)}
       >
         <ApiErrorNotice error={save.error} />
-        <Button type="button" variant="ghost" className="self-start" onClick={() => onDone(null)}>
-          Cancel
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="ghost" onClick={() => onDone(null)}>
+            Cancel
+          </Button>
+        </div>
       </PersonForm>
     </ModalDialog>
   );
@@ -565,7 +567,7 @@ function MergePeople({
               photos, photo reactions and phone bindings.
             </p>
             <p>
-              {from.name} is then hidden from every list. Nobody is ever deleted, but there is no
+              {from.name} is then hidden from every list. Merging deletes nothing, but there is no
               un-merge here.
             </p>
             <p className="text-muted-foreground">

@@ -50,6 +50,7 @@ import {
   visibleGroups,
 } from "./groups";
 import { HostsAdmins } from "./hosts-admins";
+import { HouseholdData } from "./household-data";
 
 const ME_KEY = ["me"] as const;
 const SETTINGS_KEY = ["admin", "settings"] as const;
@@ -100,6 +101,7 @@ export function SettingsAdmin() {
       <Streaming settings={settings.data} look={look("streaming")} onDirty={onDirty} />
     ) : null,
     accounts: isAdmin ? <HostsAdmins /> : null,
+    data: isAdmin ? <HouseholdData /> : null,
     account: <YourAccount account={me.data} look={look("account")} onDirty={onDirty} />,
     browser: <ThisBrowser />,
     fresh: isAdmin ? <StartFresh familyName={me.data.household_name} /> : null,

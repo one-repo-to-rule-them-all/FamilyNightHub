@@ -6,7 +6,8 @@ Until now people were never deleted, only merged away. The owner needed a real d
   requests, attendance, ballots, ratings, photo reactions and the photos they shared. A night's
   winner is stored on the night, so past results keep their winner; tallies and averages lose
   the removed person's votes and stars. Anyone earlier merged into them goes too (those rows are
-  already empty: a merge moves everything to the target).
+  already empty: a merge moves everything to the target). Their name is also scrubbed from
+  past audit rows (ADR-0017 §4): the rows stay as a record, but their `data` is redacted.
 - **Start fresh** does that for every person in the household, plus every phone, TV and night.
   The household, its accounts, settings and the movie library stay.
 
@@ -176,6 +177,13 @@ async def remove_person(
     await run("DELETE FROM device_people WHERE person_id IN :ids")
     await run("UPDATE people SET merged_into_id = NULL WHERE id IN :ids")
     await run("DELETE FROM people WHERE id IN :ids")
+    # Scrub the removed people's names from past audit rows (ADR-0017 §4: erase everything
+    # that names them). The rows stay as a record that something happened; only `data`,
+    # where names and renames live, is redacted. Done before the person.removed row below so
+    # that row's counts survive.
+    await run(
+        "UPDATE audit_events SET data = '{\"redacted\": true}'::jsonb WHERE target_id IN :ids"
+    )
     await _audit(
         db,
         household_id,
