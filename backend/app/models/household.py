@@ -222,4 +222,6 @@ class HouseholdSettings(Base):
     region: Mapped[str] = mapped_column(String(2), server_default="US")
     # ADR-0014 / owner: the TV's join QR may include the night code (the TV appends it).
     qr_includes_night_code: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    # ADR-0019: IANA name; decides which night date (album) a photo belongs to.
+    timezone: Mapped[str] = mapped_column(String(64), server_default="America/Chicago")
     updated_at: Mapped[datetime] = created_at()

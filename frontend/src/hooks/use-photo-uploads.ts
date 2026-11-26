@@ -8,6 +8,7 @@ import { holdAutoMove, uploadsInProgress } from "@/lib/auto-move";
 import { indexedDbStore } from "@/lib/photos/job-store";
 import { browserCodec, processPhoto, UnreadablePhotoError } from "@/lib/photos/process";
 import { type JobStatus, UploadQueue } from "@/lib/photos/queue";
+import { isAlbumTarget, NIGHT_ALBUMS } from "@/lib/photos/target";
 import { makeUploader } from "@/lib/photos/upload";
 
 /** One queue per tab, created on first use in the browser. */
@@ -68,6 +69,11 @@ export function usePhotoUploads(sessionId: string) {
     window.addEventListener("online", resume);
     const off = q.onComplete((job) => {
       void queryClient.invalidateQueries({ queryKey: albumKey(job.sessionId) });
+      // ADR-0019: an `album:tonight` upload lands in a concrete album; refresh every album view.
+      if (isAlbumTarget(job.sessionId)) {
+        void queryClient.invalidateQueries({ queryKey: ["album"] });
+        void queryClient.invalidateQueries({ queryKey: NIGHT_ALBUMS });
+      }
     });
     return () => {
       document.removeEventListener("visibilitychange", resume);

@@ -36,6 +36,7 @@ vi.mock("@/hooks/use-household-night", () => ({
   useHouseholdNight: () => ({ night: state.liveNight, isNew: false, markSeen: () => {} }),
 }));
 vi.mock("@/components/api-error-notice", () => ({ ApiErrorNotice: () => <p role="alert" /> }));
+vi.mock("@/hooks/use-dated-album-redirect", () => ({ useDatedAlbumRedirect: () => {} }));
 vi.mock("@/hooks/use-live-session", () => ({ useLiveSession: () => state.result }));
 
 const { AlbumScreen } = await import("./album-screen");

@@ -45,6 +45,7 @@ TABLES = (
     "ballot_ranks",
     "ratings",
     "session_attendance",
+    "albums",
     "photos",
     "photo_reactions",
     "games",
@@ -77,7 +78,9 @@ shortlist (options, movies), votes (ballot_ranks), ratings, who was there
 Terms acceptances (household_consents) and the activity log (audit_events). Ids link the
 files together; times are UTC.
 
-photos/<night id>/<photo id>.jpg are the originals. Thumbnails are not included.
+photos/<night date>/<photo id>.jpg are the originals, one folder per night album (the
+household's local date); tables/albums.json lists each album's date and title. Thumbnails are not
+included.
 
 Passwords, PINs and sign-in tokens are stored only as one-way hashes and are not included.
 """
@@ -112,8 +115,11 @@ async def collect(db: AsyncSession, household_id: uuid.UUID, account_id: uuid.UU
         ]
     household = tables["households"][0]
     by = await db.scalar(text("SELECT email FROM accounts WHERE id = :a"), {"a": account_id})
+    # ADR-0019: one folder per night date; a photo without an album (pre-contract) goes under
+    # "undated" rather than being dropped.
+    nights = {a["id"]: a["night_date"].isoformat() for a in tables["albums"]}
     photos = [
-        PhotoFile(f"photos/{p['session_id']}/{p['id']}.jpg", p["object_key"])
+        PhotoFile(f"photos/{nights.get(p['album_id'], 'undated')}/{p['id']}.jpg", p["object_key"])
         for p in tables["photos"]
         if p["status"] in ("ready", "hidden")
     ]

@@ -401,6 +401,18 @@ parallel PUTs, retry with backoff, resumes on `visibilitychange`) and `upload.ts
 complete). The input is `<input type="file" accept="image/*" multiple>`, with no `capture`
 attribute and never `image/heic`. See [ADR-0005](decisions/ADR-0005-photo-pipeline-and-storage.md).
 
+**Night albums** ([ADR-0019](decisions/ADR-0019-night-albums.md)): every photo component, the
+album query and the IndexedDB queue carry one string target (`src/lib/photos/target.ts`): a movie
+night's id (`/sessions/{id}/photos`; also what jobs queued before albums hold) or an album key
+(`album:tonight`, `album:{id}` → `/albums/…/photos`). An `album:tonight` job records the album the
+server filed it in (`completeTarget`) and completes there, so the 4:00 rollover can't misroute it.
+"Tonight's album" (`TonightAlbumCard`) sits on Home and in the Games tab and opens
+`/photos/tonight`; `/photos` lists past albums; `/photos/[album]` reuses `PhotoAlbum` (no phone
+slideshow: night-album photos reach the TV through the Night reel, owner answer 4), offers Add
+photos while the album is open (night date + 3 days) and lets a signed-in host name the night.
+`/albums/[session]` redirects to its date album once one exists. Settings → Joining has the
+household **Time zone** (saves on change).
+
 The album is a thumbnail grid with a full-screen viewer, the uploader's avatar, and emoji reactions.
 The TV slideshow uses the Screen Wake Lock API where supported.
 

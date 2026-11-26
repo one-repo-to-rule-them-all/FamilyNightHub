@@ -163,3 +163,43 @@ describe("upload", () => {
     ).rejects.toMatchObject({ retryable: false, message: "Photo not found" });
   });
 });
+
+describe("upload to a night album (ADR-0019)", () => {
+  it("creates in tonight's album and completes in the album the server chose", async () => {
+    const calls = server((method, path) =>
+      method === "POST" && path === "/albums/tonight/photos"
+        ? json(201, { ...CREATED, album_id: "album-7" })
+        : new Response(null, { status: 204 }),
+    );
+    const put: Put = async () => {};
+    const targets: (string | null | undefined)[] = [];
+    await makeUploader(put)(job({ sessionId: "album:tonight" }), {
+      onProgress: () => {},
+      onUploaded: async (_id, completeTarget) => {
+        targets.push(completeTarget);
+      },
+    });
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+      "POST /albums/tonight/photos",
+      "POST /albums/album-7/photos/photo-1/complete",
+    ]);
+    expect(targets).toEqual(["album:album-7"]);
+  });
+
+  it("a resumed album job completes where it was filed, not in today's album", async () => {
+    const calls = server(() => new Response(null, { status: 204 }));
+    await makeUploader(async () => {})(
+      job({ sessionId: "album:tonight", photoId: "photo-9", completeTarget: "album:album-3" }),
+      hooks(),
+    );
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+      "POST /albums/album-3/photos/photo-9/complete",
+    ]);
+  });
+
+  it("a movie-night job still completes on the night", async () => {
+    const calls = server(() => new Response(null, { status: 204 }));
+    await makeUploader(async () => {})(job({ photoId: "photo-2" }), hooks());
+    expect(calls.map((c) => c.path)).toEqual(["/sessions/night-1/photos/photo-2/complete"]);
+  });
+});

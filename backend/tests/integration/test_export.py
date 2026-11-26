@@ -35,6 +35,14 @@ async def _ready_photo(house: SeededHousehold) -> str:
     return key
 
 
+async def _night(h: SeededHousehold) -> str:
+    async with household_session(h.household_id) as db:
+        night = await db.scalar(
+            text("SELECT night_date FROM albums WHERE id = :a"), {"a": h.ids["album"]}
+        )
+    return str(night.isoformat())
+
+
 async def test_every_household_table_is_exported_or_deliberately_not() -> None:
     async with AsyncSessionLocal() as session:
         scoped = set(
@@ -68,12 +76,16 @@ async def test_admin_downloads_tables_and_originals_of_their_household_only(
 
     archive = zipfile.ZipFile(io.BytesIO(resp.content))
     names = set(archive.namelist())
-    photo_path = f"photos/{a.ids['session']}/{a.ids['photo']}.jpg"
+    # ADR-0019: one folder per night album, named by its date.
+    photo_path = f"photos/{await _night(a)}/{a.ids['photo']}.jpg"
     assert names == {"README.txt", photo_path, *(f"tables/{t}.json" for t in TABLES)}
     assert archive.read(photo_path) == JPEG
 
     tables = {t: json.loads(archive.read(f"tables/{t}.json")) for t in TABLES}
     assert tables["households"][0]["name"] == "Family a"
+    assert [(x["id"], x["title"]) for x in tables["albums"]] == [
+        (str(a.ids["album"]), "Seed night")
+    ]
     assert [p["id"] for p in tables["people"]] == [str(a.ids["person"])]
     for table, rows in tables.items():
         for row in rows:
@@ -100,7 +112,7 @@ async def test_a_photo_missing_from_the_bucket_is_listed_not_fatal(two_household
     assert resp.status_code == 200
     archive = zipfile.ZipFile(io.BytesIO(resp.content))
     missing = archive.read("MISSING.txt").decode()
-    assert f"photos/{a.ids['session']}/{a.ids['photo']}.jpg" in missing
+    assert f"photos/{await _night(a)}/{a.ids['photo']}.jpg" in missing
 
 
 async def test_hosts_cannot_export(two_households: Pair) -> None:

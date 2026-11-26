@@ -405,6 +405,140 @@
         "title": "AdminPersonOut",
         "type": "object"
       },
+      "AlbumOut": {
+        "properties": {
+          "cover_thumb_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Presigned GET (10 min) of the newest photo",
+            "title": "Cover Thumb Url"
+          },
+          "display_title": {
+            "description": "title, else a date label such as \"Thu 26 Nov\"",
+            "title": "Display Title",
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None only for tonight's album before its first photo",
+            "title": "Id"
+          },
+          "is_tonight": {
+            "title": "Is Tonight",
+            "type": "boolean"
+          },
+          "night_date": {
+            "description": "Household-local date, 4:00 cutoff",
+            "format": "date",
+            "title": "Night Date",
+            "type": "string"
+          },
+          "photo_count": {
+            "title": "Photo Count",
+            "type": "integer"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The host's name for the night, if renamed",
+            "title": "Title"
+          },
+          "uploads_open": {
+            "description": "Tonight, or within 3 days of the night date",
+            "title": "Uploads Open",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "night_date",
+          "title",
+          "display_title",
+          "photo_count",
+          "cover_thumb_url",
+          "uploads_open",
+          "is_tonight"
+        ],
+        "title": "AlbumOut",
+        "type": "object"
+      },
+      "AlbumPhotoCreatedOut": {
+        "properties": {
+          "album_id": {
+            "format": "uuid",
+            "title": "Album Id",
+            "type": "string"
+          },
+          "expires_in": {
+            "description": "Seconds the upload URLs stay valid",
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "photo_id": {
+            "format": "uuid",
+            "title": "Photo Id",
+            "type": "string"
+          },
+          "thumb_upload_url": {
+            "description": "PUT the thumbnail JPEG here, same content type",
+            "title": "Thumb Upload Url",
+            "type": "string"
+          },
+          "upload_url": {
+            "description": "PUT the full JPEG here with Content-Type: image/jpeg",
+            "title": "Upload Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "photo_id",
+          "upload_url",
+          "thumb_upload_url",
+          "expires_in",
+          "album_id"
+        ],
+        "title": "AlbumPhotoCreatedOut",
+        "type": "object"
+      },
+      "AlbumRenameIn": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null or blank goes back to the date label",
+            "title": "Title"
+          }
+        },
+        "title": "AlbumRenameIn",
+        "type": "object"
+      },
       "AttributionOut": {
         "properties": {
           "justwatch": {
@@ -5501,6 +5635,10 @@
             "title": "Streaming Providers",
             "type": "array"
           },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -5514,7 +5652,8 @@
           "region",
           "streaming_providers",
           "updated_at",
-          "qr_includes_night_code"
+          "qr_includes_night_code",
+          "timezone"
         ],
         "title": "SettingsOut",
         "type": "object"
@@ -5593,6 +5732,19 @@
               }
             ],
             "title": "Streaming Providers"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "IANA name, e.g. America/Chicago",
+            "title": "Timezone"
           }
         },
         "title": "SettingsUpdateIn",
@@ -7558,6 +7710,793 @@
         "summary": "Start Fresh",
         "tags": [
           "admin"
+        ]
+      }
+    },
+    "/api/v1/albums": {
+      "get": {
+        "description": "Recent albums with at least one photo, newest night first, each with a cover.",
+        "operationId": "list_albums_api_v1_albums_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AlbumOut"
+                  },
+                  "title": "Response List Albums Api V1 Albums Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Albums",
+        "tags": [
+          "albums"
+        ]
+      }
+    },
+    "/api/v1/albums/by-session/{session_id}": {
+      "get": {
+        "description": "The album of a movie night's date (404 until it has one), for `/albums/[session]`.",
+        "operationId": "album_for_session_api_v1_albums_by_session__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlbumOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Album For Session",
+        "tags": [
+          "albums"
+        ]
+      }
+    },
+    "/api/v1/albums/tonight": {
+      "get": {
+        "description": "Tonight's album. Before its first photo it doesn't exist yet: `id` is null.",
+        "operationId": "tonight_album_api_v1_albums_tonight_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlbumOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Tonight Album",
+        "tags": [
+          "albums"
+        ]
+      }
+    },
+    "/api/v1/albums/tonight/photos": {
+      "get": {
+        "description": "Tonight's photos; empty before the album's first photo.",
+        "operationId": "list_tonight_photos_api_v1_albums_tonight_photos_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PhotoOut"
+                  },
+                  "title": "Response List Tonight Photos Api V1 Albums Tonight Photos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Tonight Photos",
+        "tags": [
+          "albums"
+        ]
+      },
+      "post": {
+        "description": "Start an upload into tonight's album (created on first use; no movie night needed).\nPUT both URLs, then call `/albums/{album_id}/photos/{photo_id}/complete`.",
+        "operationId": "create_tonight_photo_api_v1_albums_tonight_photos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlbumPhotoCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "The person is not bound to this device, or Terms not accepted"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "409": {
+            "description": "The album is closed to new photos (3 days after) or is full"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Create Tonight Photo",
+        "tags": [
+          "albums"
+        ]
+      }
+    },
+    "/api/v1/albums/{album_id}": {
+      "get": {
+        "operationId": "get_album_api_v1_albums__album_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "album_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Album Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlbumOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Get Album",
+        "tags": [
+          "albums"
+        ]
+      },
+      "patch": {
+        "description": "Hosts name the night (\"Thanksgiving 2026\"); null goes back to the date label.",
+        "operationId": "rename_album_api_v1_albums__album_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "album_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Album Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlbumRenameIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlbumOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Rename Album",
+        "tags": [
+          "albums"
+        ]
+      }
+    },
+    "/api/v1/albums/{album_id}/photos": {
+      "get": {
+        "description": "The album, newest first; same shape as the movie night's. URLs expire in 10 minutes.\nHidden photos appear only for accounts that may unhide them.",
+        "operationId": "list_album_photos_api_v1_albums__album_id__photos_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "album_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Album Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PhotoOut"
+                  },
+                  "title": "Response List Album Photos Api V1 Albums  Album Id  Photos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "List Album Photos",
+        "tags": [
+          "albums"
+        ]
+      },
+      "post": {
+        "description": "Add to a past album: allowed for its night date plus 3 days, then 409.",
+        "operationId": "create_album_photo_api_v1_albums__album_id__photos_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "album_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Album Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlbumPhotoCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "The person is not bound to this device, or Terms not accepted"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "409": {
+            "description": "The album is closed to new photos (3 days after) or is full"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Create Album Photo",
+        "tags": [
+          "albums"
+        ]
+      }
+    },
+    "/api/v1/albums/{album_id}/photos/{photo_id}": {
+      "delete": {
+        "description": "Hard delete (admins), as on the movie night's album.",
+        "operationId": "delete_album_photo_api_v1_albums__album_id__photos__photo_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "album_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Album Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Delete Album Photo",
+        "tags": [
+          "albums"
+        ]
+      }
+    },
+    "/api/v1/albums/{album_id}/photos/{photo_id}/complete": {
+      "post": {
+        "operationId": "complete_album_photo_api_v1_albums__album_id__photos__photo_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "album_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Album Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "description": "Upload missing, not a JPEG, or over 10 MB"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Complete Album Photo",
+        "tags": [
+          "albums"
+        ]
+      }
+    },
+    "/api/v1/albums/{album_id}/photos/{photo_id}/hide": {
+      "post": {
+        "operationId": "hide_album_photo_api_v1_albums__album_id__photos__photo_id__hide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "album_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Album Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Hide Album Photo",
+        "tags": [
+          "albums"
+        ]
+      }
+    },
+    "/api/v1/albums/{album_id}/photos/{photo_id}/reactions/{emoji}": {
+      "delete": {
+        "operationId": "remove_album_reaction_api_v1_albums__album_id__photos__photo_id__reactions__emoji__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "album_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Album Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "emoji",
+            "required": true,
+            "schema": {
+              "enum": [
+                "\u2764\ufe0f",
+                "\ud83d\ude02",
+                "\ud83d\ude2e",
+                "\ud83d\udc4d",
+                "\ud83c\udf89",
+                "\ud83c\udf7f"
+              ],
+              "title": "Emoji",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Whose reaction to remove",
+            "in": "query",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "description": "Whose reaction to remove",
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Remove Album Reaction",
+        "tags": [
+          "albums"
+        ]
+      },
+      "put": {
+        "operationId": "add_album_reaction_api_v1_albums__album_id__photos__photo_id__reactions__emoji__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "album_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Album Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "emoji",
+            "required": true,
+            "schema": {
+              "enum": [
+                "\u2764\ufe0f",
+                "\ud83d\ude02",
+                "\ud83d\ude2e",
+                "\ud83d\udc4d",
+                "\ud83c\udf89",
+                "\ud83c\udf7f"
+              ],
+              "title": "Emoji",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Who is reacting",
+            "in": "query",
+            "name": "person_id",
+            "required": true,
+            "schema": {
+              "description": "Who is reacting",
+              "format": "uuid",
+              "title": "Person Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Add Album Reaction",
+        "tags": [
+          "albums"
+        ]
+      }
+    },
+    "/api/v1/albums/{album_id}/photos/{photo_id}/unhide": {
+      "post": {
+        "operationId": "unhide_album_photo_api_v1_albums__album_id__photos__photo_id__unhide_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "album_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Album Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such night or photo in this household"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Photo storage not configured or unavailable"
+          }
+        },
+        "summary": "Unhide Album Photo",
+        "tags": [
+          "albums"
         ]
       }
     },

@@ -9,6 +9,7 @@ import { PhotoAlbum } from "@/components/photos/photo-album";
 import { buttonVariants } from "@/components/ui/button";
 import { useHouseholdNight } from "@/hooks/use-household-night";
 import { useLiveSession } from "@/hooks/use-live-session";
+import { useDatedAlbumRedirect } from "@/hooks/use-dated-album-redirect";
 import { type Night } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ const ALBUM_OPEN: ReadonlySet<Night["status"]> = new Set(["tonight", "closed"]);
  * primary, so **Add photos** turns `secondary` (guest-home §4 rule 1).
  */
 export function AlbumScreen({ sessionId }: { sessionId: string }) {
+  useDatedAlbumRedirect(sessionId);
   const night = useLiveSession(sessionId);
   const { night: liveNight } = useHouseholdNight(night.isSuccess);
   const back = { href: `/s/${sessionId}`, label: "Movie night" };

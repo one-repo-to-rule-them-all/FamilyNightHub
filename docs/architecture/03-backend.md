@@ -513,7 +513,8 @@ Photo bytes never touch the API.
 - **Create** (`POST …/photos`, device, `{person_id, taken_on?}`): the person must be actively
   bound to the device (403), and the night's _effective_ status must be `tonight` or `closed`
   (409 otherwise; a reveal counts once it has settled, `domain/session_state.check_photos_open`).
-  Inserts a `pending` row with keys `households/{hid}/sessions/{sid}/{photo_id}.jpg` and
+  Inserts a `pending` row (keys below, under Night albums; rows from before 0016 keep
+  `households/{hid}/sessions/{sid}/{photo_id}.jpg`) and
   `…_thumb.jpg` and returns two presigned PUTs (5 min, `Content-Type: image/jpeg` signed in, so
   the bucket refuses any other type). `taken_on` is the EXIF date, stored as midnight UTC. A
   night holds at most 500 photos (a runaway-queue backstop, 409).
@@ -526,6 +527,25 @@ Photo bytes never touch the API.
   device) and **fresh presigned GETs (10 min) minted per request after the household check**.
   Hidden photos are listed only for accounts with `sessions:run` (so they can unhide);
   devices and the TV never see them. No credential → 401 before any URL is minted.
+- **Night albums** ([ADR-0019](decisions/ADR-0019-night-albums.md), `api/v1/albums.py`): a photo
+  lives in its night album (`albums`, one per household per night date: the household's
+  `settings.timezone` local date with a 4:00 cutoff, `domain/albums.night_date`). Albums are
+  created lazily (`INSERT … ON CONFLICT DO NOTHING`, so two phones racing get one row).
+  `POST /albums/tonight/photos {person_id, taken_on?}` (device) needs no movie night; same
+  person, consent and 500-per-album rules, keys `households/{hid}/albums/{album_id}/{pid}.jpg`,
+  and the response adds `album_id`. `POST /albums/{id}/photos` adds to a past album for its night
+  date plus 3 days, then **409**. `POST /sessions/{sid}/photos` keeps its status gate and files the
+  photo into the album of the night's date (`revealed_at`, else `created_at`), so one evening has
+  one album. Reads: `GET /albums?limit=` (albums with a visible photo, newest night first, cover
+  and count), `GET /albums/tonight` (`id: null` before its first photo), `GET /albums/{id}`,
+  `GET /albums/by-session/{sid}` (404 until the night's date has an album),
+  `GET /albums/{id|tonight}/photos` (the album shape above). `PATCH /albums/{id} {title}`
+  (`sessions:run`, audited) names the night; null or blank goes back to the date label
+  ("Thu 26 Nov"). Complete, reactions, hide/unhide and delete exist under both
+  `/sessions/{sid}/photos/{pid}` and `/albums/{id}/photos/{pid}` (`photo_service.Scope`); a
+  photo uploaded on a movie night is reachable through both. Moderation ignores the upload
+  window. `photo_added` is published only for photos that have a movie night. Household
+  timezone: `PATCH /admin/settings {timezone}` (IANA name, validated, default `America/Chicago`).
 - **Reactions** (`PUT/DELETE …/reactions/{emoji}?person_id=`): allowlist ❤️ 😂 😮 👍 🎉 🍿
   (422 otherwise), only on `ready` photos (404), only as a bound person (403). Both idempotent.
 - **Moderation.** Hide/unhide is `sessions:run`: the host running the night in the room is the

@@ -5,6 +5,7 @@ import { ChevronRight, Gamepad2 } from "lucide-react";
 import Link from "next/link";
 
 import { GuestShell } from "@/components/home/guest-shell";
+import { TonightAlbumCard } from "@/components/photos/tonight-album-card";
 import { api, type ApiError, type GameSummary } from "@/lib/api";
 import { kindName, PLAYABLE, statusLabel } from "@/lib/games";
 
@@ -42,6 +43,7 @@ export function GamesScreen() {
             <p className="text-muted-foreground">When the host starts one, it shows up here.</p>
           </div>
         ) : null}
+        <TonightAlbumCard />
         <GameList title="Happening now" games={live} />
         <GameList title="Finished" games={done} />
       </div>
