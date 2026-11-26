@@ -14,6 +14,8 @@ import { type BingoMode, MODE_COPY, WIN_MODE_COPY, type WinMode } from "@/lib/bi
 import { clampCycleSeconds, KIND_COPY, kindName, PLAYABLE, statusLabel } from "@/lib/games";
 import { type LoteriaPattern, PATTERN_COPY } from "@/lib/loteria";
 
+import { NightReelCard } from "./night-reel-card";
+
 /** One named tab for a game's control page, so the Family Night hub tab stays where it is. */
 export const GAME_WINDOW_NAME = "fnh-game";
 
@@ -355,6 +357,7 @@ export function GamesAdmin() {
           <Plus aria-hidden /> Start Lotería
         </Button>
       </form>
+      <NightReelCard />
 
       <section className="flex flex-col gap-2" aria-label="Your games">
         <h2 className="text-lg font-medium">Your games</h2>

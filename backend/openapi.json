@@ -4284,6 +4284,257 @@
         "title": "ReactionCountOut",
         "type": "object"
       },
+      "ReelItemOut": {
+        "description": "One slide. Only the fields of its `kind` are set.",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReelPersonOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "final": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final"
+          },
+          "game_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Kind"
+          },
+          "game_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Title"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "quote",
+              "winner",
+              "leaderboard",
+              "photo"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "photo_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReelPersonOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Place"
+          },
+          "points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Points"
+          },
+          "standings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReelStandingOut"
+            },
+            "title": "Standings",
+            "type": "array"
+          },
+          "winners": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReelPersonOut"
+            },
+            "title": "Winners",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "ReelItemOut",
+        "type": "object"
+      },
+      "ReelOut": {
+        "description": "The reel in its show order. A screen finds the slide on show with no tick events:\n`floor((now + (server_now - Date.now()) - anchor) / dwell_seconds) mod len(items)`.",
+        "properties": {
+          "anchor": {
+            "format": "date-time",
+            "title": "Anchor",
+            "type": "string"
+          },
+          "dwell_seconds": {
+            "title": "Dwell Seconds",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReelItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "server_now": {
+            "format": "date-time",
+            "title": "Server Now",
+            "type": "string"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "window": {
+            "enum": [
+              "tonight",
+              "all"
+            ],
+            "title": "Window",
+            "type": "string"
+          }
+        },
+        "required": [
+          "window",
+          "since",
+          "server_now",
+          "anchor",
+          "dwell_seconds",
+          "items"
+        ],
+        "title": "ReelOut",
+        "type": "object"
+      },
+      "ReelPersonOut": {
+        "properties": {
+          "avatar_emoji": {
+            "title": "Avatar Emoji",
+            "type": "string"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "person_id": {
+            "format": "uuid",
+            "title": "Person Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "person_id",
+          "name",
+          "avatar_emoji",
+          "color"
+        ],
+        "title": "ReelPersonOut",
+        "type": "object"
+      },
+      "ReelStandingOut": {
+        "properties": {
+          "person": {
+            "$ref": "#/components/schemas/ReelPersonOut"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "person",
+          "points"
+        ],
+        "title": "ReelStandingOut",
+        "type": "object"
+      },
       "RemovalOut": {
         "description": "What removing a person deletes (issue #94): shown in the confirm dialog, and returned\nby the delete.",
         "properties": {
@@ -10935,6 +11186,70 @@
         "summary": "Me",
         "tags": [
           "platform"
+        ]
+      }
+    },
+    "/api/v1/reel": {
+      "get": {
+        "description": "Quotes, winners, leaderboards and photos from `window` (the last 12 hours, or all\ntime), in a stable seeded order. Hidden notes and photos never appear.",
+        "operationId": "get_reel_api_v1_reel_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "window",
+            "required": false,
+            "schema": {
+              "default": "tonight",
+              "enum": [
+                "tonight",
+                "all"
+              ],
+              "title": "Window",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-FNH-Test-Seed",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Fnh-Test-Seed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Reel",
+        "tags": [
+          "reel"
         ]
       }
     },

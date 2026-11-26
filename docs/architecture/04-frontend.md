@@ -431,6 +431,26 @@ The TV slideshow uses the Screen Wake Lock API where supported.
   slept past the TTL. Images are plain `<img>` with `referrerPolicy="no-referrer"`, never
   `next/image`, whose optimizer would proxy the bytes through the server.
 
+### Night reel
+
+`/tv/reel` (`src/app/tv/reel/`, ADR-0018 amendment "Night reel") is the one TV page that cycles
+the household's quotes, winners, scores and photos by itself, all evening. It sits on `TvGameFrame`
+(the footer strip is the people on the slides, the ones on the slide now highlighted) and uses the
+`tv-*` type scale. `GET /reel` returns the show order, `anchor`, `server_now` and `dwell_seconds`;
+`useReel` refetches every 30 s and when the tab turns visible (there is no game channel to hint
+on) and works the slide index out locally with `reelIndex` in `src/lib/reel.ts`, the jar's
+`cycleIndex` arithmetic with the server/device clock offset taken when the snapshot arrived, so
+there are no tick events. The slide region is `aria-live="polite"` with a short `sr-only` summary,
+`motion-safe:` fades honour `prefers-reduced-motion`, and `useWakeLock` keeps the screen on.
+`?window=all` shows every night. Moderation is the server's: a hidden note or photo is never in
+the list, an anonymous note renders as "Someone in the family". The host's Games hub has a
+**Night reel** card (`host/games/night-reel-card.tsx`) that opens the page and shows its link for
+the TV's browser; a **Show on TV** reel target is deferred (ADR OPEN 3: `household_tv_target.game_id`
+is a non-null FK, so it needs a migration and a change to the shared tv-target routing). The ended
+jar's own TV view (`tv-jar.tsx`) now keeps cycling its notes (a manual jar gets a local cycle
+from the page's mount) instead of stopping on the thank-you line. E2E: `e2e/games-reel.spec.ts`
+with the seed's `--reel` fixtures (a finished jar and a bingo winner).
+
 ### TV slideshow
 
 **Built.** `/tv/[session]` on a `tonight` or `closed` night (`src/app/tv/[session]/slideshow.tsx`;

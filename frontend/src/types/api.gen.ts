@@ -2013,6 +2013,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Reel
+         * @description Quotes, winners, leaderboards and photos from `window` (the last 12 hours, or all
+         *     time), in a stable seeded order. Hidden notes and photos never appear.
+         */
+        get: operations["get_reel_api_v1_reel_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions": {
         parameters: {
             query?: never;
@@ -4338,6 +4359,95 @@ export interface components {
             count: number;
             /** Emoji */
             emoji: string;
+        };
+        /**
+         * ReelItemOut
+         * @description One slide. Only the fields of its `kind` are set.
+         */
+        ReelItemOut: {
+            author?: components["schemas"]["ReelPersonOut"] | null;
+            /** Body */
+            body?: string | null;
+            /** Final */
+            final?: boolean | null;
+            /** Game Kind */
+            game_kind?: string | null;
+            /** Game Title */
+            game_title?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "quote" | "winner" | "leaderboard" | "photo";
+            /** Label */
+            label?: string | null;
+            photo_by?: components["schemas"]["ReelPersonOut"] | null;
+            /** Photo Url */
+            photo_url?: string | null;
+            /** Place */
+            place?: number | null;
+            /** Points */
+            points?: number | null;
+            /**
+             * Standings
+             * @default []
+             */
+            standings: components["schemas"]["ReelStandingOut"][];
+            /**
+             * Winners
+             * @default []
+             */
+            winners: components["schemas"]["ReelPersonOut"][];
+        };
+        /**
+         * ReelOut
+         * @description The reel in its show order. A screen finds the slide on show with no tick events:
+         *     `floor((now + (server_now - Date.now()) - anchor) / dwell_seconds) mod len(items)`.
+         */
+        ReelOut: {
+            /**
+             * Anchor
+             * Format: date-time
+             */
+            anchor: string;
+            /** Dwell Seconds */
+            dwell_seconds: number;
+            /** Items */
+            items: components["schemas"]["ReelItemOut"][];
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
+            /** Since */
+            since: string | null;
+            /**
+             * Window
+             * @enum {string}
+             */
+            window: "tonight" | "all";
+        };
+        /** ReelPersonOut */
+        ReelPersonOut: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** ReelStandingOut */
+        ReelStandingOut: {
+            person: components["schemas"]["ReelPersonOut"];
+            /** Points */
+            points: number;
         };
         /**
          * RemovalOut
@@ -9261,6 +9371,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformMeOut"];
+                };
+            };
+        };
+    };
+    get_reel_api_v1_reel_get: {
+        parameters: {
+            query?: {
+                window?: "tonight" | "all";
+            };
+            header?: {
+                "X-FNH-Test-Seed"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

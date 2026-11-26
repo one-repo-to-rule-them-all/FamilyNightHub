@@ -45,6 +45,8 @@ export type SeedOptions = {
   pins?: boolean;
   /** With `tonight`: everyone was at the night (G8), so everyone may rate it (issue #91). */
   attended?: boolean;
+  /** A finished jar (a named and an anonymous note) and a bingo round Ava won: the night reel. */
+  reel?: boolean;
 };
 
 const BACKEND = path.resolve(__dirname, "../../../backend");
@@ -60,6 +62,7 @@ export function seedNight(options: SeedOptions = {}): SeededNight {
   if (options.providers?.length) args.push("--providers", options.providers.join(","));
   if (options.pins) args.push("--pins");
   if (options.attended) args.push("--attended");
+  if (options.reel) args.push("--reel");
   return runSeed(args) as SeededNight;
 }
 
