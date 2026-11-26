@@ -163,6 +163,21 @@ inside itself, and shrinks its type by head count (`stripDensity`, `roomy`/`comp
 The Gratitude Jar's snapshot has no player list, so its strip is the people behind revealed,
 non-anonymous notes; a real roster would need a `players` field on the jar's snapshot (backend).
 
+### Win and lose moment
+
+When a bingo, classic bingo or Lotería round ends with a winner, or a Scattergories game ends, the
+phone shows a full-screen card for its current person (ADR-0018 amendment 2026-11-26).
+`lib/result-moment.ts` decides `won | lost | null` (pure, vitest-covered: null while live, with no
+winner, or for someone who never joined; Scattergories ties all win) and holds the once-per-person-
+per-game `localStorage` guard and the per-device sound toggle, every storage call try/catch-wrapped.
+`components/games/result-moment.tsx` renders it: "You won!" with the pattern or points, a big
+avatar and `components/games/confetti.tsx` (CSS, no dependency); or a kind "Maybe next time" with
+three dropping "whoop" dots and who won. It is a modal dialog with a polite live region, a 56px
+close button that takes focus, Escape to close, and a still version under
+`prefers-reduced-motion` (no confetti element at all). Sound is off by default and starts only from
+a tap. The TV winner banners render the same confetti (`tv-confetti`). Hooks: `result-moment`,
+`result-won`, `result-lost`, `result-dismiss`, `confetti`; e2e: `e2e/games-win-moment.spec.ts`.
+
 ## Owner portal (admin and host)
 
 `/host` and `/admin/*` are one portal (`docs/architecture/proposals/owner-portal.md`, #44):

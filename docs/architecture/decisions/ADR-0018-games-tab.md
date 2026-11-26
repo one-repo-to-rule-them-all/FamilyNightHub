@@ -841,3 +841,24 @@ note. Thank you, everyone.", and no screen recaps across games.
 **Consequences.** No schema change, so no migration and nothing to roll back. The per-request cost
 is a handful of indexed reads plus up to 60 presigns, only while a TV is polling. Lotería adds one
 provider function and one registry line.
+
+## Amendment 2026-11-26: win and lose moment
+
+**Context.** After winning Lotería and bingo on staging with a real phone, the owner saw only a
+banner. They asked for a "You won!" with confetti on the winner's phone, and a kind "maybe next
+time" with a "whoop whoop whoop" for everyone else. The audience includes young children.
+
+**Decision.** Frontend only; the snapshot already says who won (`won`/`finish_place` for bingo and
+Lotería, the leaderboard for Scattergories). A pure helper (`lib/result-moment.ts`) decides
+`won | lost | null` for the phone's current person: null until the game is `ended`, when nobody
+won (a Scattergories game where nobody scored has no winner) and for a person who never joined;
+ties at the top of the Scattergories leaderboard all win. `components/games/result-moment.tsx`
+shows a full-screen card once per person per game on a device (a try/catch-wrapped `localStorage`
+key); the screen's own result line stays. The losing card never mocks: three dropping dots,
+"whoop, whoop, whoop", "Maybe next time" and who won. Confetti is CSS only (no dependency) and is
+not rendered at all under `prefers-reduced-motion`. The TV winner banners (bingo, Lotería, and a
+new Scattergories winner line when the game ends) get the same confetti. Sound is opt-in per device
+(off by default) and starts only after a tap. The Gratitude Jar has no winner and is unchanged.
+
+**Consequences.** No API, schema or migration change. Clearing site data replays the moment once.
+A second device for the same person shows it again (the guard is per device by design).
