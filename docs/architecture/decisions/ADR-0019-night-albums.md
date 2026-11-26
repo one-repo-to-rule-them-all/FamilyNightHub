@@ -51,7 +51,7 @@ row.
   `POST /sessions/{id}/photos` keeps working and simply files the photo into that night's album
   (the night's date), so nothing on the phone breaks during the switch.
 - No status gate for albums: tonight's album is open all evening. A past album is read-only for
-  new uploads after its night date ends (**OPEN 3**).
+  new uploads after its night date ends (owner answer 3).
 - New object keys: `households/{hid}/albums/{album_id}/{photo_id}.jpg` (and `_thumb`). Existing
   keys are **not** moved: every reader already uses the key stored on the row, so the backup worker,
   orphan sweep, delete propagation and presigning need no change.
@@ -66,7 +66,7 @@ row.
   keeps working and redirects to its album.
 - TV: `/tv/albums/[id]` reuses the existing slideshow (`use-slideshow.ts`). The household TV target
   (ADR-0018) gains an "album" target only if it stays a small change; otherwise the Night reel,
-  which already shows photos, is the TV's way to show them (**OPEN 4**).
+  which already shows photos, is the TV's way to show them (owner answer 4).
 - Night reel: unchanged; it already reads photos by time. It may switch to "tonight's album" as
   its source later for an exact match.
 
@@ -87,7 +87,7 @@ row.
 1. **`0016_night_albums`** (expand): create `albums` (RLS), add nullable `photos.album_id` with its
    composite FK and index, make `photos.session_id` nullable, and **backfill**: one album per
    (household, night date of the session's `revealed_at` or `created_at`), `photos.album_id` set
-   from its session. Two movie nights on the same date share an album (**OPEN 2**).
+   from its session. Two movie nights on the same date share an album (owner answer 2).
 2. Ship the code that writes and reads `album_id`.
 3. **`0017_albums_required`** (contract, a later deploy): `photos.album_id NOT NULL`.
 
