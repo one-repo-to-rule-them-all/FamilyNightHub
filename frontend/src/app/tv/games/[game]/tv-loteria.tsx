@@ -1,6 +1,7 @@
 "use client";
 
 import { CurrentCard, LoteriaCalledBoard } from "@/components/games/loteria-parts";
+import { Confetti } from "@/components/games/confetti";
 import { TvGameFrame } from "@/components/games/tv-game-frame";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { useWakeLock } from "@/hooks/use-wake-lock";
@@ -50,6 +51,7 @@ export function TvLoteria({ gameId }: { gameId: string }) {
       }
       banner={
         <div aria-live="polite" className="w-full">
+          {announcement ? <Confetti fixed testId="tv-confetti" /> : null}
           {announcement ? (
             <p
               data-testid="tv-loteria-winner"

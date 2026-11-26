@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { PhoneGameFrame } from "@/components/games/phone-game-frame";
+import { ResultMoment } from "@/components/games/result-moment";
 import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
 import { useLiveGame } from "@/hooks/use-live-game";
@@ -14,6 +15,7 @@ import { usePhonePeople } from "@/hooks/use-phone";
 import { api, type ApiError, type BingoCard } from "@/lib/api";
 import {
   BINGO_LETTERS,
+  WIN_MODE_COPY,
   bingoStatusLine,
   callParts,
   calledSet,
@@ -34,6 +36,7 @@ import {
   winnerLine,
   winnerNames,
 } from "@/lib/bingo";
+import { placedResult } from "@/lib/result-moment";
 import { bingoStripPlayers } from "@/lib/game-layout";
 import { statusLabel } from "@/lib/games";
 import { cn } from "@/lib/utils";
@@ -103,6 +106,12 @@ export function BingoScreen({ gameId }: { gameId: string }) {
   const calls = data?.bingo?.calls ?? [];
   const last = data?.bingo?.last_call ?? null;
   const called = calledSet(calls);
+  const result = placedResult(
+    data?.status,
+    current?.id,
+    players,
+    data?.bingo ? WIN_MODE_COPY[data.bingo.win_mode].name : null,
+  );
 
   return (
     <PhoneGameFrame
@@ -122,6 +131,7 @@ export function BingoScreen({ gameId }: { gameId: string }) {
       attrs={{ "data-kind": "bingo", "data-status": data?.status, "data-live": game.live }}
       notice={game.error ? <ApiErrorNotice error={game.error} /> : null}
     >
+      <ResultMoment gameId={gameId} personId={current?.id} decision={result} />
       {data ? (
         <>
           <div aria-live="polite" data-testid="bingo-announcement">

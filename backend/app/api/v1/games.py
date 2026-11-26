@@ -8,6 +8,7 @@ snapshot, which never holds an unrevealed note or the author of an anonymous one
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, Path, Query, status
@@ -220,7 +221,10 @@ async def create_game(body: GameCreateIn, account: CanHost, db: AccountDb) -> Ga
 async def get_tv_target(viewer: CurrentViewer, db: ViewerDb) -> TvTargetOut:
     """The game a host sent to the paired TV, if any (any device or account). The TV polls
     this snapshot and follows it; there is no event to miss."""
-    return TvTargetOut(game_id=await games_service.tv_target(db, viewer.household_id))
+    live, ended, ended_at = await games_service.tv_target_state(db, viewer.household_id)
+    return TvTargetOut(
+        game_id=live, ended_game_id=ended, ended_at=ended_at, server_now=datetime.now(UTC)
+    )
 
 
 @router.put(

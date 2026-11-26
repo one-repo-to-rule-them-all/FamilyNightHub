@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { POLL_MS } from "@/hooks/use-live-session";
-import { api, type ApiError } from "@/lib/api";
+import { api, type ApiError, type Schemas } from "@/lib/api";
+
+export type TvTargetState = Schemas["TvTargetOut"];
 
 /**
  * The game a host sent to the paired TV (ADR-0018 amendment "The TV follows the host"), or
@@ -9,11 +11,22 @@ import { api, type ApiError } from "@/lib/api";
  * "Back to QR", so a missed update corrects itself on the next read.
  */
 export function useTvTarget(options: { enabled?: boolean } = {}) {
-  return useQuery<string | null, ApiError>({
+  return useQuery<TvTargetState, ApiError, string | null>({
     queryKey: ["tv-target"],
-    queryFn: async () => (await api.tvTarget()).game_id,
+    queryFn: () => api.tvTarget(),
+    select: (t) => t.game_id,
     refetchInterval: POLL_MS,
     refetchIntervalInBackground: true,
     enabled: options.enabled ?? true,
+  });
+}
+
+/** The whole snapshot, with the ended sent game the TV holds for a while (tv-hold.ts). */
+export function useTvTargetState() {
+  return useQuery<TvTargetState, ApiError>({
+    queryKey: ["tv-target"],
+    queryFn: () => api.tvTarget(),
+    refetchInterval: POLL_MS,
+    refetchIntervalInBackground: true,
   });
 }
