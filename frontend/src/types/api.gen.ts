@@ -5195,10 +5195,20 @@ export interface components {
         /**
          * TvTargetOut
          * @description The game the host sent to the paired TV; null when none (or it ended).
+         *
+         *     `ended_game_id`/`ended_at` name the sent game once it has ended (until the host sends another
+         *     or presses Back to QR), so the TV can hold its result screen for a while (ADR-0018 amendment
+         *     2026-11-26, win and lose moment). `server_now` lets the TV measure that without clock skew.
          */
         TvTargetOut: {
+            /** Ended At */
+            ended_at?: string | null;
+            /** Ended Game Id */
+            ended_game_id?: string | null;
             /** Game Id */
             game_id: string | null;
+            /** Server Now */
+            server_now?: string | null;
         };
         /** TypedTitleIn */
         TypedTitleIn: {

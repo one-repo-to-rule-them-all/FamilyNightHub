@@ -8,6 +8,7 @@ import { useState } from "react";
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { CurrentCard } from "@/components/games/loteria-parts";
 import { PhoneGameFrame } from "@/components/games/phone-game-frame";
+import { ResultMoment } from "@/components/games/result-moment";
 import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
 import { useLiveGame } from "@/hooks/use-live-game";
@@ -20,6 +21,7 @@ import {
   loteriaStripPlayers,
   markedSet,
   notCalledMessage,
+  PATTERN_COPY,
   progressLabel,
   rankPlayers,
   recentCalls,
@@ -28,6 +30,7 @@ import {
   winnerLine,
   winnerNames,
 } from "@/lib/loteria";
+import { placedResult } from "@/lib/result-moment";
 import { cardById } from "@/lib/loteria-deck";
 import { cn } from "@/lib/utils";
 
@@ -93,6 +96,12 @@ export function LoteriaScreen({ gameId }: { gameId: string }) {
   const calls = lot?.calls ?? [];
   const last = lot?.last_call ?? null;
   const called = calledSet(calls);
+  const result = placedResult(
+    data?.status,
+    current?.id,
+    players,
+    lot ? PATTERN_COPY[lot.pattern].name : null,
+  );
 
   return (
     <PhoneGameFrame
@@ -108,6 +117,7 @@ export function LoteriaScreen({ gameId }: { gameId: string }) {
       attrs={{ "data-kind": "loteria", "data-status": data?.status, "data-live": game.live }}
       notice={game.error ? <ApiErrorNotice error={game.error} /> : null}
     >
+      <ResultMoment gameId={gameId} personId={current?.id} decision={result} />
       {data ? (
         <>
           <div aria-live="polite" data-testid="loteria-announcement">

@@ -37,6 +37,8 @@ test.describe("games on the paired TV", () => {
     const tvContext = await browser.newContext({ baseURL: origin });
     await signInAsHost(tvContext, night, origin);
     const tv = await tvContext.newPage();
+    // A controllable clock: the finished game holds the TV for two minutes (TV_HOLD_MS).
+    await tv.clock.install();
     await pairAsTv(tv);
     await tv.goto("/tv");
     await expect(tv).toHaveURL(new RegExp(`/tv/${night.sessionId}$`), POLL);
@@ -53,10 +55,19 @@ test.describe("games on the paired TV", () => {
     await expect(host.getByTestId("show-on-tv")).toHaveText(/Show on TV/, POLL);
     await expect(tv).toHaveURL(new RegExp(`/tv/${night.sessionId}$`), POLL);
 
-    // Show again, then end the game: the TV leaves it on its own.
+    // Show again, then end the game: the TV holds the finished game's screen for two minutes,
+    // then leaves it on its own (win and lose moment, ADR-0018 amendment 2026-11-26).
     await host.getByTestId("show-on-tv").click();
     await expect(tv).toHaveURL(new RegExp(`/tv/games/${gameId}$`), POLL);
     await host.getByTestId("end-game").click();
+    await expect(tv.getByTestId("tv-jar")).toHaveAttribute("data-status", "ended", POLL);
+    const polled = tv.waitForResponse((r) => r.url().includes("/games/tv-target"));
+    await tv.clock.fastForward("01:00");
+    await polled;
+    // A minute in, several polls later, the TV is still on the finished game.
+    await expect(tv.getByTestId("tv-jar")).toHaveAttribute("data-status", "ended");
+    await expect(tv).toHaveURL(new RegExp(`/tv/games/${gameId}$`));
+    await tv.clock.fastForward("02:10");
     await expect(tv).toHaveURL(new RegExp(`/tv/${night.sessionId}$`), POLL);
   });
 });

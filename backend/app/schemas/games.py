@@ -325,9 +325,17 @@ class ScatterReviewOut(BaseModel):
 
 
 class TvTargetOut(BaseModel):
-    """The game the host sent to the paired TV; null when none (or it ended)."""
+    """The game the host sent to the paired TV; null when none (or it ended).
+
+    `ended_game_id`/`ended_at` name the sent game once it has ended (until the host sends another
+    or presses Back to QR), so the TV can hold its result screen for a while (ADR-0018 amendment
+    2026-11-26, win and lose moment). `server_now` lets the TV measure that without clock skew.
+    """
 
     game_id: uuid.UUID | None
+    ended_game_id: uuid.UUID | None = None
+    ended_at: datetime | None = None
+    server_now: datetime | None = None
 
 
 class TvTargetIn(BaseModel):

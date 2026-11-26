@@ -841,3 +841,36 @@ note. Thank you, everyone.", and no screen recaps across games.
 **Consequences.** No schema change, so no migration and nothing to roll back. The per-request cost
 is a handful of indexed reads plus up to 60 presigns, only while a TV is polling. Lotería adds one
 provider function and one registry line.
+
+## Amendment 2026-11-26: win and lose moment
+
+**Context.** After winning Lotería and bingo on staging with a real phone, the owner saw only a
+banner. They asked for a "You won!" with confetti on the winner's phone, and a kind "maybe next
+time" with a "whoop whoop whoop" for everyone else. The audience includes young children.
+
+**Decision.** Frontend only; the snapshot already says who won (`won`/`finish_place` for bingo and
+Lotería, the leaderboard for Scattergories). A pure helper (`lib/result-moment.ts`) decides
+`won | lost | null` for the phone's current person: null until the game is `ended`, when nobody
+won (a Scattergories game where nobody scored has no winner) and for a person who never joined;
+ties at the top of the Scattergories leaderboard all win. `components/games/result-moment.tsx`
+shows a full-screen card once per person per game on a device (a try/catch-wrapped `localStorage`
+key); the screen's own result line stays. The losing card never mocks: three dropping dots,
+"whoop, whoop, whoop", "Maybe next time" and who won. Confetti is CSS only (no dependency) and is
+not rendered at all under `prefers-reduced-motion`. The TV winner banners (bingo, Lotería, and a
+new Scattergories winner line when the game ends) get the same confetti. Sound is opt-in per device
+(off by default) and starts only after a tap. The Gratitude Jar has no winner and is unchanged.
+
+**The TV holds the result.** On staging the paired TV left a finished game almost at once
+(the TV-target rule "switch when the game ends") and nobody saw the winner. Now the TV holds the
+finished game's screen (winner banner, confetti, results) for `TV_HOLD_MS` = 2 minutes
+(`lib/tv-hold.ts`), then follows its usual order; "Back to QR" or "Show on TV" for another game
+moves it sooner. `GET /games/tv-target` keeps `game_id` as before (null once the game ends) and
+adds `ended_game_id`, `ended_at` and `server_now`: the sent game after it ended, until the host
+sends another or presses Back to QR. Without them the TV could not tell "the game ended" from
+"Back to QR" (both read as null). The hold is the longer of the server's "ended this long ago"
+and the TV's own time since it saw the end, so a late TV does not hold again and a stale poll
+cannot hold forever.
+
+**Consequences.** One additive API change (three optional fields on `TvTargetOut`); no schema or
+migration change. Clearing site data replays the phone moment once. A second device for the same
+person shows it again (the guard is per device by design).
