@@ -86,6 +86,7 @@ import {
   classicStatusLine,
   notCalledMessage,
   patternName,
+  winPatterns,
   recentCalls,
   spacedLabel,
   squareIsCalled,
@@ -165,6 +166,35 @@ describe("callParts", () => {
 
   it("leaves anything else as the number", () => {
     expect(callParts({ label: "FREE" })).toEqual({ letter: "", number: "FREE" });
+  });
+});
+
+describe("new win patterns", () => {
+  it("has the right pattern shapes", () => {
+    expect(winPatterns("corners")).toEqual([[0, 4, 20, 24]]);
+    expect(winPatterns("x")[0]).toHaveLength(9);
+    expect(winPatterns("stamp")).toEqual([
+      [0, 1, 5, 6],
+      [3, 4, 8, 9],
+      [15, 16, 20, 21],
+      [18, 19, 23, 24],
+    ]);
+  });
+
+  it("counts squares to go with the free centre pre-marked", () => {
+    expect(markedToGo([12], "corners")).toBe(4);
+    expect(markedToGo([12, 0, 4, 20], "corners")).toBe(1);
+    expect(markedToGo([12], "x")).toBe(8);
+    expect(markedToGo([12, 0, 4, 6, 8, 16, 18, 20, 24], "x")).toBe(0);
+    expect(markedToGo([12], "stamp")).toBe(4);
+    expect(markedToGo([12, 18, 19, 23], "stamp")).toBe(1);
+    expect(markedToGo([12, 3, 4, 8, 9], "stamp")).toBe(0);
+  });
+
+  it("names them for the host", () => {
+    expect(patternName([0, 4, 20, 24])).toBe("four corners");
+    expect(patternName([0, 4, 6, 8, 12, 16, 18, 20, 24])).toBe("the X");
+    expect(patternName([18, 19, 23, 24])).toBe("postage stamp");
   });
 });
 

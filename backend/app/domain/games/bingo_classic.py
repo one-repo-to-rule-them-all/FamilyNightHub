@@ -62,11 +62,8 @@ def is_called(square: str, called: Collection[int]) -> bool:
 
 
 def pattern(mask: int, win_mode: str) -> list[int] | None:
-    """Indices of the first complete winning pattern in `mask` (a row, column, diagonal, or
-    all 25), or None."""
-    if win_mode == "blackout":
-        return list(range(CELLS)) if mask & bingo.FULL_MASK == bingo.FULL_MASK else None
-    for line in bingo.LINES:
-        if mask & line == line:
-            return [i for i in range(CELLS) if line >> i & 1]
+    """Indices of the first complete winning pattern for `win_mode` in `mask`, or None."""
+    for p in bingo.patterns(win_mode):  # type: ignore[arg-type]
+        if mask & p == p:
+            return [i for i in range(CELLS) if p >> i & 1]
     return None

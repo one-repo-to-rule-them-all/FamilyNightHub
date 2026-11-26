@@ -17,6 +17,9 @@ LoteriaPattern = Literal["line", "corners", "center", "full"]
 GameStatus = Literal["draft", "open", "live", "ended"]
 
 
+BingoWinMode = Literal["line", "blackout", "corners", "x", "stamp"]
+
+
 class GameCreateIn(BaseModel):
     kind: GameKind
     title: str = Field(min_length=1, max_length=80)
@@ -24,7 +27,7 @@ class GameCreateIn(BaseModel):
     allow_anonymous: bool = True
     # Bingo: what counts as a win, whether the middle square is free, and whether the first
     # win ends the round.
-    win_mode: Literal["line", "blackout"] = "line"
+    win_mode: BingoWinMode = "line"
     free_center: bool = True
     end_on_first_win: bool = True
     # Bingo mode: Thanksgiving (honour-system marks, the API default) or classic (host-called
@@ -34,7 +37,7 @@ class GameCreateIn(BaseModel):
     reveal_mode: Literal["cycle", "manual"] = "cycle"
     cycle_seconds: int = Field(default=12, ge=5, le=60)
     # Loteria: which pattern wins (end_on_first_win above applies too).
-    pattern: LoteriaPattern = "line"
+    pattern: LoteriaPattern = "full"
 
 
 class JarAuthorOut(BaseModel):
@@ -110,7 +113,7 @@ class BingoOut(BaseModel):
     # Classic only: the numbers called so far, in call order. Never a future call.
     calls: list[BingoCallOut] = []
     last_call: BingoCallOut | None = None
-    win_mode: Literal["line", "blackout"]
+    win_mode: BingoWinMode
     free_center: bool
     end_on_first_win: bool
     players: list[BingoPlayerOut]
@@ -139,7 +142,7 @@ class BingoCheckIn(BaseModel):
 
 class BingoCheckOut(BaseModel):
     valid: bool
-    win_mode: Literal["line", "blackout"]
+    win_mode: BingoWinMode
     # Indices of the first complete line (or all 25) when valid, else null.
     pattern: list[int] | None
     # Squares still to be called in the closest pattern (0 when valid).

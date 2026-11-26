@@ -2885,7 +2885,7 @@ export interface components {
              * Win Mode
              * @enum {string}
              */
-            win_mode: "line" | "blackout";
+            win_mode: "line" | "blackout" | "corners" | "x" | "stamp";
         };
         /** BingoDrawIn */
         BingoDrawIn: {
@@ -2924,7 +2924,7 @@ export interface components {
              * Win Mode
              * @enum {string}
              */
-            win_mode: "line" | "blackout";
+            win_mode: "line" | "blackout" | "corners" | "x" | "stamp";
         };
         /** BingoPlayerOut */
         BingoPlayerOut: {
@@ -3193,7 +3193,7 @@ export interface components {
             mode: "thanksgiving" | "classic";
             /**
              * Pattern
-             * @default line
+             * @default full
              * @enum {string}
              */
             pattern: "line" | "corners" | "center" | "full";
@@ -3210,7 +3210,7 @@ export interface components {
              * @default line
              * @enum {string}
              */
-            win_mode: "line" | "blackout";
+            win_mode: "line" | "blackout" | "corners" | "x" | "stamp";
         };
         /** GameOut */
         GameOut: {

@@ -139,7 +139,7 @@ def _out(
             last_call=None
             if not bingo_state.calls
             else BingoCallOut(**bingo_state.calls[-1].__dict__),
-            win_mode="blackout" if bingo_state.win_mode == "blackout" else "line",
+            win_mode=bingo_state.win_mode,
             free_center=bingo_state.free_center,
             end_on_first_win=bingo_state.end_on_first_win,
             players=[BingoPlayerOut(**p.__dict__) for p in bingo_state.players],
@@ -648,7 +648,7 @@ async def check_bingo(
         raise_http(err)
     return BingoCheckOut(
         valid=result.valid,
-        win_mode="blackout" if result.win_mode == "blackout" else "line",
+        win_mode=result.win_mode,
         pattern=result.pattern,
         missing=result.missing,
     )

@@ -599,7 +599,10 @@
           "win_mode": {
             "enum": [
               "line",
-              "blackout"
+              "blackout",
+              "corners",
+              "x",
+              "stamp"
             ],
             "title": "Win Mode",
             "type": "string"
@@ -690,7 +693,10 @@
           "win_mode": {
             "enum": [
               "line",
-              "blackout"
+              "blackout",
+              "corners",
+              "x",
+              "stamp"
             ],
             "title": "Win Mode",
             "type": "string"
@@ -1344,7 +1350,7 @@
             "type": "string"
           },
           "pattern": {
-            "default": "line",
+            "default": "full",
             "enum": [
               "line",
               "corners",
@@ -1373,7 +1379,10 @@
             "default": "line",
             "enum": [
               "line",
-              "blackout"
+              "blackout",
+              "corners",
+              "x",
+              "stamp"
             ],
             "title": "Win Mode",
             "type": "string"

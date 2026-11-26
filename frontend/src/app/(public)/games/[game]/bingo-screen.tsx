@@ -162,18 +162,21 @@ export function BingoScreen({ gameId }: { gameId: string }) {
           ) : null}
 
           {classic && (data.status === "live" || data.status === "ended") ? (
-            <div className="flex flex-col gap-1 rounded-2xl border border-foreground/10 bg-card p-4">
-              <p className="text-sm text-muted-foreground">Last call</p>
+            <div className="flex flex-col gap-0.5 rounded-xl border border-foreground/10 bg-card px-3 py-2">
+              <p className="text-xs text-muted-foreground">Last call</p>
               <p
                 aria-live="polite"
                 aria-label={last ? `Last call ${last.label}` : "No number called yet"}
                 data-testid="bingo-last-call"
                 data-value={last?.value}
-                className="font-heading text-6xl leading-none font-bold tabular-nums"
+                className="font-heading text-4xl leading-none font-bold tabular-nums"
               >
                 {last ? spacedLabel(last) : "—"}
               </p>
-              <p className="text-base text-muted-foreground" data-testid="bingo-recent-calls">
+              <p
+                className="truncate text-xs whitespace-nowrap text-muted-foreground"
+                data-testid="bingo-recent-calls"
+              >
                 {recentCalls(calls).length > 0 ? (
                   <>
                     Before:{" "}
@@ -197,7 +200,7 @@ export function BingoScreen({ gameId }: { gameId: string }) {
 
           {card ? (
             <>
-              <p className="text-sm text-muted-foreground" data-testid="bingo-progress">
+              <p className="sr-only" aria-live="polite" data-testid="bingo-progress">
                 {progressLabel({
                   squares_from_bingo: classic
                     ? markedToGo(card.marked, data.bingo?.win_mode ?? "line")

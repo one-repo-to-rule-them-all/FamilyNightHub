@@ -62,7 +62,7 @@ export function GamesAdmin() {
   const [endOnFirstWin, setEndOnFirstWin] = useState(true);
   const [scatterTitle, setScatterTitle] = useState("Thanksgiving scattergories");
   const [loteriaTitle, setLoteriaTitle] = useState("Lotería");
-  const [pattern, setPattern] = useState<LoteriaPattern>("line");
+  const [pattern, setPattern] = useState<LoteriaPattern>("full");
   const [loteriaEndOnFirstWin, setLoteriaEndOnFirstWin] = useState(true);
 
   const games = useQuery<GameSummary[], ApiError>({

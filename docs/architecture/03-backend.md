@@ -764,7 +764,7 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   `/jar/moderation` and can hide one before it shows (idempotent); an anonymous note never
   carries its author, even there. The snapshot holds revealed, unhidden notes only, and counts.
 - **Thanksgiving Bingo (slice B).** A host creates a round with `config` `win_mode`
-  (`line`|`blackout`), `free_center` and `end_on_first_win` (defaults line, true, true); it starts
+  (`line`|`blackout`|`corners`|`x`|`stamp`; see ADR-0018 amendment 2026-11-26), `free_center` and `end_on_first_win` (defaults line, true, true); it starts
   as a `draft`, **open** (`POST /open`, idempotent) lets people join, **start** (`POST /start`)
   makes it `live`, and `/end` ends it any time. **Join** (`/bingo/join`, as a person this phone
   acts as, consent gate) draws 24 distinct squares from `bingo_pool.THANKSGIVING_POOL` with
@@ -831,7 +831,7 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   letter; the phone's hint is a convenience. Category fit is not judged. Ending the game does not
   reveal an unrevealed round.
 - **Lotería (amendment 2026-11-26, migration `0015_loteria`).** Kind `loteria`, config `pattern`
-  (`line` | `corners` | `center` | `full`, default line) and `end_on_first_win`. Pure
+  (`line` | `corners` | `center` | `full`, default full) and `end_on_first_win`. Pure
   `domain/games/loteria.py` (4 x 4 masks, seeded `call_order`, `pattern`/`missing`) and the 54-card
   data module `loteria_deck.py` (Spanish name, English gloss, emoji; mirrored in
   `frontend/src/lib/loteria-deck.ts` and pinned equal by a unit test). **No new tables**: a tabla is
