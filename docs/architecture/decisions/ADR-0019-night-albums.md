@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-11-26). Design only; nothing is built. The owner answered all five open questions
+Accepted (2026-11-26) by the owner. The owner answered all five open questions
 on 2026-11-26, each with the recommended default (recorded at the end).
 
 ## Context

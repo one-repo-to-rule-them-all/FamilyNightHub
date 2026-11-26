@@ -43,7 +43,7 @@ The numbered docs go **broad → narrow**.
 | Platform owner: a super-admin who enters one household at a time, never bypassing RLS (accepted and built)                                                                               | [`ADR-0016`](decisions/ADR-0016-platform-owner.md)                         |
 | Consent, privacy and deletion before a second household: operator-created households, a consent gate, export and delete                                                                  | [`ADR-0017`](decisions/ADR-0017-consent-and-multi-household.md)            |
 | Games tab: household-scoped party games (all three games built; amended 2026-11-25: classic bingo, jar auto-cycle, lighter scattergories review), a game channel on SSE, host moderation | [`ADR-0018`](decisions/ADR-0018-games-tab.md)                              |
-| Night albums: photos without a movie night, one album per household per night date (proposed)                                                                                            | [`ADR-0019`](decisions/ADR-0019-night-albums.md)                           |
+| Night albums: photos without a movie night, one album per household per night date                                                                                                       | [`ADR-0019`](decisions/ADR-0019-night-albums.md)                           |
 
 ## The 30-second mental model
 
