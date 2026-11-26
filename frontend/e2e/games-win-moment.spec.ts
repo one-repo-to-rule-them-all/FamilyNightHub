@@ -118,7 +118,14 @@ test.describe("games win moment", () => {
     await page.reload();
     await expect(page.getByTestId("game-screen")).toHaveAttribute("data-status", "ended", POLL);
     await expect(page.getByTestId("loteria-announcement")).toContainText(winnerName, POLL);
-    await page.waitForTimeout(500);
+    // The guard key was written when the card first showed, so the effect finds it and stays shut.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Object.keys(localStorage).some((k) => k.startsWith("fn:result-moment:")),
+        ),
+      )
+      .toBe(true);
     await expect(page.getByTestId("result-moment")).toHaveCount(0);
 
     // A reduced-motion device for the winner: the still version, no confetti.
