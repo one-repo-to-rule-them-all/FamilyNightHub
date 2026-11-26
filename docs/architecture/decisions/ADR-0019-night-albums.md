@@ -2,8 +2,8 @@
 
 ## Status
 
-Proposed (2026-11-26). Design only; nothing is built. Open questions for the owner are marked
-**OPEN**, each with a recommended default.
+Proposed (2026-11-26). Design only; nothing is built. The owner answered all five open questions
+on 2026-11-26, each with the recommended default (recorded at the end).
 
 ## Context
 
@@ -122,15 +122,12 @@ night, consent gate, a night's upload landing in the date album, hidden photos, 
 backfill correctness, person delete; Playwright: upload a photo on a games-only evening and see it
 in the album and on the reel.
 
-## Open questions for the owner
+## Owner answers (2026-11-26)
 
-1. **Timezone.** The household has a `region` but no timezone. Default: add `settings.timezone`,
-   preset to `America/Chicago`, editable in Settings.
-2. **Two movie nights on one date** share one album after the backfill. Default: yes (it has not
-   happened in practice).
-3. **Uploading to a past album.** Default: allowed for the night date plus 3 days, then read-only;
-   admins can still hide or delete.
-4. **TV.** Default: the Night reel shows the night's photos; a dedicated album slideshow on the paired
-   TV comes only if the TV-target change stays small.
-5. **Album titles.** Default: date label ("Thu 26 Nov"); the host can rename tonight's album
-   ("Thanksgiving 2026").
+1. **Timezone:** a household `settings.timezone`, preset to `America/Chicago`, editable in Settings.
+2. **Two movie nights on one date:** one album per date; they share it.
+3. **Past albums:** uploads allowed for the night date plus 3 days, then read-only (admins can
+   still hide or delete).
+4. **TV:** photos reach the TV through the Night reel; a dedicated album slideshow only if it stays
+   small.
+5. **Titles:** a date label ("Thu 26 Nov") that the host can rename (for example "Thanksgiving 2026").
