@@ -14,6 +14,7 @@
  *
  * Types come from src/types/api.gen.ts (generated from backend/openapi.json; never hand-edited).
  */
+import { photosPath } from "@/lib/photos/target";
 import type { components, operations } from "@/types/api.gen";
 
 export type Schemas = components["schemas"];
@@ -46,6 +47,7 @@ export type HouseholdSettings = Schemas["SettingsOut"];
 export type AgeCap = NonNullable<HouseholdSettings["default_age_cap"]>;
 export type StreamingProvider = Schemas["ProviderOut"];
 export type Photo = Schemas["PhotoOut"];
+export type NightAlbum = Schemas["AlbumOut"];
 export type AdminMovie = Schemas["AdminMovieOut"];
 export type MoviePage = Schemas["MoviePageOut"];
 export type MovieFlags = Schemas["MovieFlagsIn"];
@@ -505,15 +507,27 @@ export const api = {
   enroll: (body: Schemas["EnrollIn"]) =>
     request<Schemas["EnrollOut"]>("POST", "/devices/enroll", body),
 
-  // The night's photo album (ADR-0005).
+  // Photo albums (ADR-0005, ADR-0019). `target` is a movie night's id or an album key
+  // (`album:tonight`, `album:{id}`, lib/photos/target.ts); both reach the same photo rows.
   /** The album, newest first. Every URL is a presigned GET that expires in 10 minutes. */
-  photos: (sessionId: string) =>
-    request<Photo[]>("GET", `/sessions/${encodeURIComponent(sessionId)}/photos`),
-  /** A pending photo plus presigned PUTs (5 min) for the JPEG and its thumbnail. */
-  createPhoto: (sessionId: string, body: Schemas["PhotoCreateIn"]) =>
-    request<PhotoCreated>("POST", `/sessions/${encodeURIComponent(sessionId)}/photos`, body),
-  completePhoto: (sessionId: string, photoId: string) =>
-    request<void>("POST", `${photoPath(sessionId, photoId)}/complete`),
+  photos: (target: string) => request<Photo[]>("GET", photosPath(target)),
+  /** A pending photo plus presigned PUTs (5 min) for the JPEG and its thumbnail. For an album
+   * target the response also names the album the photo was filed into. */
+  createPhoto: (target: string, body: Schemas["PhotoCreateIn"]) =>
+    request<PhotoCreated & { album_id?: string }>("POST", photosPath(target), body),
+  completePhoto: (target: string, photoId: string) =>
+    request<void>("POST", `${photoPath(target, photoId)}/complete`),
+  /** Recent night albums with at least one photo, newest first (ADR-0019). */
+  albums: (limit = 20) => request<NightAlbum[]>("GET", `/albums?limit=${limit}`),
+  /** Tonight's album; `id` is null until its first photo. */
+  tonightAlbum: () => request<NightAlbum>("GET", "/albums/tonight"),
+  album: (albumId: string) => request<NightAlbum>("GET", `/albums/${encodeURIComponent(albumId)}`),
+  /** The album of a movie night's date: 404 until it has a photo. */
+  albumForSession: (sessionId: string) =>
+    request<NightAlbum>("GET", `/albums/by-session/${encodeURIComponent(sessionId)}`),
+  /** Hosts name the night; null goes back to the date label. */
+  renameAlbum: (albumId: string, title: string | null) =>
+    request<NightAlbum>("PATCH", `/albums/${encodeURIComponent(albumId)}`, { title }),
   react: (sessionId: string, photoId: string, emoji: ReactionEmoji, personId: string) =>
     request<void>("PUT", reactionPath(sessionId, photoId, emoji, personId)),
   unreact: (sessionId: string, photoId: string, emoji: ReactionEmoji, personId: string) =>
@@ -675,8 +689,8 @@ export async function enrollDevice(
   }
 }
 
-function photoPath(sessionId: string, photoId: string): string {
-  return `/sessions/${encodeURIComponent(sessionId)}/photos/${encodeURIComponent(photoId)}`;
+function photoPath(target: string, photoId: string): string {
+  return `${photosPath(target)}/${encodeURIComponent(photoId)}`;
 }
 
 function reactionPath(sessionId: string, photoId: string, emoji: string, personId: string) {

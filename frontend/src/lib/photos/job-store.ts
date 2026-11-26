@@ -18,6 +18,9 @@ export type UploadJob = {
   attempts: number;
   /** Set once both PUTs succeeded: a retry then only needs `complete`. */
   photoId: string | null;
+  /** ADR-0019: the album the server filed an `album:tonight` photo into (`album:{id}`), so
+   * `complete` goes there even after the 4:00 rollover. Absent on movie-night jobs. */
+  completeTarget?: string | null;
   createdAt: number;
 };
 

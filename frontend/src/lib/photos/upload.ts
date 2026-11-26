@@ -13,6 +13,7 @@ import { api, ApiError } from "@/lib/api";
 
 import { type UploadJob } from "./job-store";
 import { JPEG } from "./process";
+import { albumTarget } from "./target";
 import { type UploadHooks, UploadError } from "./queue";
 
 export type Put = (
@@ -55,6 +56,7 @@ function fromApi(error: unknown, restartOn422 = false): UploadError {
 export function makeUploader(put: Put = xhrPut) {
   return async function upload(job: UploadJob, hooks: UploadHooks): Promise<void> {
     let photoId = job.photoId;
+    let completeTarget = job.completeTarget ?? job.sessionId;
     if (!photoId) {
       let created;
       try {
@@ -72,10 +74,12 @@ export function makeUploader(put: Put = xhrPut) {
         hooks.onProgress((job.full.size + f * job.thumb.size) / total),
       );
       photoId = created.photo_id;
-      await hooks.onUploaded(photoId);
+      // ADR-0019: an album upload completes in the album the server chose.
+      completeTarget = created.album_id ? albumTarget(created.album_id) : job.sessionId;
+      await hooks.onUploaded(photoId, created.album_id ? completeTarget : null);
     }
     try {
-      await api.completePhoto(job.sessionId, photoId);
+      await api.completePhoto(completeTarget, photoId);
     } catch (error) {
       throw fromApi(error, true);
     }

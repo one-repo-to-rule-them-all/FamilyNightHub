@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 
-from app.domain import credentials
+from app.domain import albums, credentials
 
 _COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 _REGION = re.compile(r"^[A-Za-z]{2}$")
@@ -188,6 +188,8 @@ class SettingsOut(BaseModel):
     updated_at: datetime
     # The TV's join QR carries the night code (`/j/{slug}?code=`). Default off.
     qr_includes_night_code: bool
+    # ADR-0019: IANA name; decides which night (album) a photo belongs to.
+    timezone: str
 
 
 class SettingsUpdateIn(BaseModel):
@@ -202,6 +204,18 @@ class SettingsUpdateIn(BaseModel):
         default=None, max_length=MAX_STREAMING_PROVIDERS
     )
     qr_includes_night_code: bool | None = None
+    timezone: str | None = Field(
+        default=None, max_length=64, description="IANA name, e.g. America/Chicago"
+    )
+
+    @field_validator("timezone")
+    @classmethod
+    def _timezone(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        if not albums.is_valid_timezone(v):
+            raise ValueError("timezone must be an IANA name, e.g. America/Chicago")
+        return v
 
     @field_validator("streaming_providers")
     @classmethod

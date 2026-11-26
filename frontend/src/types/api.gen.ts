@@ -576,6 +576,226 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/albums": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Albums
+         * @description Recent albums with at least one photo, newest night first, each with a cover.
+         */
+        get: operations["list_albums_api_v1_albums_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/by-session/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Album For Session
+         * @description The album of a movie night's date (404 until it has one), for `/albums/[session]`.
+         */
+        get: operations["album_for_session_api_v1_albums_by_session__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/tonight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tonight Album
+         * @description Tonight's album. Before its first photo it doesn't exist yet: `id` is null.
+         */
+        get: operations["tonight_album_api_v1_albums_tonight_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/tonight/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tonight Photos
+         * @description Tonight's photos; empty before the album's first photo.
+         */
+        get: operations["list_tonight_photos_api_v1_albums_tonight_photos_get"];
+        put?: never;
+        /**
+         * Create Tonight Photo
+         * @description Start an upload into tonight's album (created on first use; no movie night needed).
+         *     PUT both URLs, then call `/albums/{album_id}/photos/{photo_id}/complete`.
+         */
+        post: operations["create_tonight_photo_api_v1_albums_tonight_photos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Album */
+        get: operations["get_album_api_v1_albums__album_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename Album
+         * @description Hosts name the night ("Thanksgiving 2026"); null goes back to the date label.
+         */
+        patch: operations["rename_album_api_v1_albums__album_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Album Photos
+         * @description The album, newest first; same shape as the movie night's. URLs expire in 10 minutes.
+         *     Hidden photos appear only for accounts that may unhide them.
+         */
+        get: operations["list_album_photos_api_v1_albums__album_id__photos_get"];
+        put?: never;
+        /**
+         * Create Album Photo
+         * @description Add to a past album: allowed for its night date plus 3 days, then 409.
+         */
+        post: operations["create_album_photo_api_v1_albums__album_id__photos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}/photos/{photo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Album Photo
+         * @description Hard delete (admins), as on the movie night's album.
+         */
+        delete: operations["delete_album_photo_api_v1_albums__album_id__photos__photo_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}/photos/{photo_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Album Photo */
+        post: operations["complete_album_photo_api_v1_albums__album_id__photos__photo_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}/photos/{photo_id}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hide Album Photo */
+        post: operations["hide_album_photo_api_v1_albums__album_id__photos__photo_id__hide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}/photos/{photo_id}/reactions/{emoji}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Add Album Reaction */
+        put: operations["add_album_reaction_api_v1_albums__album_id__photos__photo_id__reactions__emoji__put"];
+        post?: never;
+        /** Remove Album Reaction */
+        delete: operations["remove_album_reaction_api_v1_albums__album_id__photos__photo_id__reactions__emoji__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}/photos/{photo_id}/unhide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unhide Album Photo */
+        post: operations["unhide_album_photo_api_v1_albums__album_id__photos__photo_id__unhide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/consent": {
         parameters: {
             query?: never;
@@ -2800,6 +3020,80 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** AlbumOut */
+        AlbumOut: {
+            /**
+             * Cover Thumb Url
+             * @description Presigned GET (10 min) of the newest photo
+             */
+            cover_thumb_url: string | null;
+            /**
+             * Display Title
+             * @description title, else a date label such as "Thu 26 Nov"
+             */
+            display_title: string;
+            /**
+             * Id
+             * @description None only for tonight's album before its first photo
+             */
+            id: string | null;
+            /** Is Tonight */
+            is_tonight: boolean;
+            /**
+             * Night Date
+             * Format: date
+             * @description Household-local date, 4:00 cutoff
+             */
+            night_date: string;
+            /** Photo Count */
+            photo_count: number;
+            /**
+             * Title
+             * @description The host's name for the night, if renamed
+             */
+            title: string | null;
+            /**
+             * Uploads Open
+             * @description Tonight, or within 3 days of the night date
+             */
+            uploads_open: boolean;
+        };
+        /** AlbumPhotoCreatedOut */
+        AlbumPhotoCreatedOut: {
+            /**
+             * Album Id
+             * Format: uuid
+             */
+            album_id: string;
+            /**
+             * Expires In
+             * @description Seconds the upload URLs stay valid
+             */
+            expires_in: number;
+            /**
+             * Photo Id
+             * Format: uuid
+             */
+            photo_id: string;
+            /**
+             * Thumb Upload Url
+             * @description PUT the thumbnail JPEG here, same content type
+             */
+            thumb_upload_url: string;
+            /**
+             * Upload Url
+             * @description PUT the full JPEG here with Content-Type: image/jpeg
+             */
+            upload_url: string;
+        };
+        /** AlbumRenameIn */
+        AlbumRenameIn: {
+            /**
+             * Title
+             * @description null or blank goes back to the date label
+             */
+            title?: string | null;
+        };
         /** AttributionOut */
         AttributionOut: {
             /** Justwatch */
@@ -4815,6 +5109,8 @@ export interface components {
             region: string;
             /** Streaming Providers */
             streaming_providers: number[];
+            /** Timezone */
+            timezone: string;
             /**
              * Updated At
              * Format: date-time
@@ -4836,6 +5132,11 @@ export interface components {
             region?: string | null;
             /** Streaming Providers */
             streaming_providers?: number[] | null;
+            /**
+             * Timezone
+             * @description IANA name, e.g. America/Chicago
+             */
+            timezone?: string | null;
         };
         /**
          * SlideshowIn
@@ -6220,6 +6521,655 @@ export interface operations {
                 content?: never;
             };
             /** @description Photos can't be deleted right now */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_albums_api_v1_albums_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    album_for_session_api_v1_albums_by_session__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumOut"];
+                };
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    tonight_album_api_v1_albums_tonight_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumOut"];
+                };
+            };
+        };
+    };
+    list_tonight_photos_api_v1_albums_tonight_photos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoOut"][];
+                };
+            };
+        };
+    };
+    create_tonight_photo_api_v1_albums_tonight_photos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumPhotoCreatedOut"];
+                };
+            };
+            /** @description The person is not bound to this device, or Terms not accepted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The album is closed to new photos (3 days after) or is full */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_album_api_v1_albums__album_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumOut"];
+                };
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    rename_album_api_v1_albums__album_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlbumRenameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumOut"];
+                };
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_album_photos_api_v1_albums__album_id__photos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoOut"][];
+                };
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_album_photo_api_v1_albums__album_id__photos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumPhotoCreatedOut"];
+                };
+            };
+            /** @description The person is not bound to this device, or Terms not accepted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The album is closed to new photos (3 days after) or is full */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_album_photo_api_v1_albums__album_id__photos__photo_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    complete_album_photo_api_v1_albums__album_id__photos__photo_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Upload missing, not a JPEG, or over 10 MB */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    hide_album_photo_api_v1_albums__album_id__photos__photo_id__hide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    add_album_reaction_api_v1_albums__album_id__photos__photo_id__reactions__emoji__put: {
+        parameters: {
+            query: {
+                /** @description Who is reacting */
+                person_id: string;
+            };
+            header?: never;
+            path: {
+                album_id: string;
+                photo_id: string;
+                emoji: "❤️" | "😂" | "😮" | "👍" | "🎉" | "🍿";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_album_reaction_api_v1_albums__album_id__photos__photo_id__reactions__emoji__delete: {
+        parameters: {
+            query: {
+                /** @description Whose reaction to remove */
+                person_id: string;
+            };
+            header?: never;
+            path: {
+                album_id: string;
+                photo_id: string;
+                emoji: "❤️" | "😂" | "😮" | "👍" | "🎉" | "🍿";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    unhide_album_photo_api_v1_albums__album_id__photos__photo_id__unhide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;

@@ -3,13 +3,29 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, String, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, created_at, household_fk, scoped_fk, uuid_pk
+
+
+class Album(Base):
+    """One per household per night date (ADR-0019), created lazily on the first upload."""
+
+    __tablename__ = "albums"
+    __table_args__ = (
+        UniqueConstraint("id", "household_id"),
+        UniqueConstraint("household_id", "night_date"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    household_id: Mapped[uuid.UUID] = household_fk()
+    night_date: Mapped[date] = mapped_column(Date)
+    title: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = created_at()
 
 
 class Photo(Base):
@@ -21,13 +37,17 @@ class Photo(Base):
         # Photos are hard-deleted only by admins through the service (storage first), so a
         # session or person delete must never silently orphan objects.
         scoped_fk("session_id", "sessions"),
+        scoped_fk("album_id", "albums"),
         scoped_fk("person_id", "people"),
         scoped_fk("uploaded_by_device_id", "devices"),
     )
 
     id: Mapped[uuid.UUID] = uuid_pk()
     household_id: Mapped[uuid.UUID] = household_fk()
-    session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    # ADR-0019: a photo's home is its night album; the movie night is optional. album_id is
+    # nullable until the contract migration (0017_albums_required) lands.
+    album_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+    session_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
     person_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
     uploaded_by_device_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     object_key: Mapped[str] = mapped_column(String(300), unique=True)

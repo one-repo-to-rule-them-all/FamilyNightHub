@@ -30,6 +30,7 @@ class HouseholdSettings:
     streaming_providers: list[int]
     updated_at: datetime
     qr_includes_night_code: bool
+    timezone: str
 
 
 async def _audit(
@@ -58,7 +59,7 @@ async def get(db: AsyncSession, household_id: uuid.UUID) -> HouseholdSettings:
         await db.execute(
             text(
                 "SELECT h.join_slug, s.default_voting_method, s.default_age_cap, s.region, "
-                "s.streaming_providers, s.updated_at, s.qr_includes_night_code "
+                "s.streaming_providers, s.updated_at, s.qr_includes_night_code, s.timezone "
                 "FROM households h JOIN settings s ON s.household_id = h.id WHERE h.id = :h"
             ),
             {"h": household_id},
@@ -72,6 +73,7 @@ async def get(db: AsyncSession, household_id: uuid.UUID) -> HouseholdSettings:
         list(row.streaming_providers or []),
         row.updated_at,
         row.qr_includes_night_code,
+        row.timezone,
     )
 
 
@@ -96,6 +98,7 @@ async def update(
         "region",
         "streaming_providers",
         "qr_includes_night_code",
+        "timezone",
     )
     fields = {k: v for k, v in changes.items() if k in allowed}
     current = await get(db, household_id)

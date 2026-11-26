@@ -20,7 +20,8 @@ PostgreSQL 16 on Fly, SQLAlchemy 2 async, Alembic. Object storage on Tigris (S3 
 | `options` | yes | Shortlisted movie per session, `source` (`manual`/`owned`/`streaming`/`tmdb`) |
 | `ballot_ranks` | yes | `session_id`, `person_id`, `option_id`, `rank`, `cast_by_device_id` or `cast_by_account_id` (one required), `is_proxy` |
 | `ratings` | yes | `session_id`, `person_id`, `score 1–5` (unique per pair). Table ships in Phase 1, UI in Phase 2 |
-| `photos` | yes | `session_id`, `person_id`, `object_key`, `thumb_key`, `taken_at`, `bytes`, `status pending/ready/hidden`, `backed_up_at` |
+| `albums` | yes | ADR-0019: one per household per `night_date` (household-local, 4:00 cutoff), `title` (null = date label). Created lazily on the first upload |
+| `photos` | yes | `album_id` (nullable until the contract migration), `session_id` (nullable since 0016), `person_id`, `object_key`, `thumb_key`, `taken_at`, `bytes`, `status pending/ready/hidden`, `backed_up_at` |
 | `photo_reactions` | yes | `photo_id`, `person_id`, `emoji` (unique triple) |
 | `photo_deletions` | yes | Tombstone written with each hard delete (`photo_id`, keys, `backup_purged_at`) so the worker can purge backup copies |
 | `settings` | yes | `default_voting_method`, `default_age_cap`, `streaming_providers int[]`, `region`, `qr_includes_night_code` (default false; the TV's QR may carry the code, never stored) |
@@ -52,7 +53,8 @@ erDiagram
     movies ||--o{ options : "is"
     options ||--o{ ballot_ranks : receives
     people ||--o{ ballot_ranks : casts
-    sessions ||--o{ photos : album
+    albums ||--o{ photos : holds
+    sessions |o--o{ photos : "taken on"
     photos ||--o{ photo_reactions : gets
     sessions ||--o{ ratings : rated
 ```
@@ -101,6 +103,18 @@ because autogenerate doesn't capture them (a FieldPro lesson). **Every new house
 ships its RLS policy in the same migration.** `tests/test_rls_coverage.py` fails CI otherwise.
 Migrations run as the owner role in the Fly release command and must be expand/contract safe.
 
+**Night albums (ADR-0019) are an expand/contract pair.** `0016_night_albums` (expand) creates
+`albums` (FORCE RLS), adds `settings.timezone`, adds nullable `photos.album_id` with its composite
+FK and index, makes `photos.session_id` nullable and backfills one album per (household, night date
+of the session's `revealed_at`, else `created_at`); two nights on one date share it. FORCE RLS binds
+even the owner, so the backfill drops FORCE on the four tables it touches and restores it in the
+same transaction. The contract step, **`0017_albums_required`** (`ALTER TABLE photos ALTER COLUMN
+album_id SET NOT NULL`), is deliberately **not** shipped with it: during a rolling deploy the
+previous API inserts photos without `album_id`, which NOT NULL would refuse. Ship it in a later
+deploy, after checking `SELECT count(*) FROM photos WHERE album_id IS NULL` is 0 (a row left by the
+old code during the switch needs the 0016 backfill's UPDATE re-run first). Its number must be
+re-checked against the head at the time.
+
 ## Object storage
 
 Tigris bucket names are global across all its users, and `fnh-photos*` were taken, so
@@ -108,7 +122,9 @@ the deployed buckets are `fnh-rbj-photos-staging`, `fnh-rbj-photos` and
 `fnh-rbj-photos-backup`; diagrams and ADR-0005 keep the short conceptual names.
 
 Bucket `fnh-rbj-photos` (private, no public ACL, no listing for app credentials beyond its prefix).
-Key layout: `households/{hid}/sessions/{sid}/{photo_id}.jpg` and `…_thumb.jpg`. Presigned PUTs last
+Key layout: `households/{hid}/albums/{album_id}/{photo_id}.jpg` and `…_thumb.jpg` (ADR-0019);
+photos from before 0016 keep `households/{hid}/sessions/{sid}/…`. Nothing moves objects: every
+reader (presign, backup, orphan sweep, delete propagation, export) uses the key stored on the row. Presigned PUTs last
 5 minutes and sign `Content-Type: image/jpeg`; presigned GETs last 10. `photos.bytes` is the full
 image's size as HEAD reported it on `complete`; `photos.taken_at` holds the EXIF date at midnight
 UTC (the phone sends a date only). Reactions are limited to a six-emoji allowlist in the service. Bucket `fnh-rbj-photos-backup` is written only by the worker using

@@ -143,7 +143,12 @@ async def complete_photo(
     """Check both uploads (HEAD: image/jpeg, 1 byte..10 MB) and publish the photo."""
     try:
         await photo_service.complete(
-            db, storage, device.household_id, device.device_id, session_id, photo_id
+            db,
+            storage,
+            device.household_id,
+            device.device_id,
+            photo_service.by_session(session_id),
+            photo_id,
         )
     except ServiceError as err:
         _raise(err)
@@ -162,31 +167,30 @@ async def list_photos(
             db,
             storage,
             viewer.household_id,
-            session_id,
+            photo_service.by_session(session_id),
             device_id=viewer.device.device_id if viewer.device else None,
             include_hidden=include_hidden,
         )
     except ServiceError as err:
         _raise(err)
-    return [
-        PhotoOut(
-            id=p.id,
-            person_id=p.person_id,
-            person_name=p.person_name,
-            person_avatar_emoji=p.person_avatar_emoji,
-            person_color=p.person_color,
-            status=p.status,
-            taken_on=p.taken_on,
-            created_at=p.created_at,
-            url=p.url,
-            thumb_url=p.thumb_url,
-            reactions=[ReactionCountOut(emoji=r.emoji, count=r.count) for r in p.reactions],
-            my_reactions=[
-                MyReactionOut(person_id=r.person_id, emoji=r.emoji) for r in p.my_reactions
-            ],
-        )
-        for p in photos
-    ]
+    return [photo_out(p) for p in photos]
+
+
+def photo_out(p: photo_service.PhotoView) -> PhotoOut:
+    return PhotoOut(
+        id=p.id,
+        person_id=p.person_id,
+        person_name=p.person_name,
+        person_avatar_emoji=p.person_avatar_emoji,
+        person_color=p.person_color,
+        status=p.status,
+        taken_on=p.taken_on,
+        created_at=p.created_at,
+        url=p.url,
+        thumb_url=p.thumb_url,
+        reactions=[ReactionCountOut(emoji=r.emoji, count=r.count) for r in p.reactions],
+        my_reactions=[MyReactionOut(person_id=r.person_id, emoji=r.emoji) for r in p.my_reactions],
+    )
 
 
 REACT: dict[int | str, dict[str, Any]] = {
@@ -212,7 +216,13 @@ async def add_reaction(
     """Idempotent."""
     try:
         await photo_service.react(
-            db, device.household_id, device.device_id, session_id, photo_id, person_id, emoji
+            db,
+            device.household_id,
+            device.device_id,
+            photo_service.by_session(session_id),
+            photo_id,
+            person_id,
+            emoji,
         )
     except ServiceError as err:
         _raise(err)
@@ -236,7 +246,13 @@ async def remove_reaction(
     """Idempotent."""
     try:
         await photo_service.unreact(
-            db, device.household_id, device.device_id, session_id, photo_id, person_id, emoji
+            db,
+            device.household_id,
+            device.device_id,
+            photo_service.by_session(session_id),
+            photo_id,
+            person_id,
+            emoji,
         )
     except ServiceError as err:
         _raise(err)
@@ -261,7 +277,12 @@ async def hide_photo(
     """Soft hide: gone from every phone and the TV, kept for an unhide. Idempotent."""
     try:
         await photo_service.set_hidden(
-            db, account.household_id, account.account_id, session_id, photo_id, hidden=True
+            db,
+            account.household_id,
+            account.account_id,
+            photo_service.by_session(session_id),
+            photo_id,
+            hidden=True,
         )
     except ServiceError as err:
         _raise(err)
@@ -279,7 +300,12 @@ async def unhide_photo(
 ) -> Response:
     try:
         await photo_service.set_hidden(
-            db, account.household_id, account.account_id, session_id, photo_id, hidden=False
+            db,
+            account.household_id,
+            account.account_id,
+            photo_service.by_session(session_id),
+            photo_id,
+            hidden=False,
         )
     except ServiceError as err:
         _raise(err)
@@ -303,7 +329,12 @@ async def delete_photo(
     worker to purge the backup copies within 24h."""
     try:
         await photo_service.delete(
-            db, storage, account.household_id, account.account_id, session_id, photo_id
+            db,
+            storage,
+            account.household_id,
+            account.account_id,
+            photo_service.by_session(session_id),
+            photo_id,
         )
     except ServiceError as err:
         _raise(err)

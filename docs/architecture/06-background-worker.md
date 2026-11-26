@@ -57,6 +57,11 @@ shows the last successful run.
 
 ## Gotchas
 
+- Night albums (ADR-0019) changed the photo key prefix for new uploads
+  (`…/albums/{album_id}/…`), not the worker: every task reads `object_key`/`thumb_key` from the
+  row or the tombstone, so old and new keys are handled alike (`tests/integration/test_worker_tasks.py`
+  passes unchanged).
+
 - The backup credentials exist only in `fnh-worker` secrets. If the API is ever compromised, the
   attacker can't delete the backups.
 - Upstash supports DB 0 only. ARQ uses the `arq:` prefix and SSE uses `session:*` channels on the same instance.
