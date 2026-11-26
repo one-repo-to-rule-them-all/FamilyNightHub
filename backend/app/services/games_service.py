@@ -716,17 +716,30 @@ async def end_game(
 async def tv_target(db: AsyncSession, household_id: uuid.UUID) -> uuid.UUID | None:
     """The game a host sent to the TV, or None. A game that has ended is no longer sent: the
     TV falls back on its own, so there is nothing to clean up (events stay hints)."""
+    return (await tv_target_state(db, household_id))[0]
+
+
+async def tv_target_state(
+    db: AsyncSession, household_id: uuid.UUID
+) -> tuple[uuid.UUID | None, uuid.UUID | None, datetime | None]:
+    """(live target, ended target, its ended_at). The ended target is the sent game after it
+    ended, still pointed at until the host sends another or presses Back to QR: the TV holds
+    its result screen for a while (win and lose moment) and then moves on by itself."""
     row = (
         await db.execute(
             text(
-                "SELECT t.game_id FROM household_tv_target t "
+                "SELECT t.game_id, g.status, g.ended_at FROM household_tv_target t "
                 "JOIN games g ON g.id = t.game_id AND g.household_id = t.household_id "
-                "WHERE t.household_id = :h AND g.status <> 'ended'"
+                "WHERE t.household_id = :h"
             ),
             {"h": household_id},
         )
     ).first()
-    return None if row is None else row.game_id
+    if row is None:
+        return None, None, None
+    if row.status == "ended":
+        return None, row.game_id, row.ended_at
+    return row.game_id, None, None
 
 
 async def set_tv_target(

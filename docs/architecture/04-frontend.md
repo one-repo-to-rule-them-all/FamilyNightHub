@@ -178,6 +178,13 @@ close button that takes focus, Escape to close, and a still version under
 a tap. The TV winner banners render the same confetti (`tv-confetti`). Hooks: `result-moment`,
 `result-won`, `result-lost`, `result-dismiss`, `confetti`; e2e: `e2e/games-win-moment.spec.ts`.
 
+The paired TV holds a finished game it was sent to for `TV_HOLD_MS` (2 minutes, `lib/tv-hold.ts`,
+vitest-covered) before following its usual order: `tv/games/[game]/game-route.tsx` stays while
+`shouldLeaveTv` says so (re-checked on each `tv-target` poll and by a timer), and `/tv` goes back
+to an ended target only while the server-measured hold is on and this TV has not already left it.
+"Back to QR" or another "Show on TV" ends the hold at once. e2e: `e2e/games-tv.spec.ts` (Playwright
+clock, no fixed waits).
+
 ## Owner portal (admin and host)
 
 `/host` and `/admin/*` are one portal (`docs/architecture/proposals/owner-portal.md`, #44):

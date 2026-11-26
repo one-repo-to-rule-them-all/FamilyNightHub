@@ -10,7 +10,8 @@ import { POLL_MS } from "@/hooks/use-live-session";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { api, type ApiError, type GameSummary, type NightSummary } from "@/lib/api";
 import { DEVICE_EXPIRED_COPY, isDeviceExpired } from "@/lib/device-idle";
-import { useTvTarget } from "@/lib/tv-target";
+import { releasedGames, shouldReturnToEnded } from "@/lib/tv-hold";
+import { useTvTargetState } from "@/lib/tv-target";
 
 /** Nights the TV should be showing, newest first. A closed night is history, not the TV's job. */
 const ON_SCREEN = ["draft", "voting", "revealed", "tonight"] as const;
@@ -46,15 +47,19 @@ type Following = "sent-game" | "night" | "game" | "none";
 export function TvHome() {
   const router = useRouter();
   const current = useCurrentNight();
-  const sent = useTvTarget();
+  const sent = useTvTargetState();
   const openGame = useOpenGame();
   useWakeLock();
 
   const settled = !current.isPending && !sent.isPending;
   let path: string | null = null;
   let following: Following = "none";
-  if (sent.data) {
-    path = `/tv/games/${sent.data}`;
+  if (sent.data?.game_id) {
+    path = `/tv/games/${sent.data.game_id}`;
+    following = "sent-game";
+  } else if (sent.data?.ended_game_id && shouldReturnToEnded(sent.data, releasedGames)) {
+    // A sent game that just ended: its result screen holds for a while (lib/tv-hold.ts).
+    path = `/tv/games/${sent.data.ended_game_id}`;
     following = "sent-game";
   } else if (current.data?.id) {
     path = `/tv/${current.data.id}`;

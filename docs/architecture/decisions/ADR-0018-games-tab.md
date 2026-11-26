@@ -860,5 +860,17 @@ not rendered at all under `prefers-reduced-motion`. The TV winner banners (bingo
 new Scattergories winner line when the game ends) get the same confetti. Sound is opt-in per device
 (off by default) and starts only after a tap. The Gratitude Jar has no winner and is unchanged.
 
-**Consequences.** No API, schema or migration change. Clearing site data replays the moment once.
-A second device for the same person shows it again (the guard is per device by design).
+**The TV holds the result.** On staging the paired TV left a finished game almost at once
+(the TV-target rule "switch when the game ends") and nobody saw the winner. Now the TV holds the
+finished game's screen (winner banner, confetti, results) for `TV_HOLD_MS` = 2 minutes
+(`lib/tv-hold.ts`), then follows its usual order; "Back to QR" or "Show on TV" for another game
+moves it sooner. `GET /games/tv-target` keeps `game_id` as before (null once the game ends) and
+adds `ended_game_id`, `ended_at` and `server_now`: the sent game after it ended, until the host
+sends another or presses Back to QR. Without them the TV could not tell "the game ended" from
+"Back to QR" (both read as null). The hold is the longer of the server's "ended this long ago"
+and the TV's own time since it saw the end, so a late TV does not hold again and a stale poll
+cannot hold forever.
+
+**Consequences.** One additive API change (three optional fields on `TvTargetOut`); no schema or
+migration change. Clearing site data replays the phone moment once. A second device for the same
+person shows it again (the guard is per device by design).

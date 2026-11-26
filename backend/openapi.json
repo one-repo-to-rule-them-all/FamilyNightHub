@@ -5764,8 +5764,32 @@
         "type": "object"
       },
       "TvTargetOut": {
-        "description": "The game the host sent to the paired TV; null when none (or it ended).",
+        "description": "The game the host sent to the paired TV; null when none (or it ended).\n\n`ended_game_id`/`ended_at` name the sent game once it has ended (until the host sends another\nor presses Back to QR), so the TV can hold its result screen for a while (ADR-0018 amendment\n2026-11-26, win and lose moment). `server_now` lets the TV measure that without clock skew.",
         "properties": {
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "ended_game_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended Game Id"
+          },
           "game_id": {
             "anyOf": [
               {
@@ -5777,6 +5801,18 @@
               }
             ],
             "title": "Game Id"
+          },
+          "server_now": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Now"
           }
         },
         "required": [
