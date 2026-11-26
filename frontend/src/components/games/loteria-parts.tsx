@@ -21,10 +21,15 @@ export function CurrentCard({
   testId: string;
 }) {
   const card = cardId === null ? null : cardById(cardId);
-  const big = variant === "tv" ? "9em" : variant === "host" ? "6rem" : "4.5rem";
+  const big = variant === "tv" ? "9em" : variant === "host" ? "6rem" : "2.75rem";
+  // The phone's version is one compact row (picture beside the name) so the tabla fits on screen.
+  const phone = variant === "phone";
   return (
     <div
-      className="flex flex-col items-center gap-2 text-center"
+      className={cn(
+        "flex items-center text-center",
+        phone ? "flex-row gap-3 text-left" : "flex-col gap-2",
+      )}
       aria-live="polite"
       aria-label={card ? `Last card ${card.es}, ${card.en}` : "No card called yet"}
     >
@@ -36,21 +41,28 @@ export function CurrentCard({
       >
         {card ? card.emoji : "🂠"}
       </span>
-      <p
-        data-testid={testId}
-        data-card-id={card?.id}
-        className={cn(
-          "font-heading leading-tight font-bold",
-          variant === "tv" ? "text-[3.2em]" : variant === "host" ? "text-4xl" : "text-3xl",
-        )}
-      >
-        {card ? card.es : "—"}
-      </p>
-      {card ? (
-        <p className={cn("text-muted-foreground", variant === "tv" ? "text-[1.2em]" : "text-base")}>
-          {card.en}
+      <div className="flex flex-col">
+        <p
+          data-testid={testId}
+          data-card-id={card?.id}
+          className={cn(
+            "font-heading leading-tight font-bold",
+            variant === "tv" ? "text-[3.2em]" : variant === "host" ? "text-4xl" : "text-2xl",
+          )}
+        >
+          {card ? card.es : "—"}
         </p>
-      ) : null}
+        {card ? (
+          <p
+            className={cn(
+              "text-muted-foreground",
+              variant === "tv" ? "text-[1.2em]" : phone ? "text-xs" : "text-base",
+            )}
+          >
+            {card.en}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
