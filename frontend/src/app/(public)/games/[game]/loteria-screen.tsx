@@ -158,10 +158,13 @@ export function LoteriaScreen({ gameId }: { gameId: string }) {
           ) : null}
 
           {data.status === "live" || data.status === "ended" ? (
-            <div className="flex flex-col gap-2 rounded-2xl border border-foreground/10 bg-card p-4">
-              <p className="text-sm text-muted-foreground">Last card</p>
+            <div className="flex flex-col gap-1 rounded-xl border border-foreground/10 bg-card px-3 py-2">
+              <p className="text-xs text-muted-foreground">Last card</p>
               <CurrentCard cardId={last?.card_id ?? null} variant="phone" testId="loteria-last" />
-              <p className="text-base text-muted-foreground" data-testid="loteria-recent">
+              <p
+                className="truncate text-xs whitespace-nowrap text-muted-foreground"
+                data-testid="loteria-recent"
+              >
                 {recentCalls(calls).length > 0 ? (
                   <>
                     Before:{" "}
@@ -181,7 +184,7 @@ export function LoteriaScreen({ gameId }: { gameId: string }) {
 
           {tabla ? (
             <>
-              <p className="text-sm text-muted-foreground" data-testid="loteria-progress">
+              <p className="sr-only" aria-live="polite" data-testid="loteria-progress">
                 {data.status === "live" || data.status === "ended"
                   ? progressLabel({ missing: tabla.missing, won: tabla.won })
                   : "Your tabla"}
@@ -219,7 +222,7 @@ export function LoteriaScreen({ gameId }: { gameId: string }) {
                           mark.mutate({ index, marked: !isMarked });
                         }}
                         className={cn(
-                          "relative flex aspect-[3/4] min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border p-1 text-center leading-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                          "relative flex aspect-square min-h-11 flex-col items-center justify-center gap-0.5 rounded-lg border p-1 text-center leading-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                           isMarked
                             ? "border-[var(--accent-cinema)] bg-[var(--accent-cinema)]/20 text-foreground"
                             : "border-foreground/15 bg-card text-foreground",
@@ -232,10 +235,13 @@ export function LoteriaScreen({ gameId }: { gameId: string }) {
                             className="absolute top-1 right-1 size-4 text-[var(--accent-cinema)]"
                           />
                         ) : null}
-                        <span aria-hidden className="text-4xl leading-none">
+                        <span aria-hidden className="text-3xl leading-none">
                           {card.emoji}
                         </span>
-                        <span aria-hidden className="text-[0.7rem] font-semibold sm:text-sm">
+                        <span
+                          aria-hidden
+                          className="truncate text-[0.65rem] font-semibold sm:text-xs"
+                        >
                           {card.es}
                         </span>
                       </button>
