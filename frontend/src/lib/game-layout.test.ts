@@ -7,6 +7,11 @@ import {
   scatterStripPlayers,
   stripDensity,
   stripMaxRows,
+  stripNameMaxEm,
+  stripSticky,
+  needsResultsPaging,
+  nextPage,
+  fitScale,
 } from "./game-layout";
 
 describe("stripDensity", () => {
@@ -28,7 +33,8 @@ describe("stripMaxRows", () => {
 
   it("lets TV and host wrap, a little more when dense", () => {
     expect(stripMaxRows("tv", "roomy")).toBe(2);
-    expect(stripMaxRows("host", "dense")).toBe(3);
+    expect(stripMaxRows("host", "compact")).toBe(4);
+    expect(stripMaxRows("host", "dense")).toBe(5);
   });
 });
 
@@ -110,5 +116,47 @@ describe("jarStripPlayers", () => {
 
   it("is empty before anything is revealed", () => {
     expect(jarStripPlayers([])).toEqual([]);
+  });
+});
+
+describe("stripNameMaxEm", () => {
+  it("narrows the name column as the crowd grows", () => {
+    expect(stripNameMaxEm("roomy")).toBeGreaterThan(stripNameMaxEm("compact"));
+    expect(stripNameMaxEm("compact")).toBeGreaterThan(stripNameMaxEm("dense"));
+  });
+});
+
+describe("fitScale", () => {
+  it("is 1 when the content fits or is not measured", () => {
+    expect(fitScale({ width: 100, height: 100 }, { width: 80, height: 90 })).toBe(1);
+    expect(fitScale({ width: 0, height: 0 }, { width: 80, height: 90 })).toBe(1);
+  });
+  it("shrinks to the tighter axis", () => {
+    expect(fitScale({ width: 100, height: 100 }, { width: 100, height: 200 })).toBe(0.5);
+    expect(fitScale({ width: 100, height: 300 }, { width: 200, height: 100 })).toBe(0.5);
+  });
+  it("never goes below the floor", () => {
+    expect(fitScale({ width: 100, height: 100 }, { width: 100, height: 1000 })).toBe(0.4);
+    expect(fitScale({ width: 100, height: 100 }, { width: 100, height: 1000 }, 0.6)).toBe(0.6);
+  });
+});
+
+describe("stripSticky", () => {
+  it("pins a short strip and lets a crowd's scroll with the page", () => {
+    expect(stripSticky(4)).toBe(true);
+    expect(stripSticky(8)).toBe(false);
+  });
+});
+
+describe("results paging", () => {
+  it("pages only a crowd's answers", () => {
+    expect(needsResultsPaging(6)).toBe(false);
+    expect(needsResultsPaging(18)).toBe(false);
+    expect(needsResultsPaging(19)).toBe(true);
+  });
+  it("wraps", () => {
+    expect(nextPage(0, 3)).toBe(1);
+    expect(nextPage(2, 3)).toBe(0);
+    expect(nextPage(0, 1)).toBe(0);
   });
 });
