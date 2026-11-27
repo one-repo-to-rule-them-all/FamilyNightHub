@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   authorLine,
   canSendNote,
+  clampCycleSeconds,
   jarProgress,
   kindName,
   jarStatusLine,
@@ -51,8 +52,8 @@ describe("games", () => {
     expect(authorLine(null)).toBe("— Someone in the family");
   });
 
-  it("only offers the jar so far", () => {
-    expect(PLAYABLE).toEqual(["gratitude_jar", "bingo", "scattergories"]);
+  it("offers every playable kind", () => {
+    expect(PLAYABLE).toEqual(["gratitude_jar", "bingo", "scattergories", "loteria"]);
     expect(KIND_COPY.gratitude_jar.name).toBe("Gratitude jar");
   });
 
@@ -61,5 +62,13 @@ describe("games", () => {
     expect(kindName("bingo", "thanksgiving")).toBe("Thanksgiving bingo");
     expect(kindName("bingo")).toBe("Thanksgiving bingo");
     expect(kindName("gratitude_jar", null)).toBe("Gratitude jar");
+  });
+
+  it("reads the seconds box as whole seconds from 5 to 60", () => {
+    expect(clampCycleSeconds("12")).toBe(12);
+    expect(clampCycleSeconds("1")).toBe(5);
+    expect(clampCycleSeconds("999")).toBe(60);
+    expect(clampCycleSeconds("")).toBe(12);
+    expect(clampCycleSeconds("abc")).toBe(12);
   });
 });

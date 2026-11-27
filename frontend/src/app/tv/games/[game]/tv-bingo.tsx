@@ -1,6 +1,7 @@
 "use client";
 
 import { CalledBoard } from "@/components/games/called-board";
+import { Confetti } from "@/components/games/confetti";
 import { TvGameFrame } from "@/components/games/tv-game-frame";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { useWakeLock } from "@/hooks/use-wake-lock";
@@ -55,6 +56,7 @@ export function TvBingo({ gameId }: { gameId: string }) {
       }
       banner={
         <div aria-live="polite" className="w-full">
+          {announcement ? <Confetti fixed testId="tv-confetti" /> : null}
           {announcement ? (
             <p
               data-testid="tv-bingo-winner"

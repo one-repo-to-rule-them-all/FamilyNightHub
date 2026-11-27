@@ -82,15 +82,21 @@ async def _create(p: Phone, h: SeededHousehold, person: uuid.UUID, **extra: Any)
     return await p.post(_base(h.ids["session"]), {"person_id": str(person), **extra})
 
 
-def _keys(h: SeededHousehold, photo_id: str) -> tuple[str, str]:
-    return photo_service.object_keys(h.household_id, h.ids["session"], uuid.UUID(photo_id))
+async def _keys(h: SeededHousehold, photo_id: str) -> tuple[str, str]:
+    """ADR-0019: a night's photo is filed under the album of the night's date."""
+    async with household_session(h.household_id) as db:
+        album_id = await db.scalar(
+            text("SELECT album_id FROM photos WHERE id = :p"), {"p": photo_id}
+        )
+    assert album_id is not None
+    return photo_service.object_keys(h.household_id, album_id, uuid.UUID(photo_id))
 
 
 async def _ready_photo(p: Phone, h: SeededHousehold, fake: FakeStorage, person: uuid.UUID) -> str:
     resp = await _create(p, h, person)
     assert resp.status_code == 201, resp.text
     photo_id: str = resp.json()["photo_id"]
-    for key in _keys(h, photo_id):
+    for key in await _keys(h, photo_id):
         fake.put(key)
     done = await p.post(f"{_base(h.ids['session'])}/{photo_id}/complete")
     assert done.status_code == 204, done.text
@@ -143,9 +149,9 @@ async def test_upload_flow_presigns_completes_and_lists(
         resp = await _create(p, a, person, taken_on="2026-10-09")
         assert resp.status_code == 201, resp.text
         body = resp.json()
-        key, thumb = _keys(a, body["photo_id"])
-        assert (
-            key == f"households/{a.household_id}/sessions/{a.ids['session']}/{body['photo_id']}.jpg"
+        key, thumb = await _keys(a, body["photo_id"])
+        assert key.startswith(f"households/{a.household_id}/albums/") and key.endswith(
+            f"/{body['photo_id']}.jpg"
         )
         assert thumb == key.removesuffix(".jpg") + "_thumb.jpg"
         assert body["upload_url"].startswith(f"{FAKE_HOST}/{quote(key)}?op=put")
@@ -201,7 +207,7 @@ async def test_complete_rejects_bad_uploads_and_stays_pending(
     async with phone() as p:
         person = await _member(p, a)
         photo_id = (await _create(p, a, person)).json()["photo_id"]
-        key, thumb_key = _keys(a, photo_id)
+        key, thumb_key = await _keys(a, photo_id)
         for k, spec in ((key, full), (thumb_key, thumb)):
             if spec is not None:
                 fake.put(k, size=spec[0], content_type=spec[1])
@@ -219,7 +225,7 @@ async def test_complete_accepts_exactly_ten_mb_and_jpeg_with_params(
     async with phone() as p:
         person = await _member(p, a)
         photo_id = (await _create(p, a, person)).json()["photo_id"]
-        key, thumb = _keys(a, photo_id)
+        key, thumb = await _keys(a, photo_id)
         fake.put(key, size=TEN_MB)
         fake.put(thumb, size=1, content_type="Image/JPEG; charset=binary")
         resp = await p.post(f"{_base(a.ids['session'])}/{photo_id}/complete")
@@ -232,7 +238,7 @@ async def test_only_the_uploading_device_completes(two_households: Pair, fake: F
         person = await _member(p, a)
         await _member(other, a)
         photo_id = (await _create(p, a, person)).json()["photo_id"]
-        for key in _keys(a, photo_id):
+        for key in await _keys(a, photo_id):
             fake.put(key)
         resp = await other.post(f"{_base(a.ids['session'])}/{photo_id}/complete")
         assert resp.status_code == 404
@@ -554,7 +560,7 @@ async def test_admin_hard_delete_writes_tombstone(two_households: Pair, fake: Fa
         person = await _member(p, a)
         photo_id = await _ready_photo(p, a, fake, person)
         sid = a.ids["session"]
-        key, thumb = _keys(a, photo_id)
+        key, thumb = await _keys(a, photo_id)
         assert (
             await _send(
                 p, "PUT", f"{_base(sid)}/{photo_id}/reactions/{HEART}", person_id=str(person)

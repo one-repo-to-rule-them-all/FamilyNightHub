@@ -28,6 +28,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.storage import PhotoStorage, StorageUnavailable
+from app.services import photo_service
 from app.services.errors import Invalid, NotFound, Unavailable
 
 
@@ -84,7 +85,7 @@ async def _delete_photos(
     keys to delete from the bucket once every row is gone."""
     rows = (
         await db.execute(
-            text(f"SELECT id, object_key, thumb_key FROM photos WHERE {where}"), params
+            text(f"SELECT id, album_id, object_key, thumb_key FROM photos WHERE {where}"), params
         )
     ).all()
     if rows and storage is None:
@@ -104,6 +105,8 @@ async def _delete_photos(
             ),
             {"ids": [r.id for r in rows]},
         )
+        # ADR-0019 §4: an album left with no photos goes in the same transaction.
+        await photo_service.drop_empty_albums(db, list({r.album_id for r in rows if r.album_id}))
     return [(r.object_key, r.thumb_key) for r in rows]
 
 
@@ -256,6 +259,7 @@ async def start_fresh(
         "games",
         "options",
         "sessions",
+        "albums",
         "device_people",
         "devices",
     ):

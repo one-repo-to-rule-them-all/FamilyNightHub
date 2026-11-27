@@ -576,6 +576,226 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/albums": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Albums
+         * @description Recent albums with at least one photo, newest night first, each with a cover.
+         */
+        get: operations["list_albums_api_v1_albums_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/by-session/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Album For Session
+         * @description The album of a movie night's date (404 until it has one), for `/albums/[session]`.
+         */
+        get: operations["album_for_session_api_v1_albums_by_session__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/tonight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tonight Album
+         * @description Tonight's album. Before its first photo it doesn't exist yet: `id` is null.
+         */
+        get: operations["tonight_album_api_v1_albums_tonight_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/tonight/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tonight Photos
+         * @description Tonight's photos; empty before the album's first photo.
+         */
+        get: operations["list_tonight_photos_api_v1_albums_tonight_photos_get"];
+        put?: never;
+        /**
+         * Create Tonight Photo
+         * @description Start an upload into tonight's album (created on first use; no movie night needed).
+         *     PUT both URLs, then call `/albums/{album_id}/photos/{photo_id}/complete`.
+         */
+        post: operations["create_tonight_photo_api_v1_albums_tonight_photos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Album */
+        get: operations["get_album_api_v1_albums__album_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename Album
+         * @description Hosts name the night ("Thanksgiving 2026"); null goes back to the date label.
+         */
+        patch: operations["rename_album_api_v1_albums__album_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Album Photos
+         * @description The album, newest first; same shape as the movie night's. URLs expire in 10 minutes.
+         *     Hidden photos appear only for accounts that may unhide them.
+         */
+        get: operations["list_album_photos_api_v1_albums__album_id__photos_get"];
+        put?: never;
+        /**
+         * Create Album Photo
+         * @description Add to a past album: allowed for its night date plus 3 days, then 409.
+         */
+        post: operations["create_album_photo_api_v1_albums__album_id__photos_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}/photos/{photo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Album Photo
+         * @description Hard delete (admins), as on the movie night's album.
+         */
+        delete: operations["delete_album_photo_api_v1_albums__album_id__photos__photo_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}/photos/{photo_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Album Photo */
+        post: operations["complete_album_photo_api_v1_albums__album_id__photos__photo_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}/photos/{photo_id}/hide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hide Album Photo */
+        post: operations["hide_album_photo_api_v1_albums__album_id__photos__photo_id__hide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}/photos/{photo_id}/reactions/{emoji}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Add Album Reaction */
+        put: operations["add_album_reaction_api_v1_albums__album_id__photos__photo_id__reactions__emoji__put"];
+        post?: never;
+        /** Remove Album Reaction */
+        delete: operations["remove_album_reaction_api_v1_albums__album_id__photos__photo_id__reactions__emoji__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/albums/{album_id}/photos/{photo_id}/unhide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unhide Album Photo */
+        post: operations["unhide_album_photo_api_v1_albums__album_id__photos__photo_id__unhide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/consent": {
         parameters: {
             query?: never;
@@ -1382,6 +1602,172 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/loteria/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Loteria
+         * @description Verify a player's spoken "Loteria!" against the called cards (hosts). A false claim
+         *     changes nothing; a true one records the win and, by config, ends the game.
+         */
+        post: operations["check_loteria_api_v1_games__game_id__loteria_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/draw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Draw Card
+         * @description Call the next card (hosts). `expected_seq` is the count the host's screen showed; a
+         *     different count is 409 so a double tap or a second window cannot draw twice.
+         */
+        post: operations["draw_card_api_v1_games__game_id__loteria_draw_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join Loteria
+         * @description Take a seat as a person bound to this phone and get a tabla (idempotent).
+         */
+        post: operations["join_loteria_api_v1_games__game_id__loteria_join_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/mark/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark Square
+         * @description Mark a picture on your own tabla. Only a called card can be marked (409).
+         */
+        put: operations["mark_square_api_v1_games__game_id__loteria_mark__index__put"];
+        post?: never;
+        /**
+         * Unmark Square
+         * @description Take a mark back. A win already recorded stays.
+         */
+        delete: operations["unmark_square_api_v1_games__game_id__loteria_mark__index__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Tablas
+         * @description The tablas of the people this phone is acting as. Nobody else's is readable.
+         */
+        get: operations["my_tablas_api_v1_games__game_id__loteria_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Loteria
+         * @description Let the family join (draft to open). Fixes the draw seed.
+         */
+        post: operations["open_loteria_api_v1_games__game_id__loteria_open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/reroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reroll Loteria
+         * @description A new tabla, as often as you like while the game is open; 409 once it has started.
+         */
+        post: operations["reroll_loteria_api_v1_games__game_id__loteria_reroll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/loteria/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Loteria
+         * @description Start the round: cards can be drawn and marked, tablas are fixed (open to live).
+         */
+        post: operations["start_loteria_api_v1_games__game_id__loteria_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}/open": {
         parameters: {
             query?: never;
@@ -1839,6 +2225,27 @@ export interface paths {
         };
         /** Me */
         get: operations["me_api_v1_platform_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Reel
+         * @description Quotes, winners, leaderboards and photos from `window` (the last 12 hours, or all
+         *     time), in a stable seeded order. Hidden notes and photos never appear.
+         */
+        get: operations["get_reel_api_v1_reel_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2613,6 +3020,80 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** AlbumOut */
+        AlbumOut: {
+            /**
+             * Cover Thumb Url
+             * @description Presigned GET (10 min) of the newest photo
+             */
+            cover_thumb_url: string | null;
+            /**
+             * Display Title
+             * @description title, else a date label such as "Thu 26 Nov"
+             */
+            display_title: string;
+            /**
+             * Id
+             * @description None only for tonight's album before its first photo
+             */
+            id: string | null;
+            /** Is Tonight */
+            is_tonight: boolean;
+            /**
+             * Night Date
+             * Format: date
+             * @description Household-local date, 4:00 cutoff
+             */
+            night_date: string;
+            /** Photo Count */
+            photo_count: number;
+            /**
+             * Title
+             * @description The host's name for the night, if renamed
+             */
+            title: string | null;
+            /**
+             * Uploads Open
+             * @description Tonight, or within 3 days of the night date
+             */
+            uploads_open: boolean;
+        };
+        /** AlbumPhotoCreatedOut */
+        AlbumPhotoCreatedOut: {
+            /**
+             * Album Id
+             * Format: uuid
+             */
+            album_id: string;
+            /**
+             * Expires In
+             * @description Seconds the upload URLs stay valid
+             */
+            expires_in: number;
+            /**
+             * Photo Id
+             * Format: uuid
+             */
+            photo_id: string;
+            /**
+             * Thumb Upload Url
+             * @description PUT the thumbnail JPEG here, same content type
+             */
+            thumb_upload_url: string;
+            /**
+             * Upload Url
+             * @description PUT the full JPEG here with Content-Type: image/jpeg
+             */
+            upload_url: string;
+        };
+        /** AlbumRenameIn */
+        AlbumRenameIn: {
+            /**
+             * Title
+             * @description null or blank goes back to the date label
+             */
+            title?: string | null;
+        };
         /** AttributionOut */
         AttributionOut: {
             /** Justwatch */
@@ -2698,7 +3179,7 @@ export interface components {
              * Win Mode
              * @enum {string}
              */
-            win_mode: "line" | "blackout";
+            win_mode: "line" | "blackout" | "corners" | "x" | "stamp";
         };
         /** BingoDrawIn */
         BingoDrawIn: {
@@ -2737,7 +3218,7 @@ export interface components {
              * Win Mode
              * @enum {string}
              */
-            win_mode: "line" | "blackout";
+            win_mode: "line" | "blackout" | "corners" | "x" | "stamp";
         };
         /** BingoPlayerOut */
         BingoPlayerOut: {
@@ -2997,13 +3478,19 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "gratitude_jar" | "bingo" | "scattergories";
+            kind: "gratitude_jar" | "bingo" | "scattergories" | "loteria";
             /**
              * Mode
              * @default thanksgiving
              * @enum {string}
              */
             mode: "thanksgiving" | "classic";
+            /**
+             * Pattern
+             * @default full
+             * @enum {string}
+             */
+            pattern: "line" | "corners" | "center" | "full";
             /**
              * Reveal Mode
              * @default cycle
@@ -3017,7 +3504,7 @@ export interface components {
              * @default line
              * @enum {string}
              */
-            win_mode: "line" | "blackout";
+            win_mode: "line" | "blackout" | "corners" | "x" | "stamp";
         };
         /** GameOut */
         GameOut: {
@@ -3039,7 +3526,8 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "gratitude_jar" | "bingo" | "scattergories";
+            kind: "gratitude_jar" | "bingo" | "scattergories" | "loteria";
+            loteria?: components["schemas"]["LoteriaOut"] | null;
             /** Mode */
             mode?: ("thanksgiving" | "classic") | null;
             scatter?: components["schemas"]["ScatterOut"] | null;
@@ -3067,7 +3555,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "gratitude_jar" | "bingo" | "scattergories";
+            kind: "gratitude_jar" | "bingo" | "scattergories" | "loteria";
             /** Mode */
             mode?: ("thanksgiving" | "classic") | null;
             /**
@@ -3290,6 +3778,107 @@ export interface components {
             password: string;
             /** Username Or Email */
             username_or_email: string;
+        };
+        /** LoteriaCallOut */
+        LoteriaCallOut: {
+            /** Card Id */
+            card_id: number;
+            /** Emoji */
+            emoji: string;
+            /** Name En */
+            name_en: string;
+            /** Name Es */
+            name_es: string;
+            /** Seq */
+            seq: number;
+        };
+        /** LoteriaCheckIn */
+        LoteriaCheckIn: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** LoteriaCheckOut */
+        LoteriaCheckOut: {
+            /** Missing */
+            missing: number;
+            /**
+             * Pattern
+             * @enum {string}
+             */
+            pattern: "line" | "corners" | "center" | "full";
+            /** Squares */
+            squares: number[] | null;
+            /** Valid */
+            valid: boolean;
+        };
+        /** LoteriaDrawIn */
+        LoteriaDrawIn: {
+            /** Expected Seq */
+            expected_seq: number;
+        };
+        /** LoteriaJoinIn */
+        LoteriaJoinIn: {
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** LoteriaOut */
+        LoteriaOut: {
+            /** Calls */
+            calls: components["schemas"]["LoteriaCallOut"][];
+            /** End On First Win */
+            end_on_first_win: boolean;
+            last_call?: components["schemas"]["LoteriaCallOut"] | null;
+            /**
+             * Pattern
+             * @enum {string}
+             */
+            pattern: "line" | "corners" | "center" | "full";
+            /** Players */
+            players: components["schemas"]["LoteriaPlayerOut"][];
+        };
+        /** LoteriaPlayerOut */
+        LoteriaPlayerOut: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /** Finish Place */
+            finish_place: number | null;
+            /** Missing */
+            missing: number;
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Won */
+            won: boolean;
+        };
+        /** LoteriaTablaOut */
+        LoteriaTablaOut: {
+            /** Finish Place */
+            finish_place: number | null;
+            /** Marked */
+            marked: number[];
+            /** Missing */
+            missing: number;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+            /** Squares */
+            squares: number[];
+            /** Won */
+            won: boolean;
         };
         /** MagicLinkIn */
         MagicLinkIn: {
@@ -4066,6 +4655,95 @@ export interface components {
             emoji: string;
         };
         /**
+         * ReelItemOut
+         * @description One slide. Only the fields of its `kind` are set.
+         */
+        ReelItemOut: {
+            author?: components["schemas"]["ReelPersonOut"] | null;
+            /** Body */
+            body?: string | null;
+            /** Final */
+            final?: boolean | null;
+            /** Game Kind */
+            game_kind?: string | null;
+            /** Game Title */
+            game_title?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "quote" | "winner" | "leaderboard" | "photo";
+            /** Label */
+            label?: string | null;
+            photo_by?: components["schemas"]["ReelPersonOut"] | null;
+            /** Photo Url */
+            photo_url?: string | null;
+            /** Place */
+            place?: number | null;
+            /** Points */
+            points?: number | null;
+            /**
+             * Standings
+             * @default []
+             */
+            standings: components["schemas"]["ReelStandingOut"][];
+            /**
+             * Winners
+             * @default []
+             */
+            winners: components["schemas"]["ReelPersonOut"][];
+        };
+        /**
+         * ReelOut
+         * @description The reel in its show order. A screen finds the slide on show with no tick events:
+         *     `floor((now + (server_now - Date.now()) - anchor) / dwell_seconds) mod len(items)`.
+         */
+        ReelOut: {
+            /**
+             * Anchor
+             * Format: date-time
+             */
+            anchor: string;
+            /** Dwell Seconds */
+            dwell_seconds: number;
+            /** Items */
+            items: components["schemas"]["ReelItemOut"][];
+            /**
+             * Server Now
+             * Format: date-time
+             */
+            server_now: string;
+            /** Since */
+            since: string | null;
+            /**
+             * Window
+             * @enum {string}
+             */
+            window: "tonight" | "all";
+        };
+        /** ReelPersonOut */
+        ReelPersonOut: {
+            /** Avatar Emoji */
+            avatar_emoji: string;
+            /** Color */
+            color: string;
+            /** Name */
+            name: string;
+            /**
+             * Person Id
+             * Format: uuid
+             */
+            person_id: string;
+        };
+        /** ReelStandingOut */
+        ReelStandingOut: {
+            person: components["schemas"]["ReelPersonOut"];
+            /** Points */
+            points: number;
+        };
+        /**
          * RemovalOut
          * @description What removing a person deletes (issue #94): shown in the confirm dialog, and returned
          *     by the delete.
@@ -4431,6 +5109,8 @@ export interface components {
             region: string;
             /** Streaming Providers */
             streaming_providers: number[];
+            /** Timezone */
+            timezone: string;
             /**
              * Updated At
              * Format: date-time
@@ -4452,6 +5132,11 @@ export interface components {
             region?: string | null;
             /** Streaming Providers */
             streaming_providers?: number[] | null;
+            /**
+             * Timezone
+             * @description IANA name, e.g. America/Chicago
+             */
+            timezone?: string | null;
         };
         /**
          * SlideshowIn
@@ -4510,10 +5195,20 @@ export interface components {
         /**
          * TvTargetOut
          * @description The game the host sent to the paired TV; null when none (or it ended).
+         *
+         *     `ended_game_id`/`ended_at` name the sent game once it has ended (until the host sends another
+         *     or presses Back to QR), so the TV can hold its result screen for a while (ADR-0018 amendment
+         *     2026-11-26, win and lose moment). `server_now` lets the TV measure that without clock skew.
          */
         TvTargetOut: {
+            /** Ended At */
+            ended_at?: string | null;
+            /** Ended Game Id */
+            ended_game_id?: string | null;
             /** Game Id */
             game_id: string | null;
+            /** Server Now */
+            server_now?: string | null;
         };
         /** TypedTitleIn */
         TypedTitleIn: {
@@ -5836,6 +6531,655 @@ export interface operations {
                 content?: never;
             };
             /** @description Photos can't be deleted right now */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_albums_api_v1_albums_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    album_for_session_api_v1_albums_by_session__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumOut"];
+                };
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    tonight_album_api_v1_albums_tonight_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumOut"];
+                };
+            };
+        };
+    };
+    list_tonight_photos_api_v1_albums_tonight_photos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoOut"][];
+                };
+            };
+        };
+    };
+    create_tonight_photo_api_v1_albums_tonight_photos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumPhotoCreatedOut"];
+                };
+            };
+            /** @description The person is not bound to this device, or Terms not accepted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The album is closed to new photos (3 days after) or is full */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_album_api_v1_albums__album_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumOut"];
+                };
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    rename_album_api_v1_albums__album_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlbumRenameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumOut"];
+                };
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_album_photos_api_v1_albums__album_id__photos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoOut"][];
+                };
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_album_photo_api_v1_albums__album_id__photos_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlbumPhotoCreatedOut"];
+                };
+            };
+            /** @description The person is not bound to this device, or Terms not accepted */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The album is closed to new photos (3 days after) or is full */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_album_photo_api_v1_albums__album_id__photos__photo_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    complete_album_photo_api_v1_albums__album_id__photos__photo_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Upload missing, not a JPEG, or over 10 MB */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    hide_album_photo_api_v1_albums__album_id__photos__photo_id__hide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    add_album_reaction_api_v1_albums__album_id__photos__photo_id__reactions__emoji__put: {
+        parameters: {
+            query: {
+                /** @description Who is reacting */
+                person_id: string;
+            };
+            header?: never;
+            path: {
+                album_id: string;
+                photo_id: string;
+                emoji: "❤️" | "😂" | "😮" | "👍" | "🎉" | "🍿";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    remove_album_reaction_api_v1_albums__album_id__photos__photo_id__reactions__emoji__delete: {
+        parameters: {
+            query: {
+                /** @description Whose reaction to remove */
+                person_id: string;
+            };
+            header?: never;
+            path: {
+                album_id: string;
+                photo_id: string;
+                emoji: "❤️" | "😂" | "😮" | "👍" | "🎉" | "🍿";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    unhide_album_photo_api_v1_albums__album_id__photos__photo_id__unhide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                album_id: string;
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night or photo in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Photo storage not configured or unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7581,6 +8925,454 @@ export interface operations {
             };
         };
     };
+    check_loteria_api_v1_games__game_id__loteria_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoteriaCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteriaCheckOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draw_card_api_v1_games__game_id__loteria_draw_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoteriaDrawIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    join_loteria_api_v1_games__game_id__loteria_join_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoteriaJoinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteriaTablaOut"];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_square_api_v1_games__game_id__loteria_mark__index__put: {
+        parameters: {
+            query: {
+                person_id: string;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteriaTablaOut"];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unmark_square_api_v1_games__game_id__loteria_mark__index__delete: {
+        parameters: {
+            query: {
+                person_id: string;
+            };
+            header?: never;
+            path: {
+                game_id: string;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteriaTablaOut"];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_tablas_api_v1_games__game_id__loteria_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteriaTablaOut"][];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_loteria_api_v1_games__game_id__loteria_open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reroll_loteria_api_v1_games__game_id__loteria_reroll_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoteriaJoinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoteriaTablaOut"];
+                };
+            };
+            /** @description This phone isn't acting as that person, or consent is needed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_loteria_api_v1_games__game_id__loteria_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameOut"];
+                };
+            };
+            /** @description No such night (or option/movie) in this household */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The game is not in a state that allows this */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     open_game_api_v1_games__game_id__open_post: {
         parameters: {
             query?: never;
@@ -8539,6 +10331,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformMeOut"];
+                };
+            };
+        };
+    };
+    get_reel_api_v1_reel_get: {
+        parameters: {
+            query?: {
+                window?: "tonight" | "all";
+            };
+            header?: {
+                "X-FNH-Test-Seed"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

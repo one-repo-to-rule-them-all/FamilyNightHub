@@ -285,6 +285,33 @@ async def test_blackout_needs_every_square(two_households: Pair) -> None:
             assert hit["valid"] is True and hit["pattern"] == list(range(25))
 
 
+@pytest.mark.parametrize(
+    ("mode", "idx"),
+    [
+        ("corners", [0, 4, 20, 24]),
+        ("x", [0, 4, 6, 8, 16, 18, 20, 24]),
+        ("stamp", [0, 1, 5, 6]),
+    ],
+)
+async def test_new_patterns_check_valid_and_invalid(
+    two_households: Pair, mode: str, idx: list[int]
+) -> None:
+    a, _ = two_households
+    async with phone() as host:
+        await _host(host, a)
+        gid = await _classic(host, win_mode=mode)
+        async with _player(a, host) as (p, sam):
+            squares = await _join(p, gid, sam)
+            await _start(host, gid)
+            # Nothing called yet: not a win, and the pattern is still all to go.
+            miss = (await _check(host, gid, sam)).json()
+            assert miss["valid"] is False and miss["win_mode"] == mode and miss["missing"] > 0
+            await _draw_until(host, gid, 0, {int(squares[i]) for i in idx})
+            hit = (await _check(host, gid, sam)).json()
+            assert hit["valid"] is True and hit["missing"] == 0
+            assert set(idx) <= set(hit["pattern"])
+
+
 async def test_thanksgiving_rejects_draw_and_check_and_stays_the_default(
     two_households: Pair,
 ) -> None:

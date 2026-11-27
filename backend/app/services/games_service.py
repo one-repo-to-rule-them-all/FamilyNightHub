@@ -35,8 +35,9 @@ _AUDIT = text(
 ).bindparams(bindparam("data", type_=JSONB))
 
 # The jar (A), bingo (B) and scattergories (C).
-AVAILABLE_KINDS = frozenset({"gratitude_jar", "bingo", "scattergories"})
-WIN_MODES = frozenset({"line", "blackout"})
+AVAILABLE_KINDS = frozenset({"gratitude_jar", "bingo", "scattergories", "loteria"})
+LOTERIA_PATTERNS = frozenset({"line", "corners", "center", "full"})
+WIN_MODES = frozenset(bingo.WIN_MODE_VALUES)
 BINGO_MODES = frozenset({"thanksgiving", "classic"})
 
 
@@ -214,12 +215,13 @@ async def create_game(
     mode: str = "thanksgiving",
     reveal_mode: str = "cycle",
     cycle_seconds: int = jar.CYCLE_SECONDS_DEFAULT,
+    pattern: str = "full",
 ) -> GameRow:
     if kind not in AVAILABLE_KINDS:
         raise Invalid("That game isn't available yet.")
     if kind == "bingo":
         if win_mode not in WIN_MODES:
-            raise Invalid("Pick line or blackout.")
+            raise Invalid("Pick line, blackout, corners, x or stamp.")
         if mode not in BINGO_MODES:
             raise Invalid("Pick classic or Thanksgiving bingo.")
         config: dict[str, Any] = {
@@ -229,6 +231,11 @@ async def create_game(
             "end_on_first_win": end_on_first_win,
         }
         status = "draft"  # the host opens it when the family is ready to join
+    elif kind == "loteria":
+        if pattern not in LOTERIA_PATTERNS:
+            raise Invalid("Pick line, four corners, centre four or full tabla.")
+        config = {"pattern": pattern, "end_on_first_win": end_on_first_win}
+        status = "draft"
     else:
         config = {"allow_anonymous": allow_anonymous}
         if kind == "gratitude_jar":
@@ -709,17 +716,30 @@ async def end_game(
 async def tv_target(db: AsyncSession, household_id: uuid.UUID) -> uuid.UUID | None:
     """The game a host sent to the TV, or None. A game that has ended is no longer sent: the
     TV falls back on its own, so there is nothing to clean up (events stay hints)."""
+    return (await tv_target_state(db, household_id))[0]
+
+
+async def tv_target_state(
+    db: AsyncSession, household_id: uuid.UUID
+) -> tuple[uuid.UUID | None, uuid.UUID | None, datetime | None]:
+    """(live target, ended target, its ended_at). The ended target is the sent game after it
+    ended, still pointed at until the host sends another or presses Back to QR: the TV holds
+    its result screen for a while (win and lose moment) and then moves on by itself."""
     row = (
         await db.execute(
             text(
-                "SELECT t.game_id FROM household_tv_target t "
+                "SELECT t.game_id, g.status, g.ended_at FROM household_tv_target t "
                 "JOIN games g ON g.id = t.game_id AND g.household_id = t.household_id "
-                "WHERE t.household_id = :h AND g.status <> 'ended'"
+                "WHERE t.household_id = :h"
             ),
             {"h": household_id},
         )
     ).first()
-    return None if row is None else row.game_id
+    if row is None:
+        return None, None, None
+    if row.status == "ended":
+        return None, row.game_id, row.ended_at
+    return row.game_id, None, None
 
 
 async def set_tv_target(
@@ -759,7 +779,8 @@ def _require_bingo(game: GameRow) -> None:
 
 
 def _win_mode(game: GameRow) -> bingo.WinMode:
-    return "blackout" if game.config.get("win_mode") == "blackout" else "line"
+    mode = game.config.get("win_mode")
+    return mode if mode in bingo.WIN_MODE_VALUES else "line"
 
 
 def _mode(game: GameRow) -> str:

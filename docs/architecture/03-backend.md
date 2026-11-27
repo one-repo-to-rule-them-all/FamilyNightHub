@@ -513,7 +513,8 @@ Photo bytes never touch the API.
 - **Create** (`POST …/photos`, device, `{person_id, taken_on?}`): the person must be actively
   bound to the device (403), and the night's _effective_ status must be `tonight` or `closed`
   (409 otherwise; a reveal counts once it has settled, `domain/session_state.check_photos_open`).
-  Inserts a `pending` row with keys `households/{hid}/sessions/{sid}/{photo_id}.jpg` and
+  Inserts a `pending` row (keys below, under Night albums; rows from before 0016 keep
+  `households/{hid}/sessions/{sid}/{photo_id}.jpg`) and
   `…_thumb.jpg` and returns two presigned PUTs (5 min, `Content-Type: image/jpeg` signed in, so
   the bucket refuses any other type). `taken_on` is the EXIF date, stored as midnight UTC. A
   night holds at most 500 photos (a runaway-queue backstop, 409).
@@ -526,6 +527,25 @@ Photo bytes never touch the API.
   device) and **fresh presigned GETs (10 min) minted per request after the household check**.
   Hidden photos are listed only for accounts with `sessions:run` (so they can unhide);
   devices and the TV never see them. No credential → 401 before any URL is minted.
+- **Night albums** ([ADR-0019](decisions/ADR-0019-night-albums.md), `api/v1/albums.py`): a photo
+  lives in its night album (`albums`, one per household per night date: the household's
+  `settings.timezone` local date with a 4:00 cutoff, `domain/albums.night_date`). Albums are
+  created lazily (`INSERT … ON CONFLICT DO NOTHING`, so two phones racing get one row).
+  `POST /albums/tonight/photos {person_id, taken_on?}` (device) needs no movie night; same
+  person, consent and 500-per-album rules, keys `households/{hid}/albums/{album_id}/{pid}.jpg`,
+  and the response adds `album_id`. `POST /albums/{id}/photos` adds to a past album for its night
+  date plus 3 days, then **409**. `POST /sessions/{sid}/photos` keeps its status gate and files the
+  photo into the album of the night's date (`revealed_at`, else `created_at`), so one evening has
+  one album. Reads: `GET /albums?limit=` (albums with a visible photo, newest night first, cover
+  and count), `GET /albums/tonight` (`id: null` before its first photo), `GET /albums/{id}`,
+  `GET /albums/by-session/{sid}` (404 until the night's date has an album),
+  `GET /albums/{id|tonight}/photos` (the album shape above). `PATCH /albums/{id} {title}`
+  (`sessions:run`, audited) names the night; null or blank goes back to the date label
+  ("Thu 26 Nov"). Complete, reactions, hide/unhide and delete exist under both
+  `/sessions/{sid}/photos/{pid}` and `/albums/{id}/photos/{pid}` (`photo_service.Scope`); a
+  photo uploaded on a movie night is reachable through both. Moderation ignores the upload
+  window. `photo_added` is published only for photos that have a movie night. Household
+  timezone: `PATCH /admin/settings {timezone}` (IANA name, validated, default `America/Chicago`).
 - **Reactions** (`PUT/DELETE …/reactions/{emoji}?person_id=`): allowlist ❤️ 😂 😮 👍 🎉 🍿
   (422 otherwise), only on `ready` photos (404), only as a bound person (403). Both idempotent.
 - **Moderation.** Hide/unhide is `sessions:run`: the host running the night in the room is the
@@ -764,7 +784,7 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   `/jar/moderation` and can hide one before it shows (idempotent); an anonymous note never
   carries its author, even there. The snapshot holds revealed, unhidden notes only, and counts.
 - **Thanksgiving Bingo (slice B).** A host creates a round with `config` `win_mode`
-  (`line`|`blackout`), `free_center` and `end_on_first_win` (defaults line, true, true); it starts
+  (`line`|`blackout`|`corners`|`x`|`stamp`; see ADR-0018 amendment 2026-11-26), `free_center` and `end_on_first_win` (defaults line, true, true); it starts
   as a `draft`, **open** (`POST /open`, idempotent) lets people join, **start** (`POST /start`)
   makes it `live`, and `/end` ends it any time. **Join** (`/bingo/join`, as a person this phone
   acts as, consent gate) draws 24 distinct squares from `bingo_pool.THANKSGIVING_POOL` with
@@ -830,6 +850,21 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   publishes nothing, and "Accept the rest" is client-side. The server stays the authority on the
   letter; the phone's hint is a convenience. Category fit is not judged. Ending the game does not
   reveal an unrevealed round.
+- **Lotería (amendment 2026-11-26, migration `0015_loteria`).** Kind `loteria`, config `pattern`
+  (`line` | `corners` | `center` | `full`, default full) and `end_on_first_win`. Pure
+  `domain/games/loteria.py` (4 x 4 masks, seeded `call_order`, `pattern`/`missing`) and the 54-card
+  data module `loteria_deck.py` (Spanish name, English gloss, emoji; mirrored in
+  `frontend/src/lib/loteria-deck.ts` and pinned equal by a unit test). **No new tables**: a tabla is
+  a `bingo_cards` row with 16 squares (the CHECK became `cardinality(squares) IN (16, 25)`) and
+  calls are `bingo_calls` rows with `value` 1-54. Routes live in `api/v1/games_loteria.py` and
+  `services/loteria_service.py`: `POST /games/{id}/loteria/{open,start,join,reroll,draw,check}`,
+  `GET …/loteria/mine`, `PUT/DELETE …/loteria/mark/{index}?person_id=`. Open fixes `reveal_seed`;
+  the n-th draw is `call_order(seed)[n]` (stale `expected_seq` 409, 54 calls max). Mark only a
+  called card (409); marking never wins. **Reroll** replaces the tabla and clears marks, unlimited
+  while `open`, 409 once `live`. **Check** (host) reads the called set, never the marks: a false
+  claim changes nothing and publishes nothing; a true one records `won_at` and, with
+  `end_on_first_win`, ends the game in the same transaction. Audit `game.loteria_called`,
+  `game.loteria_checked`. Merge, delete, Start fresh and export need nothing new.
 - **Events.** `game_changed` (status, reveal, hide, roster, a win, a round start, a verdict) and
   `game_activity` (a note dropped or taken back, a square marked, an answer saved) go to
   `game:{id}` after commit. `POST /sse-tickets` takes exactly one of `session_id` or
@@ -845,6 +880,24 @@ night**: `games` (`kind`, `status` `draft/open/live/ended`, `config`,
   (any device or account) returns `{game_id}` and returns `null` once the game has ended. No
   event: the TV polls the snapshot. The row cascades with its game, so person removal and Start
   fresh need no code; it is in `NOT_EXPORTED`.
+- **Night reel** (ADR-0018 amendment 2026-11-26). `GET /reel?window=tonight|all` (any device or
+  account, `ViewerDb`; `app/api/v1/reel.py`, `app/services/reel_service.py`, pure rules in
+  `app/domain/reel.py`) is a read-only, no-migration snapshot of the household's recent slides:
+  `quote` (revealed, unhidden notes, ended jars included; an anonymous note's author columns are
+  `NULL` in the SQL, so the name never leaves the database), `winner` (bingo cards with `won_at`
+  with their finishing place; a scattergories round's top scorers via `scatter_service.state`),
+  `leaderboard` (scattergories standings, top 5, `final` once the game ended) and `photo`
+  (`status = 'ready'` only, one presigned GET per photo minted per request, 60 at most; no storage
+  configured means no photo slides, not an error). `tonight` is a rolling 12 hours, `all` has no
+  lower bound; a slide is filtered on when it happened (`revealed_at`, `won_at`, round
+  `revealed_at`, photo `created_at`). Game kinds register their slides in
+  `reel_service.GAME_PROVIDERS` (Lotería adds one function). The response carries `items` in show
+  order, `anchor` (start of the UTC day), `server_now` and `dwell_seconds` (12): the order is each
+  id's `sha256(seed:id)`, so a new slide lands anywhere without reordering the rest, and the seed is
+  per household and UTC day unless `X-FNH-Test-Seed` pins it (test only). No write, audit row or
+  event. Tests: `tests/integration/test_reel.py` (real Postgres: typed slides, no hidden or
+  anonymous leak, window, cross-household and 401, stable seeded order) and
+  `tests/unit/test_reel_domain.py`.
 
 ## Where business logic belongs
 

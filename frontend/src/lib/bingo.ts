@@ -3,7 +3,7 @@
  * TV screens. React-free so it is unit-tested. The server decides wins; nothing here does.
  */
 
-export type WinMode = "line" | "blackout";
+export type WinMode = "line" | "blackout" | "corners" | "x" | "stamp";
 
 export interface BingoPlayerLike {
   person_id: string;
@@ -19,6 +19,9 @@ export const FREE_LABEL = "FREE";
 export const WIN_MODE_COPY: Record<WinMode, { name: string; blurb: string }> = {
   line: { name: "Line", blurb: "Any row, column or diagonal wins." },
   blackout: { name: "Blackout", blurb: "Every square on the card." },
+  corners: { name: "Four corners", blurb: "The four corner squares." },
+  x: { name: "The X", blurb: "Both diagonals, corner to corner." },
+  stamp: { name: "Postage stamp", blurb: "A 2×2 block in any corner of the card." },
 };
 
 /** A player's distance from winning, as a short caption: "Bingo!", "1 away", "4 to go". */
@@ -108,6 +111,52 @@ export function spacedLabel(call: Pick<CallLike, "label">): string {
   return call.label.replace(/^([BINGO])/, "$1 ");
 }
 
+const CARD_LINES: readonly (readonly number[])[] = [
+  ...Array.from({ length: CARD_SIZE }, (_, r) =>
+    Array.from({ length: CARD_SIZE }, (_, c) => r * CARD_SIZE + c),
+  ),
+  ...Array.from({ length: CARD_SIZE }, (_, c) =>
+    Array.from({ length: CARD_SIZE }, (_, r) => r * CARD_SIZE + c),
+  ),
+  Array.from({ length: CARD_SIZE }, (_, i) => i * CARD_SIZE + i),
+  Array.from({ length: CARD_SIZE }, (_, i) => i * CARD_SIZE + (CARD_SIZE - 1 - i)),
+];
+
+const LAST = CARD_SIZE - 1;
+const CORNER_SQUARES = [0, LAST, LAST * CARD_SIZE, LAST * CARD_SIZE + LAST];
+const X_SQUARES = [...new Set([...CARD_LINES[CARD_SIZE * 2], ...CARD_LINES[CARD_SIZE * 2 + 1]])];
+const STAMP_BLOCKS: readonly (readonly number[])[] = [0, CARD_SIZE - 2].flatMap((r) =>
+  [0, CARD_SIZE - 2].map((c) =>
+    [0, 1].flatMap((dr) => [0, 1].map((dc) => (r + dr) * CARD_SIZE + c + dc)),
+  ),
+);
+
+/** Every winning pattern for a mode (any one wins). Mirrors the server's `bingo.patterns`. */
+export function winPatterns(winMode: WinMode): readonly (readonly number[])[] {
+  switch (winMode) {
+    case "blackout":
+      return [Array.from({ length: CARD_SIZE * CARD_SIZE }, (_, i) => i)];
+    case "corners":
+      return [CORNER_SQUARES];
+    case "x":
+      return [X_SQUARES];
+    case "stamp":
+      return STAMP_BLOCKS;
+    default:
+      return CARD_LINES;
+  }
+}
+
+/**
+ * How many squares a player still has to MARK to complete a pattern. A classic round's server
+ * count follows the host's called numbers; the player's own count should follow their taps, or
+ * tapping looks like it does nothing. (The free centre is in `marked` when the round has one.)
+ */
+export function markedToGo(marked: readonly number[], winMode: WinMode): number {
+  const set = new Set(marked);
+  return Math.min(...winPatterns(winMode).map((p) => p.filter((i) => !set.has(i)).length));
+}
+
 /** A call split for display: "N34" is the letter "N" and the number "34". */
 export function callParts(call: Pick<CallLike, "label">): { letter: string; number: string } {
   const match = /^([BINGO])(\d+)$/.exec(call.label);
@@ -185,6 +234,10 @@ const COL_NAMES = ["B column", "I column", "N column", "G column", "O column"];
 export function patternName(pattern: readonly number[] | null): string {
   if (!pattern) return "";
   if (pattern.length === CARD_SIZE * CARD_SIZE) return "the whole card";
+  const key = [...pattern].sort((a, b) => a - b).join(",");
+  if (key === [...CORNER_SQUARES].sort((a, b) => a - b).join(",")) return "four corners";
+  if (key === [...X_SQUARES].sort((a, b) => a - b).join(",")) return "the X";
+  if (STAMP_BLOCKS.some((b) => b.join(",") === key)) return "postage stamp";
   const rows = new Set(pattern.map((i) => Math.floor(i / CARD_SIZE)));
   if (rows.size === 1) return ROW_NAMES[[...rows][0]];
   const cols = new Set(pattern.map((i) => i % CARD_SIZE));

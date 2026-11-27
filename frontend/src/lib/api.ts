@@ -14,6 +14,7 @@
  *
  * Types come from src/types/api.gen.ts (generated from backend/openapi.json; never hand-edited).
  */
+import { photosPath } from "@/lib/photos/target";
 import type { components, operations } from "@/types/api.gen";
 
 export type Schemas = components["schemas"];
@@ -46,6 +47,7 @@ export type HouseholdSettings = Schemas["SettingsOut"];
 export type AgeCap = NonNullable<HouseholdSettings["default_age_cap"]>;
 export type StreamingProvider = Schemas["ProviderOut"];
 export type Photo = Schemas["PhotoOut"];
+export type NightAlbum = Schemas["AlbumOut"];
 export type AdminMovie = Schemas["AdminMovieOut"];
 export type MoviePage = Schemas["MoviePageOut"];
 export type MovieFlags = Schemas["MovieFlagsIn"];
@@ -64,6 +66,10 @@ export type ModerationNote = Schemas["ModerationNoteOut"];
 export type BingoCard = Schemas["BingoCardOut"];
 export type BingoPlayer = Schemas["BingoPlayerOut"];
 export type BingoCheckResult = Schemas["BingoCheckOut"];
+export type LoteriaTabla = Schemas["LoteriaTablaOut"];
+export type LoteriaPlayer = Schemas["LoteriaPlayerOut"];
+export type LoteriaCall = Schemas["LoteriaCallOut"];
+export type LoteriaCheckResult = Schemas["LoteriaCheckOut"];
 export type ScatterState = Schemas["ScatterOut"];
 export type ScatterRevealed = Schemas["ScatterRevealedOut"];
 export type ScatterAnswer = Schemas["ScatterAnswerOut"];
@@ -298,6 +304,10 @@ export const api = {
   sseTicket: (sessionId: string) =>
     request<Schemas["SseTicketOut"]>("POST", "/sse-tickets", { session_id: sessionId }),
 
+  /** The night reel (ADR-0018 amendment): recent quotes, winners and photos in show order. */
+  reel: (window: Schemas["ReelOut"]["window"]) =>
+    request<Schemas["ReelOut"]>("GET", `/reel?window=${window}`),
+
   // Games (ADR-0018). Reads work for any household viewer; hosting is `sessions:run`.
   games: () => request<GameSummary[]>("GET", "/games"),
   game: (gameId: string) => request<Game>("GET", `/games/${encodeURIComponent(gameId)}`),
@@ -365,6 +375,36 @@ export const api = {
     }),
   checkBingo: (gameId: string, personId: string) =>
     request<BingoCheckResult>("POST", `/games/${encodeURIComponent(gameId)}/bingo/check`, {
+      person_id: personId,
+    }),
+
+  // Lotería (ADR-0018 amendment 2026-11-26). Hosts open, start, draw and check; a phone joins,
+  // rerolls its tabla while the game is open and marks called pictures.
+  openLoteria: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/loteria/open`),
+  startLoteria: (gameId: string) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/loteria/start`),
+  joinLoteria: (gameId: string, personId: string) =>
+    request<LoteriaTabla>("POST", `/games/${encodeURIComponent(gameId)}/loteria/join`, {
+      person_id: personId,
+    }),
+  rerollLoteria: (gameId: string, personId: string) =>
+    request<LoteriaTabla>("POST", `/games/${encodeURIComponent(gameId)}/loteria/reroll`, {
+      person_id: personId,
+    }),
+  myLoteriaTablas: (gameId: string) =>
+    request<LoteriaTabla[]>("GET", `/games/${encodeURIComponent(gameId)}/loteria/mine`),
+  markLoteriaSquare: (gameId: string, index: number, personId: string, marked: boolean) =>
+    request<LoteriaTabla>(
+      marked ? "PUT" : "DELETE",
+      `/games/${encodeURIComponent(gameId)}/loteria/mark/${index}?person_id=${encodeURIComponent(personId)}`,
+    ),
+  drawLoteria: (gameId: string, expectedSeq: number) =>
+    request<Game>("POST", `/games/${encodeURIComponent(gameId)}/loteria/draw`, {
+      expected_seq: expectedSeq,
+    }),
+  checkLoteria: (gameId: string, personId: string) =>
+    request<LoteriaCheckResult>("POST", `/games/${encodeURIComponent(gameId)}/loteria/check`, {
       person_id: personId,
     }),
 
@@ -467,15 +507,27 @@ export const api = {
   enroll: (body: Schemas["EnrollIn"]) =>
     request<Schemas["EnrollOut"]>("POST", "/devices/enroll", body),
 
-  // The night's photo album (ADR-0005).
+  // Photo albums (ADR-0005, ADR-0019). `target` is a movie night's id or an album key
+  // (`album:tonight`, `album:{id}`, lib/photos/target.ts); both reach the same photo rows.
   /** The album, newest first. Every URL is a presigned GET that expires in 10 minutes. */
-  photos: (sessionId: string) =>
-    request<Photo[]>("GET", `/sessions/${encodeURIComponent(sessionId)}/photos`),
-  /** A pending photo plus presigned PUTs (5 min) for the JPEG and its thumbnail. */
-  createPhoto: (sessionId: string, body: Schemas["PhotoCreateIn"]) =>
-    request<PhotoCreated>("POST", `/sessions/${encodeURIComponent(sessionId)}/photos`, body),
-  completePhoto: (sessionId: string, photoId: string) =>
-    request<void>("POST", `${photoPath(sessionId, photoId)}/complete`),
+  photos: (target: string) => request<Photo[]>("GET", photosPath(target)),
+  /** A pending photo plus presigned PUTs (5 min) for the JPEG and its thumbnail. For an album
+   * target the response also names the album the photo was filed into. */
+  createPhoto: (target: string, body: Schemas["PhotoCreateIn"]) =>
+    request<PhotoCreated & { album_id?: string }>("POST", photosPath(target), body),
+  completePhoto: (target: string, photoId: string) =>
+    request<void>("POST", `${photoPath(target, photoId)}/complete`),
+  /** Recent night albums with at least one photo, newest first (ADR-0019). */
+  albums: (limit = 20) => request<NightAlbum[]>("GET", `/albums?limit=${limit}`),
+  /** Tonight's album; `id` is null until its first photo. */
+  tonightAlbum: () => request<NightAlbum>("GET", "/albums/tonight"),
+  album: (albumId: string) => request<NightAlbum>("GET", `/albums/${encodeURIComponent(albumId)}`),
+  /** The album of a movie night's date: 404 until it has a photo. */
+  albumForSession: (sessionId: string) =>
+    request<NightAlbum>("GET", `/albums/by-session/${encodeURIComponent(sessionId)}`),
+  /** Hosts name the night; null goes back to the date label. */
+  renameAlbum: (albumId: string, title: string | null) =>
+    request<NightAlbum>("PATCH", `/albums/${encodeURIComponent(albumId)}`, { title }),
   react: (sessionId: string, photoId: string, emoji: ReactionEmoji, personId: string) =>
     request<void>("PUT", reactionPath(sessionId, photoId, emoji, personId)),
   unreact: (sessionId: string, photoId: string, emoji: ReactionEmoji, personId: string) =>
@@ -637,8 +689,8 @@ export async function enrollDevice(
   }
 }
 
-function photoPath(sessionId: string, photoId: string): string {
-  return `/sessions/${encodeURIComponent(sessionId)}/photos/${encodeURIComponent(photoId)}`;
+function photoPath(target: string, photoId: string): string {
+  return `${photosPath(target)}/${encodeURIComponent(photoId)}`;
 }
 
 function reactionPath(sessionId: string, photoId: string, emoji: string, personId: string) {

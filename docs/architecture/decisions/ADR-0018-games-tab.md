@@ -642,6 +642,104 @@ the night's QR screen; with no night but an open or live game, the TV settles on
 The target is not exported (it is a transient screen pointer, not household content) and is
 removed with its game (cascade, so person delete and Start fresh need no extra code).
 
+---
+
+## Amendment 2026-11-26: Lotería
+
+<!-- Appended section: written by the games-loteria session; the rest of this ADR is untouched. -->
+
+**Context.** The owner asked for Mexican Lotería for the family's heritage celebration: "like a
+bingo but with other characters". The loop is classic bingo's: the host calls, players mark their
+board, the host checks a spoken claim. Only the board (4 x 4 pictures, not 5 x 5 numbers) and the
+win patterns differ.
+
+**Decision.**
+
+1. **A fourth kind, `loteria`.** `games.kind` gains `loteria` (CHECK widened in `0015_loteria`;
+   `String(20)` already fits). Config (validated by the service, not trusted raw):
+   `pattern` (`line` | `corners` | `center` | `full`, default `line`) and `end_on_first_win`
+   (default true). Status runs `draft -> open -> live -> ended` exactly like classic bingo.
+2. **The deck.** 54 cards, ids 1-54, in one pure data module `domain/games/loteria_deck.py`
+   (`DECK: tuple[Card, ...]`, `Card(id, name_es, name_en, emoji)`), in the traditional order.
+   Pictures are **large emoji plus the Spanish name in big type** (no copyrighted artwork; the
+   emoji is decoration, the name carries the meaning, `aria-label` is the name, and a mark is a
+   check glyph plus colour, never colour alone). The deck is the same for every client: the API
+   sends card **ids** and the frontend maps id to name/emoji from a mirror table
+   (`frontend/src/lib/loteria-deck.ts`), pinned equal to the backend list by a backend unit test that
+   reads the TypeScript file; the snapshot's calls also carry `name_es`/`name_en`/`emoji`, so the
+   current card is right even if the mirror drifted.
+3. **The tabla.** 16 distinct card ids drawn by `random.Random(seed ^ person.int)`, row-major 4 x 4,
+   stored as decimal text. Mask bit `i` is square `i`; no free square. **Reroll** while the game is
+   `open`: unlimited, replaces the squares, resets marks, refused 409 once `live` (same rule as the
+   bingo reroll on `claude/games-card-reroll`, implemented separately here; a reroll takes
+   its own `tie_seed`: random in production, the test header under test; it never returns the same
+   tabla).
+4. **Storage: reuse, do not add tables.** Cards live in `bingo_cards` and calls in `bingo_calls`.
+   `bingo_calls.value BETWEEN 1 AND 75` already admits 1-54 and its unique indexes give "no repeat,
+   no shared slot" for free. `bingo_cards` carries a `cardinality(squares) = 25` CHECK; migration
+   `0015_loteria` replaces it with `cardinality(squares) IN (16, 25)` (and `marked_mask`'s range
+   already covers 16 bits). Why this and not `loteria_cards`/`loteria_calls`: it is one CHECK swap
+   instead of two tables, and every person-lifecycle path (export catalog, person delete, Start
+   fresh, merge, seed, `SCOPED_TABLES`, the RLS pin count) already covers these tables, so none of
+   those eight touch points can be missed or conflict with the in-flight bingo work. Cost: a table
+   named "bingo" holds Lotería rows (the `games.kind` tells them apart; every query is by `game_id`);
+   downgrade deletes Lotería games' rows before restoring the old CHECK. Rejected: a generic
+   rename (churns a table two sessions are editing).
+5. **Calling is seeded.** `reveal_seed` is set when the game is opened (`secrets.randbits(64)` or
+   `X-FNH-Test-Seed` in `ENVIRONMENT=test`); the n-th card is `call_order(seed)[n]`, a shuffle of
+   1-54. `POST /games/{id}/loteria/draw {expected_seq}` has classic bingo's semantics (409 on a
+   stale count, 409 at 54 "Every card has been called.", game row `FOR UPDATE`). The seed never
+   appears in a snapshot.
+6. **Marking.** `PUT/DELETE /games/{id}/loteria/mark/{index}?person_id=` on your own tabla; a mark
+   on an uncalled picture is 409 "That card hasn't been called."; unmarking is always allowed;
+   marking never wins.
+7. **Claims are verbal; the host checks.** Players shout "¡Lotería!". `POST
+/games/{id}/loteria/check {person_id}` verifies against the **called set** and the pattern,
+   never the player's taps, and returns `{valid, pattern: [indices] | null, missing}`. Invalid: no
+   state change, no event, audited. Valid: `won_at = clock_timestamp()` if unset, and with
+   `end_on_first_win` the game ends in the same transaction.
+8. **Patterns** (pure, masks over the 16 squares): `line` any of 4 rows, 4 columns, 2 diagonals;
+   `corners` squares 0, 3, 12, 15; `center` squares 5, 6, 9, 10; `full` all 16. `missing` is the
+   fewest uncalled squares in any one pattern of the mode.
+9. **Routes and files.** Own files, so the bingo work does not conflict: `domain/games/loteria.py`,
+   `loteria_deck.py`, `services/loteria_service.py`, `api/v1/games_loteria.py`. Shared registries
+   change add-only: `GameKind`, `AVAILABLE_KINDS`, `create_game` (a `loteria` branch),
+   `GameCreateIn.pattern`, `GameOut.loteria`. Open/start reuse the new `/loteria/open` and
+   `/loteria/start` (the bingo ones are bingo-only). End is the generic `/end`.
+10. **Events/audit.** `game.loteria_called`, `game.loteria_checked`, plus the existing opened/
+    started/ended; `GAME_CHANGED` on draw, open, start, join, reroll, valid check; `GAME_ACTIVITY`
+    on a mark; nothing on an invalid check.
+11. **Frontend.** Phone `loteria-screen.tsx` (tabla of big tiles: emoji, Spanish name, `aria-pressed`,
+    inactive-until-called with an explanation, reroll button while open, current card and the last
+    few calls above), host `loteria-host.tsx` (create form fields, open/start, **Draw**, current
+    card huge, called list, per-player **Check**), TV `tv-loteria.tsx` (current card very large,
+    recent cards, a 54-card called board, winner), all on the shared frames, ADR-0008 tokens, an
+    `aria-live` region for each call and the winner. `PLAYABLE` and `KIND_COPY` gain `loteria`.
+12. **Not in v1.** The spoken _canto_ (rhyme) and audio, undo of a draw, a phone "¡Lotería!"
+    button, custom patterns, 4 x 4 vs 5 x 5 choice, artwork beyond emoji.
+
+**Test plan** (targeted only). Pure modules at 100% with Hypothesis (tabla is 16 distinct deck ids;
+`call_order` is a seeded permutation of 1-54; pattern functions agree with a brute-force oracle;
+deck has 54 unique names). Real-Postgres integration: draws never repeat and follow a pinned seed;
+stale `expected_seq` is 409; mark only called; false then true check; line, corners, center and
+full; reroll open yes / live 409 / new squares; a Thanksgiving bingo game rejects Lotería routes
+and vice versa; cross-household 404. Vitest for the deck mirror and helpers; one Playwright spec.
+
+**OPEN (owner), with the default used.**
+
+- **L1.** Default pattern: **Full tabla (owner, 2026-11-26)**. Line, four corners and centre four
+  are host choices at creation.
+- **L2.** A valid check ends the round: **yes, the first win ends it (owner, 2026-11-26)**;
+  tickable off at creation.
+- **L3.** Pictures: **emoji + Spanish name** (used). Original illustrated cards would be a later
+  art task; the _canto_ (traditional rhyme, audio) is deferred.
+- **L4.** Deck spelling and English glosses follow the list the owner supplied (e.g. "El Violoncello",
+  "Las Jaras", "El Negrito", "El Apache"): **keep the traditional deck as supplied (owner,
+  2026-11-26)**. They live in one data file.
+- **L5.** Reroll is unlimited before the host starts (used); the same call as bingo's reroll.
+- **L6.** Storage reuses the `bingo_cards`/`bingo_calls` tables (used; reasoning in point 4).
+  Say if you would rather have dedicated tables.
+
 ### Amendment 2026-11-26: card reroll
 
 Owner request: players may reroll their own bingo card. `POST /games/{id}/bingo/reroll` (body
@@ -654,3 +752,125 @@ households, and behind the same consent gate as join. The seed follows join's pa
 means the new card always differs from the old one. It publishes `game.activity` because the host's
 "N to go" changes. Nobody else's card is touched. The phone shows a **New card** button only while
 the game is open and the person has a card.
+
+### Amendment 2026-11-26: more bingo win patterns
+
+`config.win_mode` (classic and Thanksgiving share it) grows from `line | blackout` to
+`line | blackout | corners | x | stamp`, chosen by the host at creation (default still `line`;
+existing games are unchanged). `corners` is the four corner squares; `x` is both diagonals (9
+squares); `stamp` is any one 2x2 block in a corner of the card (four candidate masks). The masks
+live in `domain/games/bingo.py` (`patterns(mode)`), and `has_win`, `squares_from_bingo` and
+classic's `bingo_classic.pattern` all read that one list, so the host Check and Thanksgiving's
+automatic win agree. A pattern that includes the centre (`x`) counts the free square as marked.
+The phone's own "to go" count (`markedToGo`, `winPatterns` in `lib/bingo.ts`) mirrors the server.
+Validation is `WIN_MODES` in the service (422 from the schema otherwise). No migration.
+
+Also decided the same day: Lotería's default pattern is the full tabla (L1), and on the classic
+phone screen the "Last call" block is compact and the separate progress line is gone (kept as
+visually hidden live text for screen readers; the player strip and the host's Check carry it).
+
+---
+
+## Amendment 2026-11-26: Night reel
+
+<!-- Appended section: written by the games-night-reel session; the rest of this ADR is untouched. -->
+
+**Context.** On staging the owner asked for "a single endpoint/URL that acts like the host panel,
+like a night reel, that shows all the quotes from the games and the winners of each game", showing
+winners and images in random order. Today an ended Gratitude Jar's TV says only "That is every
+note. Thank you, everyone.", and no screen recaps across games.
+
+**Decision.**
+
+1. **One read-only endpoint, no migration.** `GET /api/v1/reel?window=tonight|all` (any device or
+   account, `ViewerDb`) derives slides from tables that already exist: `gratitude_notes`,
+   `bingo_cards.won_at`, `scatter_rounds`/`scatter_answers` (scored by the existing pure rules via
+   `scatter_service.state`) and `photos`. Nothing is written, nothing is audited, no event is
+   published. Cross-household isolation is the same FORCE RLS plus explicit `household_id`
+   predicates every other read uses.
+2. **Slide kinds.** `quote` (a revealed, unhidden note; ended jars included; an anonymous note
+   carries no author), `winner` (a bingo card with `won_at`, classic and Thanksgiving; a
+   scattergories round's top scorers with points > 0), `leaderboard` (a scattergories game's
+   standings, top 5, `final` once the game has ended) and `photo` (status `ready` only, with a
+   presigned GET minted per request after the household check, ADR-0005). Hidden notes and hidden
+   photos are never listed, so the reel only shows what the household's moderation already allows.
+   Winners are provided through a small kind -> provider registry in `reel_service`, so Lotería
+   registers its provider when it merges (`kind = 'loteria'` does not exist on this branch).
+3. **Window.** `tonight` (default) is a rolling **last 12 hours** from the server clock; `all` is
+   no lower bound (for next year). A rolling window needs no new "night started" state and works
+   when the host never starts a movie night. Items are filtered on the moment they happened: a
+   note's `revealed_at`, a card's `won_at`, a round's `revealed_at`, a photo's `created_at`. Size
+   caps keep a long `all` response small (200 quotes, 60 photos, a signed URL each).
+4. **Shuffle and cycle, no tick events.** The server returns `items` in a seeded order, an
+   `anchor` and `dwell_seconds` (12). Each item's sort key is `sha256(seed:item_id)`, so a new
+   item lands at an arbitrary place without reshuffling the others and a 30 s refetch does not
+   reorder the show. The seed is derived from the household and the UTC day; in test
+   `X-FNH-Test-Seed` pins it (the voting tie-break pattern, ADR-0006). The anchor is the start of
+   that UTC day. The client works out the index locally with `cycleIndex` (the jar's arithmetic)
+   from `server_now`, `anchor` and `dwell_seconds`.
+5. **Refresh.** The reel has no game id, so there is no game channel to hint on; the TV refetches
+   every 30 s (and when the tab becomes visible). Events stay hints elsewhere; here the snapshot
+   is the only truth. A household-level hint is a later addition that changes nothing in the API.
+6. **TV page.** `/tv/reel` on the shared TV frame: big `tv-*` type, a "3 of 14" progress hint,
+   `prefers-reduced-motion` honoured, a polite `aria-live` region, Screen Wake Lock. An empty
+   reel says so kindly. The ended jar's own TV view keeps cycling its notes locally instead of
+   the thank-you line (add-only).
+7. **Host entry.** The Games area gets a **Night reel** card: open the reel, and choose the
+   window. **Show on TV** for the reel is deferred (see OPEN 3).
+
+**OPEN (the default used is stated; the owner reviews after).**
+
+- **OPEN 1: window.** Default: rolling last 12 hours, plus `all`. Alternative: since the host's
+  night started, or a host-picked date.
+- **OPEN 2: remove a slide from the reel.** Default: only the existing hide controls (hide a
+  note, hide a photo). No per-slide host "remove from reel" for winners or leaderboards (it would
+  need a table or a column). Add one if a result should not be shown.
+- **OPEN 3: Show on TV for the reel.** `household_tv_target.game_id` is a non-null FK to `games`,
+  so a reel target needs a migration (a nullable `game_id` plus a `kind` column) and edits to the
+  shared tv-target API and `/tv` routing that other sessions are touching. Default: deferred. Open
+  `/tv/reel` on the paired TV's browser (the Night reel card shows the link to copy).
+- **OPEN 4: dwell.** Default: one dwell of 12 s for every slide kind. Alternative: longer for
+  quotes, shorter for photos.
+- **OPEN 5: movie-night winners.** Default: not included (not cheap: a night's winner is a
+  voting-method result, ADR-0006, not a stored row).
+- **OPEN 6: ordering on change.** When the slide list changes size the local index jumps (it is
+  `elapsed / dwell` modulo the count). Default: accepted; new content is rare during a night.
+- **OPEN 7: leaderboard timing.** Default: a scattergories leaderboard appears as soon as one
+  round is revealed (`final: false` until the game ends), not only when the game ends.
+
+**Consequences.** No schema change, so no migration and nothing to roll back. The per-request cost
+is a handful of indexed reads plus up to 60 presigns, only while a TV is polling. Lotería adds one
+provider function and one registry line.
+
+## Amendment 2026-11-26: win and lose moment
+
+**Context.** After winning Lotería and bingo on staging with a real phone, the owner saw only a
+banner. They asked for a "You won!" with confetti on the winner's phone, and a kind "maybe next
+time" with a "whoop whoop whoop" for everyone else. The audience includes young children.
+
+**Decision.** Frontend only; the snapshot already says who won (`won`/`finish_place` for bingo and
+Lotería, the leaderboard for Scattergories). A pure helper (`lib/result-moment.ts`) decides
+`won | lost | null` for the phone's current person: null until the game is `ended`, when nobody
+won (a Scattergories game where nobody scored has no winner) and for a person who never joined;
+ties at the top of the Scattergories leaderboard all win. `components/games/result-moment.tsx`
+shows a full-screen card once per person per game on a device (a try/catch-wrapped `localStorage`
+key); the screen's own result line stays. The losing card never mocks: three dropping dots,
+"whoop, whoop, whoop", "Maybe next time" and who won. Confetti is CSS only (no dependency) and is
+not rendered at all under `prefers-reduced-motion`. The TV winner banners (bingo, Lotería, and a
+new Scattergories winner line when the game ends) get the same confetti. Sound is opt-in per device
+(off by default) and starts only after a tap. The Gratitude Jar has no winner and is unchanged.
+
+**The TV holds the result.** On staging the paired TV left a finished game almost at once
+(the TV-target rule "switch when the game ends") and nobody saw the winner. Now the TV holds the
+finished game's screen (winner banner, confetti, results) for `TV_HOLD_MS` = 2 minutes
+(`lib/tv-hold.ts`), then follows its usual order; "Back to QR" or "Show on TV" for another game
+moves it sooner. `GET /games/tv-target` keeps `game_id` as before (null once the game ends) and
+adds `ended_game_id`, `ended_at` and `server_now`: the sent game after it ended, until the host
+sends another or presses Back to QR. Without them the TV could not tell "the game ended" from
+"Back to QR" (both read as null). The hold is the longer of the server's "ended this long ago"
+and the TV's own time since it saw the end, so a late TV does not hold again and a stale poll
+cannot hold forever.
+
+**Consequences.** One additive API change (three optional fields on `TvTargetOut`); no schema or
+migration change. Clearing site data replays the phone moment once. A second device for the same
+person shows it again (the guard is per device by design).

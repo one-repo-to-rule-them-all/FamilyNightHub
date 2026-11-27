@@ -13,6 +13,7 @@ import { RecentNights } from "@/components/home/recent-nights";
 import { castBallots, homeBallotsKey, Tonight } from "@/components/home/tonight-card";
 import { RatePromptCard, useRatePrompt } from "@/components/night/rate-prompt-card";
 import { PhoneScreen } from "@/components/phone-screen";
+import { TonightAlbumCard } from "@/components/photos/tonight-album-card";
 import { buttonVariants } from "@/components/ui/button";
 import { markNightSeen, useHouseholdNight } from "@/hooks/use-household-night";
 import { useLiveNight, usePhonePeople } from "@/hooks/use-phone";
@@ -202,6 +203,7 @@ function Home({ people, current }: { people: PersonTile[]; current: PersonTile }
         />
       )}
       {cardAsks ? null : <RatePromptCard variant="secondary" />}
+      <TonightAlbumCard />
       <RecentNights personId={current.id} />
       <PhotoStrip />
     </GuestShell>

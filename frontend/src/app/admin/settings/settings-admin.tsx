@@ -211,6 +211,7 @@ function Joining({ settings }: { settings: HouseholdSettings }) {
     <>
       <JoinLink slug={settings.join_slug} />
       <QrCodeSetting settings={settings} />
+      <TimezoneSetting settings={settings} />
     </>
   );
 }
@@ -340,6 +341,51 @@ function QrCodeSetting({ settings }: { settings: HouseholdSettings }) {
           </span>
         </span>
       </label>
+      <ApiErrorNotice error={save.error} />
+    </div>
+  );
+}
+
+/** The zones the browser knows, with the saved one first-class even if the list lacks it. */
+function timeZones(current: string): string[] {
+  const intl = Intl as typeof Intl & { supportedValuesOf?: (key: "timeZone") => string[] };
+  const zones = intl.supportedValuesOf ? intl.supportedValuesOf("timeZone") : [];
+  return zones.includes(current) ? zones : [current, ...zones];
+}
+
+/**
+ * The household's time zone (ADR-0019): which night a photo belongs to. A photo taken before
+ * 4:00 the next morning still goes in the evening's album. Saves on change.
+ */
+function TimezoneSetting({ settings }: { settings: HouseholdSettings }) {
+  const id = useId();
+  const queryClient = useQueryClient();
+  const save = useMutation<HouseholdSettings, ApiError, string>({
+    mutationFn: (timezone) => api.updateSettings({ timezone }),
+    onSuccess: (next) => queryClient.setQueryData(SETTINGS_KEY, next),
+  });
+  return (
+    <div className="flex flex-col gap-2 border-t border-foreground/10 pt-4">
+      <Label htmlFor={id}>Time zone</Label>
+      <select
+        id={id}
+        value={save.isPending && save.variables ? save.variables : settings.timezone}
+        disabled={save.isPending}
+        aria-describedby={`${id}-help`}
+        onChange={(event) => save.mutate(event.target.value)}
+        className={SELECT_CLASS}
+        data-testid="timezone-setting"
+      >
+        {timeZones(settings.timezone).map((zone) => (
+          <option key={zone} value={zone}>
+            {zone.replaceAll("_", " ")}
+          </option>
+        ))}
+      </select>
+      <p id={`${id}-help`} className="text-sm text-muted-foreground">
+        Decides which night a photo belongs to. Photos taken before 4:00 the next morning still go
+        in the evening&apos;s album.
+      </p>
       <ApiErrorNotice error={save.error} />
     </div>
   );

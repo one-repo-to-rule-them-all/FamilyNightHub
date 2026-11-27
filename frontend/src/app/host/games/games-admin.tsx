@@ -11,7 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, type ApiError, type Game, type GameSummary } from "@/lib/api";
 import { type BingoMode, MODE_COPY, WIN_MODE_COPY, type WinMode } from "@/lib/bingo";
-import { KIND_COPY, kindName, PLAYABLE, statusLabel } from "@/lib/games";
+import { clampCycleSeconds, KIND_COPY, kindName, PLAYABLE, statusLabel } from "@/lib/games";
+import { type LoteriaPattern, PATTERN_COPY } from "@/lib/loteria";
+
+import { NightReelCard } from "./night-reel-card";
 
 /** One named tab for a game's control page, so the Family Night hub tab stays where it is. */
 export const GAME_WINDOW_NAME = "fnh-game";
@@ -51,11 +54,16 @@ export function GamesAdmin() {
   // This year the family plays classic bingo; Thanksgiving mode stays one tap away.
   const [bingoMode, setBingoMode] = useState<BingoMode>("classic");
   const [bingoTitle, setBingoTitle] = useState("Family bingo");
-  const [cycleSeconds, setCycleSeconds] = useState(12);
+  // Kept as text while typing: clamping each keystroke turned "12" into "52" (the "1" became 5).
+  const [cycleSecondsText, setCycleSecondsText] = useState("12");
+  const cycleSeconds = clampCycleSeconds(cycleSecondsText);
   const [winMode, setWinMode] = useState<WinMode>("line");
   const [freeCenter, setFreeCenter] = useState(true);
   const [endOnFirstWin, setEndOnFirstWin] = useState(true);
   const [scatterTitle, setScatterTitle] = useState("Thanksgiving scattergories");
+  const [loteriaTitle, setLoteriaTitle] = useState("Lotería");
+  const [pattern, setPattern] = useState<LoteriaPattern>("full");
+  const [loteriaEndOnFirstWin, setLoteriaEndOnFirstWin] = useState(true);
 
   const games = useQuery<GameSummary[], ApiError>({
     queryKey: ["games"],
@@ -88,6 +96,18 @@ export function GamesAdmin() {
         win_mode: winMode,
         free_center: freeCenter,
         end_on_first_win: endOnFirstWin,
+      }),
+    onSuccess: sendGameTab,
+    onError: closeGameTab,
+  });
+
+  const createLoteria = useMutation<Game, ApiError>({
+    mutationFn: () =>
+      api.createGame({
+        kind: "loteria",
+        title: loteriaTitle,
+        pattern,
+        end_on_first_win: loteriaEndOnFirstWin,
       }),
     onSuccess: sendGameTab,
     onError: closeGameTab,
@@ -138,10 +158,9 @@ export function GamesAdmin() {
           inputMode="numeric"
           min={5}
           max={60}
-          value={cycleSeconds}
-          onChange={(event) =>
-            setCycleSeconds(Math.min(60, Math.max(5, Math.round(Number(event.target.value)) || 12)))
-          }
+          value={cycleSecondsText}
+          onChange={(event) => setCycleSecondsText(event.target.value)}
+          onBlur={() => setCycleSecondsText(String(cycleSeconds))}
         />
         <label className="flex min-h-11 items-center gap-3">
           <input
@@ -278,6 +297,67 @@ export function GamesAdmin() {
           <Plus aria-hidden /> Start scattergories
         </Button>
       </form>
+
+      <form
+        className="flex flex-col gap-3 rounded-2xl border border-foreground/10 bg-card p-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (loteriaTitle.trim() && !createLoteria.isPending) {
+            openGameTab();
+            createLoteria.mutate();
+          }
+        }}
+      >
+        <h2 className="text-lg font-medium">Start {KIND_COPY.loteria.name}</h2>
+        <p className="text-sm text-muted-foreground">{KIND_COPY.loteria.blurb}</p>
+        <Label htmlFor="loteria-title">Name</Label>
+        <Input
+          id="loteria-title"
+          data-testid="loteria-title"
+          value={loteriaTitle}
+          maxLength={80}
+          onChange={(event) => setLoteriaTitle(event.target.value)}
+        />
+        <fieldset className="flex flex-col gap-1">
+          <legend className="text-sm font-medium">What wins</legend>
+          {(Object.keys(PATTERN_COPY) as LoteriaPattern[]).map((value) => (
+            <label key={value} className="flex min-h-11 items-center gap-3">
+              <input
+                type="radio"
+                name="loteria-pattern"
+                data-testid={`loteria-pattern-${value}`}
+                checked={pattern === value}
+                onChange={() => setPattern(value)}
+                className="size-5 accent-[var(--accent-cinema)]"
+              />
+              <span>
+                {PATTERN_COPY[value].name}
+                <span className="block text-sm text-muted-foreground">
+                  {PATTERN_COPY[value].blurb}
+                </span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <label className="flex min-h-11 items-center gap-3">
+          <input
+            type="checkbox"
+            checked={loteriaEndOnFirstWin}
+            onChange={(event) => setLoteriaEndOnFirstWin(event.target.checked)}
+            className="size-5 accent-[var(--accent-cinema)]"
+          />
+          The first win ends the round
+        </label>
+        <ApiErrorNotice error={createLoteria.error} />
+        <Button
+          type="submit"
+          data-testid="create-loteria"
+          disabled={!loteriaTitle.trim() || createLoteria.isPending}
+        >
+          <Plus aria-hidden /> Start Lotería
+        </Button>
+      </form>
+      <NightReelCard />
 
       <section className="flex flex-col gap-2" aria-label="Your games">
         <h2 className="text-lg font-medium">Your games</h2>

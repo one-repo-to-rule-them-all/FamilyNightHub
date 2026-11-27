@@ -37,7 +37,7 @@ from app.models.ops import (
     PlatformOperator,
     TmdbCache,
 )
-from app.models.photos import Photo, PhotoDeletion, PhotoReaction
+from app.models.photos import Album, Photo, PhotoDeletion, PhotoReaction
 
 __all__ = [
     "HouseholdTvTarget",
@@ -62,6 +62,7 @@ __all__ = [
     "Movie",
     "Option",
     "Person",
+    "Album",
     "Photo",
     "PhotoDeletion",
     "PhotoReaction",

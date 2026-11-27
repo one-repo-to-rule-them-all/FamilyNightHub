@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { PhoneGameFrame } from "@/components/games/phone-game-frame";
+import { ResultMoment } from "@/components/games/result-moment";
 import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
 import { useLiveGame } from "@/hooks/use-live-game";
@@ -14,6 +15,7 @@ import { usePhonePeople } from "@/hooks/use-phone";
 import { api, type ApiError, type BingoCard } from "@/lib/api";
 import {
   BINGO_LETTERS,
+  WIN_MODE_COPY,
   bingoStatusLine,
   callParts,
   calledSet,
@@ -23,6 +25,7 @@ import {
   classicStatusLine,
   FREE_LABEL,
   markedSet,
+  markedToGo,
   notCalledMessage,
   progressLabel,
   rankPlayers,
@@ -33,6 +36,7 @@ import {
   winnerLine,
   winnerNames,
 } from "@/lib/bingo";
+import { placedResult } from "@/lib/result-moment";
 import { bingoStripPlayers } from "@/lib/game-layout";
 import { statusLabel } from "@/lib/games";
 import { cn } from "@/lib/utils";
@@ -102,6 +106,12 @@ export function BingoScreen({ gameId }: { gameId: string }) {
   const calls = data?.bingo?.calls ?? [];
   const last = data?.bingo?.last_call ?? null;
   const called = calledSet(calls);
+  const result = placedResult(
+    data?.status,
+    current?.id,
+    players,
+    data?.bingo ? WIN_MODE_COPY[data.bingo.win_mode].name : null,
+  );
 
   return (
     <PhoneGameFrame
@@ -121,6 +131,7 @@ export function BingoScreen({ gameId }: { gameId: string }) {
       attrs={{ "data-kind": "bingo", "data-status": data?.status, "data-live": game.live }}
       notice={game.error ? <ApiErrorNotice error={game.error} /> : null}
     >
+      <ResultMoment gameId={gameId} personId={current?.id} decision={result} />
       {data ? (
         <>
           <div aria-live="polite" data-testid="bingo-announcement">
@@ -161,18 +172,21 @@ export function BingoScreen({ gameId }: { gameId: string }) {
           ) : null}
 
           {classic && (data.status === "live" || data.status === "ended") ? (
-            <div className="flex flex-col gap-1 rounded-2xl border border-foreground/10 bg-card p-4">
-              <p className="text-sm text-muted-foreground">Last call</p>
+            <div className="flex flex-col gap-0.5 rounded-xl border border-foreground/10 bg-card px-3 py-2">
+              <p className="text-xs text-muted-foreground">Last call</p>
               <p
                 aria-live="polite"
                 aria-label={last ? `Last call ${last.label}` : "No number called yet"}
                 data-testid="bingo-last-call"
                 data-value={last?.value}
-                className="font-heading text-6xl leading-none font-bold tabular-nums"
+                className="font-heading text-4xl leading-none font-bold tabular-nums"
               >
                 {last ? spacedLabel(last) : "—"}
               </p>
-              <p className="text-base text-muted-foreground" data-testid="bingo-recent-calls">
+              <p
+                className="truncate text-xs whitespace-nowrap text-muted-foreground"
+                data-testid="bingo-recent-calls"
+              >
                 {recentCalls(calls).length > 0 ? (
                   <>
                     Before:{" "}
@@ -196,9 +210,11 @@ export function BingoScreen({ gameId }: { gameId: string }) {
 
           {card ? (
             <>
-              <p className="text-sm text-muted-foreground" data-testid="bingo-progress">
+              <p className="sr-only" aria-live="polite" data-testid="bingo-progress">
                 {progressLabel({
-                  squares_from_bingo: card.squares_from_bingo,
+                  squares_from_bingo: classic
+                    ? markedToGo(card.marked, data.bingo?.win_mode ?? "line")
+                    : card.squares_from_bingo,
                   won: card.won,
                 })}
               </p>

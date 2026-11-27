@@ -1,11 +1,13 @@
 "use client";
 
 import { Countdown, Leaderboard, LetterTile, Results } from "@/components/games/scatter-parts";
+import { Confetti } from "@/components/games/confetti";
 import { TvGameFrame } from "@/components/games/tv-game-frame";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { useScatterClock } from "@/hooks/use-scatter-clock";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { scatterStripPlayers } from "@/lib/game-layout";
+import { namesList, pointsLabel, scatterWinners } from "@/lib/result-moment";
 import { roundHeading } from "@/lib/scatter";
 
 /**
@@ -22,6 +24,7 @@ export function TvScatter({ gameId }: { gameId: string }) {
   const scatter = data?.scatter ?? undefined;
   const { state, seconds, round } = useScatterClock(scatter, game.dataUpdatedAt);
   const lastRevealed = scatter?.revealed.at(-1);
+  const winners = data?.status === "ended" ? scatterWinners(scatter?.leaderboard ?? []) : [];
 
   if (game.error) {
     return (
@@ -54,6 +57,20 @@ export function TvScatter({ gameId }: { gameId: string }) {
       <p role="status" aria-live="polite" className="sr-only" data-testid="tv-announce">
         {announcement}
       </p>
+
+      {winners.length > 0 ? (
+        <>
+          <Confetti fixed testId="tv-confetti" />
+          <p
+            aria-live="polite"
+            data-testid="tv-scatter-winner"
+            className="tv-display rounded-[1em] border border-[var(--accent-cinema)] bg-card p-[0.75em] marquee-glow"
+          >
+            {namesList(winners)} {winners.length === 1 ? "wins" : "win"} with{" "}
+            {pointsLabel(winners[0].points)}!
+          </p>
+        </>
+      ) : null}
 
       {scatter && state === "lobby" ? (
         <p className="tv-body text-muted-foreground" data-testid="tv-scatter-lobby">

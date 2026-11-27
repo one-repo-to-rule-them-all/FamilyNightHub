@@ -12,8 +12,12 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-GameKind = Literal["gratitude_jar", "bingo", "scattergories"]
+GameKind = Literal["gratitude_jar", "bingo", "scattergories", "loteria"]
+LoteriaPattern = Literal["line", "corners", "center", "full"]
 GameStatus = Literal["draft", "open", "live", "ended"]
+
+
+BingoWinMode = Literal["line", "blackout", "corners", "x", "stamp"]
 
 
 class GameCreateIn(BaseModel):
@@ -23,7 +27,7 @@ class GameCreateIn(BaseModel):
     allow_anonymous: bool = True
     # Bingo: what counts as a win, whether the middle square is free, and whether the first
     # win ends the round.
-    win_mode: Literal["line", "blackout"] = "line"
+    win_mode: BingoWinMode = "line"
     free_center: bool = True
     end_on_first_win: bool = True
     # Bingo mode: Thanksgiving (honour-system marks, the API default) or classic (host-called
@@ -32,6 +36,8 @@ class GameCreateIn(BaseModel):
     # Gratitude Jar: cycle notes by themselves once started, or show them one by one.
     reveal_mode: Literal["cycle", "manual"] = "cycle"
     cycle_seconds: int = Field(default=12, ge=5, le=60)
+    # Loteria: which pattern wins (end_on_first_win above applies too).
+    pattern: LoteriaPattern = "full"
 
 
 class JarAuthorOut(BaseModel):
@@ -107,7 +113,7 @@ class BingoOut(BaseModel):
     # Classic only: the numbers called so far, in call order. Never a future call.
     calls: list[BingoCallOut] = []
     last_call: BingoCallOut | None = None
-    win_mode: Literal["line", "blackout"]
+    win_mode: BingoWinMode
     free_center: bool
     end_on_first_win: bool
     players: list[BingoPlayerOut]
@@ -118,6 +124,7 @@ class GameOut(GameSummaryOut):
     jar: JarOut | None
     bingo: BingoOut | None = None
     scatter: ScatterOut | None = None
+    loteria: LoteriaOut | None = None
 
 
 class BingoJoinIn(BaseModel):
@@ -135,7 +142,7 @@ class BingoCheckIn(BaseModel):
 
 class BingoCheckOut(BaseModel):
     valid: bool
-    win_mode: Literal["line", "blackout"]
+    win_mode: BingoWinMode
     # Indices of the first complete line (or all 25) when valid, else null.
     pattern: list[int] | None
     # Squares still to be called in the closest pattern (0 when valid).
@@ -317,14 +324,87 @@ class ScatterReviewOut(BaseModel):
     total: int
 
 
-GameOut.model_rebuild()
-
-
 class TvTargetOut(BaseModel):
-    """The game the host sent to the paired TV; null when none (or it ended)."""
+    """The game the host sent to the paired TV; null when none (or it ended).
+
+    `ended_game_id`/`ended_at` name the sent game once it has ended (until the host sends another
+    or presses Back to QR), so the TV can hold its result screen for a while (ADR-0018 amendment
+    2026-11-26, win and lose moment). `server_now` lets the TV measure that without clock skew.
+    """
 
     game_id: uuid.UUID | None
+    ended_game_id: uuid.UUID | None = None
+    ended_at: datetime | None = None
+    server_now: datetime | None = None
 
 
 class TvTargetIn(BaseModel):
     game_id: uuid.UUID | None = None
+
+
+# ---- Loteria (ADR-0018 amendment 2026-11-26) ----
+
+
+class LoteriaCallOut(BaseModel):
+    seq: int
+    # Deck card id, 1-54.
+    card_id: int
+    name_es: str
+    name_en: str
+    emoji: str
+
+
+class LoteriaPlayerOut(BaseModel):
+    person_id: uuid.UUID
+    name: str
+    avatar_emoji: str
+    color: str
+    # Squares still to be called in this player's closest pattern (0 = complete). Never which.
+    missing: int
+    won: bool
+    finish_place: int | None
+
+
+class LoteriaOut(BaseModel):
+    pattern: LoteriaPattern
+    end_on_first_win: bool
+    # The cards called so far, in order. Never a future call or the seed.
+    calls: list[LoteriaCallOut]
+    last_call: LoteriaCallOut | None = None
+    players: list[LoteriaPlayerOut]
+
+
+class LoteriaJoinIn(BaseModel):
+    person_id: uuid.UUID
+
+
+class LoteriaDrawIn(BaseModel):
+    # How many calls the host's screen showed; a different server count is 409.
+    expected_seq: int = Field(ge=0, le=54)
+
+
+class LoteriaCheckIn(BaseModel):
+    person_id: uuid.UUID
+
+
+class LoteriaCheckOut(BaseModel):
+    valid: bool
+    pattern: LoteriaPattern
+    # Square indices (0-15) of the first complete pattern when valid, else null.
+    squares: list[int] | None
+    # Squares still to be called in the closest pattern (0 when valid).
+    missing: int
+
+
+class LoteriaTablaOut(BaseModel):
+    person_id: uuid.UUID
+    # 16 deck card ids, row-major 4 x 4.
+    squares: list[int]
+    # Indexes (0-15) of the marked squares.
+    marked: list[int]
+    missing: int
+    won: bool
+    finish_place: int | None
+
+
+GameOut.model_rebuild()

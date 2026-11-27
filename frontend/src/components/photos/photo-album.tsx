@@ -13,6 +13,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { albumKey, useAlbum } from "@/hooks/use-album";
 import { api, type ApiError, type Person, type ReactionEmoji } from "@/lib/api";
 import { type LiveState } from "@/lib/live";
+import { isAlbumTarget } from "@/lib/photos/target";
 import { cn } from "@/lib/utils";
 import { actingPeople } from "@/lib/who";
 
@@ -28,12 +29,18 @@ type ReactionChange = { photoId: string; emoji: ReactionEmoji; mine: boolean; pe
  */
 export function PhotoAlbum({
   sessionId,
+  uploadTarget,
+  heading = "Photos from tonight",
   live,
   canAdd = true,
   primary = true,
   actorId,
 }: {
+  /** What to read and react on: a movie night's id or an album key (lib/photos/target.ts). */
   sessionId: string;
+  /** Where new photos go, when not `sessionId` (tonight's album before it exists, ADR-0019). */
+  uploadTarget?: string;
+  heading?: string;
   live: LiveState;
   canAdd?: boolean;
   /** False when the screen's one primary is elsewhere: **Add photos** turns `secondary`. */
@@ -68,7 +75,7 @@ export function PhotoAlbum({
   return (
     <section aria-labelledby="photos-heading" className="flex flex-col gap-4" data-testid="photos">
       <h2 id="photos-heading" className="text-xl font-medium">
-        Photos from tonight
+        {heading}
       </h2>
 
       {canAdd ? (
@@ -83,7 +90,7 @@ export function PhotoAlbum({
           <>
             {actor ? (
               <PhotoDrop
-                sessionId={sessionId}
+                sessionId={uploadTarget ?? sessionId}
                 personId={actor.id}
                 empty={emptyDrop}
                 primary={primary}
@@ -115,7 +122,9 @@ export function PhotoAlbum({
         )
       ) : (
         <>
-          {photos.some((p) => p.status === "ready") ? (
+          {/* The phone slideshow follows a movie night; a night album reaches the TV through the
+              Night reel (ADR-0019, owner answer 4). */}
+          {!isAlbumTarget(sessionId) && photos.some((p) => p.status === "ready") ? (
             <Button
               variant="secondary"
               size="tap"

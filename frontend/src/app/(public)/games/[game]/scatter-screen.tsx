@@ -8,12 +8,14 @@ import { useEffect, useRef, useState } from "react";
 import { ApiErrorNotice } from "@/components/api-error-notice";
 import { Countdown, Leaderboard, LetterTile, Results } from "@/components/games/scatter-parts";
 import { PhoneGameFrame } from "@/components/games/phone-game-frame";
+import { ResultMoment } from "@/components/games/result-moment";
 import { Avatar } from "@/components/night/avatar";
 import { Button } from "@/components/ui/button";
 import { useLiveGame } from "@/hooks/use-live-game";
 import { usePhonePeople } from "@/hooks/use-phone";
 import { useScatterClock } from "@/hooks/use-scatter-clock";
 import { api, type ApiError, type OwnScatterAnswer } from "@/lib/api";
+import { namesList, scatterResult } from "@/lib/result-moment";
 import { scatterStripPlayers } from "@/lib/game-layout";
 import { statusLabel } from "@/lib/games";
 import {
@@ -177,6 +179,12 @@ export function ScatterScreen({ gameId }: { gameId: string }) {
   });
 
   const lastRevealed = scatter?.revealed.at(-1);
+  const result = scatterResult(
+    data?.status,
+    me?.id,
+    scatter?.players ?? [],
+    scatter?.leaderboard ?? [],
+  );
   const saved = round
     ? draftFrom(
         round.categories.length,
@@ -223,8 +231,19 @@ export function ScatterScreen({ gameId }: { gameId: string }) {
         </>
       }
     >
+      <ResultMoment gameId={gameId} personId={me?.id} decision={result} />
       {data && scatter ? (
         <>
+          {result ? (
+            <p
+              className="rounded-2xl bg-card p-4 text-xl font-semibold marquee-glow"
+              data-testid="scatter-result-line"
+            >
+              {result.outcome === "won"
+                ? `You won with ${result.detail}!`
+                : `${namesList(result.winners)} won with ${result.detail}.`}
+            </p>
+          ) : null}
           {!me ? (
             <p className="rounded-xl bg-muted p-4" data-testid="scatter-pick-person">
               <Link href="/who" className="font-medium underline">

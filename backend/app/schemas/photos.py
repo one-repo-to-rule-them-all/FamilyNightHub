@@ -10,7 +10,7 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 PhotoStatus = Literal["ready", "hidden"]
 # Mirrors photo_service.REACTIONS (pinned by a unit test).
@@ -56,3 +56,35 @@ class PhotoOut(BaseModel):
     my_reactions: list[MyReactionOut] = Field(
         description="Reactions by people bound to the calling device (empty for accounts)"
     )
+
+
+# --- Night albums (ADR-0019) --------------------------------------------------------------
+
+
+class AlbumOut(BaseModel):
+    id: uuid.UUID | None = Field(description="None only for tonight's album before its first photo")
+    night_date: date = Field(description="Household-local date, 4:00 cutoff")
+    title: str | None = Field(description="The host's name for the night, if renamed")
+    display_title: str = Field(description='title, else a date label such as "Thu 26 Nov"')
+    photo_count: int
+    cover_thumb_url: str | None = Field(description="Presigned GET (10 min) of the newest photo")
+    uploads_open: bool = Field(description="Tonight, or within 3 days of the night date")
+    is_tonight: bool
+
+
+class AlbumRenameIn(BaseModel):
+    title: str | None = Field(
+        default=None, max_length=80, description="null or blank goes back to the date label"
+    )
+
+    @field_validator("title")
+    @classmethod
+    def _title(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        cleaned = " ".join(v.split())
+        return cleaned or None
+
+
+class AlbumPhotoCreatedOut(PhotoCreatedOut):
+    album_id: uuid.UUID

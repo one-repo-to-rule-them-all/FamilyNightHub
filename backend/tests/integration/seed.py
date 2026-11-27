@@ -16,6 +16,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import household_session
+from app.domain.albums import DEFAULT_TIMEZONE, night_date
 from app.domain.legal import PRIVACY_VERSION, TERMS_VERSION
 
 
@@ -114,11 +115,19 @@ async def seed_household(tag: str) -> SeededHousehold:
             person_id=ids["person"],
             score=5,
         )
-        photo_key = f"households/{hid}/sessions/{ids['session']}/{nonce}"
+        ids["album"] = await _insert(
+            s,
+            "albums",
+            household_id=hid,
+            night_date=night_date(datetime.now(UTC), DEFAULT_TIMEZONE),
+            title="Seed night",
+        )
+        photo_key = f"households/{hid}/albums/{ids['album']}/{nonce}"
         ids["photo"] = await _insert(
             s,
             "photos",
             household_id=hid,
+            album_id=ids["album"],
             session_id=ids["session"],
             person_id=ids["person"],
             object_key=f"{photo_key}.jpg",

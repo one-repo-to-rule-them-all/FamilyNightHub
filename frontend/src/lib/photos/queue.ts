@@ -43,8 +43,9 @@ export class UploadError extends Error {
 
 export type UploadHooks = {
   onProgress: (fraction: number) => void;
-  /** Both PUTs succeeded: the queue persists the photo id so a retry only completes. */
-  onUploaded: (photoId: string) => Promise<void>;
+  /** Both PUTs succeeded: the queue persists the photo id (and, for a night album, where to
+   * complete it) so a retry only completes. */
+  onUploaded: (photoId: string, completeTarget?: string | null) => Promise<void>;
 };
 
 export type Uploader = (job: UploadJob, hooks: UploadHooks) => Promise<void>;
@@ -191,8 +192,8 @@ export class UploadQueue {
       await this.upload(current, {
         onProgress: (fraction) =>
           this.patch(job.id, { progress: Math.max(0, Math.min(1, fraction)) }),
-        onUploaded: async (photoId) => {
-          current = { ...current, photoId };
+        onUploaded: async (photoId, completeTarget) => {
+          current = { ...current, photoId, completeTarget: completeTarget ?? null };
           this.jobs.set(job.id, current);
           await this.store.put(current);
         },
@@ -214,6 +215,7 @@ export class UploadQueue {
       ...job,
       attempts: job.attempts + 1,
       photoId: upload?.restart ? null : job.photoId,
+      completeTarget: upload?.restart ? null : job.completeTarget,
     };
     this.jobs.set(job.id, next);
     await this.store.put(next);
